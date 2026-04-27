@@ -160,9 +160,9 @@ Layout: search bar di atas + timeline vertikal.
 
 ## Checklist
 
-- [ ] `dashboard.types.ts` — DashboardSummary, MonitoringSummary, JourneyResponse
-- [ ] `dashboard.service.ts` — getSummary, getMonitoringSummary, getJourney
-- [ ] `SummaryCard.vue`
-- [ ] `DashboardPage.vue` — cards + filter + chart + tabel
-- [ ] `ProjectJourneyPage.vue` — search + timeline
-- [ ] `ProjectTimeline.vue` — hierarki vertikal dengan expand/collapse
+- [x] `dashboard.types.ts` — DashboardSummary, MonitoringSummary, JourneyResponse
+- [x] `dashboard.service.ts` — getSummary, getMonitoringSummary, getJourney
+- [x] `SummaryCard.vue`
+- [x] `DashboardPage.vue` — cards + filter + chart + tabel
+- [x] `ProjectJourneyPage.vue` — search + timeline
+- [x] `ProjectTimeline.vue` — hierarki vertikal dengan expand/collapse

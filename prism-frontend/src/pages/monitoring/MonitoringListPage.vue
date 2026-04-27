@@ -10,8 +10,10 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
 import MonitoringCard from '@/components/monitoring/MonitoringCard.vue'
 import MonitoringChart from '@/components/monitoring/MonitoringChart.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { usePagination } from '@/composables/usePagination'
 import { usePermission } from '@/composables/usePermission'
+import { useToast } from '@/composables/useToast'
 import { useMonitoringStore } from '@/stores/monitoring.store'
 import type { MonitoringDisbursement } from '@/types/monitoring.types'
 import { formatDate } from '@/pages/loan-agreement/loan-agreement-page-utils'
@@ -21,13 +23,15 @@ const router = useRouter()
 const monitoringStore = useMonitoringStore()
 const pagination = usePagination()
 const { can } = usePermission()
+const confirm = useConfirm()
+const toast = useToast()
 
 const loanAgreementId = computed(() => String(route.params.laId ?? ''))
 const currentLA = computed(() => monitoringStore.currentLA)
 const todayString = computed(() => new Date().toISOString().slice(0, 10))
 const isNotEffective = computed(() => {
   if (!currentLA.value?.effective_date) return false
-  return currentLA.value.effective_date > todayString.value
+  return currentLA.value.effective_date.slice(0, 10) > todayString.value
 })
 const columns: ColumnDef[] = [
   { field: 'budget_year', header: 'Budget Year' },
@@ -48,6 +52,13 @@ async function loadData() {
       limit: pagination.limit.value,
     }),
   ])
+}
+
+function deleteMonitoring(row: MonitoringDisbursement) {
+  confirm.confirmDelete(`monitoring ${row.quarter} ${row.budget_year}`, async () => {
+    await monitoringStore.deleteMonitoring(loanAgreementId.value, row.id)
+    toast.success('Berhasil', 'Monitoring berhasil dihapus')
+  })
 }
 
 watch(
@@ -158,10 +169,31 @@ onMounted(() => {
         <span v-else-if="column.field === 'exchange_rate_la_idr'">
           {{ Number(row.exchange_rate_la_idr).toLocaleString('id-ID') }}
         </span>
-        <span v-else-if="column.field === 'actions'">
-          {{ ((row as unknown as MonitoringDisbursement).komponen ?? []).length }} komponen
-        </span>
-        <span v-else>{{ row[column.field] || '-' }}</span>
+        <div v-else-if="column.field === 'actions'" class="flex flex-wrap items-center gap-2">
+          <span class="mr-1 text-xs text-surface-500">
+            {{ ((row as unknown as MonitoringDisbursement).komponen ?? []).length }} komponen
+          </span>
+          <Button
+            v-if="can('monitoring_disbursement', 'update')"
+            as="router-link"
+            :to="{ name: 'monitoring-edit', params: { laId: loanAgreementId, id: row.id } }"
+            icon="pi pi-pencil"
+            label="Edit"
+            size="small"
+            severity="secondary"
+            outlined
+          />
+          <Button
+            v-if="can('monitoring_disbursement', 'delete')"
+            icon="pi pi-trash"
+            label="Hapus"
+            size="small"
+            severity="danger"
+            outlined
+            @click="deleteMonitoring(row as unknown as MonitoringDisbursement)"
+          />
+        </div>
+        <span v-else>{{ row[column.field] ?? '-' }}</span>
       </template>
     </DataTable>
   </section>

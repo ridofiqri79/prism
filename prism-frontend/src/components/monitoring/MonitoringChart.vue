@@ -31,7 +31,7 @@ const option = computed(() => ({
     trigger: 'axis',
     axisPointer: { type: 'shadow' },
     formatter: (params: unknown) => {
-      const items = Array.isArray(params) ? params : []
+      const items = Array.isArray(params) ? (params as Array<{ axisValue?: string }>) : []
       const quarter = String(items[0]?.axisValue ?? '')
       const row = chartData.value.find((item) => item.quarter === quarter)
       const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
