@@ -1,0 +1,8 @@
+.env
+prism-backend/bin/
+prism-backend/tmp/
+prism-backend/internal/database/queries/
+prism-frontend/node_modules/
+prism-frontend/dist/
+.DS_Store
+*.log
