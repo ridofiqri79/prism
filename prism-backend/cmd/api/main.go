@@ -48,11 +48,15 @@ func main() {
 	masterService := service.NewMasterService(pool, q)
 	blueBookService := service.NewBlueBookService(pool, q, broker)
 	greenBookService := service.NewGreenBookService(pool, q, broker)
+	dkService := service.NewDKService(pool, q, broker)
+	laService := service.NewLAService(pool, q, broker)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
 	blueBookHandler := handler.NewBlueBookHandler(blueBookService)
 	greenBookHandler := handler.NewGreenBookHandler(greenBookService)
+	dkHandler := handler.NewDKHandler(dkService)
+	laHandler := handler.NewLAHandler(laService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -166,6 +170,26 @@ func main() {
 	greenBooks.GET("/:gbId/projects/:id", greenBookHandler.GetGBProject, middleware.Require("gb_project", "read"))
 	greenBooks.PUT("/:gbId/projects/:id", greenBookHandler.UpdateGBProject, middleware.Require("gb_project", "update"))
 	greenBooks.DELETE("/:gbId/projects/:id", greenBookHandler.DeleteGBProject, middleware.Require("gb_project", "delete"))
+
+	dk := api.Group("/daftar-kegiatan")
+	dk.GET("", dkHandler.ListDK, middleware.Require("daftar_kegiatan", "read"))
+	dk.POST("", dkHandler.CreateDK, middleware.Require("daftar_kegiatan", "create"))
+	dk.GET("/:id", dkHandler.GetDK, middleware.Require("daftar_kegiatan", "read"))
+	dk.PUT("/:id", dkHandler.UpdateDK, middleware.Require("daftar_kegiatan", "update"))
+	dk.DELETE("/:id", dkHandler.DeleteDK, middleware.Require("daftar_kegiatan", "delete"))
+
+	dk.GET("/:dkId/projects", dkHandler.ListDKProjects, middleware.Require("daftar_kegiatan", "read"))
+	dk.POST("/:dkId/projects", dkHandler.CreateDKProject, middleware.Require("daftar_kegiatan", "create"))
+	dk.GET("/:dkId/projects/:id", dkHandler.GetDKProject, middleware.Require("daftar_kegiatan", "read"))
+	dk.PUT("/:dkId/projects/:id", dkHandler.UpdateDKProject, middleware.Require("daftar_kegiatan", "update"))
+	dk.DELETE("/:dkId/projects/:id", dkHandler.DeleteDKProject, middleware.Require("daftar_kegiatan", "delete"))
+
+	loanAgreements := api.Group("/loan-agreements")
+	loanAgreements.GET("", laHandler.ListLA, middleware.Require("loan_agreement", "read"))
+	loanAgreements.POST("", laHandler.CreateLA, middleware.Require("loan_agreement", "create"))
+	loanAgreements.GET("/:id", laHandler.GetLA, middleware.Require("loan_agreement", "read"))
+	loanAgreements.PUT("/:id", laHandler.UpdateLA, middleware.Require("loan_agreement", "update"))
+	loanAgreements.DELETE("/:id", laHandler.DeleteLA, middleware.Require("loan_agreement", "delete"))
 
 	e.GET("/events", handler.SSEHandler(broker))
 

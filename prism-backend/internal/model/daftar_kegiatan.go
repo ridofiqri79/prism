@@ -1,0 +1,114 @@
+package model
+
+type DaftarKegiatanRequest struct {
+	LetterNumber *string `json:"letter_number"`
+	Subject      string  `json:"subject" validate:"required"`
+	Date         string  `json:"date"`
+	Tanggal      string  `json:"tanggal"`
+}
+
+type DaftarKegiatanResponse struct {
+	ID           string  `json:"id"`
+	LetterNumber *string `json:"letter_number,omitempty"`
+	Subject      string  `json:"subject"`
+	Date         string  `json:"date"`
+	CreatedAt    string  `json:"created_at,omitempty"`
+	UpdatedAt    string  `json:"updated_at,omitempty"`
+}
+
+type CreateDKProjectRequest struct {
+	ProgramTitleID   *string                 `json:"program_title_id"`
+	InstitutionID    *string                 `json:"institution_id"`
+	Duration         *string                 `json:"duration"`
+	Objectives       *string                 `json:"objectives"`
+	GBProjectIDs     []string                `json:"gb_project_ids" validate:"required,min=1"`
+	LocationIDs      []string                `json:"location_ids"`
+	FinancingDetails []DKFinancingDetailItem `json:"financing_details"`
+	LoanAllocations  []DKLoanAllocationItem  `json:"loan_allocations"`
+	ActivityDetails  []DKActivityDetailItem  `json:"activity_details"`
+}
+
+type UpdateDKProjectRequest = CreateDKProjectRequest
+
+type DKFinancingDetailItem struct {
+	LenderID            *string `json:"lender_id"`
+	Currency            string  `json:"currency"`
+	AmountOriginal      float64 `json:"amount_original"`
+	GrantOriginal       float64 `json:"grant_original"`
+	CounterpartOriginal float64 `json:"counterpart_original"`
+	AmountUSD           float64 `json:"amount_usd"`
+	GrantUSD            float64 `json:"grant_usd"`
+	CounterpartUSD      float64 `json:"counterpart_usd"`
+	Remarks             *string `json:"remarks"`
+}
+
+type DKLoanAllocationItem struct {
+	InstitutionID       *string `json:"institution_id"`
+	Currency            string  `json:"currency"`
+	AmountOriginal      float64 `json:"amount_original"`
+	GrantOriginal       float64 `json:"grant_original"`
+	CounterpartOriginal float64 `json:"counterpart_original"`
+	AmountUSD           float64 `json:"amount_usd"`
+	GrantUSD            float64 `json:"grant_usd"`
+	CounterpartUSD      float64 `json:"counterpart_usd"`
+	Remarks             *string `json:"remarks"`
+}
+
+type DKActivityDetailItem struct {
+	ActivityNumber int32  `json:"activity_number" validate:"required"`
+	ActivityName   string `json:"activity_name" validate:"required"`
+}
+
+type DKProjectResponse struct {
+	ID               string                      `json:"id"`
+	DKID             string                      `json:"dk_id"`
+	ProgramTitleID   *string                     `json:"program_title_id,omitempty"`
+	InstitutionID    *string                     `json:"institution_id,omitempty"`
+	Duration         *string                     `json:"duration"`
+	Objectives       *string                     `json:"objectives"`
+	GBProjects       []GBProjectSummary          `json:"gb_projects"`
+	Locations        []RegionResponse            `json:"locations"`
+	FinancingDetails []DKFinancingDetailResponse `json:"financing_details"`
+	LoanAllocations  []DKLoanAllocationResponse  `json:"loan_allocations"`
+	ActivityDetails  []DKActivityDetailResponse  `json:"activity_details"`
+	CreatedAt        string                      `json:"created_at,omitempty"`
+	UpdatedAt        string                      `json:"updated_at,omitempty"`
+}
+
+type GBProjectSummary struct {
+	ID          string `json:"id"`
+	GBCode      string `json:"gb_code"`
+	ProjectName string `json:"project_name"`
+}
+
+type DKFinancingDetailResponse struct {
+	ID                  string      `json:"id"`
+	Lender              *LenderInfo `json:"lender,omitempty"`
+	Currency            string      `json:"currency"`
+	AmountOriginal      float64     `json:"amount_original"`
+	GrantOriginal       float64     `json:"grant_original"`
+	CounterpartOriginal float64     `json:"counterpart_original"`
+	AmountUSD           float64     `json:"amount_usd"`
+	GrantUSD            float64     `json:"grant_usd"`
+	CounterpartUSD      float64     `json:"counterpart_usd"`
+	Remarks             *string     `json:"remarks"`
+}
+
+type DKLoanAllocationResponse struct {
+	ID                  string           `json:"id"`
+	Institution         *InstitutionInfo `json:"institution,omitempty"`
+	Currency            string           `json:"currency"`
+	AmountOriginal      float64          `json:"amount_original"`
+	GrantOriginal       float64          `json:"grant_original"`
+	CounterpartOriginal float64          `json:"counterpart_original"`
+	AmountUSD           float64          `json:"amount_usd"`
+	GrantUSD            float64          `json:"grant_usd"`
+	CounterpartUSD      float64          `json:"counterpart_usd"`
+	Remarks             *string          `json:"remarks"`
+}
+
+type DKActivityDetailResponse struct {
+	ID             string `json:"id"`
+	ActivityNumber int32  `json:"activity_number"`
+	ActivityName   string `json:"activity_name"`
+}

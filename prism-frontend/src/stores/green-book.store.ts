@@ -13,6 +13,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
   const greenBooks = ref<GreenBook[]>([])
   const currentGreenBook = ref<GreenBook | null>(null)
   const projects = ref<GBProject[]>([])
+  const projectOptions = ref<GBProject[]>([])
   const currentProject = ref<GBProject | null>(null)
   const loading = ref(false)
   const total = ref(0)
@@ -66,6 +67,17 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     })
   }
 
+  async function fetchProjectOptions() {
+    const response = await GreenBookService.getGreenBooks({ limit: 1000 })
+    const nested = await Promise.all(
+      response.data.map((greenBook) =>
+        GreenBookService.getProjects(greenBook.id, { limit: 1000 }),
+      ),
+    )
+    projectOptions.value = nested.flatMap((item) => item.data)
+    return projectOptions.value
+  }
+
   async function fetchProject(greenBookId: string, id: string) {
     return withLoading(async () => {
       currentProject.value = await GreenBookService.getProject(greenBookId, id)
@@ -91,6 +103,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     greenBooks.value = []
     currentGreenBook.value = null
     projects.value = []
+    projectOptions.value = []
     currentProject.value = null
     loading.value = false
     total.value = 0
@@ -101,6 +114,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     greenBooks,
     currentGreenBook,
     projects,
+    projectOptions,
     currentProject,
     loading,
     total,
@@ -111,6 +125,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     updateGreenBook,
     deleteGreenBook,
     fetchProjects,
+    fetchProjectOptions,
     fetchProject,
     createProject,
     updateProject,
@@ -118,4 +133,3 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     $reset,
   }
 })
-

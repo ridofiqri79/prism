@@ -223,14 +223,14 @@ la.DELETE("/:id", laHandler.DeleteLA, permission.Require("loan_agreement", "dele
 
 ## Checklist
 
-- [ ] `sql/queries/dk_project.sql` — termasuk `GetAllowedLenderIDsForDK`
-- [ ] `sql/queries/loan_agreement.sql` — termasuk `GetAllowedLenderIDsForLA`
-- [ ] `make generate`
-- [ ] `internal/model/daftar_kegiatan.go` + `internal/model/loan_agreement.go`
-- [ ] `internal/service/dk_service.go` — validasi lender dari allowed set
-- [ ] `internal/service/la_service.go` — cek duplicate + validasi lender + computed is_extended
-- [ ] Handler DK dan LA
-- [ ] Routes terdaftar
-- [ ] `POST /dk-projects` dengan lender tidak dari GB/BB → 422
-- [ ] `POST /loan-agreements` untuk DK yang sudah punya LA → 409
-- [ ] `is_extended = true` saat `closing_date != original_closing_date`
+- [x] `sql/queries/dk_project.sql` — termasuk `GetAllowedLenderIDsForDK`
+- [x] `sql/queries/loan_agreement.sql` — termasuk `GetAllowedLenderIDsForLA`
+- [x] `make generate`
+- [x] `internal/model/daftar_kegiatan.go` + `internal/model/loan_agreement.go`
+- [x] `internal/service/dk_service.go` — validasi lender dari allowed set
+- [x] `internal/service/la_service.go` — cek duplicate + validasi lender + computed is_extended
+- [x] Handler DK dan LA
+- [x] Routes terdaftar
+- [x] `POST /dk-projects` dengan lender tidak dari GB/BB → 422
+- [x] `POST /loan-agreements` untuk DK yang sudah punya LA → 409
+- [x] `is_extended = true` saat `closing_date != original_closing_date`

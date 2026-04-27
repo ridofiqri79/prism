@@ -1,4 +1,4 @@
-# PLAN 06 — Daftar Kegiatan Module
+# PLAN 06 - Daftar Kegiatan Module
 
 > **Scope:** CRUD Daftar Kegiatan (header surat + DK Project + sub-tabel multi-currency).
 > **Deliverable:** Staff bisa input DK lengkap. Lender difilter dari BB/GB terkait.
@@ -6,7 +6,7 @@
 
 ---
 
-## Task 1 — Types & Schema
+## Task 1 - Types & Schema
 
 **`src/types/daftar-kegiatan.types.ts`:**
 ```typescript
@@ -37,14 +37,14 @@ export const dkProjectSchema = z.object({
 
 ---
 
-## Task 2 — Service & Store
+## Task 2 - Service & Store
 
-**`src/services/daftar-kegiatan.service.ts`** — semua endpoint dari API Contract.
-**`src/stores/daftar-kegiatan.store.ts`** — state dan actions standar.
+**`src/services/daftar-kegiatan.service.ts`** - semua endpoint dari API Contract.
+**`src/stores/daftar-kegiatan.store.ts`** - state dan actions standar.
 
 ---
 
-## Task 3 — composables/forms/useDKProjectForm.ts
+## Task 3 - composables/forms/useDKProjectForm.ts
 
 ```typescript
 export function useDKProjectForm(initialData?) {
@@ -66,7 +66,7 @@ export function useDKProjectForm(initialData?) {
   const loanAllocations = ref<AllocationRow[]>([])
   const addAllocation = () => loanAllocations.value.push({ institution_id: '', currency: 'USD', amount_original: 0, grant_original: 0, counterpart_original: 0, amount_usd: 0, grant_usd: 0, counterpart_usd: 0 })
 
-  // Activity Details — nomor urut otomatis
+  // Activity Details - nomor urut otomatis
   const activityDetails = ref<ActivityRow[]>([])
   const addActivity = () => activityDetails.value.push({ activity_number: activityDetails.value.length + 1, activity_name: '' })
   const removeActivity = (i: number) => { activityDetails.value.splice(i, 1); activityDetails.value.forEach((a, idx) => a.activity_number = idx + 1) }
@@ -77,48 +77,48 @@ export function useDKProjectForm(initialData?) {
 
 ---
 
-## Task 4 — DKListPage.vue
+## Task 4 - DKListPage.vue
 
 - `<PageHeader title="Daftar Kegiatan">` + tombol "Buat Daftar Kegiatan"
 - Tabel: subject, date, letter_number, jumlah proyek, actions
-- Click baris → DKDetailPage
+- Click baris -> DKDetailPage
 
 ---
 
-## Task 5 — DKDetailPage.vue
+## Task 5 - DKDetailPage.vue
 
 - Header surat: subject, date, letter_number
 - Daftar DK Projects dalam surat: accordion per proyek
 - Setiap proyek accordion memuat: info proyek, GB references, Financing Detail table, Loan Allocation table, Activity Details list
-- Tombol "Tambah Proyek ke Surat" → form DK Project
+- Tombol "Tambah Proyek ke Surat" -> form DK Project
 
 ---
 
-## Task 6 — DKProjectFormPage.vue (4 Section)
+## Task 6 - DKProjectFormPage.vue (4 Section)
 
 Gunakan `useDKProjectForm()`.
 
-**Section 1 — Header Proyek:**
-program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` — Executing Agency), duration, objectives, gb_project_ids (MultiSelect GB Project), location_ids (`<LocationMultiSelect>`)
+**Section 1 - Header Proyek:**
+program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), duration, objectives, gb_project_ids (MultiSelect GB Project), location_ids (`<LocationMultiSelect>`)
 
-**Section 2 — Financing Detail (tabel multi-currency):**
+**Section 2 - Financing Detail (tabel multi-currency):**
 Kolom: lender_id (`<LenderSelect :allowedIds>`), currency (text input ISO), amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd (`<CurrencyInput>`), remarks. Tombol "Tambah Baris". Tampilkan catatan: "Konversi ke USD dilakukan manual".
 
-**Section 3 — Loan Allocation (tabel multi-currency):**
+**Section 3 - Loan Allocation (tabel multi-currency):**
 Kolom: institution_id (`<InstitutionSelect>`), currency, amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd, remarks.
 
-**Section 4 — Activity Details:**
+**Section 4 - Activity Details:**
 List sederhana dengan nomor urut otomatis + nama aktivitas (input bebas). Tombol "Tambah" dan "Hapus" per baris. Nomor urut auto-recalculate.
 
 ---
 
 ## Checklist
 
-- [ ] `daftar-kegiatan.types.ts`
-- [ ] `daftar-kegiatan.schema.ts`
-- [ ] `daftar-kegiatan.service.ts`
-- [ ] `daftar-kegiatan.store.ts`
-- [ ] `useDKProjectForm.ts` — allowedLenderIds computed
-- [ ] `DKListPage.vue`
-- [ ] `DKDetailPage.vue` — accordion per DK Project
-- [ ] `DKProjectFormPage.vue` — 4 section + multi-currency
+- [x] `daftar-kegiatan.types.ts`
+- [x] `daftar-kegiatan.schema.ts`
+- [x] `daftar-kegiatan.service.ts`
+- [x] `daftar-kegiatan.store.ts`
+- [x] `useDKProjectForm.ts` - allowedLenderIds computed
+- [x] `DKListPage.vue`
+- [x] `DKDetailPage.vue` - accordion per DK Project
+- [x] `DKProjectFormPage.vue` - 4 section + multi-currency
