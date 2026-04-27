@@ -18,6 +18,7 @@ import (
 	"github.com/ridofiqri79/prism-backend/internal/database/queries"
 	"github.com/ridofiqri79/prism-backend/internal/handler"
 	"github.com/ridofiqri79/prism-backend/internal/middleware"
+	"github.com/ridofiqri79/prism-backend/internal/service"
 	"github.com/ridofiqri79/prism-backend/internal/sse"
 )
 
@@ -37,7 +38,12 @@ func main() {
 	defer pool.Close()
 
 	q := queries.New(pool)
-	_ = q
+	middleware.SetPermissionChecker(middleware.NewDatabasePermissionChecker(q))
+
+	authService := service.NewAuthService(q, cfg.JWTSecret, cfg.JWTExpiresIn)
+	userService := service.NewUserService(pool, q)
+	authHandler := handler.NewAuthHandler(authService)
+	userHandler := handler.NewUserHandler(userService)
 
 	broker := sse.NewBroker()
 	go broker.Run()
@@ -56,9 +62,24 @@ func main() {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
 
+	e.POST("/api/v1/auth/login", authHandler.Login)
+
 	api := e.Group("/api/v1")
 	api.Use(middleware.Auth(cfg.JWTSecret))
 	api.Use(middleware.SetAuditUser(pool))
+
+	authGroup := api.Group("/auth")
+	authGroup.POST("/logout", authHandler.Logout)
+	authGroup.GET("/me", authHandler.Me)
+
+	userGroup := api.Group("/users", middleware.RequireAdmin())
+	userGroup.GET("", userHandler.List)
+	userGroup.POST("", userHandler.Create)
+	userGroup.GET("/:id", userHandler.Get)
+	userGroup.PUT("/:id", userHandler.Update)
+	userGroup.DELETE("/:id", userHandler.Delete)
+	userGroup.GET("/:id/permissions", userHandler.GetPermissions)
+	userGroup.PUT("/:id/permissions", userHandler.UpdatePermissions)
 
 	e.GET("/events", handler.SSEHandler(broker))
 

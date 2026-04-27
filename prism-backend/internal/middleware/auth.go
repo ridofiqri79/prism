@@ -19,6 +19,10 @@ type JWTClaims struct {
 func Auth(secret string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if c.Request().Method == "OPTIONS" || c.Request().URL.Path == "/api/v1/auth/login" {
+				return next(c)
+			}
+
 			header := c.Request().Header.Get(echo.HeaderAuthorization)
 			if header == "" {
 				return apperrors.Unauthorized("Token tidak ditemukan")
@@ -41,8 +45,13 @@ func Auth(secret string) echo.MiddlewareFunc {
 				return apperrors.Unauthorized("Token tidak valid atau kedaluwarsa")
 			}
 
+			userID, err := model.ParseUUID(claims.Subject)
+			if err != nil {
+				return apperrors.Unauthorized("Token tidak valid atau kedaluwarsa")
+			}
+
 			c.Set("user", &model.AuthUser{
-				ID:       claims.Subject,
+				ID:       userID,
 				Username: claims.Username,
 				Role:     claims.Role,
 			})

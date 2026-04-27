@@ -1,11 +1,5 @@
 package model
 
-type AuthUser struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
-}
-
 type PaginationParams struct {
 	Page  int    `query:"page"`
 	Limit int    `query:"limit"`

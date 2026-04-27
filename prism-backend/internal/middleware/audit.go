@@ -16,8 +16,8 @@ func SetAuditUser(_ *pgxpool.Pool) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			user, ok := c.Get("user").(*model.AuthUser)
-			if ok && user != nil && user.ID != "" {
-				ctx := context.WithValue(c.Request().Context(), auditUserIDContextKey{}, user.ID)
+			if ok && user != nil && user.ID.Valid {
+				ctx := context.WithValue(c.Request().Context(), auditUserIDContextKey{}, model.UUIDToString(user.ID))
 				c.SetRequest(c.Request().WithContext(ctx))
 			}
 

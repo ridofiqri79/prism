@@ -6,3 +6,4 @@ prism-frontend/node_modules/
 prism-frontend/dist/
 .DS_Store
 *.log
+prism-backend/api.exe

@@ -281,15 +281,15 @@ Jalankan `make migrate-up`.
 
 ## Checklist
 
-- [ ] `sql/queries/user.sql` — semua query user + permission
-- [ ] `make generate` berhasil
-- [ ] `internal/model/auth.go` — semua request/response types
-- [ ] `internal/service/auth_service.go` — login + JWT + getMe
-- [ ] `internal/service/user_service.go` — CRUD + updatePermissions transaksional
-- [ ] `internal/handler/auth_handler.go`
-- [ ] `internal/handler/user_handler.go`
-- [ ] `internal/middleware/permission.go` — implementasi cek ke DB
-- [ ] Routes terdaftar di `main.go`
-- [ ] Seed admin di migration
-- [ ] `POST /auth/login` dengan admin/admin123 → JWT
-- [ ] `GET /auth/me` dengan JWT → user + permissions
+- [x] `sql/queries/user.sql` — semua query user + permission
+- [x] `make generate` berhasil
+- [x] `internal/model/auth.go` — semua request/response types
+- [x] `internal/service/auth_service.go` — login + JWT + getMe
+- [x] `internal/service/user_service.go` — CRUD + updatePermissions transaksional
+- [x] `internal/handler/auth_handler.go`
+- [x] `internal/handler/user_handler.go`
+- [x] `internal/middleware/permission.go` — implementasi cek ke DB
+- [x] Routes terdaftar di `main.go`
+- [x] Seed admin di migration
+- [x] `POST /auth/login` dengan admin/admin123 → JWT
+- [x] `GET /auth/me` dengan JWT → user + permissions
