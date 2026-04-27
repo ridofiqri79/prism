@@ -1,4 +1,4 @@
-FROM golang:1.23
+FROM golang:1.26.2
 RUN apt-get update && apt-get install -y git gcc && rm -rf /var/lib/apt/lists/*
 RUN wget -O /usr/local/bin/air \
     https://github.com/air-verse/air/releases/download/v1.52.3/air_1.52.3_linux_amd64 \

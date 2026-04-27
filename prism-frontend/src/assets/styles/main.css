@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "tailwindcss-primeui";
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui;
+}
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-surface-900;
+    font-family: var(--font-sans);
+    margin: 0;
+  }
+
+  #app {
+    min-height: 100vh;
+  }
+}
