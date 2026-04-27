@@ -204,15 +204,15 @@ api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, permission.
 
 ## Checklist
 
-- [ ] `sql/queries/monitoring.sql` — monitoring + komponen + dashboard queries
-- [ ] `make generate`
-- [ ] `internal/model/monitoring.go` + `internal/model/dashboard.go`
-- [ ] `internal/service/monitoring_service.go` — guard effective_date + absorption_pct computed
-- [ ] `internal/service/dashboard_service.go`
-- [ ] `internal/service/journey_service.go` — assemble multi-level response
-- [ ] Handler monitoring, dashboard, journey
-- [ ] Routes terdaftar
-- [ ] `POST /monitoring` sebelum LA efektif → 422
-- [ ] `POST /monitoring` duplikat quarter → 409
-- [ ] `GET /dashboard/summary` → angka agregat benar
-- [ ] `GET /projects/:id/journey` → full tree response
+- [x] `sql/queries/monitoring.sql` — monitoring + komponen + dashboard queries
+- [x] `make generate`
+- [x] `internal/model/monitoring.go` + `internal/model/dashboard.go`
+- [x] `internal/service/monitoring_service.go` — guard effective_date + absorption_pct computed
+- [x] `internal/service/dashboard_service.go`
+- [x] `internal/service/journey_service.go` — assemble multi-level response
+- [x] Handler monitoring, dashboard, journey
+- [x] Routes terdaftar
+- [x] `POST /monitoring` sebelum LA efektif → 422
+- [x] `POST /monitoring` duplikat quarter → 409
+- [x] `GET /dashboard/summary` → angka agregat benar
+- [x] `GET /projects/:id/journey` → full tree response

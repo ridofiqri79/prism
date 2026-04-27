@@ -50,6 +50,9 @@ func main() {
 	greenBookService := service.NewGreenBookService(pool, q, broker)
 	dkService := service.NewDKService(pool, q, broker)
 	laService := service.NewLAService(pool, q, broker)
+	monitoringService := service.NewMonitoringService(pool, q, broker)
+	dashboardService := service.NewDashboardService(q)
+	journeyService := service.NewJourneyService(q)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -57,6 +60,9 @@ func main() {
 	greenBookHandler := handler.NewGreenBookHandler(greenBookService)
 	dkHandler := handler.NewDKHandler(dkService)
 	laHandler := handler.NewLAHandler(laService)
+	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
+	dashboardHandler := handler.NewDashboardHandler(dashboardService)
+	journeyHandler := handler.NewJourneyHandler(journeyService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -190,6 +196,19 @@ func main() {
 	loanAgreements.GET("/:id", laHandler.GetLA, middleware.Require("loan_agreement", "read"))
 	loanAgreements.PUT("/:id", laHandler.UpdateLA, middleware.Require("loan_agreement", "update"))
 	loanAgreements.DELETE("/:id", laHandler.DeleteLA, middleware.Require("loan_agreement", "delete"))
+
+	monitoring := api.Group("/loan-agreements/:laId/monitoring")
+	monitoring.GET("", monitoringHandler.List, middleware.Require("monitoring_disbursement", "read"))
+	monitoring.POST("", monitoringHandler.Create, middleware.Require("monitoring_disbursement", "create"))
+	monitoring.GET("/:id", monitoringHandler.Get, middleware.Require("monitoring_disbursement", "read"))
+	monitoring.PUT("/:id", monitoringHandler.Update, middleware.Require("monitoring_disbursement", "update"))
+	monitoring.DELETE("/:id", monitoringHandler.Delete, middleware.Require("monitoring_disbursement", "delete"))
+
+	dashboard := api.Group("/dashboard")
+	dashboard.GET("/summary", dashboardHandler.Summary)
+	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
+
+	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
 
 	e.GET("/events", handler.SSEHandler(broker))
 

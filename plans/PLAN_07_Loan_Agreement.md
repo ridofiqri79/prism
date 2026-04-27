@@ -98,10 +98,10 @@ Computed `isExtended = closing_date !== original_closing_date`, `extensionDays =
 
 ## Checklist
 
-- [ ] `loan-agreement.types.ts`
-- [ ] `loan-agreement.schema.ts` — dengan refine closing_date >= original_closing_date
-- [ ] `loan-agreement.service.ts`
-- [ ] `loan-agreement.store.ts`
-- [ ] `LAListPage.vue` — filter is_extended
-- [ ] `LAFormPage.vue` — indikator perpanjangan real-time + lender filter dari DK
-- [ ] `LADetailPage.vue`
+- [x] `loan-agreement.types.ts`
+- [x] `loan-agreement.schema.ts` — dengan refine closing_date >= original_closing_date
+- [x] `loan-agreement.service.ts`
+- [x] `loan-agreement.store.ts`
+- [x] `LAListPage.vue` — filter is_extended
+- [x] `LAFormPage.vue` — indikator perpanjangan real-time + lender filter dari DK
+- [x] `LADetailPage.vue`
