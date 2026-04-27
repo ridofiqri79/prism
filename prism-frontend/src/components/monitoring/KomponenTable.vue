@@ -56,13 +56,13 @@ function updateRow(index: number, patch: Partial<MonitoringKomponen>) {
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3">Komponen</th>
-          <th class="px-4 py-3">Planned LA</th>
-          <th class="px-4 py-3">Planned USD</th>
-          <th class="px-4 py-3">Planned IDR</th>
-          <th class="px-4 py-3">Realized LA</th>
-          <th class="px-4 py-3">Realized USD</th>
-          <th class="px-4 py-3">Realized IDR</th>
-          <th v-if="editable" class="px-4 py-3">Actions</th>
+          <th class="px-4 py-3">Rencana LA</th>
+          <th class="px-4 py-3">Rencana USD</th>
+          <th class="px-4 py-3">Rencana IDR</th>
+          <th class="px-4 py-3">Realisasi LA</th>
+          <th class="px-4 py-3">Realisasi USD</th>
+          <th class="px-4 py-3">Realisasi IDR</th>
+          <th v-if="editable" class="px-4 py-3">Aksi</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-100">

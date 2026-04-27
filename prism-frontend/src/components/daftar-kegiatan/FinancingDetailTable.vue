@@ -27,21 +27,21 @@ function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
 <template>
   <div class="space-y-3">
     <div class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-surface-700">
-      Konversi ke USD dilakukan manual. Isi amount original dan amount USD sesuai hasil konversi staf.
+      Konversi ke USD dilakukan manual. Isi nilai original dan nilai USD sesuai hasil konversi staf.
     </div>
     <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <table class="w-full min-w-[90rem] text-left text-sm">
         <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
           <tr>
             <th class="px-4 py-3">Lender</th>
-            <th class="px-4 py-3">Currency</th>
-            <th class="px-4 py-3">Loan Original</th>
-            <th class="px-4 py-3">Grant Original</th>
+            <th class="px-4 py-3">Mata Uang</th>
+            <th class="px-4 py-3">Pinjaman Original</th>
+            <th class="px-4 py-3">Hibah Original</th>
             <th class="px-4 py-3">Counterpart Original</th>
-            <th class="px-4 py-3">Loan USD</th>
-            <th class="px-4 py-3">Grant USD</th>
+            <th class="px-4 py-3">Pinjaman USD</th>
+            <th class="px-4 py-3">Hibah USD</th>
             <th class="px-4 py-3">Counterpart USD</th>
-            <th class="px-4 py-3">Remarks</th>
+            <th class="px-4 py-3">Catatan</th>
             <th class="w-20 px-4 py-3"></th>
           </tr>
         </thead>
@@ -116,7 +116,7 @@ function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
           </tr>
           <tr v-if="rows.length === 0">
             <td colspan="10" class="px-4 py-6 text-center text-surface-500">
-              Pilih GB Project di Section 1 lalu tambah financing detail.
+              Pilih GB Project di header proyek, lalu tambah rincian pembiayaan.
             </td>
           </tr>
         </tbody>

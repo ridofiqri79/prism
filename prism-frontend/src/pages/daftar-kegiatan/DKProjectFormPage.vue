@@ -80,7 +80,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="pageTitle" subtitle="Form DK Project dengan 4 section dan multi-currency">
+    <PageHeader :title="pageTitle" subtitle="Lengkapi data proyek dalam Daftar Kegiatan">
       <template #actions>
         <Button
           label="Kembali"
@@ -94,12 +94,11 @@ onMounted(() => {
     <form class="space-y-6" @submit.prevent="onSubmit">
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 1</p>
           <h2 class="text-lg font-semibold text-surface-950">Header Proyek</h2>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Program Title</span>
+            <span class="text-sm font-medium text-surface-700">Judul Program</span>
             <ProgramTitleSelect v-model="form.values.program_title_id" />
           </label>
           <label class="block space-y-2">
@@ -108,7 +107,7 @@ onMounted(() => {
             <small v-if="form.errors.institution_id" class="text-red-600">{{ form.errors.institution_id }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Duration</span>
+            <span class="text-sm font-medium text-surface-700">Durasi</span>
             <InputText v-model="form.values.duration" class="w-full" placeholder="2025-2030" />
           </label>
           <label class="block space-y-2">
@@ -131,7 +130,7 @@ onMounted(() => {
             <small v-if="form.errors.location_ids" class="text-red-600">{{ form.errors.location_ids }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Objectives</span>
+            <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <Textarea v-model="form.values.objectives" auto-resize rows="3" class="w-full" />
           </label>
         </div>
@@ -139,10 +138,9 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 2</p>
-          <h2 class="text-lg font-semibold text-surface-950">Financing Detail</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Rincian Pembiayaan</h2>
           <p class="text-sm text-surface-500">
-            Dropdown lender hanya berisi lender dari GB funding source dan BB lender indication proyek terpilih.
+            Pilihan lender hanya berisi lender dari funding source GB dan indikasi lender BB proyek terpilih.
           </p>
           <small v-if="form.errors.financing_details" class="text-red-600">{{ form.errors.financing_details }}</small>
         </div>
@@ -156,8 +154,7 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 3</p>
-          <h2 class="text-lg font-semibold text-surface-950">Loan Allocation</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Alokasi Pinjaman</h2>
           <small v-if="form.errors.loan_allocations" class="text-red-600">{{ form.errors.loan_allocations }}</small>
         </div>
         <LoanAllocationTable
@@ -169,8 +166,7 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 4</p>
-          <h2 class="text-lg font-semibold text-surface-950">Activity Details</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Rincian Kegiatan</h2>
           <p class="text-sm text-surface-500">Nomor urut otomatis dihitung ulang saat baris dihapus.</p>
           <small v-if="form.errors.activity_details" class="text-red-600">{{ form.errors.activity_details }}</small>
         </div>

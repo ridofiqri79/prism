@@ -61,10 +61,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updateProgramTitle(editing.value.id, payload)
-    toast.success('Berhasil', 'Program title berhasil diperbarui')
+    toast.success('Berhasil', 'Judul program berhasil diperbarui')
   } else {
     await masterStore.createProgramTitle(payload)
-    toast.success('Berhasil', 'Program title berhasil dibuat')
+    toast.success('Berhasil', 'Judul program berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -75,7 +75,7 @@ function deleteItem(programTitle: ProgramTitle) {
   confirm.confirmDelete(`program title ${programTitle.title}`, async () => {
     await masterStore.deleteProgramTitle(programTitle.id)
     await loadData()
-    toast.success('Berhasil', 'Program title berhasil dihapus')
+    toast.success('Berhasil', 'Judul program berhasil dihapus')
   })
 }
 
@@ -86,7 +86,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Program Title" subtitle="Master program title parent dan child">
+    <PageHeader title="Judul Program" subtitle="Master judul program induk dan turunan">
       <template #actions>
         <Button v-if="can('program_title', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -94,7 +94,7 @@ onMounted(() => {
 
     <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
       <Column field="title" header="Judul" expander />
-      <Column header="Actions">
+      <Column header="Aksi">
         <template #body="{ node }">
           <div class="flex flex-wrap gap-2">
             <Button
@@ -119,7 +119,7 @@ onMounted(() => {
       </Column>
     </TreeTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Program Title' : 'Tambah Program Title'" class="w-[36rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Judul Program' : 'Tambah Judul Program'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Judul</span>

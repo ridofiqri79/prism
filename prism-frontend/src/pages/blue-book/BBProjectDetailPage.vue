@@ -106,7 +106,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="project?.bb_code ?? 'BB Project Detail'"
+      :title="project?.bb_code ?? 'Detail BB Project'"
       :subtitle="project?.project_name"
     >
       <template #actions>
@@ -142,7 +142,7 @@ onMounted(() => {
             <StatusBadge :status="project.status" />
           </div>
           <div class="text-right">
-            <p class="text-sm text-surface-500">Program Title</p>
+            <p class="text-sm text-surface-500">Judul Program</p>
             <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
           </div>
         </div>
@@ -169,7 +169,7 @@ onMounted(() => {
           <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.locations) }}</p>
         </div>
         <div class="md:col-span-2">
-          <p class="text-xs uppercase tracking-wide text-surface-500">National Priority</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Prioritas Nasional</p>
           <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.national_priorities) }}</p>
         </div>
       </div>
@@ -194,12 +194,12 @@ onMounted(() => {
       </div>
 
       <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-surface-950">Project Cost</h2>
+        <h2 class="text-lg font-semibold text-surface-950">Biaya Proyek</h2>
         <ProjectCostTable :rows="project.project_costs" :editable="false" />
       </section>
 
       <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-surface-950">Lender Indication</h2>
+        <h2 class="text-lg font-semibold text-surface-950">Indikasi Lender</h2>
         <LenderIndicationTable :rows="project.lender_indications" :editable="false" />
       </section>
 
@@ -243,4 +243,3 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
-

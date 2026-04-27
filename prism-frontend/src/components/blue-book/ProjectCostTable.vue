@@ -43,9 +43,9 @@ function updateRow(index: number, patch: Partial<ProjectCostPayload>) {
     <table class="w-full min-w-[48rem] text-left text-sm">
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Funding Type</th>
-          <th class="px-4 py-3">Funding Category</th>
-          <th class="px-4 py-3">Amount USD</th>
+          <th class="px-4 py-3">Tipe Pendanaan</th>
+          <th class="px-4 py-3">Kategori Pendanaan</th>
+          <th class="px-4 py-3">Nilai USD</th>
           <th v-if="editable" class="w-28 px-4 py-3"></th>
         </tr>
       </thead>
@@ -85,14 +85,14 @@ function updateRow(index: number, patch: Partial<ProjectCostPayload>) {
               severity="danger"
               text
               rounded
-              aria-label="Hapus baris project cost"
+              aria-label="Hapus baris biaya proyek"
               @click="emit('remove', index)"
             />
           </td>
         </tr>
         <tr v-if="rows.length === 0">
           <td :colspan="editable ? 4 : 3" class="px-4 py-6 text-center text-surface-500">
-            Belum ada project cost.
+            Belum ada biaya proyek.
           </td>
         </tr>
       </tbody>

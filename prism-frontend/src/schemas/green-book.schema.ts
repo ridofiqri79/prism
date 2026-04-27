@@ -11,17 +11,16 @@ export const greenBookSchema = z.object({
 })
 
 export const gbProjectSchema = z.object({
-  program_title_id: z.string().uuid('Program Title wajib dipilih'),
-  gb_code: z.string().min(1, 'GB Code wajib diisi'),
+  program_title_id: z.string().uuid('Judul program wajib dipilih'),
+  gb_code: z.string().min(1, 'Kode GB wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
   duration: optionalText,
   objective: optionalText,
   scope_of_project: optionalText,
   bb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 BB Project'),
-  executing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Executing Agency'),
-  implementing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Implementing Agency'),
+  executing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 executing agency'),
+  implementing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 implementing agency'),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
 })
 
 export type GBProjectBaseFormValues = z.infer<typeof gbProjectSchema>
-

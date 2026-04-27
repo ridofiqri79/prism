@@ -28,8 +28,8 @@ const form = reactive<NationalPriorityPayload>({ period_id: '', title: '' })
 const errors = ref<FormErrors<NationalPriorityField>>({})
 const columns: ColumnDef[] = [
   { field: 'title', header: 'Judul', sortable: true },
-  { field: 'period', header: 'Period' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'period', header: 'Periode' },
+  { field: 'actions', header: 'Aksi' },
 ]
 const filteredPriorities = computed(() => {
   if (!selectedPeriodId.value) return masterStore.nationalPriorities
@@ -75,10 +75,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updateNationalPriority(editing.value.id, parsed.data)
-    toast.success('Berhasil', 'National priority berhasil diperbarui')
+    toast.success('Berhasil', 'Prioritas nasional berhasil diperbarui')
   } else {
     await masterStore.createNationalPriority(parsed.data)
-    toast.success('Berhasil', 'National priority berhasil dibuat')
+    toast.success('Berhasil', 'Prioritas nasional berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -89,7 +89,7 @@ function deleteItem(priority: NationalPriority) {
   confirm.confirmDelete(`national priority ${priority.title}`, async () => {
     await masterStore.deleteNationalPriority(priority.id)
     await loadData()
-    toast.success('Berhasil', 'National priority berhasil dihapus')
+    toast.success('Berhasil', 'Prioritas nasional berhasil dihapus')
   })
 }
 
@@ -104,7 +104,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="National Priority" subtitle="Master prioritas nasional per period">
+    <PageHeader title="Prioritas Nasional" subtitle="Master prioritas nasional per periode">
       <template #actions>
         <Button v-if="can('national_priority', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -112,7 +112,7 @@ onMounted(() => {
 
     <div class="rounded-lg border border-surface-200 bg-white p-4">
       <label class="block max-w-sm space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Period</span>
+        <span class="text-sm font-medium text-surface-700">Filter Periode</span>
         <Select
           v-model="selectedPeriodId"
           :options="masterStore.periods"
@@ -158,10 +158,10 @@ onMounted(() => {
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit National Priority' : 'Tambah National Priority'" class="w-[36rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Prioritas Nasional' : 'Tambah Prioritas Nasional'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Period</span>
+          <span class="text-sm font-medium text-surface-700">Periode</span>
           <Select
             v-model="form.period_id"
             :options="masterStore.periods"

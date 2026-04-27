@@ -35,7 +35,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="dkStore.currentDK?.subject ?? 'Daftar Kegiatan Detail'"
+      :title="dkStore.currentDK?.subject ?? 'Detail Daftar Kegiatan'"
       :subtitle="dkStore.currentDK ? formatDate(dkStore.currentDK.date) : undefined"
     >
       <template #actions>
@@ -96,7 +96,7 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Financing Detail</h3>
+              <h3 class="font-semibold text-surface-950">Rincian Pembiayaan</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
                 <table class="w-full min-w-[56rem] text-left text-sm">
                   <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
@@ -122,12 +122,12 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Loan Allocation</h3>
+              <h3 class="font-semibold text-surface-950">Alokasi Pinjaman</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
                 <table class="w-full min-w-[56rem] text-left text-sm">
                   <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
                     <tr>
-                      <th class="px-4 py-3">Institution</th>
+                      <th class="px-4 py-3">Instansi</th>
                       <th class="px-4 py-3">Currency</th>
                       <th class="px-4 py-3">Original</th>
                       <th class="px-4 py-3">USD</th>
@@ -148,7 +148,7 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Activity Details</h3>
+              <h3 class="font-semibold text-surface-950">Rincian Kegiatan</h3>
               <ol class="space-y-2">
                 <li
                   v-for="activity in project.activity_details"

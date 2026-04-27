@@ -34,9 +34,9 @@ const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
   { field: 'gb_code', header: 'GB Code' },
   { field: 'project_name', header: 'Nama Proyek' },
-  { field: 'bb_projects', header: 'BB Projects' },
+  { field: 'bb_projects', header: 'BB Project' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -180,4 +180,3 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
-

@@ -32,7 +32,7 @@ const columns: ColumnDef[] = [
   { field: 'date', header: 'Tanggal' },
   { field: 'letter_number', header: 'Nomor Surat' },
   { field: 'project_count', header: 'Jumlah Proyek' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {

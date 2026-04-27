@@ -47,7 +47,7 @@ const [password] = defineField('password')
 const [role] = defineField('role')
 const [isActive] = defineField('is_active')
 
-const pageTitle = computed(() => (isEditMode.value ? 'Edit User' : 'Tambah User'))
+const pageTitle = computed(() => (isEditMode.value ? 'Edit Pengguna' : 'Tambah Pengguna'))
 
 const onSubmit = handleSubmit(async (values) => {
   if (isEditMode.value) {
@@ -57,7 +57,7 @@ const onSubmit = handleSubmit(async (values) => {
       role: values.role,
       is_active: values.is_active,
     })
-    toast.success('Berhasil', 'User berhasil diperbarui')
+    toast.success('Berhasil', 'Pengguna berhasil diperbarui')
   } else {
     await userStore.createUser({
       username: values.username,
@@ -65,7 +65,7 @@ const onSubmit = handleSubmit(async (values) => {
       password: values.password ?? '',
       role: values.role,
     })
-    toast.success('Berhasil', 'User berhasil dibuat')
+    toast.success('Berhasil', 'Pengguna berhasil dibuat')
   }
 
   await router.push({ name: 'users' })
@@ -89,7 +89,7 @@ onMounted(async () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="pageTitle" subtitle="Akun ADMIN memiliki akses penuh, STAFF mengikuti permission matrix">
+    <PageHeader :title="pageTitle" subtitle="Akun ADMIN memiliki akses penuh, STAFF mengikuti matriks hak akses">
       <template #actions>
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'users' })" />
       </template>
@@ -115,13 +115,13 @@ onMounted(async () => {
       </label>
 
       <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Role</span>
+        <span class="text-sm font-medium text-surface-700">Peran</span>
         <Select v-model="role" :options="roleOptions" class="w-full" />
         <small v-if="errors.role" class="text-red-600">{{ errors.role }}</small>
       </label>
 
       <label v-if="isEditMode" class="flex items-center justify-between rounded-lg border border-surface-200 p-4">
-        <span class="text-sm font-medium text-surface-700">User aktif</span>
+        <span class="text-sm font-medium text-surface-700">Pengguna aktif</span>
         <ToggleSwitch v-model="isActive" />
       </label>
 

@@ -77,26 +77,25 @@ onMounted(async () => {
     </PageHeader>
 
     <Message v-if="isNotEffective" severity="warn" :closable="false">
-      LA belum efektif - monitoring belum bisa diinput. Effective Date:
+      LA belum efektif - monitoring belum bisa diinput. Tanggal efektif:
       {{ formatDate(currentLA?.effective_date ?? '') }}
     </Message>
 
     <form class="space-y-6" @submit.prevent="onSubmit">
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 1</p>
           <h2 class="text-lg font-semibold text-surface-950">Periode dan Kurs</h2>
           <p class="text-sm text-surface-500">Triwulan mengikuti tahun anggaran PRISM; kurs diinput manual.</p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Budget Year</span>
+            <span class="text-sm font-medium text-surface-700">Tahun Anggaran</span>
             <InputNumber v-model="form.values.budget_year" :use-grouping="false" class="w-full" />
             <small v-if="form.errors.budget_year" class="text-red-600">{{ form.errors.budget_year }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Quarter</span>
+            <span class="text-sm font-medium text-surface-700">Triwulan</span>
             <Select
               v-model="form.values.quarter"
               :options="quarterOptions"
@@ -107,7 +106,7 @@ onMounted(async () => {
             <small v-if="form.errors.quarter" class="text-red-600">{{ form.errors.quarter }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Exchange Rate USD/IDR</span>
+            <span class="text-sm font-medium text-surface-700">Kurs USD/IDR</span>
             <InputNumber
               v-model="form.values.exchange_rate_usd_idr"
               :min="0"
@@ -119,7 +118,7 @@ onMounted(async () => {
             </small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Exchange Rate LA/IDR</span>
+            <span class="text-sm font-medium text-surface-700">Kurs Mata Uang LA/IDR</span>
             <InputNumber
               v-model="form.values.exchange_rate_la_idr"
               :min="0"
@@ -135,9 +134,8 @@ onMounted(async () => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 2</p>
           <h2 class="text-lg font-semibold text-surface-950">Rencana vs Realisasi</h2>
-          <p class="text-sm text-surface-500">Simpan nilai LA, USD, dan IDR secara manual tanpa auto-convert.</p>
+          <p class="text-sm text-surface-500">Simpan nilai LA, USD, dan IDR secara manual tanpa konversi otomatis.</p>
         </div>
 
         <div class="overflow-auto rounded-lg border border-surface-200">
@@ -170,7 +168,7 @@ onMounted(async () => {
         </div>
 
         <div class="rounded-lg bg-surface-50 p-4">
-          <p class="mb-2 text-sm font-medium text-surface-700">Absorption real-time</p>
+          <p class="mb-2 text-sm font-medium text-surface-700">Penyerapan sementara</p>
           <AbsorptionBar :pct="form.absorptionPct.value" />
         </div>
       </section>
@@ -178,13 +176,12 @@ onMounted(async () => {
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 3</p>
             <h2 class="text-lg font-semibold text-surface-950">Breakdown Komponen</h2>
             <p class="text-sm text-surface-500">Opsional; total komponen tidak wajib sama dengan level LA.</p>
           </div>
           <label class="flex items-center gap-3 text-sm font-medium text-surface-700">
             <ToggleSwitch v-model="form.showKomponen.value" />
-            Tambah Breakdown per Komponen
+            Tambah rincian per komponen
           </label>
         </div>
 

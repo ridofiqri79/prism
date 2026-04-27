@@ -31,7 +31,7 @@ const columns: ColumnDef[] = [
   { field: 'publish_year', header: 'Publish Year' },
   { field: 'revision', header: 'Revision' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -68,7 +68,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Green Book" subtitle="Header Green Book per publish year">
+    <PageHeader title="Green Book" subtitle="Header Green Book per tahun terbit">
       <template #actions>
         <Button
           v-if="can('green_book', 'create')"
@@ -126,4 +126,3 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
-

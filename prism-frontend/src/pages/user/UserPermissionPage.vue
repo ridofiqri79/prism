@@ -17,16 +17,16 @@ const toast = useToast()
 const userId = computed(() => String(route.params.id ?? ''))
 const actions: PermissionAction[] = ['create', 'read', 'update', 'delete']
 const actionLabels: Record<PermissionAction, string> = {
-  create: 'Create',
-  read: 'Read',
-  update: 'Update',
-  delete: 'Delete',
+  create: 'Tambah',
+  read: 'Lihat',
+  update: 'Ubah',
+  delete: 'Hapus',
 }
 
 const matrix = reactive<Record<string, UserPermission>>({})
 
 const title = computed(() =>
-  userStore.currentUser ? `Permission ${userStore.currentUser.username}` : 'Permission User',
+  userStore.currentUser ? `Hak Akses ${userStore.currentUser.username}` : 'Hak Akses Pengguna',
 )
 
 function ensurePermission(module: string) {
@@ -68,7 +68,7 @@ async function savePermissions() {
   const payload = permissionModules.map((item) => ensurePermission(item.module))
 
   await userStore.updatePermissions(userId.value, payload)
-  toast.success('Berhasil', 'Permission user berhasil disimpan')
+  toast.success('Berhasil', 'Hak akses pengguna berhasil disimpan')
 }
 
 onMounted(async () => {
@@ -85,7 +85,7 @@ onMounted(async () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="title" subtitle="Setiap perubahan permission disimpan replace-all secara transaksional">
+    <PageHeader :title="title" subtitle="Setiap perubahan hak akses disimpan secara transaksional">
       <template #actions>
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'users' })" />
         <Button label="Simpan Semua" icon="pi pi-save" :loading="userStore.loading" @click="savePermissions" />

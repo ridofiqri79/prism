@@ -50,10 +50,10 @@ const cards = computed(() => {
     { label: 'Total BB Projects', value: data?.total_bb_projects ?? 0, format: 'number' as const },
     { label: 'Total GB Projects', value: data?.total_gb_projects ?? 0, format: 'number' as const },
     { label: 'Total Loan Agreements', value: data?.total_loan_agreements ?? 0, format: 'number' as const },
-    { label: 'Total Amount', value: data?.total_amount_usd ?? 0, unit: 'USD', format: 'currency' as const },
+    { label: 'Total Nilai Pinjaman', value: data?.total_amount_usd ?? 0, unit: 'USD', format: 'currency' as const },
     { label: 'Total Realisasi', value: data?.total_realized_usd ?? 0, unit: 'USD', format: 'currency' as const },
-    { label: 'Overall Absorption', value: data?.overall_absorption_pct ?? 0, format: 'percent' as const },
-    { label: 'Active Monitoring', value: data?.active_monitoring ?? 0, format: 'number' as const },
+    { label: 'Penyerapan Keseluruhan', value: data?.overall_absorption_pct ?? 0, format: 'percent' as const },
+    { label: 'Monitoring Aktif', value: data?.active_monitoring ?? 0, format: 'number' as const },
   ]
 })
 
@@ -138,7 +138,7 @@ onMounted(() => {
     <section class="rounded-lg border border-surface-200 bg-white p-4">
       <div class="grid gap-4 md:grid-cols-[12rem_14rem_1fr_auto]">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Budget Year</span>
+          <span class="text-sm font-medium text-surface-700">Tahun Anggaran</span>
           <Select
             v-model="filters.budget_year"
             :options="yearOptions"
@@ -149,7 +149,7 @@ onMounted(() => {
           />
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Quarter</span>
+          <span class="text-sm font-medium text-surface-700">Triwulan</span>
           <Select
             v-model="filters.quarter"
             :options="quarterOptions"
@@ -170,7 +170,7 @@ onMounted(() => {
 
     <section class="grid gap-4 xl:grid-cols-[24rem_1fr]">
       <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <p class="text-sm text-surface-500">Monitoring Overview</p>
+        <p class="text-sm text-surface-500">Ringkasan Monitoring</p>
         <p class="mt-2 text-4xl font-semibold text-surface-950">
           {{ (monitoringSummary?.absorption_pct ?? 0).toFixed(1) }}%
         </p>
@@ -198,17 +198,17 @@ onMounted(() => {
 
     <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <div class="border-b border-surface-200 p-4">
-        <h2 class="text-lg font-semibold text-surface-950">Breakdown by Lender</h2>
+        <h2 class="text-lg font-semibold text-surface-950">Rincian per Lender</h2>
       </div>
       <div class="overflow-auto">
         <table class="w-full min-w-[52rem] text-left text-sm">
           <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
             <tr>
               <th class="px-4 py-3">Lender</th>
-              <th class="px-4 py-3">Type</th>
+              <th class="px-4 py-3">Tipe</th>
               <th class="px-4 py-3">Rencana USD</th>
               <th class="px-4 py-3">Realisasi USD</th>
-              <th class="px-4 py-3">Absorption</th>
+              <th class="px-4 py-3">Penyerapan</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-surface-100">

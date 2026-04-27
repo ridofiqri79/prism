@@ -44,8 +44,8 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3">No</th>
-          <th class="px-4 py-3">Activity Name</th>
-          <th class="px-4 py-3">Implementation Location</th>
+          <th class="px-4 py-3">Nama Kegiatan</th>
+          <th class="px-4 py-3">Lokasi Pelaksanaan</th>
           <th class="px-4 py-3">PIU</th>
           <th v-if="editable" class="w-36 px-4 py-3"></th>
         </tr>
@@ -86,7 +86,7 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
                 icon="pi pi-arrow-up"
                 text
                 rounded
-                aria-label="Naikkan activity"
+                aria-label="Naikkan kegiatan"
                 :disabled="index === 0"
                 @click="emit('reorder', index, index - 1)"
               />
@@ -94,7 +94,7 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
                 icon="pi pi-arrow-down"
                 text
                 rounded
-                aria-label="Turunkan activity"
+                aria-label="Turunkan kegiatan"
                 :disabled="index === rows.length - 1"
                 @click="emit('reorder', index, index + 1)"
               />
@@ -103,7 +103,7 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
                 severity="danger"
                 text
                 rounded
-                aria-label="Hapus activity"
+                aria-label="Hapus kegiatan"
                 @click="emit('remove', index)"
               />
             </div>
@@ -111,14 +111,13 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
         </tr>
         <tr v-if="rows.length === 0">
           <td :colspan="editable ? 5 : 4" class="px-4 py-6 text-center text-surface-500">
-            Belum ada activity.
+            Belum ada kegiatan.
           </td>
         </tr>
       </tbody>
     </table>
     <div v-if="editable" class="border-t border-surface-200 p-3">
-      <Button label="Tambah Activity" icon="pi pi-plus" outlined size="small" @click="emit('add')" />
+      <Button label="Tambah Kegiatan" icon="pi pi-plus" outlined size="small" @click="emit('add')" />
     </div>
   </div>
 </template>
-

@@ -28,7 +28,7 @@ const errors = ref<FormErrors<CountryField>>({})
 const columns: ColumnDef[] = [
   { field: 'code', header: 'Kode', sortable: true },
   { field: 'name', header: 'Nama', sortable: true },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -58,10 +58,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updateCountry(editing.value.id, parsed.data)
-    toast.success('Berhasil', 'Country berhasil diperbarui')
+    toast.success('Berhasil', 'Negara berhasil diperbarui')
   } else {
     await masterStore.createCountry(parsed.data)
-    toast.success('Berhasil', 'Country berhasil dibuat')
+    toast.success('Berhasil', 'Negara berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -72,7 +72,7 @@ function deleteItem(country: Country) {
   confirm.confirmDelete(`country ${country.name}`, async () => {
     await masterStore.deleteCountry(country.id)
     await loadData()
-    toast.success('Berhasil', 'Country berhasil dihapus')
+    toast.success('Berhasil', 'Negara berhasil dihapus')
   })
 }
 
@@ -83,7 +83,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Country" subtitle="Master negara pemberi pinjaman dan referensi lender">
+    <PageHeader title="Negara" subtitle="Master negara pemberi pinjaman dan referensi lender">
       <template #actions>
         <Button v-if="can('country', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -121,7 +121,7 @@ onMounted(() => {
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Country' : 'Tambah Country'" class="w-[32rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Negara' : 'Tambah Negara'" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama</span>

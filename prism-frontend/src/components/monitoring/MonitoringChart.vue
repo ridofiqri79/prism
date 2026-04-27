@@ -38,9 +38,9 @@ const option = computed(() => ({
 
       return [
         `<strong>${quarter}</strong>`,
-        `Planned: ${formatter.format(row?.planned ?? 0)}`,
-        `Realized: ${formatter.format(row?.realized ?? 0)}`,
-        `Absorption: ${(row?.absorption ?? 0).toFixed(1)}%`,
+        `Rencana: ${formatter.format(row?.planned ?? 0)}`,
+        `Realisasi: ${formatter.format(row?.realized ?? 0)}`,
+        `Penyerapan: ${(row?.absorption ?? 0).toFixed(1)}%`,
       ].join('<br/>')
     },
   },

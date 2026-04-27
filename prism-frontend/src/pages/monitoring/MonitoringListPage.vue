@@ -34,14 +34,14 @@ const isNotEffective = computed(() => {
   return currentLA.value.effective_date.slice(0, 10) > todayString.value
 })
 const columns: ColumnDef[] = [
-  { field: 'budget_year', header: 'Budget Year' },
-  { field: 'quarter', header: 'Quarter' },
+  { field: 'budget_year', header: 'Tahun Anggaran' },
+  { field: 'quarter', header: 'Triwulan' },
   { field: 'exchange_rate_usd_idr', header: 'USD/IDR' },
   { field: 'exchange_rate_la_idr', header: 'LA/IDR' },
-  { field: 'planned_usd', header: 'Planned USD' },
-  { field: 'realized_usd', header: 'Realized USD' },
-  { field: 'absorption_pct', header: 'Absorption' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'planned_usd', header: 'Rencana USD' },
+  { field: 'realized_usd', header: 'Realisasi USD' },
+  { field: 'absorption_pct', header: 'Penyerapan' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -106,13 +106,13 @@ onMounted(() => {
     </PageHeader>
 
     <Message v-if="isNotEffective" severity="warn" :closable="false">
-      LA belum efektif - monitoring belum bisa diinput. Effective Date:
+      LA belum efektif - monitoring belum bisa diinput. Tanggal efektif:
       {{ formatDate(currentLA?.effective_date ?? '') }}
     </Message>
 
     <section v-if="currentLA" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Loan Code</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Kode Loan</p>
         <p class="font-semibold text-surface-950">{{ currentLA.loan_code }}</p>
       </div>
       <div>
@@ -120,11 +120,11 @@ onMounted(() => {
         <p class="font-semibold text-surface-950">{{ currentLA.lender.name }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Currency</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Mata Uang</p>
         <p class="font-semibold text-surface-950">{{ currentLA.currency }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Effective Date</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Tanggal Efektif</p>
         <p class="font-semibold text-surface-950">{{ formatDate(currentLA.effective_date) }}</p>
       </div>
     </section>

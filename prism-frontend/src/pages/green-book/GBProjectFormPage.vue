@@ -81,7 +81,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="pageTitle" subtitle="Form GB Project lengkap dengan 5 tab">
+    <PageHeader :title="pageTitle" subtitle="Lengkapi data proyek Green Book">
       <template #actions>
         <Button
           label="Kembali"
@@ -96,10 +96,10 @@ onMounted(() => {
       <Tabs value="0" class="rounded-lg border border-surface-200 bg-white p-2">
         <TabList>
           <Tab value="0">Informasi Umum</Tab>
-          <Tab value="1">Activities</Tab>
+          <Tab value="1">Kegiatan</Tab>
           <Tab value="2">Funding Source</Tab>
-          <Tab value="3">Disbursement Plan</Tab>
-          <Tab value="4">Funding Allocation</Tab>
+          <Tab value="3">Rencana Disbursement</Tab>
+          <Tab value="4">Alokasi Funding</Tab>
         </TabList>
 
         <TabPanels>
@@ -107,14 +107,14 @@ onMounted(() => {
             <div class="space-y-4 p-3">
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="block space-y-2">
-                  <span class="text-sm font-medium text-surface-700">Program Title</span>
+                  <span class="text-sm font-medium text-surface-700">Judul Program</span>
                   <ProgramTitleSelect v-model="form.values.program_title_id" />
                   <small v-if="form.errors.program_title_id" class="text-red-600">
                     {{ form.errors.program_title_id }}
                   </small>
                 </label>
                 <label class="block space-y-2">
-                  <span class="text-sm font-medium text-surface-700">BB Projects</span>
+                  <span class="text-sm font-medium text-surface-700">BB Project</span>
                   <MultiSelect
                     v-model="form.values.bb_project_ids"
                     :options="bbProjectOptions"
@@ -133,7 +133,7 @@ onMounted(() => {
 
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="block space-y-2">
-                  <span class="text-sm font-medium text-surface-700">GB Code</span>
+                  <span class="text-sm font-medium text-surface-700">Kode GB</span>
                   <InputText v-model="form.values.gb_code" class="w-full" :disabled="isEditMode" />
                   <small v-if="form.errors.gb_code" class="text-red-600">{{ form.errors.gb_code }}</small>
                 </label>
@@ -143,18 +143,18 @@ onMounted(() => {
                   <small v-if="form.errors.project_name" class="text-red-600">{{ form.errors.project_name }}</small>
                 </label>
                 <label class="block space-y-2 md:col-span-2">
-                  <span class="text-sm font-medium text-surface-700">Duration</span>
+                  <span class="text-sm font-medium text-surface-700">Durasi</span>
                   <InputText v-model="form.values.duration" class="w-full" placeholder="2025-2030" />
                 </label>
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="block space-y-2">
-                  <span class="text-sm font-medium text-surface-700">Objective</span>
+                  <span class="text-sm font-medium text-surface-700">Tujuan</span>
                   <Textarea v-model="form.values.objective" auto-resize rows="3" class="w-full" />
                 </label>
                 <label class="block space-y-2">
-                  <span class="text-sm font-medium text-surface-700">Scope of Project</span>
+                  <span class="text-sm font-medium text-surface-700">Lingkup Proyek</span>
                   <Textarea v-model="form.values.scope_of_project" auto-resize rows="3" class="w-full" />
                 </label>
               </div>
@@ -219,8 +219,8 @@ onMounted(() => {
           <TabPanel value="4">
             <div class="space-y-3 p-3">
               <div class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-surface-700">
-                Funding Allocation selalu mengikuti jumlah dan urutan Activities. Saat activity dihapus,
-                baris allocation ikut berkurang otomatis.
+                Alokasi funding selalu mengikuti jumlah dan urutan kegiatan. Saat kegiatan dihapus,
+                baris alokasi ikut berkurang otomatis.
               </div>
               <FundingAllocationTable
                 :activities="form.activities.value"
@@ -243,4 +243,3 @@ onMounted(() => {
     </form>
   </section>
 </template>
-
