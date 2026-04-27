@@ -61,7 +61,7 @@ const items = computed<NavigationItem[]>(() =>
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
     },
-    { label: 'Journey', to: '/journey/demo-project', icon: 'pi pi-share-alt', module: 'bb_project' },
+    { label: 'Journey', to: '/journey', icon: 'pi pi-share-alt', module: 'bb_project' },
     { label: 'Users', to: '/users', icon: 'pi pi-user', adminOnly: true },
   ].filter((item) => {
     if (item.adminOnly) return auth.user?.role === 'ADMIN'

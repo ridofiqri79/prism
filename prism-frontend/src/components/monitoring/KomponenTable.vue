@@ -17,6 +17,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  'update:komponen': [value: MonitoringKomponen[]]
   remove: [index: number]
 }>()
 
@@ -40,6 +41,13 @@ const totals = computed(() =>
     },
   ),
 )
+
+function updateRow(index: number, patch: Partial<MonitoringKomponen>) {
+  emit(
+    'update:komponen',
+    props.komponen.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)),
+  )
+}
 </script>
 
 <template>
@@ -65,31 +73,79 @@ const totals = computed(() =>
         </tr>
         <tr v-for="(row, index) in komponen" :key="row.id ?? index">
           <td class="px-4 py-3">
-            <InputText v-if="editable" v-model="row.component_name" class="w-full" placeholder="Konstruksi" />
+            <InputText
+              v-if="editable"
+              :model-value="row.component_name"
+              class="w-full"
+              placeholder="Konstruksi"
+              @update:model-value="updateRow(index, { component_name: String($event ?? '') })"
+            />
             <span v-else>{{ row.component_name }}</span>
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.planned_la" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.planned_la"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { planned_la: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.planned_la" />
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.planned_usd" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.planned_usd"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { planned_usd: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.planned_usd" currency="USD" />
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.planned_idr" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.planned_idr"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { planned_idr: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.planned_idr" currency="IDR" />
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.realized_la" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.realized_la"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { realized_la: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.realized_la" />
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.realized_usd" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.realized_usd"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { realized_usd: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.realized_usd" currency="USD" />
           </td>
           <td class="px-4 py-3">
-            <InputNumber v-if="editable" v-model="row.realized_idr" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-if="editable"
+              :model-value="row.realized_idr"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+              @update:model-value="updateRow(index, { realized_idr: Number($event ?? 0) })"
+            />
             <CurrencyDisplay v-else :amount="row.realized_idr" currency="IDR" />
           </td>
           <td v-if="editable" class="px-4 py-3">

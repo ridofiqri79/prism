@@ -13,4 +13,10 @@ export const monitoringRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/monitoring/MonitoringFormPage.vue'),
     meta: { requiresAuth: true, permission: { module: 'monitoring_disbursement', action: 'create' } },
   },
+  {
+    path: 'loan-agreements/:laId/monitoring/:id/edit',
+    name: 'monitoring-edit',
+    component: () => import('@/pages/monitoring/MonitoringFormPage.vue'),
+    meta: { requiresAuth: true, permission: { module: 'monitoring_disbursement', action: 'update' } },
+  },
 ]

@@ -6,15 +6,16 @@ const props = defineProps<{
   pct: number
 }>()
 
-const normalizedPct = computed(() => {
+const safePct = computed(() => {
   if (!Number.isFinite(props.pct)) return 0
-  return Math.max(0, Math.min(100, props.pct))
+  return Math.max(0, props.pct)
 })
 
-const label = computed(() => `${props.pct.toFixed(1)}%`)
+const normalizedPct = computed(() => Math.min(100, safePct.value))
+const label = computed(() => `${safePct.value.toFixed(1)}%`)
 const tone = computed(() => {
-  if (props.pct < 50) return 'danger'
-  if (props.pct < 80) return 'warn'
+  if (safePct.value < 50) return 'danger'
+  if (safePct.value < 80) return 'warn'
   return 'success'
 })
 

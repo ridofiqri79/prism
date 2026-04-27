@@ -49,23 +49,29 @@ export const useMonitoringStore = defineStore('monitoring', () => {
   }
 
   async function createMonitoring(loanAgreementId: string, data: MonitoringPayload) {
-    const created = await MonitoringService.createMonitoring(loanAgreementId, data)
-    monitorings.value = [created, ...monitorings.value]
-    total.value += 1
-    return created
+    return withLoading(async () => {
+      const created = await MonitoringService.createMonitoring(loanAgreementId, data)
+      monitorings.value = [created, ...monitorings.value]
+      total.value += 1
+      return created
+    })
   }
 
   async function updateMonitoring(loanAgreementId: string, id: string, data: MonitoringPayload) {
-    const updated = await MonitoringService.updateMonitoring(loanAgreementId, id, data)
-    monitorings.value = monitorings.value.map((item) => (item.id === id ? updated : item))
-    currentMonitoring.value = updated
-    return updated
+    return withLoading(async () => {
+      const updated = await MonitoringService.updateMonitoring(loanAgreementId, id, data)
+      monitorings.value = monitorings.value.map((item) => (item.id === id ? updated : item))
+      currentMonitoring.value = updated
+      return updated
+    })
   }
 
   async function deleteMonitoring(loanAgreementId: string, id: string) {
-    await MonitoringService.deleteMonitoring(loanAgreementId, id)
-    monitorings.value = monitorings.value.filter((item) => item.id !== id)
-    total.value = Math.max(0, total.value - 1)
+    return withLoading(async () => {
+      await MonitoringService.deleteMonitoring(loanAgreementId, id)
+      monitorings.value = monitorings.value.filter((item) => item.id !== id)
+      total.value = Math.max(0, total.value - 1)
+    })
   }
 
   function $reset() {

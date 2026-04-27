@@ -22,11 +22,13 @@ const toast = useToast()
 const form = useMonitoringForm()
 
 const loanAgreementId = computed(() => String(route.params.laId ?? ''))
+const monitoringId = computed(() => (route.params.id ? String(route.params.id) : ''))
+const isEdit = computed(() => Boolean(monitoringId.value))
 const currentLA = computed(() => monitoringStore.currentLA)
 const todayString = computed(() => new Date().toISOString().slice(0, 10))
 const isNotEffective = computed(() => {
   if (!currentLA.value?.effective_date) return false
-  return currentLA.value.effective_date > todayString.value
+  return currentLA.value.effective_date.slice(0, 10) > todayString.value
 })
 const quarterOptions: { label: string; value: Quarter }[] = [
   { label: 'TW1 (Apr-Jun)', value: 'TW1' },
@@ -38,19 +40,32 @@ const quarterOptions: { label: string; value: Quarter }[] = [
 const onSubmit = form.submit(async (values) => {
   if (isNotEffective.value) return
 
-  const created = await monitoringStore.createMonitoring(loanAgreementId.value, values)
-  toast.success('Berhasil', 'Monitoring berhasil disimpan')
-  await router.push({ name: 'monitoring-list', params: { laId: loanAgreementId.value }, hash: `#${created.id}` })
+  const saved = isEdit.value
+    ? await monitoringStore.updateMonitoring(loanAgreementId.value, monitoringId.value, values)
+    : await monitoringStore.createMonitoring(loanAgreementId.value, values)
+
+  toast.success('Berhasil', `Monitoring berhasil ${isEdit.value ? 'diperbarui' : 'disimpan'}`)
+  await router.push({ name: 'monitoring-list', params: { laId: loanAgreementId.value }, hash: `#${saved.id}` })
 })
 
-onMounted(() => {
-  void monitoringStore.fetchLoanAgreement(loanAgreementId.value)
+onMounted(async () => {
+  await monitoringStore.fetchLoanAgreement(loanAgreementId.value)
+
+  if (isEdit.value) {
+    const monitoring = await monitoringStore.fetchMonitoring(loanAgreementId.value, monitoringId.value)
+    if (monitoring) {
+      form.applyMonitoring(monitoring)
+    }
+  }
 })
 </script>
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Tambah Monitoring" subtitle="Input rencana dan realisasi per triwulan">
+    <PageHeader
+      :title="isEdit ? 'Edit Monitoring' : 'Tambah Monitoring'"
+      subtitle="Input rencana dan realisasi per triwulan"
+    >
       <template #actions>
         <Button
           label="Kembali"
@@ -93,14 +108,24 @@ onMounted(() => {
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Exchange Rate USD/IDR</span>
-            <InputNumber v-model="form.values.exchange_rate_usd_idr" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-model="form.values.exchange_rate_usd_idr"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+            />
             <small v-if="form.errors.exchange_rate_usd_idr" class="text-red-600">
               {{ form.errors.exchange_rate_usd_idr }}
             </small>
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Exchange Rate LA/IDR</span>
-            <InputNumber v-model="form.values.exchange_rate_la_idr" :min-fraction-digits="2" class="w-full" />
+            <InputNumber
+              v-model="form.values.exchange_rate_la_idr"
+              :min="0"
+              :min-fraction-digits="2"
+              class="w-full"
+            />
             <small v-if="form.errors.exchange_rate_la_idr" class="text-red-600">
               {{ form.errors.exchange_rate_la_idr }}
             </small>
@@ -127,18 +152,18 @@ onMounted(() => {
             <tbody class="divide-y divide-surface-100">
               <tr>
                 <td class="px-4 py-3 font-medium text-surface-900">Mata Uang LA</td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_la" :min-fraction-digits="2" class="w-full" /></td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_la" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_la" :min="0" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_la" :min="0" :min-fraction-digits="2" class="w-full" /></td>
               </tr>
               <tr>
                 <td class="px-4 py-3 font-medium text-surface-900">USD</td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_usd" :min-fraction-digits="2" class="w-full" /></td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_usd" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_usd" :min="0" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_usd" :min="0" :min-fraction-digits="2" class="w-full" /></td>
               </tr>
               <tr>
                 <td class="px-4 py-3 font-medium text-surface-900">IDR</td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_idr" :min-fraction-digits="2" class="w-full" /></td>
-                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_idr" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.planned_idr" :min="0" :min-fraction-digits="2" class="w-full" /></td>
+                <td class="px-4 py-3"><InputNumber v-model="form.values.realized_idr" :min="0" :min-fraction-digits="2" class="w-full" /></td>
               </tr>
             </tbody>
           </table>
@@ -165,7 +190,7 @@ onMounted(() => {
 
         <div v-if="form.showKomponen.value" class="space-y-3">
           <KomponenTable
-            :komponen="form.komponen.value"
+            v-model:komponen="form.komponen.value"
             editable
             @remove="form.removeKomponen"
           />
@@ -182,7 +207,7 @@ onMounted(() => {
         />
         <Button
           type="submit"
-          label="Simpan"
+          :label="isEdit ? 'Perbarui' : 'Simpan'"
           icon="pi pi-save"
           :loading="monitoringStore.loading"
           :disabled="isNotEffective"
