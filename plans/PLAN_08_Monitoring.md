@@ -147,14 +147,14 @@ Toggle switch "Tambah Breakdown per Komponen". Jika ON: tampilkan `<KomponenTabl
 
 ## Checklist
 
-- [ ] `monitoring.types.ts`
-- [ ] `monitoring.schema.ts`
-- [ ] `monitoring.service.ts`
-- [ ] `monitoring.store.ts`
-- [ ] `useMonitoringForm.ts` — absorptionPct computed + komponen optional
-- [ ] `MonitoringListPage.vue` — guard effective_date + tabel dengan AbsorptionBar
-- [ ] `MonitoringFormPage.vue` — 3 section
-- [ ] `AbsorptionBar.vue` — color coding 3 level
-- [ ] `MonitoringCard.vue`
-- [ ] `KomponenTable.vue` — editable + read-only mode
-- [ ] `MonitoringChart.vue` — ECharts grouped bar
+- [x] `monitoring.types.ts`
+- [x] `monitoring.schema.ts`
+- [x] `monitoring.service.ts`
+- [x] `monitoring.store.ts`
+- [x] `useMonitoringForm.ts` — absorptionPct computed + komponen optional
+- [x] `MonitoringListPage.vue` — guard effective_date + tabel dengan AbsorptionBar
+- [x] `MonitoringFormPage.vue` — 3 section
+- [x] `AbsorptionBar.vue` — color coding 3 level
+- [x] `MonitoringCard.vue`
+- [x] `KomponenTable.vue` — editable + read-only mode
+- [x] `MonitoringChart.vue` — ECharts grouped bar
