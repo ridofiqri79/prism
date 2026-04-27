@@ -168,14 +168,14 @@ Dialog untuk create LoI (dari BBProjectDetailPage):
 
 ## Checklist
 
-- [ ] `blue-book.types.ts`
-- [ ] `blue-book.schema.ts` — bbProject + loI schemas
-- [ ] `blue-book.service.ts`
-- [ ] `blue-book.store.ts`
-- [ ] `BlueBookListPage.vue`
-- [ ] `BlueBookDetailPage.vue`
-- [ ] `useBBProjectForm.ts`
-- [ ] `BBProjectFormPage.vue` — 5 section
-- [ ] `BBProjectDetailPage.vue`
-- [ ] `ProjectCostTable.vue`, `LenderIndicationTable.vue`, `LoITable.vue`
-- [ ] LoI Dialog
+- [x] `blue-book.types.ts`
+- [x] `blue-book.schema.ts` — bbProject + loI schemas
+- [x] `blue-book.service.ts`
+- [x] `blue-book.store.ts`
+- [x] `BlueBookListPage.vue`
+- [x] `BlueBookDetailPage.vue`
+- [x] `useBBProjectForm.ts`
+- [x] `BBProjectFormPage.vue` — 5 section
+- [x] `BBProjectDetailPage.vue`
+- [x] `ProjectCostTable.vue`, `LenderIndicationTable.vue`, `LoITable.vue`
+- [x] LoI Dialog
