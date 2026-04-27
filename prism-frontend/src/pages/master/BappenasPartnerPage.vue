@@ -108,7 +108,7 @@ onMounted(() => {
           <Tag :value="node.data.level" severity="info" rounded />
         </template>
       </Column>
-      <Column header="Actions">
+      <Column header="Aksi">
         <template #body="{ node }">
           <div class="flex flex-wrap gap-2">
             <Button

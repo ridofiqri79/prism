@@ -42,7 +42,7 @@ const columns: ColumnDef[] = [
   { field: 'project_name', header: 'Nama Proyek' },
   { field: 'executing_agency', header: 'Executing Agency' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -124,7 +124,7 @@ onMounted(() => {
 
     <div v-if="blueBookStore.currentBlueBook" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Period</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Periode</p>
         <p class="font-semibold text-surface-950">{{ blueBookStore.currentBlueBook.period.name }}</p>
       </div>
       <div>
@@ -191,7 +191,7 @@ onMounted(() => {
     <Dialog v-model:visible="dialogVisible" modal header="Edit Blue Book" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Period</span>
+          <span class="text-sm font-medium text-surface-700">Periode</span>
           <Select
             v-model="form.period_id"
             :options="masterStore.periods"
@@ -201,7 +201,7 @@ onMounted(() => {
             class="w-full"
             disabled
           />
-          <small class="text-surface-500">Period tidak diubah saat edit Blue Book.</small>
+          <small class="text-surface-500">Periode tidak diubah saat edit Blue Book.</small>
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Tanggal Terbit</span>
@@ -226,4 +226,3 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
-

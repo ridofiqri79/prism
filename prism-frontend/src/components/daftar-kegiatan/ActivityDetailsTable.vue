@@ -50,20 +50,20 @@ function updateName(index: number, activityName: string) {
               severity="danger"
               text
               rounded
-              :aria-label="`Hapus activity ${row.activity_number}`"
+              :aria-label="`Hapus kegiatan ${row.activity_number}`"
               @click="emit('remove', index)"
             />
           </td>
         </tr>
         <tr v-if="rows.length === 0">
           <td colspan="3" class="px-4 py-6 text-center text-surface-500">
-            Belum ada activity detail.
+            Belum ada rincian kegiatan.
           </td>
         </tr>
       </tbody>
     </table>
     <div class="border-t border-surface-200 p-3">
-      <Button label="Tambah Activity" icon="pi pi-plus" outlined size="small" @click="emit('add')" />
+      <Button label="Tambah Kegiatan" icon="pi pi-plus" outlined size="small" @click="emit('add')" />
     </div>
   </div>
 </template>

@@ -40,7 +40,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="loanAgreement?.loan_code || 'Loan Agreement Detail'"
+      :title="loanAgreement?.loan_code || 'Detail Loan Agreement'"
       subtitle="Detail Loan Agreement dan status perpanjangan"
     >
       <template #actions>
@@ -77,7 +77,7 @@ onMounted(() => {
           </div>
           <dl class="grid gap-4 md:grid-cols-2">
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Loan Code</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Kode Loan</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.loan_code }}</dd>
             </div>
             <div>
@@ -85,19 +85,19 @@ onMounted(() => {
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.lender.name }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Agreement Date</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Agreement</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.agreement_date) }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Effective Date</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Efektif</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.effective_date) }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Original Closing Date</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing Awal</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.original_closing_date) }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Closing Date</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.closing_date) }}</dd>
             </div>
           </dl>

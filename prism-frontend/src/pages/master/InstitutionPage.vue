@@ -91,10 +91,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updateInstitution(editing.value.id, payload)
-    toast.success('Berhasil', 'Institution berhasil diperbarui')
+    toast.success('Berhasil', 'Instansi berhasil diperbarui')
   } else {
     await masterStore.createInstitution(payload)
-    toast.success('Berhasil', 'Institution berhasil dibuat')
+    toast.success('Berhasil', 'Instansi berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -105,7 +105,7 @@ function deleteItem(institution: Institution) {
   confirm.confirmDelete(`institution ${institution.name}`, async () => {
     await masterStore.deleteInstitution(institution.id)
     await loadData()
-    toast.success('Berhasil', 'Institution berhasil dihapus')
+    toast.success('Berhasil', 'Instansi berhasil dihapus')
   })
 }
 
@@ -116,7 +116,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Institution" subtitle="Hierarki instansi sampai 6 level referensi">
+    <PageHeader title="Instansi" subtitle="Hierarki instansi sampai 6 level referensi">
       <template #actions>
         <Button v-if="can('institution', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -124,7 +124,7 @@ onMounted(() => {
 
     <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
       <Column field="name" header="Nama" expander />
-      <Column field="short_name" header="Short Name">
+      <Column field="short_name" header="Nama Singkat">
         <template #body="{ node }">{{ node.data.short_name || '-' }}</template>
       </Column>
       <Column field="level" header="Level">
@@ -132,7 +132,7 @@ onMounted(() => {
           <Tag :value="node.data.level" severity="info" rounded />
         </template>
       </Column>
-      <Column header="Actions">
+      <Column header="Aksi">
         <template #body="{ node }">
           <div class="flex flex-wrap gap-2">
             <Button
@@ -157,7 +157,7 @@ onMounted(() => {
       </Column>
     </TreeTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Institution' : 'Tambah Institution'" class="w-[38rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Instansi' : 'Tambah Instansi'" class="w-[38rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama</span>
@@ -166,7 +166,7 @@ onMounted(() => {
         </label>
 
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Short Name</span>
+          <span class="text-sm font-medium text-surface-700">Nama Singkat</span>
           <InputText v-model="form.short_name" class="w-full" :invalid="Boolean(errors.short_name)" />
           <small v-if="errors.short_name" class="text-red-600">{{ errors.short_name }}</small>
         </label>

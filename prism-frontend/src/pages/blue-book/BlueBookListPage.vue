@@ -37,11 +37,11 @@ const form = reactive<BlueBookPayload>({
 const errors = ref<FormErrors<BlueBookField>>({})
 
 const columns: ColumnDef[] = [
-  { field: 'period', header: 'Period' },
+  { field: 'period', header: 'Periode' },
   { field: 'publish_date', header: 'Tanggal Terbit' },
   { field: 'revision', header: 'Revision' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions = ['active', 'superseded']
 
@@ -105,7 +105,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Blue Book" subtitle="Header Blue Book per period dan status revisi">
+    <PageHeader title="Blue Book" subtitle="Header Blue Book per periode dan status revisi">
       <template #actions>
         <Button
           v-if="can('blue_book', 'create')"
@@ -118,7 +118,7 @@ onMounted(() => {
 
     <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-2">
       <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Period</span>
+        <span class="text-sm font-medium text-surface-700">Filter Periode</span>
         <Select
           v-model="periodFilter"
           :options="masterStore.periods"
@@ -172,7 +172,7 @@ onMounted(() => {
     <Dialog v-model:visible="dialogVisible" modal header="Buat Blue Book" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Period</span>
+          <span class="text-sm font-medium text-surface-700">Periode</span>
           <Select
             v-model="form.period_id"
             :options="masterStore.periods"

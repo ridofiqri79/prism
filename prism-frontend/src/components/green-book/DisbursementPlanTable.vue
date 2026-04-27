@@ -59,8 +59,8 @@ function updateAmount(index: number, amount: number) {
       <table class="w-full min-w-[32rem] text-left text-sm">
         <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
           <tr>
-            <th class="px-4 py-3">Year</th>
-            <th class="px-4 py-3">Amount USD</th>
+            <th class="px-4 py-3">Tahun</th>
+            <th class="px-4 py-3">Nilai USD</th>
             <th v-if="editable" class="w-24 px-4 py-3"></th>
           </tr>
         </thead>
@@ -90,14 +90,14 @@ function updateAmount(index: number, amount: number) {
                 severity="danger"
                 text
                 rounded
-                aria-label="Hapus disbursement year"
+                aria-label="Hapus tahun disbursement"
                 @click="emit('remove', index)"
               />
             </td>
           </tr>
           <tr v-if="rows.length === 0">
             <td :colspan="editable ? 3 : 2" class="px-4 py-6 text-center text-surface-500">
-              Belum ada disbursement plan.
+              Belum ada rencana disbursement.
             </td>
           </tr>
         </tbody>
@@ -112,4 +112,3 @@ function updateAmount(index: number, amount: number) {
     </div>
   </div>
 </template>
-

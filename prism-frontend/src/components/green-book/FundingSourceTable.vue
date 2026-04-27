@@ -77,9 +77,9 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3">Lender</th>
-          <th class="px-4 py-3">Institution</th>
-          <th class="px-4 py-3">Loan USD</th>
-          <th class="px-4 py-3">Grant USD</th>
+          <th class="px-4 py-3">Instansi</th>
+          <th class="px-4 py-3">Pinjaman USD</th>
+          <th class="px-4 py-3">Hibah USD</th>
           <th class="px-4 py-3">Local USD</th>
           <th v-if="editable" class="w-24 px-4 py-3"></th>
         </tr>

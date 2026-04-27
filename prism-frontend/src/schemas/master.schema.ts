@@ -62,7 +62,7 @@ export const periodSchema = z
   })
 
 export const nationalPrioritySchema = z.object({
-  period_id: z.string().uuid('Period wajib dipilih'),
+  period_id: z.string().uuid('Periode wajib dipilih'),
   title: z.string().min(1, 'Judul wajib diisi'),
 })
 
@@ -82,5 +82,5 @@ export const bappenasPartnerSchema = z
       if (data.level === 'Eselon II') return Boolean(data.parent_id)
       return true
     },
-    { message: 'Eselon I parent wajib diisi untuk Eselon II', path: ['parent_id'] },
+    { message: 'Induk Eselon I wajib dipilih untuk Eselon II', path: ['parent_id'] },
   )

@@ -55,7 +55,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="project?.gb_code ?? 'GB Project Detail'" :subtitle="project?.project_name">
+    <PageHeader :title="project?.gb_code ?? 'Detail GB Project'" :subtitle="project?.project_name">
       <template #actions>
         <Button
           label="Kembali"
@@ -81,7 +81,7 @@ onMounted(() => {
           <StatusBadge :status="project.status" />
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Program Title</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Judul Program</p>
           <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
         </div>
         <div>
@@ -122,10 +122,10 @@ onMounted(() => {
 
       <Tabs value="0" class="rounded-lg border border-surface-200 bg-white p-2">
         <TabList>
-          <Tab value="0">Activities</Tab>
+          <Tab value="0">Kegiatan</Tab>
           <Tab value="1">Funding Source</Tab>
-          <Tab value="2">Disbursement Plan</Tab>
-          <Tab value="3">Funding Allocation</Tab>
+          <Tab value="2">Rencana Disbursement</Tab>
+          <Tab value="3">Alokasi Funding</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="0">
@@ -157,4 +157,3 @@ onMounted(() => {
     </div>
   </section>
 </template>
-

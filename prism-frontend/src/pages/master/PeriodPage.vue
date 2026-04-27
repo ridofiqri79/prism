@@ -29,7 +29,7 @@ const columns: ColumnDef[] = [
   { field: 'name', header: 'Nama', sortable: true },
   { field: 'year_start', header: 'Tahun Awal' },
   { field: 'year_end', header: 'Tahun Akhir' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -63,10 +63,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updatePeriod(editing.value.id, parsed.data)
-    toast.success('Berhasil', 'Period berhasil diperbarui')
+    toast.success('Berhasil', 'Periode berhasil diperbarui')
   } else {
     await masterStore.createPeriod(parsed.data)
-    toast.success('Berhasil', 'Period berhasil dibuat')
+    toast.success('Berhasil', 'Periode berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -77,7 +77,7 @@ function deleteItem(period: Period) {
   confirm.confirmDelete(`period ${period.name}`, async () => {
     await masterStore.deletePeriod(period.id)
     await loadData()
-    toast.success('Berhasil', 'Period berhasil dihapus')
+    toast.success('Berhasil', 'Periode berhasil dihapus')
   })
 }
 
@@ -88,7 +88,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Period" subtitle="Master periode perencanaan">
+    <PageHeader title="Periode" subtitle="Master periode perencanaan">
       <template #actions>
         <Button v-if="can('period', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -126,7 +126,7 @@ onMounted(() => {
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Period' : 'Tambah Period'" class="w-[32rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Periode' : 'Tambah Periode'" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama</span>

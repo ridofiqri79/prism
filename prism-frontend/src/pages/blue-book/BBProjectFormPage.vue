@@ -82,7 +82,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="pageTitle" subtitle="Form BB Project lengkap dalam 5 section">
+    <PageHeader :title="pageTitle" subtitle="Lengkapi data proyek Blue Book">
       <template #actions>
         <Button
           label="Kembali"
@@ -96,25 +96,24 @@ onMounted(() => {
     <form class="space-y-6" @submit.prevent="onSubmit">
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Section 1</p>
           <h2 class="mt-1 text-lg font-semibold text-surface-950">Informasi Umum</h2>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Program Title</span>
+            <span class="text-sm font-medium text-surface-700">Judul Program</span>
             <ProgramTitleSelect v-model="form.values.program_title_id" />
             <small v-if="form.errors.program_title_id" class="text-red-600">
               {{ form.errors.program_title_id }}
             </small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Bappenas Partner (Eselon II)</span>
+            <span class="text-sm font-medium text-surface-700">Mitra Bappenas (Eselon II)</span>
             <Select
               v-model="form.values.bappenas_partner_id"
               :options="bappenasPartnerOptions"
               option-label="name"
               option-value="id"
-              placeholder="Pilih Bappenas Partner"
+              placeholder="Pilih mitra Bappenas"
               filter
               class="w-full"
             />
@@ -124,11 +123,11 @@ onMounted(() => {
           </label>
         </div>
         <div class="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700">
-          Eselon I Parent: <strong>{{ selectedPartnerParent }}</strong>
+          Induk Eselon I: <strong>{{ selectedPartnerParent }}</strong>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">BB Code</span>
+            <span class="text-sm font-medium text-surface-700">Kode BB</span>
             <InputText v-model="form.values.bb_code" class="w-full" :disabled="isEditMode" />
             <small v-if="form.errors.bb_code" class="text-red-600">{{ form.errors.bb_code }}</small>
           </label>
@@ -138,17 +137,17 @@ onMounted(() => {
             <small v-if="form.errors.project_name" class="text-red-600">{{ form.errors.project_name }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Duration</span>
+            <span class="text-sm font-medium text-surface-700">Durasi</span>
             <InputText v-model="form.values.duration" class="w-full" placeholder="2025-2030" />
           </label>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Objective</span>
+            <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <Textarea v-model="form.values.objective" auto-resize rows="3" class="w-full" />
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Scope of Work</span>
+            <span class="text-sm font-medium text-surface-700">Lingkup Pekerjaan</span>
             <Textarea v-model="form.values.scope_of_work" auto-resize rows="3" class="w-full" />
           </label>
           <label class="block space-y-2">
@@ -164,7 +163,6 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Section 2</p>
           <h2 class="mt-1 text-lg font-semibold text-surface-950">Pihak Terlibat</h2>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
@@ -187,7 +185,6 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Section 3</p>
           <h2 class="mt-1 text-lg font-semibold text-surface-950">Lokasi & Prioritas</h2>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
@@ -197,7 +194,7 @@ onMounted(() => {
             <small v-if="form.errors.location_ids" class="text-red-600">{{ form.errors.location_ids }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">National Priority</span>
+            <span class="text-sm font-medium text-surface-700">Prioritas Nasional</span>
             <NationalPriorityMultiSelect v-model="form.values.national_priority_ids" :period-id="periodId" />
           </label>
         </div>
@@ -205,8 +202,7 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Section 4</p>
-          <h2 class="mt-1 text-lg font-semibold text-surface-950">Project Cost</h2>
+          <h2 class="mt-1 text-lg font-semibold text-surface-950">Biaya Proyek</h2>
         </div>
         <ProjectCostTable
           v-model:rows="form.projectCosts.value"
@@ -217,8 +213,7 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Section 5</p>
-          <h2 class="mt-1 text-lg font-semibold text-surface-950">Lender Indication</h2>
+          <h2 class="mt-1 text-lg font-semibold text-surface-950">Indikasi Lender</h2>
         </div>
         <LenderIndicationTable
           v-model:rows="form.lenderIndications.value"

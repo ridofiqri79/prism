@@ -61,18 +61,18 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
     <table class="w-full min-w-[64rem] text-left text-sm">
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Activity</th>
-          <th class="px-4 py-3">Services</th>
-          <th class="px-4 py-3">Constructions</th>
-          <th class="px-4 py-3">Goods</th>
-          <th class="px-4 py-3">Trainings</th>
-          <th class="px-4 py-3">Other</th>
+          <th class="px-4 py-3">Kegiatan</th>
+          <th class="px-4 py-3">Jasa</th>
+          <th class="px-4 py-3">Konstruksi</th>
+          <th class="px-4 py-3">Barang</th>
+          <th class="px-4 py-3">Pelatihan</th>
+          <th class="px-4 py-3">Lainnya</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-100">
         <tr v-for="(activity, index) in activities" :key="index">
           <td class="px-4 py-3 font-medium text-surface-950">
-            {{ activity.activity_name || `Activity ${index + 1}` }}
+            {{ activity.activity_name || `Kegiatan ${index + 1}` }}
           </td>
           <td class="px-4 py-3">
             <CurrencyInput
@@ -134,4 +134,3 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
     </table>
   </div>
 </template>
-

@@ -11,7 +11,7 @@ export const daftarKegiatanSchema = z.object({
 
 export const dkFinancingDetailSchema = z.object({
   lender_id: z.string().uuid('Lender wajib dipilih'),
-  currency: z.string().min(3, 'Currency wajib diisi').max(3, 'Gunakan kode ISO 4217'),
+  currency: z.string().min(3, 'Mata uang wajib diisi').max(3, 'Gunakan kode ISO 4217'),
   amount_original: money,
   grant_original: money,
   counterpart_original: money,
@@ -22,8 +22,8 @@ export const dkFinancingDetailSchema = z.object({
 })
 
 export const dkLoanAllocationSchema = z.object({
-  institution_id: z.string().uuid('Institution wajib dipilih'),
-  currency: z.string().min(3, 'Currency wajib diisi').max(3, 'Gunakan kode ISO 4217'),
+  institution_id: z.string().uuid('Instansi wajib dipilih'),
+  currency: z.string().min(3, 'Mata uang wajib diisi').max(3, 'Gunakan kode ISO 4217'),
   amount_original: money,
   grant_original: money,
   counterpart_original: money,
@@ -40,12 +40,12 @@ export const dkActivityDetailSchema = z.object({
 
 export const dkProjectSchema = z.object({
   program_title_id: optionalUuid,
-  institution_id: z.string().uuid('Executing Agency wajib dipilih'),
+  institution_id: z.string().uuid('Executing agency wajib dipilih'),
   duration: z.string().optional().nullable(),
   objectives: z.string().optional().nullable(),
   gb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 GB Project'),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
-  financing_details: z.array(dkFinancingDetailSchema).min(1, 'Minimal 1 financing detail'),
-  loan_allocations: z.array(dkLoanAllocationSchema).min(1, 'Minimal 1 loan allocation'),
-  activity_details: z.array(dkActivityDetailSchema).min(1, 'Minimal 1 activity detail'),
+  financing_details: z.array(dkFinancingDetailSchema).min(1, 'Minimal 1 rincian pembiayaan'),
+  loan_allocations: z.array(dkLoanAllocationSchema).min(1, 'Minimal 1 alokasi pinjaman'),
+  activity_details: z.array(dkActivityDetailSchema).min(1, 'Minimal 1 rincian kegiatan'),
 })

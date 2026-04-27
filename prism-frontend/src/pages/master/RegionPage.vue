@@ -81,10 +81,10 @@ async function save() {
 
   if (editing.value) {
     await masterStore.updateRegion(editing.value.id, payload)
-    toast.success('Berhasil', 'Region berhasil diperbarui')
+    toast.success('Berhasil', 'Wilayah berhasil diperbarui')
   } else {
     await masterStore.createRegion(payload)
-    toast.success('Berhasil', 'Region berhasil dibuat')
+    toast.success('Berhasil', 'Wilayah berhasil dibuat')
   }
 
   dialogVisible.value = false
@@ -95,7 +95,7 @@ function deleteItem(region: Region) {
   confirm.confirmDelete(`region ${region.name}`, async () => {
     await masterStore.deleteRegion(region.id)
     await loadData()
-    toast.success('Berhasil', 'Region berhasil dihapus')
+    toast.success('Berhasil', 'Wilayah berhasil dihapus')
   })
 }
 
@@ -106,7 +106,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Region" subtitle="Hierarki wilayah COUNTRY, PROVINCE, dan CITY">
+    <PageHeader title="Wilayah" subtitle="Hierarki wilayah nasional, provinsi, dan kota/kabupaten">
       <template #actions>
         <Button v-if="can('region', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
@@ -115,12 +115,12 @@ onMounted(() => {
     <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
       <Column field="code" header="Kode" expander />
       <Column field="name" header="Nama" />
-      <Column field="type" header="Type">
+      <Column field="type" header="Tipe">
         <template #body="{ node }">
           <Tag :value="node.data.type" severity="info" rounded />
         </template>
       </Column>
-      <Column header="Actions">
+      <Column header="Aksi">
         <template #body="{ node }">
           <div class="flex flex-wrap gap-2">
             <Button
@@ -145,7 +145,7 @@ onMounted(() => {
       </Column>
     </TreeTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Region' : 'Tambah Region'" class="w-[36rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Wilayah' : 'Tambah Wilayah'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Kode</span>
@@ -160,7 +160,7 @@ onMounted(() => {
         </label>
 
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Type</span>
+          <span class="text-sm font-medium text-surface-700">Tipe</span>
           <Select v-model="form.type" :options="typeOptions" class="w-full" />
           <small v-if="errors.type" class="text-red-600">{{ errors.type }}</small>
         </label>

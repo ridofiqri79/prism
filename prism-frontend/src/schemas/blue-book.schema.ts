@@ -11,7 +11,7 @@ const optionalText = z
   .transform((value) => value?.trim() || undefined)
 
 export const blueBookSchema = z.object({
-  period_id: z.string().uuid('Period wajib dipilih'),
+  period_id: z.string().uuid('Periode wajib dipilih'),
   publish_date: z.string().min(1, 'Tanggal terbit wajib diisi'),
   revision_number: z.number().int().min(0, 'Revisi minimal 0'),
   revision_year: optionalNumber,
@@ -29,17 +29,17 @@ export const lenderIndicationSchema = z.object({
 })
 
 export const bbProjectSchema = z.object({
-  program_title_id: z.string().uuid('Program Title wajib dipilih'),
-  bappenas_partner_id: z.string().uuid('Bappenas Partner wajib dipilih'),
-  bb_code: z.string().min(1, 'BB Code wajib diisi'),
+  program_title_id: z.string().uuid('Judul program wajib dipilih'),
+  bappenas_partner_id: z.string().uuid('Mitra Bappenas wajib dipilih'),
+  bb_code: z.string().min(1, 'Kode BB wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
   duration: optionalText,
   objective: optionalText,
   scope_of_work: optionalText,
   outputs: optionalText,
   outcomes: optionalText,
-  executing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Executing Agency'),
-  implementing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Implementing Agency'),
+  executing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 executing agency'),
+  implementing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 implementing agency'),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
   national_priority_ids: z.array(z.string().uuid()),
 })
@@ -54,4 +54,3 @@ export const loiSchema = z.object({
 export type BlueBookFormValues = z.infer<typeof blueBookSchema>
 export type BBProjectBaseFormValues = z.infer<typeof bbProjectSchema>
 export type LoIFormValues = z.infer<typeof loiSchema>
-

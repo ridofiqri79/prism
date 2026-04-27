@@ -36,10 +36,10 @@ const showCountry = computed(() => form.type !== 'Multilateral')
 
 const columns: ColumnDef[] = [
   { field: 'name', header: 'Nama', sortable: true },
-  { field: 'short_name', header: 'Short Name' },
-  { field: 'type', header: 'Type' },
+  { field: 'short_name', header: 'Nama Singkat' },
+  { field: 'type', header: 'Tipe' },
   { field: 'country', header: 'Negara' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
@@ -161,13 +161,13 @@ onMounted(() => {
         </label>
 
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Short Name</span>
+          <span class="text-sm font-medium text-surface-700">Nama Singkat</span>
           <InputText v-model="form.short_name" class="w-full" :invalid="Boolean(errors.short_name)" />
           <small v-if="errors.short_name" class="text-red-600">{{ errors.short_name }}</small>
         </label>
 
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Type</span>
+          <span class="text-sm font-medium text-surface-700">Tipe</span>
           <Select v-model="form.type" :options="typeOptions" class="w-full" />
           <small v-if="errors.type" class="text-red-600">{{ errors.type }}</small>
         </label>

@@ -90,7 +90,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="pageTitle" subtitle="Form Loan Agreement dengan validasi lender dan perpanjangan">
+    <PageHeader :title="pageTitle" subtitle="Lengkapi data Loan Agreement">
       <template #actions>
         <Button
           label="Kembali"
@@ -104,10 +104,9 @@ onMounted(() => {
     <form class="space-y-6" @submit.prevent="onSubmit">
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 1</p>
           <h2 class="text-lg font-semibold text-surface-950">Referensi DK dan Lender</h2>
           <p class="text-sm text-surface-500">
-            Lender hanya dapat dipilih dari Financing Detail DK Project terkait.
+            Lender hanya dapat dipilih dari rincian pembiayaan DK Project terkait.
           </p>
         </div>
 
@@ -149,40 +148,39 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 2</p>
           <h2 class="text-lg font-semibold text-surface-950">Informasi Loan</h2>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Loan Code</span>
+            <span class="text-sm font-medium text-surface-700">Kode Loan</span>
             <InputText v-model="form.values.loan_code" class="w-full" placeholder="IP-603" />
             <small v-if="form.errors.loan_code" class="text-red-600">{{ form.errors.loan_code }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Currency</span>
+            <span class="text-sm font-medium text-surface-700">Mata Uang</span>
             <InputText v-model="form.values.currency" class="w-full" placeholder="JPY" />
             <small v-if="form.errors.currency" class="text-red-600">{{ form.errors.currency }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Agreement Date</span>
+            <span class="text-sm font-medium text-surface-700">Tanggal Agreement</span>
             <DatePicker v-model="agreementDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
             <small v-if="form.errors.agreement_date" class="text-red-600">{{ form.errors.agreement_date }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Effective Date</span>
+            <span class="text-sm font-medium text-surface-700">Tanggal Efektif</span>
             <DatePicker v-model="effectiveDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
             <small v-if="form.errors.effective_date" class="text-red-600">{{ form.errors.effective_date }}</small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Original Closing Date</span>
+            <span class="text-sm font-medium text-surface-700">Tanggal Closing Awal</span>
             <DatePicker v-model="originalClosingDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
             <small v-if="form.errors.original_closing_date" class="text-red-600">
               {{ form.errors.original_closing_date }}
             </small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Closing Date</span>
+            <span class="text-sm font-medium text-surface-700">Tanggal Closing</span>
             <DatePicker v-model="closingDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
             <small v-if="form.errors.closing_date" class="text-red-600">{{ form.errors.closing_date }}</small>
           </label>
@@ -195,7 +193,6 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-primary">Section 3</p>
           <h2 class="text-lg font-semibold text-surface-950">Nilai Pinjaman</h2>
           <p class="text-sm text-surface-500">Konversi ke USD diisi manual oleh Staff.</p>
         </div>

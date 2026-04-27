@@ -18,25 +18,25 @@ const { can } = usePermission()
 
 const masterItems = computed<NavigationItem[]>(() =>
   [
-    { label: 'Countries', to: '/master/countries', icon: 'pi pi-globe', module: 'country' },
-    { label: 'Lenders', to: '/master/lenders', icon: 'pi pi-building-columns', module: 'lender' },
-    { label: 'Institutions', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
-    { label: 'Regions', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
+    { label: 'Negara', to: '/master/countries', icon: 'pi pi-globe', module: 'country' },
+    { label: 'Lender', to: '/master/lenders', icon: 'pi pi-building-columns', module: 'lender' },
+    { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
+    { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {
-      label: 'Program Titles',
+      label: 'Judul Program',
       to: '/master/program-titles',
       icon: 'pi pi-book',
       module: 'program_title',
     },
     {
-      label: 'Bappenas Partners',
+      label: 'Mitra Bappenas',
       to: '/master/bappenas-partners',
       icon: 'pi pi-users',
       module: 'bappenas_partner',
     },
-    { label: 'Periods', to: '/master/periods', icon: 'pi pi-calendar', module: 'period' },
+    { label: 'Periode', to: '/master/periods', icon: 'pi pi-calendar', module: 'period' },
     {
-      label: 'National Priorities',
+      label: 'Prioritas Nasional',
       to: '/master/national-priorities',
       icon: 'pi pi-flag',
       module: 'national_priority',
@@ -47,8 +47,8 @@ const masterItems = computed<NavigationItem[]>(() =>
 const items = computed<NavigationItem[]>(() =>
   [
     { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-home' },
-    { label: 'Blue Books', to: '/blue-books', icon: 'pi pi-folder-open', module: 'bb_project' },
-    { label: 'Green Books', to: '/green-books', icon: 'pi pi-folder', module: 'gb_project' },
+    { label: 'Blue Book', to: '/blue-books', icon: 'pi pi-folder-open', module: 'bb_project' },
+    { label: 'Green Book', to: '/green-books', icon: 'pi pi-folder', module: 'gb_project' },
     {
       label: 'Daftar Kegiatan',
       to: '/daftar-kegiatan',
@@ -56,13 +56,13 @@ const items = computed<NavigationItem[]>(() =>
       module: 'daftar_kegiatan',
     },
     {
-      label: 'Loan Agreements',
+      label: 'Loan Agreement',
       to: '/loan-agreements',
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
     },
-    { label: 'Journey', to: '/journey', icon: 'pi pi-share-alt', module: 'bb_project' },
-    { label: 'Users', to: '/users', icon: 'pi pi-user', adminOnly: true },
+    { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-share-alt', module: 'bb_project' },
+    { label: 'Pengguna', to: '/users', icon: 'pi pi-user', adminOnly: true },
   ].filter((item) => {
     if (item.adminOnly) return auth.user?.role === 'ADMIN'
     if (!item.module) return true
@@ -79,7 +79,7 @@ function isActive(path: string) {
   <aside class="hidden w-72 shrink-0 border-r border-surface-200 bg-white lg:block">
     <div class="border-b border-surface-200 px-6 py-5">
       <p class="text-xs font-semibold uppercase tracking-[0.24em] text-primary">PRISM</p>
-      <h1 class="mt-2 text-xl font-semibold text-surface-950">Frontend Setup</h1>
+      <h1 class="mt-2 text-xl font-semibold text-surface-950">Monitoring Pinjaman Luar Negeri</h1>
       <p class="mt-1 text-sm text-surface-500">Project Loan Integrated Monitoring System</p>
     </div>
 
@@ -101,7 +101,7 @@ function isActive(path: string) {
 
       <div v-if="masterItems.length > 0" class="pt-4">
         <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-surface-400">
-          Master Data
+          Data Master
         </p>
         <RouterLink
           v-for="item in masterItems"

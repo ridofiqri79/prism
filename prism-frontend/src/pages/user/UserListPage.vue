@@ -21,9 +21,9 @@ const toast = useToast()
 const columns: ColumnDef[] = [
   { field: 'username', header: 'Username', sortable: true },
   { field: 'email', header: 'Email', sortable: true },
-  { field: 'role', header: 'Role' },
+  { field: 'role', header: 'Peran' },
   { field: 'is_active', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadUsers() {
@@ -43,7 +43,7 @@ function goToPermissions(user: AppUser) {
 }
 
 function confirmDeactivate(user: AppUser) {
-  confirm.confirmDelete(`user ${user.username}`, async () => {
+  confirm.confirmDelete(`pengguna ${user.username}`, async () => {
     await userStore.updateUser(user.id, {
       username: user.username,
       email: user.email,
@@ -51,7 +51,7 @@ function confirmDeactivate(user: AppUser) {
       is_active: false,
     })
     await loadUsers()
-    toast.success('Berhasil', 'User berhasil dinonaktifkan')
+    toast.success('Berhasil', 'Pengguna berhasil dinonaktifkan')
   })
 }
 
@@ -80,9 +80,9 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Manajemen User" subtitle="Kelola akun dan permission staff PRISM">
+    <PageHeader title="Manajemen Pengguna" subtitle="Kelola akun dan hak akses staff PRISM">
       <template #actions>
-        <Button label="Tambah User" icon="pi pi-plus" @click="goToCreate" />
+        <Button label="Tambah Pengguna" icon="pi pi-plus" @click="goToCreate" />
       </template>
     </PageHeader>
 
@@ -112,7 +112,7 @@ onMounted(() => {
           <Button icon="pi pi-pencil" label="Edit" size="small" outlined @click="goToEdit(row as AppUser)" />
           <Button
             icon="pi pi-shield"
-            label="Set Permission"
+            label="Atur Hak Akses"
             size="small"
             outlined
             @click="goToPermissions(row as AppUser)"

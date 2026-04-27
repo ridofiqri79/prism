@@ -28,15 +28,15 @@ function updateRow(index: number, patch: Partial<DKLoanAllocationPayload>) {
     <table class="w-full min-w-[90rem] text-left text-sm">
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Institution</th>
-          <th class="px-4 py-3">Currency</th>
-          <th class="px-4 py-3">Loan Original</th>
-          <th class="px-4 py-3">Grant Original</th>
+          <th class="px-4 py-3">Instansi</th>
+          <th class="px-4 py-3">Mata Uang</th>
+          <th class="px-4 py-3">Pinjaman Original</th>
+          <th class="px-4 py-3">Hibah Original</th>
           <th class="px-4 py-3">Counterpart Original</th>
-          <th class="px-4 py-3">Loan USD</th>
-          <th class="px-4 py-3">Grant USD</th>
+          <th class="px-4 py-3">Pinjaman USD</th>
+          <th class="px-4 py-3">Hibah USD</th>
           <th class="px-4 py-3">Counterpart USD</th>
-          <th class="px-4 py-3">Remarks</th>
+          <th class="px-4 py-3">Catatan</th>
           <th class="w-20 px-4 py-3"></th>
         </tr>
       </thead>
@@ -108,7 +108,7 @@ function updateRow(index: number, patch: Partial<DKLoanAllocationPayload>) {
         </tr>
         <tr v-if="rows.length === 0">
           <td colspan="10" class="px-4 py-6 text-center text-surface-500">
-            Belum ada loan allocation.
+            Belum ada alokasi pinjaman.
           </td>
         </tr>
       </tbody>

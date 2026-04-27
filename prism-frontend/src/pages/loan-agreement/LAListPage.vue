@@ -25,18 +25,18 @@ const isExtended = ref<boolean | null>(null)
 const closingDateBefore = ref<Date | null>(null)
 const isExtendedOptions = [
   { label: 'Semua', value: null },
-  { label: 'Extended', value: true },
-  { label: 'Tidak Extended', value: false },
+  { label: 'Diperpanjang', value: true },
+  { label: 'Tidak diperpanjang', value: false },
 ]
 const columns: ColumnDef[] = [
-  { field: 'loan_code', header: 'Loan Code' },
+  { field: 'loan_code', header: 'Kode Loan' },
   { field: 'lender', header: 'Lender' },
-  { field: 'effective_date', header: 'Effective Date' },
-  { field: 'closing_date', header: 'Closing Date' },
-  { field: 'currency', header: 'Currency' },
-  { field: 'amount_usd', header: 'Amount USD' },
+  { field: 'effective_date', header: 'Tanggal Efektif' },
+  { field: 'closing_date', header: 'Tanggal Closing' },
+  { field: 'currency', header: 'Mata Uang' },
+  { field: 'amount_usd', header: 'Nilai USD' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Actions' },
+  { field: 'actions', header: 'Aksi' },
 ]
 
 const closingDateBeforeString = computed(() => toDateString(closingDateBefore.value))
@@ -110,12 +110,12 @@ onMounted(() => {
           />
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Closing Date Before</span>
+          <span class="text-sm font-medium text-surface-700">Closing Sebelum Tanggal</span>
           <DatePicker v-model="closingDateBefore" date-format="yy-mm-dd" show-icon class="w-full" />
         </label>
         <div class="flex items-end gap-2">
           <Button
-            :label="isExtended === true ? 'Extended only aktif' : 'Extended only'"
+            :label="isExtended === true ? 'Hanya diperpanjang aktif' : 'Hanya diperpanjang'"
             :severity="isExtended === true ? 'warn' : 'secondary'"
             outlined
             @click="isExtended = isExtended === true ? null : true"

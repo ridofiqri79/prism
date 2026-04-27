@@ -129,7 +129,7 @@ watch(
 
             <div v-if="isOpen('blue-book')" class="mt-3 space-y-3 border-l border-surface-100 pl-5">
               <div class="text-sm">
-                <p class="font-medium text-surface-700">Lender Indication</p>
+                <p class="font-medium text-surface-700">Indikasi Lender</p>
                 <p
                   v-if="(bbProject.lender_indications?.length ?? 0) === 0"
                   class="italic text-surface-400"
