@@ -11,6 +11,11 @@ import { masterRoutes } from '@/router/routes/master.routes'
 import { monitoringRoutes } from '@/router/routes/monitoring.routes'
 import { userRoutes } from '@/router/routes/user.routes'
 
+interface PermissionMeta {
+  module: string
+  action: 'create' | 'read' | 'update' | 'delete'
+}
+
 const appRoutes: RouteRecordRaw[] = [
   {
     path: '/',
@@ -71,6 +76,14 @@ router.beforeEach(async (to) => {
 
   if (to.meta.adminOnly && auth.user?.role !== 'ADMIN') {
     return { name: 'forbidden' }
+  }
+
+  if (to.meta.permission) {
+    const permission = to.meta.permission as PermissionMeta
+
+    if (!auth.can(permission.module, permission.action)) {
+      return { name: 'forbidden' }
+    }
   }
 
   if (to.name === 'login' && auth.isAuthenticated) {

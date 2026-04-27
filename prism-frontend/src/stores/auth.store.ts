@@ -31,11 +31,11 @@ export const useAuthStore = defineStore('auth', () => {
     clearStoredSession()
   }
 
-  async function login(username: string, password: string) {
+  async function login(payload: { username: string; password: string }) {
     loading.value = true
 
     try {
-      const result = await AuthService.login({ username, password })
+      const result = await AuthService.login(payload)
 
       user.value = result.user
       token.value = result.access_token
@@ -47,8 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
         permissions: [],
       })
 
-      const { default: router } = await import('@/router')
-      await router.push({ name: 'dashboard' })
+      await fetchMe()
 
       return result
     } finally {
@@ -57,6 +56,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    try {
+      if (token.value) {
+        await AuthService.logout()
+      }
+    } catch {
+      // Local session cleanup must still happen if the server is unreachable.
+    }
+
     clearSession()
 
     const { default: router } = await import('@/router')
@@ -74,14 +81,19 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
 
     try {
-      const session = await AuthService.fetchMe()
+      const session = await AuthService.getMe()
 
-      user.value = session.user
+      user.value = {
+        id: session.id,
+        username: session.username,
+        email: session.email,
+        role: session.role,
+      }
       permissions.value = session.permissions
 
       storeSession({
         token: token.value,
-        user: session.user,
+        user: user.value,
         permissions: session.permissions,
       })
     } finally {

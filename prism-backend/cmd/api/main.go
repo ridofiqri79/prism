@@ -42,8 +42,10 @@ func main() {
 
 	authService := service.NewAuthService(q, cfg.JWTSecret, cfg.JWTExpiresIn)
 	userService := service.NewUserService(pool, q)
+	masterService := service.NewMasterService(pool, q)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
+	masterHandler := handler.NewMasterHandler(masterService)
 
 	broker := sse.NewBroker()
 	go broker.Run()
@@ -80,6 +82,55 @@ func main() {
 	userGroup.DELETE("/:id", userHandler.Delete)
 	userGroup.GET("/:id/permissions", userHandler.GetPermissions)
 	userGroup.PUT("/:id/permissions", userHandler.UpdatePermissions)
+
+	master := api.Group("/master")
+	master.GET("/countries", masterHandler.ListCountries, middleware.Require("country", "read"))
+	master.GET("/countries/:id", masterHandler.GetCountry, middleware.Require("country", "read"))
+	master.POST("/countries", masterHandler.CreateCountry, middleware.Require("country", "create"))
+	master.PUT("/countries/:id", masterHandler.UpdateCountry, middleware.Require("country", "update"))
+	master.DELETE("/countries/:id", masterHandler.DeleteCountry, middleware.Require("country", "delete"))
+
+	master.GET("/lenders", masterHandler.ListLenders, middleware.Require("lender", "read"))
+	master.GET("/lenders/:id", masterHandler.GetLender, middleware.Require("lender", "read"))
+	master.POST("/lenders", masterHandler.CreateLender, middleware.Require("lender", "create"))
+	master.PUT("/lenders/:id", masterHandler.UpdateLender, middleware.Require("lender", "update"))
+	master.DELETE("/lenders/:id", masterHandler.DeleteLender, middleware.Require("lender", "delete"))
+
+	master.GET("/institutions", masterHandler.ListInstitutions, middleware.Require("institution", "read"))
+	master.GET("/institutions/:id", masterHandler.GetInstitution, middleware.Require("institution", "read"))
+	master.POST("/institutions", masterHandler.CreateInstitution, middleware.Require("institution", "create"))
+	master.PUT("/institutions/:id", masterHandler.UpdateInstitution, middleware.Require("institution", "update"))
+	master.DELETE("/institutions/:id", masterHandler.DeleteInstitution, middleware.Require("institution", "delete"))
+
+	master.GET("/regions", masterHandler.ListRegions, middleware.Require("region", "read"))
+	master.GET("/regions/:id", masterHandler.GetRegion, middleware.Require("region", "read"))
+	master.POST("/regions", masterHandler.CreateRegion, middleware.Require("region", "create"))
+	master.PUT("/regions/:id", masterHandler.UpdateRegion, middleware.Require("region", "update"))
+	master.DELETE("/regions/:id", masterHandler.DeleteRegion, middleware.Require("region", "delete"))
+
+	master.GET("/program-titles", masterHandler.ListProgramTitles, middleware.Require("program_title", "read"))
+	master.GET("/program-titles/:id", masterHandler.GetProgramTitle, middleware.Require("program_title", "read"))
+	master.POST("/program-titles", masterHandler.CreateProgramTitle, middleware.Require("program_title", "create"))
+	master.PUT("/program-titles/:id", masterHandler.UpdateProgramTitle, middleware.Require("program_title", "update"))
+	master.DELETE("/program-titles/:id", masterHandler.DeleteProgramTitle, middleware.Require("program_title", "delete"))
+
+	master.GET("/bappenas-partners", masterHandler.ListBappenasPartners, middleware.Require("bappenas_partner", "read"))
+	master.GET("/bappenas-partners/:id", masterHandler.GetBappenasPartner, middleware.Require("bappenas_partner", "read"))
+	master.POST("/bappenas-partners", masterHandler.CreateBappenasPartner, middleware.Require("bappenas_partner", "create"))
+	master.PUT("/bappenas-partners/:id", masterHandler.UpdateBappenasPartner, middleware.Require("bappenas_partner", "update"))
+	master.DELETE("/bappenas-partners/:id", masterHandler.DeleteBappenasPartner, middleware.Require("bappenas_partner", "delete"))
+
+	master.GET("/periods", masterHandler.ListPeriods, middleware.Require("period", "read"))
+	master.GET("/periods/:id", masterHandler.GetPeriod, middleware.Require("period", "read"))
+	master.POST("/periods", masterHandler.CreatePeriod, middleware.Require("period", "create"))
+	master.PUT("/periods/:id", masterHandler.UpdatePeriod, middleware.Require("period", "update"))
+	master.DELETE("/periods/:id", masterHandler.DeletePeriod, middleware.Require("period", "delete"))
+
+	master.GET("/national-priorities", masterHandler.ListNationalPriorities, middleware.Require("national_priority", "read"))
+	master.GET("/national-priorities/:id", masterHandler.GetNationalPriority, middleware.Require("national_priority", "read"))
+	master.POST("/national-priorities", masterHandler.CreateNationalPriority, middleware.Require("national_priority", "create"))
+	master.PUT("/national-priorities/:id", masterHandler.UpdateNationalPriority, middleware.Require("national_priority", "update"))
+	master.DELETE("/national-priorities/:id", masterHandler.DeleteNationalPriority, middleware.Require("national_priority", "delete"))
 
 	e.GET("/events", handler.SSEHandler(broker))
 

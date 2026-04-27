@@ -32,7 +32,7 @@ func ApplyAuditUser(ctx context.Context, tx pgx.Tx) error {
 		return nil
 	}
 
-	_, err := tx.Exec(ctx, "SET LOCAL app.current_user_id = $1", userID)
+	_, err := tx.Exec(ctx, "SELECT set_config('app.current_user_id', $1, true)", userID)
 	return err
 }
 

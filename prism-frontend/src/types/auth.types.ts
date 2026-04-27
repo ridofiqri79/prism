@@ -22,7 +22,6 @@ export interface LoginResponse {
   user: AuthUser
 }
 
-export interface AuthSession {
-  user: AuthUser
+export interface MeResponse extends AuthUser {
   permissions: UserPermission[]
 }

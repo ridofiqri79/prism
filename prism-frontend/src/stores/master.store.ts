@@ -3,16 +3,22 @@ import { defineStore } from 'pinia'
 import { MasterService } from '@/services/master.service'
 import type {
   BappenasPartner,
+  BappenasPartnerPayload,
   Country,
-  CreatePayload,
+  CountryPayload,
   Institution,
+  InstitutionPayload,
   Lender,
+  LenderPayload,
   ListParams,
   NationalPriority,
+  NationalPriorityPayload,
   Period,
+  PeriodPayload,
   ProgramTitle,
+  ProgramTitlePayload,
   Region,
-  UpdatePayload,
+  RegionPayload,
 } from '@/types/master.types'
 
 type MasterKey =
@@ -88,13 +94,13 @@ export const useMasterStore = defineStore('master', () => {
     loaded.value[key] = false
   }
 
-  async function createCountry(data: CreatePayload<Country>) {
+  async function createCountry(data: CountryPayload) {
     const result = await MasterService.createCountry(data)
     invalidate('countries')
     return result
   }
 
-  async function updateCountry(id: string, data: UpdatePayload<Country>) {
+  async function updateCountry(id: string, data: Partial<CountryPayload>) {
     const result = await MasterService.updateCountry(id, data)
     invalidate('countries')
     return result
@@ -105,13 +111,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('countries')
   }
 
-  async function createLender(data: CreatePayload<Lender>) {
+  async function createLender(data: LenderPayload) {
     const result = await MasterService.createLender(data)
     invalidate('lenders')
     return result
   }
 
-  async function updateLender(id: string, data: UpdatePayload<Lender>) {
+  async function updateLender(id: string, data: Partial<LenderPayload>) {
     const result = await MasterService.updateLender(id, data)
     invalidate('lenders')
     return result
@@ -122,13 +128,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('lenders')
   }
 
-  async function createInstitution(data: CreatePayload<Institution>) {
+  async function createInstitution(data: InstitutionPayload) {
     const result = await MasterService.createInstitution(data)
     invalidate('institutions')
     return result
   }
 
-  async function updateInstitution(id: string, data: UpdatePayload<Institution>) {
+  async function updateInstitution(id: string, data: Partial<InstitutionPayload>) {
     const result = await MasterService.updateInstitution(id, data)
     invalidate('institutions')
     return result
@@ -139,13 +145,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('institutions')
   }
 
-  async function createRegion(data: CreatePayload<Region>) {
+  async function createRegion(data: RegionPayload) {
     const result = await MasterService.createRegion(data)
     invalidate('regions')
     return result
   }
 
-  async function updateRegion(id: string, data: UpdatePayload<Region>) {
+  async function updateRegion(id: string, data: Partial<RegionPayload>) {
     const result = await MasterService.updateRegion(id, data)
     invalidate('regions')
     return result
@@ -156,13 +162,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('regions')
   }
 
-  async function createProgramTitle(data: CreatePayload<ProgramTitle>) {
+  async function createProgramTitle(data: ProgramTitlePayload) {
     const result = await MasterService.createProgramTitle(data)
     invalidate('programTitles')
     return result
   }
 
-  async function updateProgramTitle(id: string, data: UpdatePayload<ProgramTitle>) {
+  async function updateProgramTitle(id: string, data: Partial<ProgramTitlePayload>) {
     const result = await MasterService.updateProgramTitle(id, data)
     invalidate('programTitles')
     return result
@@ -173,13 +179,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('programTitles')
   }
 
-  async function createBappenasPartner(data: CreatePayload<BappenasPartner>) {
+  async function createBappenasPartner(data: BappenasPartnerPayload) {
     const result = await MasterService.createBappenasPartner(data)
     invalidate('bappenasPartners')
     return result
   }
 
-  async function updateBappenasPartner(id: string, data: UpdatePayload<BappenasPartner>) {
+  async function updateBappenasPartner(id: string, data: Partial<BappenasPartnerPayload>) {
     const result = await MasterService.updateBappenasPartner(id, data)
     invalidate('bappenasPartners')
     return result
@@ -190,13 +196,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('bappenasPartners')
   }
 
-  async function createPeriod(data: CreatePayload<Period>) {
+  async function createPeriod(data: PeriodPayload) {
     const result = await MasterService.createPeriod(data)
     invalidate('periods')
     return result
   }
 
-  async function updatePeriod(id: string, data: UpdatePayload<Period>) {
+  async function updatePeriod(id: string, data: Partial<PeriodPayload>) {
     const result = await MasterService.updatePeriod(id, data)
     invalidate('periods')
     return result
@@ -207,13 +213,13 @@ export const useMasterStore = defineStore('master', () => {
     invalidate('periods')
   }
 
-  async function createNationalPriority(data: CreatePayload<NationalPriority>) {
+  async function createNationalPriority(data: NationalPriorityPayload) {
     const result = await MasterService.createNationalPriority(data)
     invalidate('nationalPriorities')
     return result
   }
 
-  async function updateNationalPriority(id: string, data: UpdatePayload<NationalPriority>) {
+  async function updateNationalPriority(id: string, data: Partial<NationalPriorityPayload>) {
     const result = await MasterService.updateNationalPriority(id, data)
     invalidate('nationalPriorities')
     return result

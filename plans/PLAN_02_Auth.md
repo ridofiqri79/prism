@@ -133,14 +133,20 @@ Halaman set permission per user (ADMIN only):
 
 ## Checklist
 
-- [ ] `auth.schema.ts`
-- [ ] `auth.service.ts`
-- [ ] `LoginPage.vue` — form fungsional + error handling
-- [ ] `AppSidebar.vue` — menu conditional berdasarkan permission
-- [ ] `user.schema.ts` — create + update schema
-- [ ] `user.service.ts`
-- [ ] `user.store.ts`
-- [ ] `UserListPage.vue`
-- [ ] `UserFormPage.vue` — create & edit mode
-- [ ] `UserPermissionPage.vue` — permission matrix
-- [ ] `ForbiddenPage.vue` + `NotFoundPage.vue`
+- [x] `auth.schema.ts`
+- [x] `auth.service.ts`
+- [x] `LoginPage.vue` — form fungsional + error handling
+- [x] `AppSidebar.vue` — menu conditional berdasarkan permission
+- [x] `user.schema.ts` — create + update schema
+- [x] `user.service.ts`
+- [x] `user.store.ts`
+- [x] `UserListPage.vue`
+- [x] `UserFormPage.vue` — create & edit mode
+- [x] `UserPermissionPage.vue` — permission matrix
+- [x] `ForbiddenPage.vue` + `NotFoundPage.vue`
+
+Catatan verifikasi 2026-04-27:
+- `POST http://localhost:8080/api/v1/auth/login` dengan `admin/admin123` mengembalikan JWT.
+- Login dari `http://localhost:5173/login` berhasil dan redirect ke `/dashboard`.
+- Link `/users` tersedia untuk akun ADMIN.
+- `/users/1/permissions` menampilkan permission matrix dengan checkbox untuk seluruh modul.

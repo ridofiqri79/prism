@@ -4,6 +4,8 @@ export interface Country {
   code: string
 }
 
+export type CountryPayload = Omit<Country, 'id'>
+
 export type LenderType = 'Bilateral' | 'Multilateral' | 'KSA'
 
 export interface Lender {
@@ -11,16 +13,39 @@ export interface Lender {
   name: string
   short_name?: string
   type: LenderType
+  country_id?: string
   country?: Country
 }
+
+export interface LenderPayload {
+  name: string
+  short_name?: string
+  type: LenderType
+  country_id?: string | null
+}
+
+export type InstitutionLevel =
+  | 'Kementerian/Badan/Lembaga'
+  | 'Eselon I'
+  | 'BUMN'
+  | 'Pemerintah Daerah'
+  | 'BUMD'
+  | 'Lainnya'
 
 export interface Institution {
   id: string
   name: string
   short_name?: string
-  level: string
+  level: InstitutionLevel
   parent_id?: string
   parent?: Institution
+}
+
+export interface InstitutionPayload {
+  name: string
+  short_name?: string
+  level: InstitutionLevel
+  parent_id?: string | null
 }
 
 export type RegionType = 'COUNTRY' | 'PROVINCE' | 'CITY'
@@ -33,11 +58,23 @@ export interface Region {
   parent_code?: string
 }
 
+export interface RegionPayload {
+  code: string
+  name: string
+  type: RegionType
+  parent_code?: string | null
+}
+
 export interface ProgramTitle {
   id: string
   title: string
   parent_id?: string
   parent?: ProgramTitle
+}
+
+export interface ProgramTitlePayload {
+  title: string
+  parent_id?: string | null
 }
 
 export type BappenasPartnerLevel = 'Eselon I' | 'Eselon II'
@@ -50,6 +87,12 @@ export interface BappenasPartner {
   parent?: BappenasPartner
 }
 
+export interface BappenasPartnerPayload {
+  name: string
+  level: BappenasPartnerLevel
+  parent_id?: string | null
+}
+
 export interface Period {
   id: string
   name: string
@@ -57,11 +100,18 @@ export interface Period {
   year_end: number
 }
 
+export type PeriodPayload = Omit<Period, 'id'>
+
 export interface NationalPriority {
   id: string
   title: string
   period_id: string
   period?: Period
+}
+
+export interface NationalPriorityPayload {
+  period_id: string
+  title: string
 }
 
 export interface ListParams {

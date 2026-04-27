@@ -234,11 +234,11 @@ master.DELETE("/lenders/:id", masterHandler.DeleteLender, permission.Require("le
 
 ## Checklist
 
-- [ ] `sql/queries/master.sql` — semua query master
-- [ ] `make generate` berhasil
-- [ ] `internal/model/master.go` — semua request/response types
-- [ ] `internal/service/master_service.go` — dengan validasi bisnis lender
-- [ ] `internal/handler/master_handler.go` — CRUD handler semua master
-- [ ] Routes semua master terdaftar di `main.go`
-- [ ] `GET /api/v1/master/lenders` → list lender
-- [ ] `POST /api/v1/master/lenders` dengan type=Bilateral tanpa country_id → 400
+- [x] `sql/queries/master.sql` — semua query master
+- [x] `make generate` berhasil
+- [x] `internal/model/master.go` — semua request/response types
+- [x] `internal/service/master_service.go` — dengan validasi bisnis lender
+- [x] `internal/handler/master_handler.go` — CRUD handler semua master
+- [x] Routes semua master terdaftar di `main.go`
+- [x] `GET /api/v1/master/lenders` → list lender
+- [x] `POST /api/v1/master/lenders` dengan type=Bilateral tanpa country_id → 400

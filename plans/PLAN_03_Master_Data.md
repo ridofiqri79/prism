@@ -147,12 +147,12 @@ export const bappenasPartnerSchema = z.object({
 
 ## Checklist
 
-- [ ] `master.schema.ts` — semua Zod schemas dengan refine
-- [ ] `CountryPage.vue`
-- [ ] `LenderPage.vue` — conditional country_id field
-- [ ] `InstitutionPage.vue` — TreeTable 6 level
-- [ ] `RegionPage.vue` — TreeTable 3 level
-- [ ] `ProgramTitlePage.vue` — TreeTable
-- [ ] `BappenasPartnerPage.vue` — TreeTable
-- [ ] `PeriodPage.vue`
-- [ ] `NationalPriorityPage.vue` — filter by period
+- [x] `master.schema.ts` — semua Zod schemas dengan refine
+- [x] `CountryPage.vue`
+- [x] `LenderPage.vue` — conditional country_id field
+- [x] `InstitutionPage.vue` — TreeTable 6 level
+- [x] `RegionPage.vue` — TreeTable 3 level
+- [x] `ProgramTitlePage.vue` — TreeTable
+- [x] `BappenasPartnerPage.vue` — TreeTable
+- [x] `PeriodPage.vue`
+- [x] `NationalPriorityPage.vue` — filter by period
