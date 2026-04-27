@@ -174,22 +174,22 @@ Setiap fetch action: jika `loaded[key]` dan tidak force, skip. Setelah mutasi (c
 
 ## Checklist
 
-- [ ] `usePermission.ts`
-- [ ] `usePagination.ts`
-- [ ] `useToast.ts`
-- [ ] `useConfirm.ts`
-- [ ] `PageHeader.vue`
-- [ ] `DataTable.vue` — wrapper dengan pagination + empty state + skeleton
-- [ ] `EmptyState.vue`
-- [ ] `StatusBadge.vue`
-- [ ] `CurrencyDisplay.vue`
-- [ ] `ConfirmDialog.vue` — di App.vue
-- [ ] `LocationMultiSelect.vue` — dengan logika COUNTRY
-- [ ] `InstitutionSelect.vue`
-- [ ] `LenderSelect.vue` — dengan allowedIds filter
-- [ ] `ProgramTitleSelect.vue`
-- [ ] `NationalPriorityMultiSelect.vue`
-- [ ] `CurrencyInput.vue`
-- [ ] `master.types.ts`
-- [ ] `master.service.ts` — semua endpoint
-- [ ] `master.store.ts` — cache + force refresh
+- [x] `usePermission.ts`
+- [x] `usePagination.ts`
+- [x] `useToast.ts`
+- [x] `useConfirm.ts`
+- [x] `PageHeader.vue`
+- [x] `DataTable.vue` — wrapper dengan pagination + empty state + skeleton
+- [x] `EmptyState.vue`
+- [x] `StatusBadge.vue`
+- [x] `CurrencyDisplay.vue`
+- [x] `ConfirmDialog.vue` — di App.vue
+- [x] `LocationMultiSelect.vue` — dengan logika COUNTRY
+- [x] `InstitutionSelect.vue`
+- [x] `LenderSelect.vue` — dengan allowedIds filter
+- [x] `ProgramTitleSelect.vue`
+- [x] `NationalPriorityMultiSelect.vue`
+- [x] `CurrencyInput.vue`
+- [x] `master.types.ts`
+- [x] `master.service.ts` — semua endpoint
+- [x] `master.store.ts` — cache + force refresh

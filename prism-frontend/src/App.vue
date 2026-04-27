@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
-import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import type { AppToastMessage } from '@/utils/app-events'
 import { TOAST_EVENT_NAME } from '@/utils/app-events'
 

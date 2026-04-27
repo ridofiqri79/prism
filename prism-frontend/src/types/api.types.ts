@@ -24,3 +24,7 @@ export interface FieldError {
   field: string
   message: string
 }
+
+export interface ApiErrorResponse {
+  error: ApiError
+}

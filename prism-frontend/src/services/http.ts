@@ -1,4 +1,5 @@
-import axios from 'axios'
+import axios, { type AxiosError } from 'axios'
+import type { ApiErrorResponse } from '@/types/api.types'
 import { clearStoredSession, readStoredToken } from '@/utils/auth-session'
 import { emitToast, emitUnauthorized } from '@/utils/app-events'
 
@@ -19,8 +20,8 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const status = error.response?.status as number | undefined
+  async (error: AxiosError<ApiErrorResponse>) => {
+    const status = error.response?.status
 
     if (status === 401) {
       clearStoredSession()
@@ -37,17 +38,26 @@ http.interceptors.response.use(
       emitToast({
         severity: 'error',
         summary: 'Akses Ditolak',
-        detail: 'Anda tidak memiliki izin untuk mengakses halaman ini.',
-        life: 3000,
+        detail: 'Anda tidak memiliki izin untuk melakukan tindakan ini',
+        life: 5000,
       })
     }
 
     if (status === 500) {
       emitToast({
         severity: 'error',
-        summary: 'Terjadi Kesalahan Server',
-        detail: 'Silakan coba lagi beberapa saat lagi.',
-        life: 3000,
+        summary: 'Terjadi Kesalahan',
+        detail: 'Server mengalami masalah, silakan coba lagi',
+        life: 5000,
+      })
+    }
+
+    if (!error.response) {
+      emitToast({
+        severity: 'error',
+        summary: 'Koneksi Bermasalah',
+        detail: 'Periksa koneksi internet Anda',
+        life: 5000,
       })
     }
 
