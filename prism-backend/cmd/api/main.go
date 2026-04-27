@@ -40,15 +40,17 @@ func main() {
 	q := queries.New(pool)
 	middleware.SetPermissionChecker(middleware.NewDatabasePermissionChecker(q))
 
+	broker := sse.NewBroker()
+	go broker.Run()
+
 	authService := service.NewAuthService(q, cfg.JWTSecret, cfg.JWTExpiresIn)
 	userService := service.NewUserService(pool, q)
 	masterService := service.NewMasterService(pool, q)
+	blueBookService := service.NewBlueBookService(pool, q, broker)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
-
-	broker := sse.NewBroker()
-	go broker.Run()
+	blueBookHandler := handler.NewBlueBookHandler(blueBookService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -131,6 +133,24 @@ func main() {
 	master.POST("/national-priorities", masterHandler.CreateNationalPriority, middleware.Require("national_priority", "create"))
 	master.PUT("/national-priorities/:id", masterHandler.UpdateNationalPriority, middleware.Require("national_priority", "update"))
 	master.DELETE("/national-priorities/:id", masterHandler.DeleteNationalPriority, middleware.Require("national_priority", "delete"))
+
+	blueBooks := api.Group("/blue-books")
+	blueBooks.GET("", blueBookHandler.ListBlueBooks, middleware.Require("blue_book", "read"))
+	blueBooks.POST("", blueBookHandler.CreateBlueBook, middleware.Require("blue_book", "create"))
+	blueBooks.GET("/:id", blueBookHandler.GetBlueBook, middleware.Require("blue_book", "read"))
+	blueBooks.PUT("/:id", blueBookHandler.UpdateBlueBook, middleware.Require("blue_book", "update"))
+	blueBooks.DELETE("/:id", blueBookHandler.DeleteBlueBook, middleware.Require("blue_book", "delete"))
+
+	blueBooks.GET("/:bbId/projects", blueBookHandler.ListBBProjects, middleware.Require("bb_project", "read"))
+	blueBooks.POST("/:bbId/projects", blueBookHandler.CreateBBProject, middleware.Require("bb_project", "create"))
+	blueBooks.GET("/:bbId/projects/:id", blueBookHandler.GetBBProject, middleware.Require("bb_project", "read"))
+	blueBooks.PUT("/:bbId/projects/:id", blueBookHandler.UpdateBBProject, middleware.Require("bb_project", "update"))
+	blueBooks.DELETE("/:bbId/projects/:id", blueBookHandler.DeleteBBProject, middleware.Require("bb_project", "delete"))
+
+	loi := api.Group("/bb-projects/:bbProjectId/loi")
+	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))
+	loi.POST("", blueBookHandler.CreateLoI, middleware.Require("bb_project", "update"))
+	loi.DELETE("/:id", blueBookHandler.DeleteLoI, middleware.Require("bb_project", "update"))
 
 	e.GET("/events", handler.SSEHandler(broker))
 

@@ -239,12 +239,13 @@ loi.DELETE("/:id", bbHandler.DeleteLoI, permission.Require("bb_project", "update
 
 ## Checklist
 
-- [ ] `sql/queries/bb_project.sql` — semua query BB
-- [ ] `make generate`
-- [ ] `internal/model/blue_book.go`
-- [ ] `internal/service/blue_book_service.go` — CRUD + validasi bisnis + transaksi + SSE
-- [ ] `internal/handler/blue_book_handler.go`
-- [ ] Routes terdaftar
-- [ ] `POST /bb-projects` dengan bb_code duplikat → 409
-- [ ] `POST /bb-projects` dengan EA = IA → 422
-- [ ] `POST /bb-projects` sukses → SSE event terkirim
+- [x] `sql/queries/bb_project.sql` — semua query BB
+- [x] `make generate`
+- [x] `internal/model/blue_book.go`
+- [x] `internal/service/blue_book_service.go` — CRUD + validasi bisnis + transaksi + SSE
+- [x] `internal/handler/blue_book_handler.go`
+- [x] Routes terdaftar
+- [x] `POST /bb-projects` dengan bb_code duplikat → 409
+- [x] `POST /bb-projects` dengan EA = IA → 422
+- [x] `POST /bb-projects` sukses → SSE event terkirim
+- [x] `DELETE /blue-books/:bbId/projects/:id` → status `deleted`, record tetap ada di DB
