@@ -124,11 +124,11 @@ gb.DELETE("/:gbId/projects/:id", gbHandler.DeleteGBProject, permission.Require("
 
 ## Checklist
 
-- [ ] `sql/queries/gb_project.sql` — semua query GB
-- [ ] `make generate`
-- [ ] `internal/model/green_book.go`
-- [ ] `internal/service/green_book_service.go` — validasi + transaksi dengan activity_index mapping
-- [ ] `internal/handler/green_book_handler.go`
-- [ ] Routes terdaftar
-- [ ] `POST /gb-projects` dengan duplikat tahun disbursement → 422
-- [ ] `POST /gb-projects` sukses → Activities + FundingAllocation tersimpan berurutan
+- [x] `sql/queries/gb_project.sql` — semua query GB
+- [x] `make generate`
+- [x] `internal/model/green_book.go`
+- [x] `internal/service/green_book_service.go` — validasi + transaksi dengan activity_index mapping
+- [x] `internal/handler/green_book_handler.go`
+- [x] Routes terdaftar
+- [x] `POST /gb-projects` dengan duplikat tahun disbursement → 422
+- [x] `POST /gb-projects` sukses → Activities + FundingAllocation tersimpan berurutan

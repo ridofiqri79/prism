@@ -1,0 +1,137 @@
+import type { BBProject } from '@/types/blue-book.types'
+import type { Institution, Lender, ProgramTitle, Region } from '@/types/master.types'
+
+export type GreenBookStatus = 'active' | 'superseded'
+export type GBProjectStatus = 'active' | 'deleted'
+
+export interface GreenBook {
+  id: string
+  publish_year: number
+  revision_number: number
+  status: GreenBookStatus
+  created_at?: string
+  updated_at?: string
+}
+
+export interface GreenBookPayload {
+  publish_year: number
+  revision_number: number
+}
+
+export interface BBProjectSummary {
+  id: string
+  bb_code: string
+  project_name: string
+}
+
+export interface GBProject {
+  id: string
+  green_book_id?: string
+  program_title_id?: string
+  gb_code: string
+  project_name: string
+  duration?: string | null
+  objective?: string | null
+  scope_of_project?: string | null
+  program_title?: ProgramTitle
+  bb_projects: BBProjectSummary[]
+  executing_agencies: Institution[]
+  implementing_agencies: Institution[]
+  locations: Region[]
+  activities: GBActivity[]
+  funding_sources: GBFundingSource[]
+  disbursement_plan: GBDisbursementPlan[]
+  funding_allocations: GBFundingAllocation[]
+  status: GBProjectStatus
+  created_at?: string
+  updated_at?: string
+}
+
+export interface GBActivity {
+  id: string
+  activity_name: string
+  implementation_location?: string | null
+  piu?: string | null
+  sort_order: number
+}
+
+export interface GBActivityPayload {
+  activity_name: string
+  implementation_location?: string | null
+  piu?: string | null
+  sort_order: number
+}
+
+export interface GBFundingSource {
+  id: string
+  lender: Lender
+  institution?: Institution
+  loan_usd: number
+  grant_usd: number
+  local_usd: number
+}
+
+export interface GBFundingSourcePayload {
+  lender_id: string
+  institution_id?: string | null
+  loan_usd: number
+  grant_usd: number
+  local_usd: number
+}
+
+export interface GBDisbursementPlan {
+  id: string
+  year: number
+  amount_usd: number
+}
+
+export interface GBDisbursementPlanPayload {
+  year: number
+  amount_usd: number
+}
+
+export interface GBFundingAllocation {
+  id: string
+  gb_activity_id: string
+  activity_name?: string
+  sort_order?: number
+  services: number
+  constructions: number
+  goods: number
+  trainings: number
+  other: number
+}
+
+export interface GBAllocationValues {
+  services: number
+  constructions: number
+  goods: number
+  trainings: number
+  other: number
+}
+
+export interface GBFundingAllocationPayload extends GBAllocationValues {
+  activity_index: number
+}
+
+export interface GBProjectPayload {
+  program_title_id: string
+  gb_code: string
+  project_name: string
+  duration?: string | null
+  objective?: string | null
+  scope_of_project?: string | null
+  bb_project_ids: string[]
+  executing_agency_ids: string[]
+  implementing_agency_ids: string[]
+  location_ids: string[]
+  activities: GBActivityPayload[]
+  funding_sources: GBFundingSourcePayload[]
+  disbursement_plan: GBDisbursementPlanPayload[]
+  funding_allocations: GBFundingAllocationPayload[]
+}
+
+export interface BBProjectOption extends Pick<BBProject, 'id' | 'bb_code' | 'project_name'> {
+  blue_book_id?: string
+}
+

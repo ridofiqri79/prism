@@ -15,6 +15,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
   const blueBooks = ref<BlueBook[]>([])
   const currentBlueBook = ref<BlueBook | null>(null)
   const projects = ref<BBProject[]>([])
+  const projectOptions = ref<BBProject[]>([])
   const currentProject = ref<BBProject | null>(null)
   const lois = ref<LoI[]>([])
   const loading = ref(false)
@@ -69,6 +70,15 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     })
   }
 
+  async function fetchProjectOptions() {
+    const response = await BlueBookService.getBlueBooks({ limit: 1000 })
+    const nested = await Promise.all(
+      response.data.map((blueBook) => BlueBookService.getProjects(blueBook.id, { limit: 1000 })),
+    )
+    projectOptions.value = nested.flatMap((item) => item.data)
+    return projectOptions.value
+  }
+
   async function fetchProject(blueBookId: string, id: string) {
     return withLoading(async () => {
       currentProject.value = await BlueBookService.getProject(blueBookId, id)
@@ -110,6 +120,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     blueBooks.value = []
     currentBlueBook.value = null
     projects.value = []
+    projectOptions.value = []
     currentProject.value = null
     lois.value = []
     loading.value = false
@@ -121,6 +132,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     blueBooks,
     currentBlueBook,
     projects,
+    projectOptions,
     currentProject,
     lois,
     loading,
@@ -132,6 +144,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     updateBlueBook,
     deleteBlueBook,
     fetchProjects,
+    fetchProjectOptions,
     fetchProject,
     createProject,
     updateProject,
@@ -142,4 +155,3 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     $reset,
   }
 })
-

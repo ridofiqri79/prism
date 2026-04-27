@@ -47,10 +47,12 @@ func main() {
 	userService := service.NewUserService(pool, q)
 	masterService := service.NewMasterService(pool, q)
 	blueBookService := service.NewBlueBookService(pool, q, broker)
+	greenBookService := service.NewGreenBookService(pool, q, broker)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
 	blueBookHandler := handler.NewBlueBookHandler(blueBookService)
+	greenBookHandler := handler.NewGreenBookHandler(greenBookService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -151,6 +153,19 @@ func main() {
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))
 	loi.POST("", blueBookHandler.CreateLoI, middleware.Require("bb_project", "update"))
 	loi.DELETE("/:id", blueBookHandler.DeleteLoI, middleware.Require("bb_project", "update"))
+
+	greenBooks := api.Group("/green-books")
+	greenBooks.GET("", greenBookHandler.ListGreenBooks, middleware.Require("green_book", "read"))
+	greenBooks.POST("", greenBookHandler.CreateGreenBook, middleware.Require("green_book", "create"))
+	greenBooks.GET("/:id", greenBookHandler.GetGreenBook, middleware.Require("green_book", "read"))
+	greenBooks.PUT("/:id", greenBookHandler.UpdateGreenBook, middleware.Require("green_book", "update"))
+	greenBooks.DELETE("/:id", greenBookHandler.DeleteGreenBook, middleware.Require("green_book", "delete"))
+
+	greenBooks.GET("/:gbId/projects", greenBookHandler.ListGBProjects, middleware.Require("gb_project", "read"))
+	greenBooks.POST("/:gbId/projects", greenBookHandler.CreateGBProject, middleware.Require("gb_project", "create"))
+	greenBooks.GET("/:gbId/projects/:id", greenBookHandler.GetGBProject, middleware.Require("gb_project", "read"))
+	greenBooks.PUT("/:gbId/projects/:id", greenBookHandler.UpdateGBProject, middleware.Require("gb_project", "update"))
+	greenBooks.DELETE("/:gbId/projects/:id", greenBookHandler.DeleteGBProject, middleware.Require("gb_project", "delete"))
 
 	e.GET("/events", handler.SSEHandler(broker))
 

@@ -1,0 +1,156 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+
+	"github.com/ridofiqri79/prism-backend/internal/model"
+	"github.com/ridofiqri79/prism-backend/internal/service"
+)
+
+type GreenBookHandler struct {
+	service *service.GreenBookService
+}
+
+func NewGreenBookHandler(service *service.GreenBookService) *GreenBookHandler {
+	return &GreenBookHandler{service: service}
+}
+
+func (h *GreenBookHandler) ListGreenBooks(c echo.Context) error {
+	res, err := h.service.ListGreenBooks(c.Request().Context(), paginationParams(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *GreenBookHandler) GetGreenBook(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetGreenBook(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.GreenBookResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) CreateGreenBook(c echo.Context) error {
+	var req model.GreenBookRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.CreateGreenBook(c.Request().Context(), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[*model.GreenBookResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) UpdateGreenBook(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	var req model.GreenBookRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.UpdateGreenBook(c.Request().Context(), id, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.GreenBookResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) DeleteGreenBook(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	if err := h.service.DeleteGreenBook(c.Request().Context(), id); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *GreenBookHandler) ListGBProjects(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.ListGBProjects(c.Request().Context(), gbID, paginationParams(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *GreenBookHandler) GetGBProject(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetGBProject(c.Request().Context(), gbID, id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.GBProjectResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) CreateGBProject(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	var req model.CreateGBProjectRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.CreateGBProject(c.Request().Context(), gbID, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[*model.GBProjectResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) UpdateGBProject(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	var req model.UpdateGBProjectRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.UpdateGBProject(c.Request().Context(), gbID, id, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.GBProjectResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) DeleteGBProject(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	if err := h.service.DeleteGBProject(c.Request().Context(), gbID, id); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}

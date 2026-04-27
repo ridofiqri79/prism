@@ -27,21 +27,15 @@ const selectedValue = computed({
   set: (value: string | null) => emit('update:modelValue', value),
 })
 
-const groupedOptions = computed(() => {
-  const parents = masterStore.programTitles.filter((item) => !item.parent_id)
-  const children = masterStore.programTitles.filter((item) => item.parent_id)
-
-  return parents.map((parent) => ({
-    label: parent.title,
-    items: children
-      .filter((child) => child.parent_id === parent.id)
-      .map((child) => formatProgramOption(child)),
-  }))
-})
+const options = computed(() =>
+  masterStore.programTitles.map((programTitle) => formatProgramOption(programTitle)),
+)
 
 function formatProgramOption(programTitle: ProgramTitle) {
+  const parent = masterStore.programTitles.find((item) => item.id === programTitle.parent_id)
+
   return {
-    label: programTitle.title,
+    label: parent ? `${parent.title} / ${programTitle.title}` : programTitle.title,
     value: programTitle.id,
   }
 }
@@ -54,9 +48,7 @@ onMounted(() => {
 <template>
   <Select
     v-model="selectedValue"
-    :options="groupedOptions"
-    option-group-label="label"
-    option-group-children="items"
+    :options="options"
     option-label="label"
     option-value="value"
     :placeholder="placeholder"

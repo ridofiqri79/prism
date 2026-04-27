@@ -140,11 +140,11 @@ Tombol "Simpan" di footer (bukan di dalam tab) — submit semua tab sekaligus.
 
 ## Checklist
 
-- [ ] `green-book.types.ts`
-- [ ] `green-book.schema.ts`
-- [ ] `green-book.service.ts`
-- [ ] `green-book.store.ts`
-- [ ] `useGBProjectForm.ts` — activities/funding/disbursement/allocation sync via watch
-- [ ] `GBProjectFormPage.vue` — 5 tab
-- [ ] `GBProjectDetailPage.vue`
-- [ ] `ActivitiesTable.vue`, `FundingSourceTable.vue`, `DisbursementPlanTable.vue`, `FundingAllocationTable.vue`
+- [x] `green-book.types.ts`
+- [x] `green-book.schema.ts`
+- [x] `green-book.service.ts`
+- [x] `green-book.store.ts`
+- [x] `useGBProjectForm.ts` — activities/funding/disbursement/allocation sync via watch
+- [x] `GBProjectFormPage.vue` — 5 tab
+- [x] `GBProjectDetailPage.vue`
+- [x] `ActivitiesTable.vue`, `FundingSourceTable.vue`, `DisbursementPlanTable.vue`, `FundingAllocationTable.vue`
