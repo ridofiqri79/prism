@@ -32,6 +32,8 @@
 
 @layer components {
   .prism-shell {
+    --prism-layout-header-height: 60px;
+    --prism-layout-surface: rgba(255, 255, 255, 0.94);
     background:
       linear-gradient(180deg, rgba(31, 181, 178, 0.08) 0%, rgba(253, 184, 19, 0.06) 48%, rgba(60, 203, 107, 0.07) 100%),
       #f8fffe;
@@ -43,16 +45,17 @@
   }
 
   .prism-sidebar {
-    border-color: rgba(31, 181, 178, 0.36);
-    background:
-      linear-gradient(180deg, #0b6f73 0%, #0f8f8c 58%, #157e5c 100%);
-    color: #effefd;
-    box-shadow: 1px 0 0 rgba(255, 212, 90, 0.2);
+    border-color: rgba(31, 181, 178, 0.24);
+    background: var(--prism-layout-surface);
+    color: #0b6f73;
+    box-shadow: 1px 0 0 rgba(31, 181, 178, 0.14);
   }
 
   .prism-sidebar-header {
-    border-color: rgba(31, 181, 178, 0.38);
-    background: rgba(11, 111, 115, 0.52);
+    height: var(--prism-layout-header-height);
+    min-height: var(--prism-layout-header-height);
+    border-color: rgba(31, 181, 178, 0.24);
+    background: var(--prism-layout-surface);
   }
 
   .prism-sidebar-logo {
@@ -61,22 +64,22 @@
   }
 
   .prism-sidebar-title {
-    color: #ffffff;
+    color: #0b6f73;
   }
 
   .prism-sidebar-muted {
-    color: rgba(239, 254, 253, 0.66);
+    color: rgba(21, 126, 92, 0.78);
   }
 
   .prism-sidebar-icon-button,
   .prism-sidebar-item {
-    color: rgba(239, 254, 253, 0.78);
+    color: rgba(11, 111, 115, 0.78);
   }
 
   .prism-sidebar-icon-button:hover,
   .prism-sidebar-item:hover {
-    background: rgba(31, 181, 178, 0.2);
-    color: #ffffff;
+    background: rgba(31, 181, 178, 0.1);
+    color: #0f8f8c;
   }
 
   .prism-sidebar-icon-button:focus-visible,
@@ -86,11 +89,11 @@
   }
 
   .prism-sidebar-item i {
-    color: rgba(255, 255, 255, 0.58);
+    color: rgba(11, 111, 115, 0.52);
   }
 
   .prism-sidebar-item:hover i {
-    color: #ffd45a;
+    color: #0f8f8c;
   }
 
   .prism-sidebar-item.is-active {
@@ -106,21 +109,21 @@
 
   .prism-sidebar-section,
   .prism-sidebar-kbd {
-    color: rgba(255, 212, 90, 0.8);
+    color: rgba(21, 126, 92, 0.68);
   }
 
   .prism-sidebar-search-icon {
-    color: rgba(239, 254, 253, 0.56);
+    color: rgba(11, 111, 115, 0.52);
   }
 
   .prism-sidebar-search-input {
-    border-color: rgba(31, 181, 178, 0.44);
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    border-color: rgba(31, 181, 178, 0.22);
+    background: rgba(255, 255, 255, 0.72);
+    color: #0b6f73;
   }
 
   .prism-sidebar-search-input::placeholder {
-    color: rgba(239, 254, 253, 0.52);
+    color: rgba(11, 111, 115, 0.44);
   }
 
   .prism-sidebar-search-input:focus {
@@ -129,12 +132,19 @@
   }
 
   .prism-sidebar-child-list {
-    border-color: rgba(255, 212, 90, 0.28);
+    border-color: rgba(31, 181, 178, 0.18);
+  }
+
+  .prism-sidebar-footer {
+    border-color: rgba(31, 181, 178, 0.18);
+    background: var(--prism-layout-surface);
   }
 
   .prism-topbar {
+    height: var(--prism-layout-header-height);
+    min-height: var(--prism-layout-header-height);
     border-color: rgba(31, 181, 178, 0.24);
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--prism-layout-surface);
     box-shadow: 0 1px 0 rgba(253, 184, 19, 0.16);
   }
 

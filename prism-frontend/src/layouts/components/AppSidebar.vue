@@ -210,37 +210,26 @@ function handleSearchShortcut(event: KeyboardEvent) {
     class="prism-sidebar hidden shrink-0 border-r transition-[width] duration-200 lg:flex lg:flex-col"
     :class="isCollapsed ? 'w-[68px]' : 'w-[260px]'"
   >
-    <div class="prism-sidebar-header border-b" :class="isCollapsed ? 'px-2 py-3' : 'px-4 py-3'">
+    <div
+      class="prism-sidebar-header flex items-center border-b"
+      :class="isCollapsed ? 'px-2' : 'px-4'"
+    >
       <div
-        class="flex gap-3"
-        :class="isCollapsed ? 'flex-col items-center' : 'items-center justify-between'"
+        class="flex w-full"
+        :class="isCollapsed ? 'justify-center' : 'items-center gap-3'"
       >
         <div class="flex min-w-0 items-center gap-3" :class="isCollapsed ? 'justify-center' : ''">
           <img
             src="/prism-logo.png"
             alt=""
-            class="prism-sidebar-logo h-7 w-7 shrink-0 rounded-md object-contain p-0.5"
+            class="prism-sidebar-logo shrink-0 rounded-md object-contain p-0.5"
+            :class="isCollapsed ? 'h-5 w-5' : 'h-7 w-7'"
           />
           <div v-if="!isCollapsed" class="min-w-0">
             <p class="prism-sidebar-title truncate text-sm font-medium">{{ accountLabel }}</p>
             <p class="prism-sidebar-muted truncate text-xs">{{ accountMeta }}</p>
           </div>
         </div>
-
-        <button
-          type="button"
-          class="prism-sidebar-icon-button flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
-          :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          @click="toggleSidebar"
-        >
-          <i
-            :class="[
-              isCollapsed ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left',
-              'text-sm',
-            ]"
-          />
-        </button>
       </div>
     </div>
 
@@ -336,5 +325,18 @@ function handleSearchShortcut(event: KeyboardEvent) {
         </div>
       </section>
     </nav>
+
+    <div class="prism-sidebar-footer border-t p-3" :class="isCollapsed ? 'flex justify-center' : ''">
+      <button
+        type="button"
+        class="prism-sidebar-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+        :class="isCollapsed ? '' : 'ml-auto'"
+        :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        @click="toggleSidebar"
+      >
+        <i class="pi pi-bars text-sm" />
+      </button>
+    </div>
   </aside>
 </template>
