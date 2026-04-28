@@ -10,10 +10,12 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import { useToast } from '@/composables/useToast'
 import {
   blueBookImportFileSchema,
+  daftarKegiatanImportFileSchema,
   greenBookImportFileSchema,
   masterImportFileSchema,
 } from '@/schemas/master.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
+import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { ApiErrorResponse } from '@/types/api.types'
@@ -27,7 +29,7 @@ import type {
 } from '@/types/master.types'
 
 type ImportStatusFilter = MasterImportRowStatus | 'all'
-type ImportKind = 'master' | 'blue_book' | 'green_book'
+type ImportKind = 'master' | 'blue_book' | 'green_book' | 'daftar_kegiatan'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
 type ParsedImportInput = { file: File; blueBookId?: string; greenBookId?: string }
 type ImportKindOption = { value: ImportKind; label: string; description: string }
@@ -40,6 +42,7 @@ interface ImportPageEvent {
 const masterStore = useMasterStore()
 const blueBookStore = useBlueBookStore()
 const greenBookStore = useGreenBookStore()
+const daftarKegiatanStore = useDaftarKegiatanStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -70,6 +73,11 @@ const importKindOptions: ImportKindOption[] = [
     value: 'green_book',
     label: 'Green Book',
     description: 'Proyek Green Book beserta BB Project, activity, funding, dan allocation',
+  },
+  {
+    value: 'daftar_kegiatan',
+    label: 'Daftar Kegiatan',
+    description: 'Header DK baru beserta project, GB Project, pembiayaan, alokasi, dan aktivitas',
   },
 ]
 
@@ -105,11 +113,22 @@ const greenBookWorkbookSheets = [
   'Relasi - Funding Allocation',
 ]
 
+const daftarKegiatanWorkbookSheets = [
+  'Daftar Kegiatan',
+  'Input Data',
+  'Relasi - GB Project',
+  'Relasi - Locations',
+  'Relasi - Financing Detail',
+  'Relasi - Loan Allocation',
+  'Relasi - Activity Detail',
+]
+
 const workbookSheets = computed(() => {
   if (activeImportKind.value === 'master') return masterWorkbookSheets
   if (activeImportKind.value === 'blue_book') return blueBookWorkbookSheets
+  if (activeImportKind.value === 'green_book') return greenBookWorkbookSheets
 
-  return greenBookWorkbookSheets
+  return daftarKegiatanWorkbookSheets
 })
 
 const blueBookOptions = computed(() =>
@@ -137,7 +156,9 @@ const importBusy = computed(() =>
     ? masterStore.previewing || masterStore.importing
     : activeImportKind.value === 'blue_book'
       ? blueBookStore.importPreviewing || blueBookStore.importExecuting
-      : greenBookStore.importPreviewing || greenBookStore.importExecuting,
+      : activeImportKind.value === 'green_book'
+        ? greenBookStore.importPreviewing || greenBookStore.importExecuting
+        : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
 )
 
 const previewLoading = computed(() =>
@@ -145,7 +166,9 @@ const previewLoading = computed(() =>
     ? masterStore.previewing
     : activeImportKind.value === 'blue_book'
       ? blueBookStore.importPreviewing
-      : greenBookStore.importPreviewing,
+      : activeImportKind.value === 'green_book'
+        ? greenBookStore.importPreviewing
+        : daftarKegiatanStore.importPreviewing,
 )
 
 const executeLoading = computed(() =>
@@ -153,7 +176,9 @@ const executeLoading = computed(() =>
     ? masterStore.importing
     : activeImportKind.value === 'blue_book'
       ? blueBookStore.importExecuting
-      : greenBookStore.importExecuting,
+      : activeImportKind.value === 'green_book'
+        ? greenBookStore.importExecuting
+        : daftarKegiatanStore.importExecuting,
 )
 
 const templateLoading = computed(() =>
@@ -161,7 +186,9 @@ const templateLoading = computed(() =>
     ? masterStore.downloadingTemplate
     : activeImportKind.value === 'blue_book'
       ? blueBookStore.templateDownloading
-      : greenBookStore.templateDownloading,
+      : activeImportKind.value === 'green_book'
+        ? greenBookStore.templateDownloading
+        : daftarKegiatanStore.templateDownloading,
 )
 
 const targetMissing = computed(
@@ -307,8 +334,10 @@ async function previewFile() {
       summary.value = await masterStore.previewMasterData(input.file)
     } else if (activeImportKind.value === 'blue_book') {
       summary.value = await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
-    } else {
+    } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.previewProjectImport(input.greenBookId ?? '', input.file)
+    } else {
+      summary.value = await daftarKegiatanStore.previewImport(input.file)
     }
     setDefaultResultFilter(summary.value)
     toast.success('Preview selesai', `${summary.value.total_inserted} baris siap ditambahkan`)
@@ -337,8 +366,10 @@ async function executeFile() {
       summary.value = await masterStore.importMasterData(input.file)
     } else if (activeImportKind.value === 'blue_book') {
       summary.value = await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
-    } else {
+    } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.importProjects(input.greenBookId ?? '', input.file)
+    } else {
+      summary.value = await daftarKegiatanStore.executeImport(input.file)
     }
     executed.value = true
     setDefaultResultFilter(summary.value)
@@ -371,14 +402,21 @@ async function downloadTemplate() {
       return
     }
 
-    if (!selectedGreenBookId.value) {
-      errorMessage.value = 'Pilih target Green Book sebelum download template'
+    if (activeImportKind.value === 'green_book') {
+      if (!selectedGreenBookId.value) {
+        errorMessage.value = 'Pilih target Green Book sebelum download template'
+        return
+      }
+
+      const blob = await greenBookStore.downloadProjectImportTemplate(selectedGreenBookId.value)
+      saveBlob(blob, 'green_book_import_template.xlsx')
+      toast.success('Template diunduh', 'Template Green Book sudah dibuat dari snapshot master data')
       return
     }
 
-    const blob = await greenBookStore.downloadProjectImportTemplate(selectedGreenBookId.value)
-    saveBlob(blob, 'green_book_import_template.xlsx')
-    toast.success('Template diunduh', 'Template Green Book sudah dibuat dari snapshot master data')
+    const dkBlob = await daftarKegiatanStore.downloadImportTemplate()
+    saveBlob(dkBlob, 'daftar_kegiatan_import_template.xlsx')
+    toast.success('Template diunduh', 'Template Daftar Kegiatan sudah dibuat dari snapshot master data')
   } catch (error) {
     errorMessage.value = getErrorMessage(error)
   }
@@ -408,16 +446,26 @@ function getImportInput(): ParsedImportInput | null {
     return { file: parsed.data.file, blueBookId: parsed.data.blue_book_id }
   }
 
-  const parsed = greenBookImportFileSchema.safeParse({
-    file: selectedFile.value,
-    green_book_id: selectedGreenBookId.value ?? '',
-  })
+  if (activeImportKind.value === 'green_book') {
+    const parsed = greenBookImportFileSchema.safeParse({
+      file: selectedFile.value,
+      green_book_id: selectedGreenBookId.value ?? '',
+    })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
+  }
+
+  const parsed = daftarKegiatanImportFileSchema.safeParse({ file: selectedFile.value })
   if (!parsed.success) {
     errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
     return null
   }
 
-  return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
+  return { file: parsed.data.file }
 }
 
 function getErrorMessage(error: unknown) {

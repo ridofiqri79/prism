@@ -709,6 +709,53 @@ Baris dengan `GB Code` yang sudah ada di database akan di-skip. Proyek baru waji
 
 ## Daftar Kegiatan
 
+### Import Daftar Kegiatan
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/daftar-kegiatan/import/template` | ADMIN only |
+| `POST` | `/daftar-kegiatan/import/preview` | ADMIN only |
+| `POST` | `/daftar-kegiatan/import/execute` | ADMIN only |
+
+**Content-Type:** `multipart/form-data`
+
+**Form field:**
+
+| Field | Keterangan |
+|-------|------------|
+| `file` | Workbook `.xlsx` berisi sheet `Daftar Kegiatan`, `Input Data`, `Relasi - GB Project`, `Relasi - Locations`, `Relasi - Financing Detail`, `Relasi - Loan Allocation`, dan `Relasi - Activity Detail` |
+
+Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh relasinya. Workbook mendukung multi header DK. `DK Key (*)` adalah kunci sementara workbook untuk header; `Project Key (*)` wajib unik per `DK Key` dan hanya dipakai untuk menghubungkan sheet relasi. `Letter Number (*)` wajib untuk import dan menjadi idempotency key.
+
+**Template:**
+`GET /daftar-kegiatan/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Daftar Kegiatan`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data, GB Project aktif, dan referensi allowed lender per GB Project saat template dibuat.
+
+**Kolom workbook:**
+
+| Sheet | Kolom |
+|-------|-------|
+| `Daftar Kegiatan` | `DK Key (*)`, `Letter Number (*)`, `Subject (*)`, `Date (*)` |
+| `Input Data` | `DK Key (*)`, `Project Key (*)`, `Program Title`, `Executing Agency Name (*)`, `Duration`, `Objectives` |
+| `Relasi - GB Project` | `DK Key (*)`, `Project Key (*)`, `GB Code (*)` |
+| `Relasi - Locations` | `DK Key (*)`, `Project Key (*)`, `Location Name (*)` |
+| `Relasi - Financing Detail` | `DK Key (*)`, `Project Key (*)`, `Lender Name (*)`, `Currency`, `Amount Original`, `Grant Original`, `Counterpart Original`, `Amount USD`, `Grant USD`, `Counterpart USD`, `Remarks` |
+| `Relasi - Loan Allocation` | `DK Key (*)`, `Project Key (*)`, `Institution Name (*)`, `Currency`, `Amount Original`, `Grant Original`, `Counterpart Original`, `Amount USD`, `Grant USD`, `Counterpart USD`, `Remarks` |
+| `Relasi - Activity Detail` | `DK Key (*)`, `Project Key (*)`, `Activity No (*)`, `Activity Name (*)` |
+
+**Preview:**
+`POST /daftar-kegiatan/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+**Execute:**
+`POST /daftar-kegiatan/import/execute` menjalankan import hanya jika hasil validasi memiliki `total_failed = 0`. Jika masih ada failed, response error validasi dan data tidak disimpan.
+
+**Response `200`:**
+Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
+
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode 3 huruf. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+`Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
+
+---
+
 ### Daftar Kegiatan (Header Surat)
 
 | Method | Endpoint | Permission |

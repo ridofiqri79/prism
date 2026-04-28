@@ -6,7 +6,7 @@ import type {
   DKProject,
   DKProjectPayload,
 } from '@/types/daftar-kegiatan.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const DaftarKegiatanService = {
   async getDaftarKegiatan(params?: ListParams) {
@@ -33,6 +33,38 @@ export const DaftarKegiatanService = {
 
   async deleteDK(id: string) {
     await http.delete(`/daftar-kegiatan/${id}`)
+  },
+
+  async downloadImportTemplate() {
+    const response = await http.get<Blob>('/daftar-kegiatan/import/template', {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
+  async previewImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/daftar-kegiatan/import/preview',
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/daftar-kegiatan/import/execute',
+      formData,
+    )
+
+    return response.data.data
   },
 
   async getProjects(dkId: string, params?: ListParams) {

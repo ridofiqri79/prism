@@ -7,7 +7,7 @@ import type {
   DKProject,
   DKProjectPayload,
 } from '@/types/daftar-kegiatan.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
   const daftarKegiatan = ref<DaftarKegiatan[]>([])
@@ -15,6 +15,9 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
   const projects = ref<DKProject[]>([])
   const currentProject = ref<DKProject | null>(null)
   const loading = ref(false)
+  const templateDownloading = ref(false)
+  const importPreviewing = ref(false)
+  const importExecuting = ref(false)
   const total = ref(0)
   const projectTotal = ref(0)
 
@@ -57,6 +60,36 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     await DaftarKegiatanService.deleteDK(id)
   }
 
+  async function downloadImportTemplate(): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await DaftarKegiatanService.downloadImportTemplate()
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
+  async function previewImport(file: File): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await DaftarKegiatanService.previewImport(file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
+  async function executeImport(file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await DaftarKegiatanService.executeImport(file)
+      daftarKegiatan.value = []
+      projects.value = []
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
   async function fetchProjects(dkId: string, params?: ListParams) {
     return withLoading(async () => {
       const response = await DaftarKegiatanService.getProjects(dkId, params)
@@ -93,6 +126,9 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     projects.value = []
     currentProject.value = null
     loading.value = false
+    templateDownloading.value = false
+    importPreviewing.value = false
+    importExecuting.value = false
     total.value = 0
     projectTotal.value = 0
   }
@@ -103,6 +139,9 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     projects,
     currentProject,
     loading,
+    templateDownloading,
+    importPreviewing,
+    importExecuting,
     total,
     projectTotal,
     fetchDaftarKegiatan,
@@ -110,6 +149,9 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     createDK,
     updateDK,
     deleteDK,
+    downloadImportTemplate,
+    previewImport,
+    executeImport,
     fetchProjects,
     fetchProject,
     createProject,

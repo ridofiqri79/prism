@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	apperrors "github.com/ridofiqri79/prism-backend/internal/errors"
 	"github.com/ridofiqri79/prism-backend/internal/model"
 	"github.com/ridofiqri79/prism-backend/internal/service"
 )
@@ -74,6 +75,24 @@ func (h *DKHandler) DeleteDK(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *DKHandler) DownloadDKImportTemplate(c echo.Context) error {
+	template, err := h.service.BuildImportTemplate(c.Request().Context())
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
+func (h *DKHandler) PreviewImportDK(c echo.Context) error {
+	return h.handleImportDK(c, true)
+}
+
+func (h *DKHandler) ImportDK(c echo.Context) error {
+	return h.handleImportDK(c, false)
 }
 
 func (h *DKHandler) ListDKProjects(c echo.Context) error {
@@ -153,4 +172,29 @@ func (h *DKHandler) DeleteDKProject(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *DKHandler) handleImportDK(c echo.Context, preview bool) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewDaftarKegiatanImport(c.Request().Context(), file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportDaftarKegiatan(c.Request().Context(), file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
 }

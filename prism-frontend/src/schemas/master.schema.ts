@@ -99,3 +99,5 @@ export const blueBookImportFileSchema = masterImportFileSchema.extend({
 export const greenBookImportFileSchema = masterImportFileSchema.extend({
   green_book_id: z.string().uuid('Green Book wajib dipilih'),
 })
+
+export const daftarKegiatanImportFileSchema = masterImportFileSchema

@@ -115,6 +115,7 @@ type masterImportLookups struct {
 	nationalPriorityKeys      map[string]struct{}
 	nationalPrioritiesByTitle map[string]queries.ListNationalPrioritiesRow
 	bbProjectsByCode          map[string]queries.ListActiveBBProjectReferencesRow
+	gbProjectsByCode          map[string]queries.ListActiveGBProjectReferencesRow
 }
 
 func (s *MasterService) ImportMasterData(ctx context.Context, fileName string, reader io.Reader, size int64) (*model.MasterImportResponse, error) {
@@ -216,6 +217,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		nationalPriorityKeys:      map[string]struct{}{},
 		nationalPrioritiesByTitle: map[string]queries.ListNationalPrioritiesRow{},
 		bbProjectsByCode:          map[string]queries.ListActiveBBProjectReferencesRow{},
+		gbProjectsByCode:          map[string]queries.ListActiveGBProjectReferencesRow{},
 	}
 
 	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
@@ -292,6 +294,14 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	}
 	for _, project := range bbProjects {
 		lookups.addBBProjectReference(project)
+	}
+
+	gbProjects, err := qtx.ListActiveGBProjectReferences(ctx)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca referensi GB Project")
+	}
+	for _, project := range gbProjects {
+		lookups.addGBProjectReference(project)
 	}
 
 	return lookups, nil
@@ -1207,6 +1217,15 @@ func (l *masterImportLookups) addBBProjectReference(project queries.ListActiveBB
 
 func (l *masterImportLookups) bbProjectByCode(code string) (queries.ListActiveBBProjectReferencesRow, bool) {
 	project, exists := l.bbProjectsByCode[normalizeLookupKey(code)]
+	return project, exists
+}
+
+func (l *masterImportLookups) addGBProjectReference(project queries.ListActiveGBProjectReferencesRow) {
+	l.gbProjectsByCode[normalizeLookupKey(project.GbCode)] = project
+}
+
+func (l *masterImportLookups) gbProjectByCode(code string) (queries.ListActiveGBProjectReferencesRow, bool) {
+	project, exists := l.gbProjectsByCode[normalizeLookupKey(code)]
 	return project, exists
 }
 

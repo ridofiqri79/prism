@@ -14,6 +14,12 @@ SELECT *
 FROM daftar_kegiatan
 WHERE id = $1;
 
+-- name: GetDaftarKegiatanByLetterNumber :one
+SELECT *
+FROM daftar_kegiatan
+WHERE LOWER(letter_number) = LOWER($1)
+LIMIT 1;
+
 -- name: CreateDaftarKegiatan :one
 INSERT INTO daftar_kegiatan (letter_number, subject, date)
 VALUES ($1, $2, $3)
@@ -75,6 +81,25 @@ RETURNING *;
 -- name: DeleteDKProject :exec
 DELETE FROM dk_project
 WHERE id = $1;
+
+-- name: ListActiveGBProjectReferences :many
+SELECT
+    gp.id,
+    gp.green_book_id,
+    gp.program_title_id,
+    gp.gb_code,
+    gp.project_name,
+    gb.publish_year,
+    gb.revision_number,
+    gp.duration,
+    gp.objective,
+    gp.scope_of_project,
+    gp.created_at,
+    gp.updated_at
+FROM gb_project gp
+JOIN green_book gb ON gb.id = gp.green_book_id
+WHERE gp.status = 'active'
+ORDER BY gp.gb_code ASC;
 
 -- ===== DK PROJECT GB PROJECT =====
 
@@ -252,3 +277,24 @@ FROM (
     WHERE dkgb.dk_project_id = $1
 ) allowed_lenders
 WHERE lender_id IS NOT NULL;
+
+-- name: ListAllowedLenderReferencesByGBProject :many
+SELECT DISTINCT
+    allowed_lenders.gb_project_id,
+    allowed_lenders.lender_id,
+    l.name AS lender_name,
+    l.short_name AS lender_short_name,
+    l.type AS lender_type
+FROM (
+    SELECT gfs.gb_project_id, gfs.lender_id
+    FROM gb_funding_source gfs
+    WHERE gfs.gb_project_id = $1
+    UNION
+    SELECT gbp.gb_project_id, li.lender_id
+    FROM gb_project_bb_project gbp
+    JOIN lender_indication li ON li.bb_project_id = gbp.bb_project_id
+    WHERE gbp.gb_project_id = $1
+) allowed_lenders
+JOIN lender l ON l.id = allowed_lenders.lender_id
+WHERE allowed_lenders.lender_id IS NOT NULL
+ORDER BY l.name ASC;
