@@ -158,7 +158,7 @@ func (s *BlueBookService) CreateBBProject(ctx context.Context, bbID pgtype.UUID,
 		if _, err := qtx.GetBlueBook(ctx, bbID); err != nil {
 			return mapNotFound(err, "Blue Book tidak ditemukan")
 		}
-		if err := s.validateNationalPriorities(ctx, qtx, bbID, req.NationalPriorityIDs); err != nil {
+		if err := s.validateNationalPriorities(ctx, qtx, req.NationalPriorityIDs); err != nil {
 			return err
 		}
 		project, err := qtx.CreateBBProject(ctx, queries.CreateBBProjectParams{
@@ -201,7 +201,7 @@ func (s *BlueBookService) UpdateBBProject(ctx context.Context, bbID, id pgtype.U
 		if _, err := qtx.GetActiveBBProjectByBlueBook(ctx, queries.GetActiveBBProjectByBlueBookParams{BlueBookID: bbID, ID: id}); err != nil {
 			return mapNotFound(err, "BB Project tidak ditemukan")
 		}
-		if err := s.validateNationalPriorities(ctx, qtx, bbID, req.NationalPriorityIDs); err != nil {
+		if err := s.validateNationalPriorities(ctx, qtx, req.NationalPriorityIDs); err != nil {
 			return err
 		}
 		project, err := qtx.UpdateBBProject(ctx, queries.UpdateBBProjectParams{
@@ -378,24 +378,18 @@ func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *que
 	return nil
 }
 
-func (s *BlueBookService) validateNationalPriorities(ctx context.Context, qtx *queries.Queries, bbID pgtype.UUID, ids []string) error {
+func (s *BlueBookService) validateNationalPriorities(ctx context.Context, qtx *queries.Queries, ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	parsed := make([]pgtype.UUID, 0, len(ids))
 	for _, id := range ids {
 		priorityID, err := model.ParseUUID(id)
 		if err != nil {
 			return validation("national_priority_ids", "UUID tidak valid")
 		}
-		parsed = append(parsed, priorityID)
-	}
-	count, err := qtx.CountMismatchedBBProjectNationalPriorities(ctx, queries.CountMismatchedBBProjectNationalPrioritiesParams{ID: bbID, Column2: parsed})
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return validation("national_priority_ids", "Harus sesuai period Blue Book")
+		if _, err := qtx.GetNationalPriority(ctx, priorityID); err != nil {
+			return mapNotFound(err, "National Priority tidak ditemukan")
+		}
 	}
 	return nil
 }
@@ -492,15 +486,6 @@ func validateBBProjectRequest(req model.CreateBBProjectRequest, validateCode boo
 	}
 	if len(req.LocationIDs) == 0 {
 		return validation("location_ids", "minimal satu")
-	}
-	ea := make(map[string]struct{}, len(req.ExecutingAgencyIDs))
-	for _, id := range req.ExecutingAgencyIDs {
-		ea[strings.TrimSpace(id)] = struct{}{}
-	}
-	for _, id := range req.ImplementingAgencyIDs {
-		if _, exists := ea[strings.TrimSpace(id)]; exists {
-			return apperrors.BusinessRule("Institution tidak boleh menjadi EA sekaligus IA")
-		}
 	}
 	return nil
 }

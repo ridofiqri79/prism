@@ -102,18 +102,18 @@ type inlineStringXML struct {
 }
 
 type masterImportLookups struct {
-	countriesByCode        map[string]queries.Country
-	countriesByName        map[string]queries.Country
-	lendersByName          map[string]masterImportLenderRef
-	institutionsByName     map[string]queries.Institution
-	regionsByCode          map[string]queries.Region
-	regionsByName          map[string]queries.Region
-	programTitlesByTitle   map[string]queries.ProgramTitle
-	bappenasPartnersByName map[string]queries.BappenasPartner
-	periodsByName          map[string]queries.Period
-	periodsByYears         map[string]queries.Period
-	nationalPriorityKeys   map[string]struct{}
-	nationalPriorities     map[string]queries.ListNationalPrioritiesRow
+	countriesByCode           map[string]queries.Country
+	countriesByName           map[string]queries.Country
+	lendersByName             map[string]masterImportLenderRef
+	institutionsByName        map[string]queries.Institution
+	regionsByCode             map[string]queries.Region
+	regionsByName             map[string]queries.Region
+	programTitlesByTitle      map[string]queries.ProgramTitle
+	bappenasPartnersByName    map[string]queries.BappenasPartner
+	periodsByName             map[string]queries.Period
+	periodsByYears            map[string]queries.Period
+	nationalPriorityKeys      map[string]struct{}
+	nationalPrioritiesByTitle map[string]queries.ListNationalPrioritiesRow
 }
 
 func (s *MasterService) ImportMasterData(ctx context.Context, fileName string, reader io.Reader, size int64) (*model.MasterImportResponse, error) {
@@ -202,18 +202,18 @@ func (s *MasterService) processMasterDataWorkbook(ctx context.Context, fileName 
 
 func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *queries.Queries) (*masterImportLookups, error) {
 	lookups := &masterImportLookups{
-		countriesByCode:        map[string]queries.Country{},
-		countriesByName:        map[string]queries.Country{},
-		lendersByName:          map[string]masterImportLenderRef{},
-		institutionsByName:     map[string]queries.Institution{},
-		regionsByCode:          map[string]queries.Region{},
-		regionsByName:          map[string]queries.Region{},
-		programTitlesByTitle:   map[string]queries.ProgramTitle{},
-		bappenasPartnersByName: map[string]queries.BappenasPartner{},
-		periodsByName:          map[string]queries.Period{},
-		periodsByYears:         map[string]queries.Period{},
-		nationalPriorityKeys:   map[string]struct{}{},
-		nationalPriorities:     map[string]queries.ListNationalPrioritiesRow{},
+		countriesByCode:           map[string]queries.Country{},
+		countriesByName:           map[string]queries.Country{},
+		lendersByName:             map[string]masterImportLenderRef{},
+		institutionsByName:        map[string]queries.Institution{},
+		regionsByCode:             map[string]queries.Region{},
+		regionsByName:             map[string]queries.Region{},
+		programTitlesByTitle:      map[string]queries.ProgramTitle{},
+		bappenasPartnersByName:    map[string]queries.BappenasPartner{},
+		periodsByName:             map[string]queries.Period{},
+		periodsByYears:            map[string]queries.Period{},
+		nationalPriorityKeys:      map[string]struct{}{},
+		nationalPrioritiesByTitle: map[string]queries.ListNationalPrioritiesRow{},
 	}
 
 	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
@@ -278,7 +278,10 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	}
 	for _, priority := range priorities {
 		lookups.nationalPriorityKeys[nationalPriorityKey(model.UUIDToString(priority.PeriodID), priority.Title)] = struct{}{}
-		lookups.nationalPriorities[nationalPriorityKey(model.UUIDToString(priority.PeriodID), priority.Title)] = priority
+		titleKey := normalizeLookupKey(priority.Title)
+		if _, exists := lookups.nationalPrioritiesByTitle[titleKey]; !exists {
+			lookups.nationalPrioritiesByTitle[titleKey] = priority
+		}
 	}
 
 	return lookups, nil
@@ -1183,8 +1186,8 @@ func (l *masterImportLookups) regionByNameOrCode(value string) (queries.Region, 
 	return region, exists
 }
 
-func (l *masterImportLookups) nationalPriorityByPeriodAndTitle(periodID pgtype.UUID, title string) (queries.ListNationalPrioritiesRow, bool) {
-	priority, exists := l.nationalPriorities[nationalPriorityKey(model.UUIDToString(periodID), title)]
+func (l *masterImportLookups) nationalPriorityByTitle(title string) (queries.ListNationalPrioritiesRow, bool) {
+	priority, exists := l.nationalPrioritiesByTitle[normalizeLookupKey(title)]
 	return priority, exists
 }
 

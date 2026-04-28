@@ -173,7 +173,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 	relationRows = append(relationRows, s.parseBlueBookInstitutionRelation(workbook, lookups, projectsByCode, relationResults, blueBookImportSheetEA, "executing_agency_name", roleExecutingAgency)...)
 	relationRows = append(relationRows, s.parseBlueBookInstitutionRelation(workbook, lookups, projectsByCode, relationResults, blueBookImportSheetIA, "implementing_agency_name", roleImplementingAgency)...)
 	relationRows = append(relationRows, s.parseBlueBookLocationRelation(workbook, lookups, projectsByCode, relationResults)...)
-	relationRows = append(relationRows, s.parseBlueBookNationalPriorityRelation(workbook, lookups, projectsByCode, relationResults, blueBook.PeriodID)...)
+	relationRows = append(relationRows, s.parseBlueBookNationalPriorityRelation(workbook, lookups, projectsByCode, relationResults)...)
 	relationRows = append(relationRows, s.parseBlueBookProjectCostRelation(workbook, projectsByCode, relationResults)...)
 	relationRows = append(relationRows, s.parseBlueBookLenderIndicationRelation(workbook, lookups, projectsByCode, relationResults)...)
 
@@ -189,9 +189,6 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 		}
 		if len(draft.locationIDs) == 0 {
 			draft.addError("Location wajib diisi")
-		}
-		if hasIntersectingIDs(draft.executingAgencyIDs, draft.implementingAgencyIDs) {
-			draft.addError("Institution tidak boleh menjadi EA sekaligus IA")
 		}
 	}
 
@@ -470,7 +467,7 @@ func (s *BlueBookService) parseBlueBookLocationRelation(workbook *xlsxWorkbook, 
 	return relations
 }
 
-func (s *BlueBookService) parseBlueBookNationalPriorityRelation(workbook *xlsxWorkbook, lookups *masterImportLookups, projectsByCode map[string]*blueBookImportProjectDraft, relationResults map[string]model.MasterImportSheetResult, periodID pgtype.UUID) []blueBookImportRelationRow {
+func (s *BlueBookService) parseBlueBookNationalPriorityRelation(workbook *xlsxWorkbook, lookups *masterImportLookups, projectsByCode map[string]*blueBookImportProjectDraft, relationResults map[string]model.MasterImportSheetResult) []blueBookImportRelationRow {
 	result := relationResults[blueBookImportSheetNationalPriority]
 	rows, ok := workbook.importRows(blueBookImportSheetNationalPriority, []string{"bb_code", "national_priority_name"})
 	if !ok {
@@ -506,10 +503,10 @@ func (s *BlueBookService) parseBlueBookNationalPriorityRelation(workbook *xlsxWo
 			relations = append(relations, relation)
 			continue
 		}
-		priority, exists := lookups.nationalPriorityByPeriodAndTitle(periodID, name)
+		priority, exists := lookups.nationalPriorityByTitle(name)
 		if !exists {
 			relation.status = masterImportStatusFailed
-			relation.message = fmt.Sprintf("National Priority %q tidak ada untuk periode Blue Book target", name)
+			relation.message = fmt.Sprintf("National Priority %q tidak ada di master data", name)
 			draft.addError(relation.message)
 			relations = append(relations, relation)
 			continue
@@ -679,19 +676,6 @@ func relationStatus(relation blueBookImportRelationRow) (string, string) {
 		return masterImportStatusFailed, "Project terkait gagal validasi"
 	}
 	return masterImportStatusCreate, ""
-}
-
-func hasIntersectingIDs(left, right []string) bool {
-	seen := make(map[string]struct{}, len(left))
-	for _, id := range left {
-		seen[id] = struct{}{}
-	}
-	for _, id := range right {
-		if _, exists := seen[id]; exists {
-			return true
-		}
-	}
-	return false
 }
 
 func normalizeProjectFundingType(value string) (string, bool) {

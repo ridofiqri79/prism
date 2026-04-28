@@ -163,14 +163,7 @@ func (s *BBProjectService) CreateBBProject(ctx context.Context, bbID pgtype.UUID
         return nil, errors.Conflict("BB Code sudah digunakan")
     }
 
-    // 2. Validasi EA dan IA tidak overlap pada proyek yang sama
-    eaSet := toSet(req.ExecutingAgencyIDs)
-    iaSet := toSet(req.ImplementingAgencyIDs)
-    for id := range eaSet {
-        if iaSet[id] {
-            return nil, errors.BusinessRule("Institution tidak boleh menjadi EA sekaligus IA")
-        }
-    }
+    // 2. EA dan IA boleh overlap bila sesuai data proyek
 
     // Transaksi: insert project + semua relasi
     tx, err := s.db.Begin(ctx)
@@ -246,6 +239,6 @@ loi.DELETE("/:id", bbHandler.DeleteLoI, permission.Require("bb_project", "update
 - [x] `internal/handler/blue_book_handler.go`
 - [x] Routes terdaftar
 - [x] `POST /bb-projects` dengan bb_code duplikat → 409
-- [x] `POST /bb-projects` dengan EA = IA → 422
+- [x] `POST /bb-projects` dengan EA = IA → diterima bila payload lain valid
 - [x] `POST /bb-projects` sukses → SSE event terkirim
 - [x] `DELETE /blue-books/:bbId/projects/:id` → status `deleted`, record tetap ada di DB

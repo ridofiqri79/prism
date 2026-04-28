@@ -320,7 +320,7 @@ SALAH  → State tabel nested (activities, funding source) di halaman langsung
 - Satu `active` per Period — revisi baru → lama jadi `superseded`
 - `bb_code` unik global, tidak bisa dipakai ulang meski `deleted`
 - Bappenas Partner: simpan Eselon II saja, Eselon I diturunkan dari `parent_id`
-- National Priority: filter berdasarkan `period_id` BB yang sama
+- National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun
 
 ### Green Book
 - Satu `active` per `publish_year`
@@ -350,7 +350,7 @@ SALAH  → State tabel nested (activities, funding source) di halaman langsung
 - Frontend: nonaktifkan pilihan PROVINCE/CITY jika COUNTRY sudah dipilih
 
 ### Institution
-- Satu institution **tidak boleh** jadi EA sekaligus IA pada proyek yang sama
+- Satu institution **boleh** jadi EA sekaligus IA pada proyek yang sama bila sesuai data proyek
 
 ### Permission
 - ADMIN: akses penuh, tidak ada entri di `user_permission`
@@ -480,8 +480,8 @@ Kerjakan **satu plan per sesi**. Selesaikan semua task dan checklist sebelum pin
 | **BE-00** | `plans/PLAN_BE_00_Foundation.md` | `sqlc.yaml`, `Makefile`, `.air.toml`, `internal/config/config.go` (viper), `internal/database/db.go` (pgxpool 20 koneksi), `internal/errors/errors.go` (AppError + FromPgError pg code mapping), middleware: `logger.go`, `auth.go` (JWT), `permission.go` (stub), `audit.go` (SET LOCAL), `error_handler.go`. `internal/model/common.go` (generic ListResponse/DataResponse). `internal/sse/broker.go` (channel-based). `cmd/api/main.go` wiring + `/health` endpoint |
 | **BE-01** | `plans/PLAN_BE_01_Auth.md` | `sql/queries/user.sql` (GetUserByUsername, GetUserByID, ListUsers, CreateUser, UpdateUser, GetUserPermissions, DeleteUserPermissions, CreateUserPermission, GetUserPermissionByModule), `make generate`, `internal/model/auth.go`, `internal/service/auth_service.go` (bcrypt + JWT sign), `internal/service/user_service.go` (UpdatePermissions replace-all transaksional), handler auth + user, `permission.go` middleware implementasi full (cek DB), routes terdaftar, seed ADMIN migration |
 | **BE-02** | `plans/PLAN_BE_02_Master_Data.md` | `sql/queries/master.sql` (CRUD semua 8 tabel master, ListLenders dengan JOIN country), `make generate`, `internal/model/master.go`, `internal/service/master_service.go` (validasi lender: country_id wajib Bilateral/KSA, NULL Multilateral), `internal/handler/master_handler.go`, semua routes master terdaftar |
-| **BE-03** | `plans/PLAN_BE_03_Blue_Book.md` | `sql/queries/bb_project.sql` (CRUD BB + BB Project + junction tables institution/location/priority + costs + lender_indication + LoI + SupersedeBlueBooksByPeriod), `make generate`, `internal/model/blue_book.go`, `internal/service/blue_book_service.go` (validasi: bb_code unik global termasuk deleted, EA≠IA, transaksi multi-tabel, SSE publish), handler + routes |
-| **BE-04** | `plans/PLAN_BE_04_Green_Book.md` | `sql/queries/gb_project.sql` (CRUD GB + junction + activities ordered by sort_order + funding_source + UpsertGBDisbursementPlan + funding_allocation), `make generate`, `internal/service/green_book_service.go` (validasi: min 1 BB, EA≠IA, tahun disbursement tidak duplikat, `activity_index` mapping ke `activityIDs[]` dalam transaksi), handler + routes |
+| **BE-03** | `plans/PLAN_BE_03_Blue_Book.md` | `sql/queries/bb_project.sql` (CRUD BB + BB Project + junction tables institution/location/priority + costs + lender_indication + LoI + SupersedeBlueBooksByPeriod), `make generate`, `internal/model/blue_book.go`, `internal/service/blue_book_service.go` (validasi: bb_code unik global termasuk deleted, transaksi multi-tabel, SSE publish), handler + routes |
+| **BE-04** | `plans/PLAN_BE_04_Green_Book.md` | `sql/queries/gb_project.sql` (CRUD GB + junction + activities ordered by sort_order + funding_source + UpsertGBDisbursementPlan + funding_allocation), `make generate`, `internal/service/green_book_service.go` (validasi: min 1 BB, tahun disbursement tidak duplikat, `activity_index` mapping ke `activityIDs[]` dalam transaksi), handler + routes |
 | **BE-05** | `plans/PLAN_BE_05_DK_LA.md` | `sql/queries/dk_project.sql` (CRUD DK + junction + financing multi-currency + loan_allocation + activity_detail + `GetAllowedLenderIDsForDK` UNION query), `sql/queries/loan_agreement.sql` (CRUD LA + `GetAllowedLenderIDsForLA` + `GetLoanAgreementByDKProject`), `make generate`, service DK (validasi lender dari allowed set setelah GB relations tersimpan), service LA (cek one-to-one + validasi lender + `is_extended` computed + SSE `loan_agreement.extended`), handler + routes |
 | **BE-06** | `plans/PLAN_BE_06_Monitoring.md` | `sql/queries/monitoring.sql` (CRUD monitoring + komponen + `GetMonitoringByLAAndPeriod` + `GetDashboardSummary` aggregate query + `GetMonitoringSummary` GROUP BY lender), `make generate`, `internal/service/monitoring_service.go` (guard: `effective_date <= NOW()`, cek duplikat quarter, `absorption_pct` computed div-by-zero safe), `internal/service/dashboard_service.go`, `internal/service/journey_service.go` (multi-level response assembly), handler monitoring + dashboard + journey, semua routes |
 

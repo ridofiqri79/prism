@@ -465,15 +465,6 @@ func validateGBProjectRequest(req model.CreateGBProjectRequest, validateCode boo
 	if len(req.LocationIDs) == 0 {
 		return validation("location_ids", "minimal satu")
 	}
-	ea := make(map[string]struct{}, len(req.ExecutingAgencyIDs))
-	for _, id := range req.ExecutingAgencyIDs {
-		ea[strings.TrimSpace(id)] = struct{}{}
-	}
-	for _, id := range req.ImplementingAgencyIDs {
-		if _, exists := ea[strings.TrimSpace(id)]; exists {
-			return apperrors.BusinessRule("Institution tidak boleh menjadi EA sekaligus IA")
-		}
-	}
 	years := make(map[int32]struct{}, len(req.DisbursementPlan))
 	for _, item := range req.DisbursementPlan {
 		if _, exists := years[item.Year]; exists {

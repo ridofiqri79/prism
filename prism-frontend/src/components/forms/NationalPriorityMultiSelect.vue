@@ -2,6 +2,11 @@
 import { computed, onMounted } from 'vue'
 import MultiSelect from 'primevue/multiselect'
 import { useMasterStore } from '@/stores/master.store'
+import type { NationalPriority } from '@/types/master.types'
+
+type NationalPriorityOption = NationalPriority & {
+  display_label: string
+}
 
 const props = withDefaults(
   defineProps<{
@@ -28,10 +33,13 @@ const selectedValues = computed({
   set: (value: string[]) => emit('update:modelValue', value),
 })
 
-const options = computed(() =>
-  masterStore.nationalPriorities.filter(
-    (priority) => !props.periodId || priority.period_id === props.periodId,
-  ),
+const options = computed<NationalPriorityOption[]>(() =>
+  masterStore.nationalPriorities
+    .filter((priority) => !props.periodId || priority.period_id === props.periodId)
+    .map((priority) => ({
+      ...priority,
+      display_label: priority.period?.name ? `${priority.title} (${priority.period.name})` : priority.title,
+    })),
 )
 
 onMounted(() => {
@@ -43,7 +51,7 @@ onMounted(() => {
   <MultiSelect
     v-model="selectedValues"
     :options="options"
-    option-label="title"
+    option-label="display_label"
     option-value="id"
     :placeholder="placeholder"
     :disabled="disabled"

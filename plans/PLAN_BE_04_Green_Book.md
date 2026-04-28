@@ -49,7 +49,7 @@ func (s *GBProjectService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
     if len(req.BBProjectIDs) == 0 {
         return nil, errors.Validation(errors.FieldError{Field: "bb_project_ids", Message: "Minimal 1 BB Project"})
     }
-    // 2. EA dan IA tidak overlap
+    // 2. EA dan IA boleh overlap bila sesuai data proyek
     // 3. gb_code unik global
     // 4. Tahun disbursement tidak duplikat
     yearSet := map[int]bool{}

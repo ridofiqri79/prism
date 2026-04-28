@@ -38,8 +38,6 @@ const selectedPartner = computed(() =>
   masterStore.bappenasPartners.find((partner) => partner.id === form.values.bappenas_partner_id),
 )
 const selectedPartnerParent = computed(() => findPartnerParent(selectedPartner.value))
-const periodId = computed(() => blueBookStore.currentBlueBook?.period.id)
-
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
   return masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ?? partner.parent?.name ?? '-'
@@ -195,7 +193,7 @@ onMounted(() => {
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Prioritas Nasional</span>
-            <NationalPriorityMultiSelect v-model="form.values.national_priority_ids" :period-id="periodId" />
+            <NationalPriorityMultiSelect v-model="form.values.national_priority_ids" />
           </label>
         </div>
       </section>

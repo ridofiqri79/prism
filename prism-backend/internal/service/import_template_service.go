@@ -214,7 +214,7 @@ func (s *MasterService) buildMasterImportTemplateWorkbook(ctx context.Context) (
 
 func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context.Context, blueBook queries.GetBlueBookRow) (simpleXLSXWorkbook, error) {
 	masterSvc := &MasterService{db: s.db, queries: s.queries}
-	reference, err := masterSvc.loadImportTemplateReferenceData(ctx, blueBook.PeriodID)
+	reference, err := masterSvc.loadImportTemplateReferenceData(ctx, pgtype.UUID{})
 	if err != nil {
 		return simpleXLSXWorkbook{}, err
 	}
@@ -234,11 +234,11 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 		}),
 		templateInputSheet(blueBookImportSheetEA, []string{"BB Code (*)", "Executing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data. Satu institution tidak boleh menjadi EA sekaligus IA pada proyek yang sama."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data. Institution yang sama boleh dipakai sebagai EA dan IA bila memang sesuai data proyek."),
 		}),
 		templateInputSheet(blueBookImportSheetIA, []string{"BB Code (*)", "Implementing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution dari master data. Jangan pilih institution yang sama dengan EA untuk BB Code yang sama."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution dari master data. Boleh sama dengan EA untuk BB Code yang sama."),
 		}),
 		templateInputSheet(blueBookImportSheetLocations, []string{"BB Code (*)", "Location Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
@@ -246,7 +246,7 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 		}),
 		templateInputSheet(blueBookImportSheetNationalPriority, []string{"BB Code (*)", "National Priority Name (*)"}, []float64{22, 64}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddNationalPriorities", "National Priority", "Pilih National Priority yang sesuai dengan period Blue Book target."),
+			listValidation("B2:B"+inputLastRow(), "ddNationalPriorities", "National Priority", "Pilih National Priority dari seluruh master data, tidak dibatasi period Blue Book target."),
 		}),
 		templateInputSheet(blueBookImportSheetProjectCost, []string{"BB Code (*)", "Funding Type (*)", "Funding Category (*)", "Amount USD"}, []float64{22, 22, 32, 18}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
@@ -402,7 +402,7 @@ func buildMasterGuideSheet() simpleXLSXSheet {
 func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 	rows := [][]simpleXLSXCell{
 		styledTextRow(xlsxStyleTitle, "Panduan Import Proyek Blue Book"),
-		styledTextRow(xlsxStyleSubtitle, "Target Blue Book", blueBook.PeriodName, "National Priority pada template ini sudah difilter berdasarkan period target."),
+		styledTextRow(xlsxStyleSubtitle, "Target Blue Book", blueBook.PeriodName, "National Priority pada template ini menampilkan seluruh master data dan tidak dibatasi period target."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
 		textRow("1. Isi Input Data", "Satu baris mewakili satu proyek. BB Code menjadi kunci penghubung ke semua sheet relasi.", "BB Code yang sudah ada di database akan masuk status skip."),
@@ -414,9 +414,9 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration dan uraian proyek opsional. Bappenas Partner pilih Eselon II bila tersedia."),
 		textRow("Relasi - EA", "BB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib untuk proyek baru."),
-		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Institution yang sama tidak boleh menjadi EA sekaligus IA pada proyek yang sama."),
+		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Institution yang sama boleh dipakai sebagai EA dan IA pada proyek yang sama."),
 		textRow("Relasi - Locations", "BB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region dari dropdown."),
-		textRow("Relasi - National Priority", "BB Code (*), National Priority Name (*)", "Pilih national priority yang sesuai period Blue Book target."),
+		textRow("Relasi - National Priority", "BB Code (*), National Priority Name (*)", "Pilih national priority dari seluruh master data, tidak dibatasi period Blue Book target."),
 		textRow("Relasi - Project Cost", "BB Code (*), Funding Type (*), Funding Category (*)", "Amount USD angka. Funding Type: Foreign/Counterpart."),
 		textRow("Relasi - Lender Indication", "BB Code (*), Lender Name (*)", "Keterangan opsional dan akan disimpan sebagai remarks lender indication."),
 		textRow(""),

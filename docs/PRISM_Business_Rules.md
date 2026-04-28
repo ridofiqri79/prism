@@ -28,7 +28,7 @@
 - Format revisi: `BB 2025-2029 Revisi ke-1 Tahun 2026`.
 - `bb_code` unik global — tidak bisa dipakai ulang meski proyek sudah `deleted`.
 - Bappenas Partner: simpan Eselon II saja — Eselon I diturunkan dari `parent_id`.
-- National Priority: hanya tampilkan yang `period_id`-nya sama dengan BB terkait.
+- National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun.
 
 ---
 
@@ -80,7 +80,7 @@
 
 ## 9. Aturan Institution
 
-- Satu institution tidak boleh jadi EA sekaligus IA pada proyek yang sama. Backend wajib validasi.
+- Satu institution boleh menjadi EA sekaligus IA pada proyek yang sama bila memang sesuai data proyek.
 
 ---
 
