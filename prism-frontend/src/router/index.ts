@@ -10,11 +10,7 @@ import { loanAgreementRoutes } from '@/router/routes/loan-agreement.routes'
 import { masterRoutes } from '@/router/routes/master.routes'
 import { monitoringRoutes } from '@/router/routes/monitoring.routes'
 import { userRoutes } from '@/router/routes/user.routes'
-
-interface PermissionMeta {
-  module: string
-  action: 'create' | 'read' | 'update' | 'delete'
-}
+import { resolveRouteTitle } from '@/utils/route-title'
 
 const appRoutes: RouteRecordRaw[] = [
   {
@@ -35,6 +31,7 @@ const appRoutes: RouteRecordRaw[] = [
         component: () => import('@/pages/common/ForbiddenPage.vue'),
         meta: {
           requiresAuth: true,
+          title: 'Akses Ditolak',
         },
       },
       ...userRoutes,
@@ -51,6 +48,9 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/pages/common/NotFoundPage.vue'),
+      meta: {
+        title: 'Halaman Tidak Ditemukan',
+      },
     },
   ],
 })
@@ -84,7 +84,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.permission) {
-    const permission = to.meta.permission as PermissionMeta
+    const permission = to.meta.permission
 
     if (!auth.can(permission.module, permission.action)) {
       return { name: 'forbidden' }
@@ -96,6 +96,10 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+router.afterEach((to) => {
+  document.title = resolveRouteTitle(to)
 })
 
 export default router

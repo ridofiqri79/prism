@@ -8,6 +8,7 @@ export const userRoutes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       adminOnly: true,
+      title: 'Manajemen Pengguna',
     },
   },
   {
@@ -17,6 +18,7 @@ export const userRoutes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       adminOnly: true,
+      title: 'Tambah Pengguna',
     },
   },
   {
@@ -26,6 +28,7 @@ export const userRoutes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       adminOnly: true,
+      title: 'Edit Pengguna',
     },
   },
   {
@@ -35,6 +38,7 @@ export const userRoutes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       adminOnly: true,
+      title: 'Hak Akses Pengguna',
     },
   },
 ]
