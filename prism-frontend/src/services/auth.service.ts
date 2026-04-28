@@ -9,7 +9,9 @@ export interface LoginRequest {
 
 export const AuthService = {
   async login(payload: LoginRequest) {
-    const response = await http.post<ApiResponse<LoginResponse>>('/auth/login', payload)
+    const response = await http.post<ApiResponse<LoginResponse>>('/auth/login', payload, {
+      skipAuthRedirect: true,
+    })
 
     return response.data.data
   },

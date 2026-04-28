@@ -3,6 +3,12 @@ import type { ApiErrorResponse } from '@/types/api.types'
 import { clearStoredSession, readStoredToken } from '@/utils/auth-session'
 import { emitToast, emitUnauthorized } from '@/utils/app-events'
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean
+  }
+}
+
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30000,
@@ -22,8 +28,9 @@ http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
     const status = error.response?.status
+    const skipAuthRedirect = error.config?.skipAuthRedirect === true
 
-    if (status === 401) {
+    if (status === 401 && !skipAuthRedirect) {
       clearStoredSession()
       emitUnauthorized()
 
