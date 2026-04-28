@@ -69,6 +69,19 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 Container PostgreSQL development membuat schema awal dari [docs/prism_ddl.sql](docs/prism_ddl.sql). File migration di [prism-backend/migrations/](prism-backend/migrations/) tetap disimpan untuk database yang sudah hidup dari schema lama dan untuk histori perubahan, tetapi tidak perlu dijalankan manual setelah fresh DB dari DDL terbaru.
 
+## Init Migration State
+
+Setelah fresh DB dari `docs/prism_ddl.sql`, gunakan skrip ini untuk mengisi seed admin:
+
+```powershell
+# Jalankan dari root repo setelah container PostgreSQL dev hidup.
+$env:DATABASE_URL = "postgres://prism:prism_secret@localhost:5432/prism_dev?sslmode=disable"
+
+Set-Location .\prism-backend
+migrate -path migrations -database $env:DATABASE_URL up
+Set-Location ..
+```
+
 ## Backend
 
 Masuk ke folder backend:
