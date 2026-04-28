@@ -44,7 +44,12 @@ onMounted(() => {
       subtitle="Detail Loan Agreement dan status perpanjangan"
     >
       <template #actions>
-        <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'loan-agreements' })" />
+        <Button
+          label="Kembali"
+          icon="pi pi-arrow-left"
+          outlined
+          @click="router.push({ name: 'loan-agreements' })"
+        />
         <Button
           v-if="can('loan_agreement', 'update') && loanAgreement"
           as="router-link"
@@ -71,7 +76,7 @@ onMounted(() => {
           <div class="mb-4 flex flex-wrap items-center gap-3">
             <h2 class="text-lg font-semibold text-surface-950">Informasi Loan</h2>
             <StatusBadge v-if="loanAgreement.is_extended" status="Extended" />
-            <span v-if="loanAgreement.is_extended" class="text-sm font-medium text-orange-700">
+            <span v-if="loanAgreement.is_extended" class="text-sm font-medium text-prism-gold-deep">
               {{ loanAgreement.extension_days }} hari
             </span>
           </div>
@@ -86,19 +91,27 @@ onMounted(() => {
             </div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Agreement</dt>
-              <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.agreement_date) }}</dd>
+              <dd class="mt-1 font-medium text-surface-900">
+                {{ formatDate(loanAgreement.agreement_date) }}
+              </dd>
             </div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Efektif</dt>
-              <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.effective_date) }}</dd>
+              <dd class="mt-1 font-medium text-surface-900">
+                {{ formatDate(loanAgreement.effective_date) }}
+              </dd>
             </div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing Awal</dt>
-              <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.original_closing_date) }}</dd>
+              <dd class="mt-1 font-medium text-surface-900">
+                {{ formatDate(loanAgreement.original_closing_date) }}
+              </dd>
             </div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing</dt>
-              <dd class="mt-1 font-medium text-surface-900">{{ formatDate(loanAgreement.closing_date) }}</dd>
+              <dd class="mt-1 font-medium text-surface-900">
+                {{ formatDate(loanAgreement.closing_date) }}
+              </dd>
             </div>
           </dl>
         </section>
@@ -107,9 +120,14 @@ onMounted(() => {
           <h2 class="mb-4 text-lg font-semibold text-surface-950">Nilai Pinjaman</h2>
           <dl class="grid gap-4 md:grid-cols-2">
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">{{ loanAgreement.currency }}</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">
+                {{ loanAgreement.currency }}
+              </dt>
               <dd class="mt-1 text-xl font-semibold text-surface-950">
-                <CurrencyDisplay :amount="loanAgreement.amount_original" :currency="loanAgreement.currency" />
+                <CurrencyDisplay
+                  :amount="loanAgreement.amount_original"
+                  :currency="loanAgreement.currency"
+                />
               </dd>
             </div>
             <div>

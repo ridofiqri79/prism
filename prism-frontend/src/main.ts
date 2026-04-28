@@ -9,6 +9,7 @@ import { prismPreset } from '@/assets/styles/theme'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth.store'
 import { UNAUTHORIZED_EVENT_NAME } from '@/utils/app-events'
+import 'primeicons/primeicons.css'
 import '@/assets/styles/main.css'
 
 const app = createApp(App)

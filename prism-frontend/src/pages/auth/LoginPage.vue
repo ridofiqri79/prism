@@ -53,8 +53,7 @@ function initGlobe(canvas: HTMLCanvasElement) {
 
       if (!fromNode || !toNode) continue
 
-      const distance =
-        fromNode.x * toNode.x + fromNode.y * toNode.y + fromNode.z * toNode.z
+      const distance = fromNode.x * toNode.x + fromNode.y * toNode.y + fromNode.z * toNode.z
 
       if (distance > 0.89) {
         edges.push([i, j])
@@ -106,12 +105,29 @@ function initGlobe(canvas: HTMLCanvasElement) {
       centerY,
       radius,
     )
-    body.addColorStop(0, 'rgba(59,130,246,0.24)')
-    body.addColorStop(1, 'rgba(15,23,42,0)')
+    body.addColorStop(0, 'rgba(255,212,90,0.16)')
+    body.addColorStop(0.3, 'rgba(31,181,178,0.24)')
+    body.addColorStop(0.72, 'rgba(38,183,165,0.1)')
+    body.addColorStop(1, 'rgba(11,111,115,0)')
     ctx.beginPath()
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
     ctx.fillStyle = body
     ctx.fill()
+
+    const rim = ctx.createLinearGradient(
+      centerX - radius,
+      centerY - radius,
+      centerX + radius,
+      centerY + radius,
+    )
+    rim.addColorStop(0, 'rgba(255,212,90,0.26)')
+    rim.addColorStop(0.44, 'rgba(31,181,178,0.3)')
+    rim.addColorStop(1, 'rgba(21,126,92,0.16)')
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius * 0.995, 0, Math.PI * 2)
+    ctx.strokeStyle = rim
+    ctx.lineWidth = 1.3
+    ctx.stroke()
 
     const projectedNodes = nodes.map((node) => project(node))
 
@@ -130,12 +146,12 @@ function initGlobe(canvas: HTMLCanvasElement) {
 
       if (averageDepth < -0.5) continue
 
-      const opacity = Math.max(0, (averageDepth + 1) / 2) * 0.7 + 0.1
+      const opacity = Math.max(0, (averageDepth + 1) / 2) * 0.55 + 0.12
       ctx.beginPath()
       ctx.moveTo(a.sx, a.sy)
       ctx.lineTo(b.sx, b.sy)
-      ctx.strokeStyle = `rgba(59,130,246,${opacity * 0.5})`
-      ctx.lineWidth = 1.5
+      ctx.strokeStyle = `rgba(31,181,178,${opacity * 0.46})`
+      ctx.lineWidth = averageDepth > 0.42 ? 1.45 : 1.05
       ctx.stroke()
     }
 
@@ -145,10 +161,10 @@ function initGlobe(canvas: HTMLCanvasElement) {
       if (point.depth < -0.65) continue
 
       const depthRatio = (point.depth + 1) / 2
-      const opacity = depthRatio * 0.9 + 0.1
-      const nodeSize = depthRatio * 4.5 + 1.2
+      const opacity = depthRatio * 0.78 + 0.14
+      const nodeSize = depthRatio * 3.8 + 1.1
 
-      if (depthRatio > 0.5) {
+      if (depthRatio > 0.58) {
         const glow = ctx.createRadialGradient(
           point.sx,
           point.sy,
@@ -157,8 +173,9 @@ function initGlobe(canvas: HTMLCanvasElement) {
           point.sy,
           nodeSize * 4,
         )
-        glow.addColorStop(0, `rgba(59,130,246,${opacity * 0.65})`)
-        glow.addColorStop(1, 'rgba(96,165,250,0)')
+        glow.addColorStop(0, `rgba(255,212,90,${opacity * 0.32})`)
+        glow.addColorStop(0.42, `rgba(31,181,178,${opacity * 0.12})`)
+        glow.addColorStop(1, 'rgba(31,181,178,0)')
         ctx.beginPath()
         ctx.arc(point.sx, point.sy, nodeSize * 4, 0, Math.PI * 2)
         ctx.fillStyle = glow
@@ -167,7 +184,10 @@ function initGlobe(canvas: HTMLCanvasElement) {
 
       ctx.beginPath()
       ctx.arc(point.sx, point.sy, nodeSize, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(29,78,216,${opacity})`
+      ctx.fillStyle =
+        depthRatio > 0.72
+          ? `rgba(253,184,19,${opacity * 0.9})`
+          : `rgba(31,181,178,${opacity * 0.88})`
       ctx.fill()
     }
 
@@ -200,7 +220,12 @@ const safeRedirectTarget = computed(() => {
   const redirect = route.query.redirect
   const target = Array.isArray(redirect) ? redirect[0] : redirect
 
-  if (!target || !target.startsWith('/') || target.startsWith('//') || target.startsWith('/login')) {
+  if (
+    !target ||
+    !target.startsWith('/') ||
+    target.startsWith('//') ||
+    target.startsWith('/login')
+  ) {
     return null
   }
 
@@ -235,54 +260,43 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="relative min-h-screen overflow-x-hidden px-5 py-8 sm:px-8 lg:px-12">
+  <main class="relative flex min-h-screen flex-col overflow-hidden bg-[#e8f7f7] px-5 sm:px-8">
     <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div
-        class="absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-50/80 blur-3xl lg:left-[62%] lg:h-[680px] lg:w-[680px]"
+        class="absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-50/80 blur-3xl lg:h-[680px] lg:w-[680px]"
       />
       <canvas
         ref="globeCanvas"
-        class="absolute left-1/2 top-1/2 h-[880px] w-[880px] -translate-x-1/2 -translate-y-1/2 opacity-60 lg:left-[62%] lg:h-[1240px] lg:w-[1240px] lg:opacity-70"
+        class="absolute left-1/2 top-1/2 h-[880px] w-[880px] -translate-x-1/2 -translate-y-1/2 opacity-20 lg:h-[1240px] lg:w-[1240px] lg:opacity-25"
       />
     </div>
 
-    <div class="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center">
-      <div class="grid w-full gap-10 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:gap-16">
-        <section class="space-y-10">
-          <div class="max-w-2xl space-y-6">
-            <div class="flex items-center gap-3">
-              <div
-                class="flex h-11 w-11 items-center justify-center rounded-md border border-primary-200 bg-primary-50 text-sm font-semibold text-primary-700"
-                aria-hidden="true"
-              >
-                PR
-              </div>
-              <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">PRISM</p>
-                <p class="text-sm text-surface-500">Internal monitoring system</p>
-              </div>
+    <div class="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center justify-center py-10">
+      <section
+        class="w-full max-w-[448px] rounded-2xl border border-white/70 bg-white px-10 py-10 shadow-[0_24px_70px_rgba(11,111,115,0.08)] sm:px-10 sm:py-10"
+        aria-labelledby="login-title"
+      >
+        <div class="text-prism-teal-dark">
+          <div class="mb-8 border-b border-surface-200 pb-8 text-center">
+            <div
+              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-prism-teal/18 bg-prism-teal/10 shadow-[0_10px_28px_rgba(31,181,178,0.12)]"
+            >
+              <img src="/prism-logo.png" alt="Logo PRISM" class="h-11 w-11 object-contain" />
             </div>
-
-            <div class="space-y-4">
-              <h1 class="max-w-xl text-4xl font-semibold leading-tight text-surface-950 sm:text-5xl">
-                Project Loan Integrated Monitoring System
-              </h1>
-              <p class="max-w-2xl text-base leading-7 text-surface-600">
-                Kelola alur pinjaman luar negeri dari perencanaan, perjanjian, sampai monitoring
-                disbursement triwulanan dalam satu ruang kerja.
-              </p>
-            </div>
+            <p class="text-[1.55rem] font-extrabold leading-none tracking-wide text-surface-900">PRISM</p>
+            <h1 class="mt-3 text-[0.62rem] font-semibold uppercase tracking-[0.32em] text-surface-700">
+              Project Loan Integrated Monitoring System
+            </h1>
           </div>
-        </section>
 
-        <section
-          class="w-full rounded-lg border border-surface-200 bg-white p-6 shadow-sm sm:p-8"
-          aria-labelledby="login-title"
-        >
-          <div class="mb-8 space-y-2">
-            <p class="text-sm font-semibold text-primary">Akses internal</p>
-            <h2 id="login-title" class="text-2xl font-semibold text-surface-950">Masuk ke PRISM</h2>
-            <p class="text-sm leading-6 text-surface-500">Gunakan akun yang sudah diberikan admin.</p>
+          <div class="mb-7">
+            <div class="flex items-center justify-between gap-4">
+              <h2 id="login-title" class="text-xl font-semibold leading-tight text-surface-900">Login</h2>
+              <span class="rounded-md bg-surface-100 px-3 py-1.5 text-xs font-medium text-surface-600">
+                Akses Internal
+              </span>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-surface-600">Silakan masukkan kredensial Anda.</p>
           </div>
 
           <form class="space-y-5" @submit.prevent="onSubmit">
@@ -291,11 +305,12 @@ onBeforeUnmount(() => {
             </Message>
 
             <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Username</span>
+              <span class="text-sm font-medium text-surface-900">Username</span>
               <InputText
                 v-model="username"
-                class="w-full"
+                class="h-[46px] w-full border-surface-300 bg-surface-50 px-4 text-surface-950 placeholder:text-surface-400"
                 autocomplete="username"
+                placeholder="Masukkan username"
                 :invalid="Boolean(errors.username)"
                 @input="loginError = null"
               />
@@ -303,12 +318,12 @@ onBeforeUnmount(() => {
             </label>
 
             <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Password</span>
+              <span class="text-sm font-medium text-surface-900">Password</span>
               <Password
                 v-model="password"
                 class="w-full"
-                input-class="w-full"
-                :input-props="{ autocomplete: 'current-password' }"
+                input-class="h-[46px] w-full border-surface-300 bg-surface-50 px-4 text-surface-950 placeholder:text-surface-400"
+                :input-props="{ autocomplete: 'current-password', placeholder: 'Masukkan password' }"
                 :feedback="false"
                 :invalid="Boolean(errors.password)"
                 toggle-mask
@@ -320,20 +335,14 @@ onBeforeUnmount(() => {
             <Button
               type="submit"
               label="Masuk"
-              icon="pi pi-sign-in"
-              class="w-full"
+              icon="pi pi-arrow-right"
+              icon-pos="right"
+              class="mt-3 h-11 w-full border-prism-teal-deep bg-prism-teal-deep font-semibold text-white hover:border-prism-teal-dark hover:bg-prism-teal-dark"
               :loading="auth.loading"
             />
           </form>
-
-          <div class="mt-8 border-t border-surface-200 pt-5">
-            <p class="text-sm leading-6 text-surface-500">
-              Akses modul dikelola oleh admin. Hubungi admin jika menu kerja belum tersedia setelah
-              login.
-            </p>
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   </main>
 </template>

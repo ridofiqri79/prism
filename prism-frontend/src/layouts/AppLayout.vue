@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-surface-100">
+  <div class="prism-shell flex h-screen overflow-hidden">
     <AppSidebar />
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <AppTopbar />
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="prism-shell-content flex-1 overflow-y-auto p-6">
         <RouterView />
       </main>
     </div>

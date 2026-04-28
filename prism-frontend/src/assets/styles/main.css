@@ -1,8 +1,21 @@
-@import "tailwindcss";
-@import "tailwindcss-primeui";
+@import 'tailwindcss';
+@import 'tailwindcss-primeui';
 
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui;
+  --color-prism-gold: #fdb813;
+  --color-prism-gold-deep: #f6a800;
+  --color-prism-gold-light: #ffd45a;
+  --color-prism-teal: #1fb5b2;
+  --color-prism-teal-mid: #17a2a4;
+  --color-prism-teal-deep: #0f8f8c;
+  --color-prism-teal-dark: #0b6f73;
+  --color-prism-green: #3ccb6b;
+  --color-prism-green-mid: #2dbe7f;
+  --color-prism-green-deep: #1fa06f;
+  --color-prism-green-dark: #157e5c;
+  --color-prism-bridge: #26b7a5;
+  --color-prism-lime: #4bc46e;
 }
 
 @layer base {
@@ -14,5 +27,139 @@
 
   #app {
     min-height: 100vh;
+  }
+}
+
+@layer components {
+  .prism-shell {
+    background:
+      linear-gradient(180deg, rgba(31, 181, 178, 0.08) 0%, rgba(253, 184, 19, 0.06) 48%, rgba(60, 203, 107, 0.07) 100%),
+      #f8fffe;
+  }
+
+  .prism-shell-content {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.66) 0%, rgba(234, 251, 250, 0.72) 100%);
+  }
+
+  .prism-sidebar {
+    border-color: rgba(31, 181, 178, 0.36);
+    background:
+      linear-gradient(180deg, #0b6f73 0%, #0f8f8c 58%, #157e5c 100%);
+    color: #effefd;
+    box-shadow: 1px 0 0 rgba(255, 212, 90, 0.2);
+  }
+
+  .prism-sidebar-header {
+    border-color: rgba(31, 181, 178, 0.38);
+    background: rgba(11, 111, 115, 0.52);
+  }
+
+  .prism-sidebar-logo {
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 0 0 1px rgba(255, 212, 90, 0.34);
+  }
+
+  .prism-sidebar-title {
+    color: #ffffff;
+  }
+
+  .prism-sidebar-muted {
+    color: rgba(239, 254, 253, 0.66);
+  }
+
+  .prism-sidebar-icon-button,
+  .prism-sidebar-item {
+    color: rgba(239, 254, 253, 0.78);
+  }
+
+  .prism-sidebar-icon-button:hover,
+  .prism-sidebar-item:hover {
+    background: rgba(31, 181, 178, 0.2);
+    color: #ffffff;
+  }
+
+  .prism-sidebar-icon-button:focus-visible,
+  .prism-sidebar-item:focus-visible {
+    outline: 2px solid #ffd45a;
+    outline-offset: 2px;
+  }
+
+  .prism-sidebar-item i {
+    color: rgba(255, 255, 255, 0.58);
+  }
+
+  .prism-sidebar-item:hover i {
+    color: #ffd45a;
+  }
+
+  .prism-sidebar-item.is-active {
+    background: #fdb813;
+    color: #0b6f73;
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 #ffd45a;
+  }
+
+  .prism-sidebar-item.is-active i {
+    color: #0b6f73;
+  }
+
+  .prism-sidebar-section,
+  .prism-sidebar-kbd {
+    color: rgba(255, 212, 90, 0.8);
+  }
+
+  .prism-sidebar-search-icon {
+    color: rgba(239, 254, 253, 0.56);
+  }
+
+  .prism-sidebar-search-input {
+    border-color: rgba(31, 181, 178, 0.44);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+
+  .prism-sidebar-search-input::placeholder {
+    color: rgba(239, 254, 253, 0.52);
+  }
+
+  .prism-sidebar-search-input:focus {
+    border-color: #fdb813;
+    box-shadow: 0 0 0 3px rgba(253, 184, 19, 0.22);
+  }
+
+  .prism-sidebar-child-list {
+    border-color: rgba(255, 212, 90, 0.28);
+  }
+
+  .prism-topbar {
+    border-color: rgba(31, 181, 178, 0.24);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 1px 0 rgba(253, 184, 19, 0.16);
+  }
+
+  .prism-topbar-kicker {
+    color: #0f8f8c;
+  }
+
+  .prism-topbar-title,
+  .prism-topbar-user {
+    color: #0b6f73;
+  }
+
+  .prism-topbar-muted {
+    color: rgba(21, 126, 92, 0.78);
+  }
+
+  .prism-role-pill {
+    border: 1px solid rgba(31, 181, 178, 0.28);
+    background: rgba(31, 181, 178, 0.1);
+    color: #0b6f73;
+  }
+
+  .prism-role-pill.is-admin {
+    border-color: rgba(60, 203, 107, 0.36);
+    background: rgba(60, 203, 107, 0.12);
+    color: #157e5c;
   }
 }

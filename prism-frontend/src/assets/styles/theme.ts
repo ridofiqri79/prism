@@ -4,17 +4,17 @@ import Aura from '@primevue/themes/aura'
 export const prismPreset = definePreset(Aura, {
   semantic: {
     primary: {
-      50: '{blue.50}',
-      100: '{blue.100}',
-      200: '{blue.200}',
-      300: '{blue.300}',
-      400: '{blue.400}',
-      500: '{blue.500}',
-      600: '{blue.600}',
-      700: '{blue.700}',
-      800: '{blue.800}',
-      900: '{blue.900}',
-      950: '{blue.950}',
+      50: '#EAFBFA',
+      100: '#D8F5F4',
+      200: '#B7ECE9',
+      300: '#78DCD8',
+      400: '#26B7A5',
+      500: '#1FB5B2',
+      600: '#17A2A4',
+      700: '#0F8F8C',
+      800: '#0B6F73',
+      900: '#075A5F',
+      950: '#043F43',
     },
   },
 })

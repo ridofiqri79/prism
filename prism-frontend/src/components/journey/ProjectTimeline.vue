@@ -37,8 +37,8 @@ function toggle(key: string) {
 }
 
 function nodeClass(state: 'completed' | 'pending' | 'extended') {
-  if (state === 'extended') return 'text-orange-500'
-  if (state === 'completed') return 'text-green-600'
+  if (state === 'extended') return 'text-prism-gold-deep'
+  if (state === 'completed') return 'text-prism-green-deep'
   return 'text-surface-400'
 }
 
@@ -100,7 +100,9 @@ watch(
   <div class="rounded-lg border border-surface-200 bg-white p-5">
     <div class="space-y-4 border-l border-surface-200 pl-5">
       <div class="relative">
-        <span class="absolute -left-[1.82rem] top-1.5 h-3 w-3 rounded-full bg-green-500 ring-4 ring-white" />
+        <span
+          class="absolute -left-[1.82rem] top-1.5 h-3 w-3 rounded-full bg-prism-green ring-4 ring-white"
+        />
         <div class="flex items-start gap-3">
           <Button
             icon="pi pi-chevron-down"
@@ -112,15 +114,15 @@ watch(
           />
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <i class="pi pi-book text-green-600" />
+              <i class="pi pi-book text-prism-green-deep" />
               <RouterLink
                 v-if="bbProjectRoute()"
                 :to="bbProjectRoute()"
-                class="font-semibold text-green-600 hover:underline"
+                class="font-semibold text-prism-green-deep hover:underline"
               >
                 Blue Book
               </RouterLink>
-              <span v-else class="font-semibold text-green-600">Blue Book</span>
+              <span v-else class="font-semibold text-prism-green-deep">Blue Book</span>
               <Tag value="Completed" severity="success" rounded />
             </div>
             <p class="mt-1 text-sm text-surface-900">
@@ -137,7 +139,12 @@ watch(
                   Belum ada
                 </p>
                 <p v-else class="text-surface-600">
-                  {{ bbProject.lender_indications?.map((item) => item.lender?.short_name || item.lender?.name).filter(Boolean).join(', ') }}
+                  {{
+                    bbProject.lender_indications
+                      ?.map((item) => item.lender?.short_name || item.lender?.name)
+                      .filter(Boolean)
+                      .join(', ')
+                  }}
                 </p>
               </div>
 
@@ -153,10 +160,12 @@ watch(
                 <div
                   v-for="loi in journey.loi"
                   :key="loi.id"
-                  class="flex flex-wrap items-center gap-2 text-sm text-green-600"
+                  class="flex flex-wrap items-center gap-2 text-sm text-prism-green-deep"
                 >
                   <i class="pi pi-check-circle" />
-                  <span>{{ loi.lender?.short_name || loi.lender?.name || loi.subject || 'LoI' }}</span>
+                  <span>{{
+                    loi.lender?.short_name || loi.lender?.name || loi.subject || 'LoI'
+                  }}</span>
                   <span class="text-surface-500">{{ formatDate(loiDate(loi)) }}</span>
                 </div>
               </div>
@@ -168,7 +177,7 @@ watch(
       <div class="relative">
         <span
           class="absolute -left-[1.82rem] top-1.5 h-3 w-3 rounded-full ring-4 ring-white"
-          :class="journey.gb_projects.length ? 'bg-green-500' : 'bg-surface-300'"
+          :class="journey.gb_projects.length ? 'bg-prism-green' : 'bg-surface-300'"
         />
         <div class="flex items-start gap-3">
           <Button
@@ -181,18 +190,29 @@ watch(
           />
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <i class="pi pi-folder" :class="nodeClass(journey.gb_projects.length ? 'completed' : 'pending')" />
-              <span class="font-semibold" :class="nodeClass(journey.gb_projects.length ? 'completed' : 'pending')">
+              <i
+                class="pi pi-folder"
+                :class="nodeClass(journey.gb_projects.length ? 'completed' : 'pending')"
+              />
+              <span
+                class="font-semibold"
+                :class="nodeClass(journey.gb_projects.length ? 'completed' : 'pending')"
+              >
                 Green Book
               </span>
               <Tag
-                :value="journey.gb_projects.length ? `${journey.gb_projects.length} project` : 'Belum ada'"
+                :value="
+                  journey.gb_projects.length ? `${journey.gb_projects.length} project` : 'Belum ada'
+                "
                 :severity="journey.gb_projects.length ? 'success' : 'secondary'"
                 rounded
               />
             </div>
 
-            <div v-if="isOpen('green-book')" class="mt-3 space-y-4 border-l border-surface-100 pl-5">
+            <div
+              v-if="isOpen('green-book')"
+              class="mt-3 space-y-4 border-l border-surface-100 pl-5"
+            >
               <p v-if="journey.gb_projects.length === 0" class="text-sm italic text-surface-400">
                 Belum ada
               </p>
@@ -209,20 +229,25 @@ watch(
                   />
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                      <i class="pi pi-folder-open text-green-600" />
+                      <i class="pi pi-folder-open text-prism-green-deep" />
                       <RouterLink
                         v-if="gbProjectRoute(gbProject)"
                         :to="gbProjectRoute(gbProject)"
-                        class="font-semibold text-green-600 hover:underline"
+                        class="font-semibold text-prism-green-deep hover:underline"
                       >
                         {{ gbProject.gb_code }}
                       </RouterLink>
-                      <span v-else class="font-semibold text-green-600">{{ gbProject.gb_code }}</span>
+                      <span v-else class="font-semibold text-prism-green-deep">{{
+                        gbProject.gb_code
+                      }}</span>
                       <Tag value="Completed" severity="success" rounded />
                     </div>
                     <p class="mt-1 text-sm text-surface-900">{{ gbProject.project_name }}</p>
 
-                    <div v-if="isOpen(`gb-${gbProject.id}`)" class="mt-3 space-y-3 border-l border-surface-100 pl-5">
+                    <div
+                      v-if="isOpen(`gb-${gbProject.id}`)"
+                      class="mt-3 space-y-3 border-l border-surface-100 pl-5"
+                    >
                       <div class="text-sm">
                         <p class="font-medium text-surface-700">Funding</p>
                         <p
@@ -236,7 +261,10 @@ watch(
                         </p>
                       </div>
 
-                      <div v-if="gbProject.dk_projects.length === 0" class="text-sm italic text-surface-400">
+                      <div
+                        v-if="gbProject.dk_projects.length === 0"
+                        class="text-sm italic text-surface-400"
+                      >
                         Daftar Kegiatan: Belum ada
                       </div>
 
@@ -246,19 +274,34 @@ watch(
                         class="space-y-3"
                       >
                         <div class="flex flex-wrap items-center gap-2">
-                          <i class="pi pi-list text-green-600" />
+                          <i class="pi pi-list text-prism-green-deep" />
                           <RouterLink
                             v-if="dkRoute(dkProject)"
                             :to="dkRoute(dkProject)"
-                            class="font-semibold text-green-600 hover:underline"
+                            class="font-semibold text-prism-green-deep hover:underline"
                           >
-                            Daftar Kegiatan: {{ dkProject.daftar_kegiatan?.subject || dkProject.objectives || dkProject.id }}
+                            Daftar Kegiatan:
+                            {{
+                              dkProject.daftar_kegiatan?.subject ||
+                              dkProject.objectives ||
+                              dkProject.id
+                            }}
                           </RouterLink>
-                          <span v-else class="font-semibold text-green-600">
-                            Daftar Kegiatan: {{ dkProject.daftar_kegiatan?.subject || dkProject.objectives || dkProject.id }}
+                          <span v-else class="font-semibold text-prism-green-deep">
+                            Daftar Kegiatan:
+                            {{
+                              dkProject.daftar_kegiatan?.subject ||
+                              dkProject.objectives ||
+                              dkProject.id
+                            }}
                           </span>
                           <span class="text-sm text-surface-500">
-                            {{ formatDate(dkProject.daftar_kegiatan?.date ?? dkProject.daftar_kegiatan?.tanggal) }}
+                            {{
+                              formatDate(
+                                dkProject.daftar_kegiatan?.date ??
+                                  dkProject.daftar_kegiatan?.tanggal,
+                              )
+                            }}
                           </span>
                         </div>
 
@@ -275,30 +318,48 @@ watch(
                             <div class="flex flex-wrap items-center gap-2">
                               <i
                                 class="pi pi-file-edit"
-                                :class="nodeClass(dkProject.loan_agreement.is_extended ? 'extended' : 'completed')"
+                                :class="
+                                  nodeClass(
+                                    dkProject.loan_agreement.is_extended ? 'extended' : 'completed',
+                                  )
+                                "
                               />
                               <RouterLink
                                 :to="laRoute(dkProject.loan_agreement)"
                                 class="font-semibold hover:underline"
-                                :class="nodeClass(dkProject.loan_agreement.is_extended ? 'extended' : 'completed')"
+                                :class="
+                                  nodeClass(
+                                    dkProject.loan_agreement.is_extended ? 'extended' : 'completed',
+                                  )
+                                "
                               >
                                 Loan Agreement: {{ dkProject.loan_agreement.loan_code }}
                               </RouterLink>
                               <Tag
-                                :value="dkProject.loan_agreement.is_extended ? 'Extended' : 'Completed'"
-                                :severity="dkProject.loan_agreement.is_extended ? 'warn' : 'success'"
+                                :value="
+                                  dkProject.loan_agreement.is_extended ? 'Extended' : 'Completed'
+                                "
+                                :severity="
+                                  dkProject.loan_agreement.is_extended ? 'warn' : 'success'
+                                "
                                 rounded
                               />
                             </div>
                             <div class="grid gap-2 text-sm text-surface-600 md:grid-cols-2">
-                              <span>Effective: {{ formatDate(dkProject.loan_agreement.effective_date) }}</span>
-                              <span>Closing: {{ formatDate(dkProject.loan_agreement.closing_date) }}</span>
+                              <span
+                                >Effective:
+                                {{ formatDate(dkProject.loan_agreement.effective_date) }}</span
+                              >
+                              <span
+                                >Closing:
+                                {{ formatDate(dkProject.loan_agreement.closing_date) }}</span
+                              >
                             </div>
 
                             <div class="space-y-2 border-l border-surface-100 pl-5">
                               <RouterLink
                                 :to="monitoringRoute(dkProject.loan_agreement)"
-                                class="inline-flex items-center gap-2 text-sm font-semibold text-green-600 hover:underline"
+                                class="inline-flex items-center gap-2 text-sm font-semibold text-prism-green-deep hover:underline"
                               >
                                 <i class="pi pi-chart-line" />
                                 Monitoring
@@ -315,16 +376,24 @@ watch(
                                 :to="monitoringRoute(dkProject.loan_agreement, monitoring)"
                                 class="grid gap-2 rounded-lg border border-surface-100 p-3 text-sm hover:border-primary/50 md:grid-cols-[1fr_10rem]"
                               >
-                                <span class="font-medium text-green-600">
+                                <span class="font-medium text-prism-green-deep">
                                   {{ monitoring.quarter }} {{ monitoring.budget_year }}
                                 </span>
                                 <AbsorptionBar :pct="monitoring.absorption_pct" />
                                 <span class="text-surface-500">
-                                  <CurrencyDisplay :amount="monitoring.planned_usd" currency="USD" compact />
+                                  <CurrencyDisplay
+                                    :amount="monitoring.planned_usd"
+                                    currency="USD"
+                                    compact
+                                  />
                                   planned
                                 </span>
                                 <span class="text-surface-500">
-                                  <CurrencyDisplay :amount="monitoring.realized_usd" currency="USD" compact />
+                                  <CurrencyDisplay
+                                    :amount="monitoring.realized_usd"
+                                    currency="USD"
+                                    compact
+                                  />
                                   realized
                                 </span>
                               </RouterLink>

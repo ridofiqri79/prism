@@ -146,10 +146,7 @@ const filteredImportRows = computed(() =>
 
 const previewFirst = computed(() => (previewPage.value - 1) * previewRowsPerPage.value)
 const paginatedImportRows = computed(() =>
-  filteredImportRows.value.slice(
-    previewFirst.value,
-    previewFirst.value + previewRowsPerPage.value,
-  ),
+  filteredImportRows.value.slice(previewFirst.value, previewFirst.value + previewRowsPerPage.value),
 )
 const previewPageStart = computed(() =>
   filteredImportRows.value.length === 0 ? 0 : previewFirst.value + 1,
@@ -563,7 +560,7 @@ function filterButtonClass(active: boolean) {
         </div>
 
         <div class="grid grid-cols-3 gap-2 text-center">
-          <div class="rounded-md bg-green-50 px-4 py-2 text-green-700">
+          <div class="rounded-md bg-prism-green/10 px-4 py-2 text-prism-green-dark">
             <p class="text-lg font-semibold">{{ summary.total_inserted }}</p>
             <p class="text-xs">Ditambah</p>
           </div>

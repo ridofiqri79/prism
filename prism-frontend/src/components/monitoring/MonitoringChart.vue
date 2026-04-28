@@ -13,6 +13,7 @@ const props = defineProps<{
   data: MonitoringDisbursement[]
 }>()
 
+const chartColors = ['#1FB5B2', '#3CCB6B']
 const quarters: Quarter[] = ['TW1', 'TW2', 'TW3', 'TW4']
 const chartData = computed(() =>
   quarters.map((quarter) => {
@@ -26,7 +27,7 @@ const chartData = computed(() =>
 )
 
 const option = computed(() => ({
-  color: ['#2563eb', '#059669'],
+  color: chartColors,
   tooltip: {
     trigger: 'axis',
     axisPointer: { type: 'shadow' },
