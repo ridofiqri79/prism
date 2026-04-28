@@ -172,6 +172,7 @@ func main() {
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))
 	loi.POST("", blueBookHandler.CreateLoI, middleware.Require("bb_project", "update"))
 	loi.DELETE("/:id", blueBookHandler.DeleteLoI, middleware.Require("bb_project", "update"))
+	api.GET("/bb-projects/:bbProjectId/history", blueBookHandler.GetBBProjectHistory, middleware.Require("bb_project", "read"))
 
 	greenBooks := api.Group("/green-books")
 	greenBooks.GET("", greenBookHandler.ListGreenBooks, middleware.Require("green_book", "read"))
@@ -188,6 +189,7 @@ func main() {
 	greenBooks.POST("/:gbId/import-projects/preview", greenBookHandler.PreviewImportGBProjects, middleware.RequireAdmin())
 	greenBooks.POST("/:gbId/import-projects/execute", greenBookHandler.ImportGBProjects, middleware.RequireAdmin())
 	greenBooks.GET("/:gbId/import-projects/template", greenBookHandler.DownloadGBProjectImportTemplate, middleware.RequireAdmin())
+	api.GET("/gb-projects/:gbProjectId/history", greenBookHandler.GetGBProjectHistory, middleware.Require("gb_project", "read"))
 
 	dk := api.Group("/daftar-kegiatan")
 	dk.GET("", dkHandler.ListDK, middleware.Require("daftar_kegiatan", "read"))

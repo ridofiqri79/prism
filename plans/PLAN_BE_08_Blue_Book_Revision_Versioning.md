@@ -8,9 +8,9 @@
 
 ## Prasyarat
 
-- [ ] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
-- [ ] `make generate` sudah berhasil setelah perubahan SQL.
-- [ ] Query identity/latest/history BB tersedia di generated sqlc package.
+- [x] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
+- [x] `make generate` sudah berhasil setelah perubahan SQL.
+- [x] Query identity/latest/history BB tersedia di generated sqlc package.
 
 ---
 
@@ -22,18 +22,18 @@ Files:
 
 Checklist:
 
-- [ ] Tambahkan `ProjectIdentityID` pada BB Project request/response bila diperlukan.
-- [ ] Tambahkan field response:
-  - [ ] `project_identity_id`.
-  - [ ] `is_latest`.
-  - [ ] `has_newer_revision`.
-- [ ] Tambahkan model history item untuk `GET /bb-projects/:id/history`.
-- [ ] Pastikan semua tipe strongly typed, tidak memakai `any`/`interface{}` untuk payload DB.
-- [ ] Pastikan JSON field mengikuti contract snake_case.
+- [x] Tambahkan `ProjectIdentityID` pada BB Project request/response bila diperlukan.
+- [x] Tambahkan field response:
+  - [x] `project_identity_id`.
+  - [x] `is_latest`.
+  - [x] `has_newer_revision`.
+- [x] Tambahkan model history item untuk `GET /bb-projects/:id/history`.
+- [x] Pastikan semua tipe strongly typed, tidak memakai `any`/`interface{}` untuk payload DB.
+- [x] Pastikan JSON field mengikuti contract snake_case.
 
 Acceptance:
 
-- [ ] Model dapat merepresentasikan snapshot dan logical identity.
+- [x] Model dapat merepresentasikan snapshot dan logical identity.
 
 ---
 
@@ -45,20 +45,20 @@ Files:
 
 Checklist:
 
-- [ ] Ganti validasi duplicate dari global code menjadi per `blue_book_id`.
-- [ ] Saat create tanpa `project_identity_id`, buat `project_identity` baru dalam transaksi.
-- [ ] Saat create dengan `project_identity_id`, validasi identity ada.
-- [ ] Simpan `project_identity_id` ke `bb_project`.
-- [ ] Build response mengisi latest flags:
-  - [ ] `is_latest`.
-  - [ ] `has_newer_revision`.
-- [ ] Update BB Project tidak mengubah `bb_code` kecuali memang contract memperbolehkan; jika diperbolehkan, validasi tetap per Blue Book.
-- [ ] Pastikan child rows tetap transaksional: institutions, locations, priorities, costs, lender indications.
+- [x] Ganti validasi duplicate dari global code menjadi per `blue_book_id`.
+- [x] Saat create tanpa `project_identity_id`, buat `project_identity` baru dalam transaksi.
+- [x] Saat create dengan `project_identity_id`, validasi identity ada.
+- [x] Simpan `project_identity_id` ke `bb_project`.
+- [x] Build response mengisi latest flags:
+  - [x] `is_latest`.
+  - [x] `has_newer_revision`.
+- [x] Update BB Project tidak mengubah `bb_code` kecuali memang contract memperbolehkan; jika diperbolehkan, validasi tetap per Blue Book.
+- [x] Pastikan child rows tetap transaksional: institutions, locations, priorities, costs, lender indications.
 
 Acceptance:
 
-- [ ] `bb_code` sama bisa dibuat di revisi Blue Book berbeda.
-- [ ] Duplicate `bb_code` dalam Blue Book yang sama tetap conflict.
+- [x] `bb_code` sama bisa dibuat di revisi Blue Book berbeda.
+- [x] Duplicate `bb_code` dalam Blue Book yang sama tetap conflict.
 
 ---
 
@@ -70,27 +70,27 @@ Files:
 
 Checklist:
 
-- [ ] Tentukan source revisi:
-  - [ ] Jika request membawa `replaces_blue_book_id`, gunakan itu.
-  - [ ] Jika tidak, gunakan Blue Book active terakhir pada period yang sama sebelum supersede.
-- [ ] Dalam satu transaksi:
-  - [ ] Supersede Blue Book lama.
-  - [ ] Create Blue Book baru.
-  - [ ] Clone semua active BB Project dari source.
-  - [ ] Reuse `project_identity_id` dari source project.
-  - [ ] Clone institutions.
-  - [ ] Clone locations.
-  - [ ] Clone national priorities.
-  - [ ] Clone project costs.
-  - [ ] Clone lender indications.
-  - [ ] Clone LoI sesuai keputusan plan default.
-- [ ] Pastikan clone tidak memakai lookup global `bb_code`.
-- [ ] Publish SSE setelah commit berhasil.
+- [x] Tentukan source revisi:
+  - [x] Jika request membawa `replaces_blue_book_id`, gunakan itu.
+  - [x] Jika tidak, gunakan Blue Book active terakhir pada period yang sama sebelum supersede.
+- [x] Dalam satu transaksi:
+  - [x] Supersede Blue Book lama.
+  - [x] Create Blue Book baru.
+  - [x] Clone semua active BB Project dari source.
+  - [x] Reuse `project_identity_id` dari source project.
+  - [x] Clone institutions.
+  - [x] Clone locations.
+  - [x] Clone national priorities.
+  - [x] Clone project costs.
+  - [x] Clone lender indications.
+  - [x] Clone LoI sesuai keputusan plan default.
+- [x] Pastikan clone tidak memakai lookup global `bb_code`.
+- [x] Publish SSE setelah commit berhasil.
 
 Acceptance:
 
-- [ ] Revisi BB baru berisi snapshot project yang sama dengan identity yang sama.
-- [ ] BB lama menjadi `superseded`.
+- [x] Revisi BB baru berisi snapshot project yang sama dengan identity yang sama.
+- [x] BB lama menjadi `superseded`.
 
 ---
 
@@ -103,24 +103,24 @@ Files:
 
 Checklist:
 
-- [ ] Implement service method `GetBBProjectHistory`.
-- [ ] Implement handler untuk `GET /bb-projects/:id/history`.
-- [ ] Daftarkan route dengan permission `bb_project:read`.
-- [ ] Response history memuat:
-  - [ ] snapshot id.
-  - [ ] `project_identity_id`.
-  - [ ] Blue Book id.
-  - [ ] book label atau period + revision.
-  - [ ] `revision_number`.
-  - [ ] `revision_year`.
-  - [ ] book status.
-  - [ ] `is_latest`.
-  - [ ] `used_by_downstream` jika query tersedia.
-- [ ] Return 404 aman jika snapshot tidak ditemukan.
+- [x] Implement service method `GetBBProjectHistory`.
+- [x] Implement handler untuk `GET /bb-projects/:id/history`.
+- [x] Daftarkan route dengan permission `bb_project:read`.
+- [x] Response history memuat:
+  - [x] snapshot id.
+  - [x] `project_identity_id`.
+  - [x] Blue Book id.
+  - [x] book label atau period + revision.
+  - [x] `revision_number`.
+  - [x] `revision_year`.
+  - [x] book status.
+  - [x] `is_latest`.
+  - [x] `used_by_downstream` jika query tersedia.
+- [x] Return 404 aman jika snapshot tidak ditemukan.
 
 Acceptance:
 
-- [ ] User bisa melihat semua revisi BB yang memuat logical project yang sama.
+- [x] User bisa melihat semua revisi BB yang memuat logical project yang sama.
 
 ---
 
@@ -132,19 +132,19 @@ Files:
 
 Checklist:
 
-- [ ] Duplicate `BB Code` dalam workbook tetap error.
-- [ ] `BB Code` yang sudah ada di revisi lama tidak di-skip otomatis.
-- [ ] Jika import ke Blue Book revisi dan kode ditemukan pada revisi/source sebelumnya, reuse `project_identity_id`.
-- [ ] Jika kode tidak ditemukan pada source identity manapun, create identity baru.
-- [ ] Relasi workbook tetap memakai `BB Code` hanya dalam konteks workbook target.
-- [ ] Import summary membedakan:
-  - [ ] created new logical project.
-  - [ ] created revision snapshot.
-  - [ ] skipped due to duplicate within workbook/target document.
+- [x] Duplicate `BB Code` dalam workbook tetap error.
+- [x] `BB Code` yang sudah ada di revisi lama tidak di-skip otomatis.
+- [x] Jika import ke Blue Book revisi dan kode ditemukan pada revisi/source sebelumnya, reuse `project_identity_id`.
+- [x] Jika kode tidak ditemukan pada source identity manapun, create identity baru.
+- [x] Relasi workbook tetap memakai `BB Code` hanya dalam konteks workbook target.
+- [x] Import summary membedakan:
+  - [x] created new logical project.
+  - [x] created revision snapshot.
+  - [x] skipped due to duplicate within workbook/target document.
 
 Acceptance:
 
-- [ ] Import ke revisi bisa membuat snapshot dengan kode yang sama tanpa kehilangan history.
+- [x] Import ke revisi bisa membuat snapshot dengan kode yang sama tanpa kehilangan history.
 
 ---
 
@@ -156,15 +156,15 @@ Checklist:
 - [ ] Tambah/update tests untuk create BB revision clone.
 - [ ] Tambah/update tests untuk BB Project history endpoint.
 - [ ] Tambah/update tests untuk import code reuse behavior.
-- [ ] Jalankan `go test ./...`.
-- [ ] Jalankan smoke API:
-  - [ ] create BB original.
-  - [ ] create BB Project `BB-001`.
-  - [ ] create BB revision.
-  - [ ] verify revisi memuat `BB-001` dengan `project_identity_id` sama.
-  - [ ] call `/bb-projects/:id/history`.
+- [x] Jalankan `go test ./...`.
+- [x] Jalankan smoke API:
+  - [x] create BB original.
+  - [x] create BB Project `BB-001`.
+  - [x] create BB revision.
+  - [x] verify revisi memuat `BB-001` dengan `project_identity_id` sama.
+  - [x] call `/bb-projects/:id/history`.
 
 Done Criteria:
 
-- [ ] Blue Book revision versioning bekerja end-to-end.
-- [ ] Tidak ada global `bb_code` blocker tersisa di service/import.
+- [x] Blue Book revision versioning bekerja end-to-end.
+- [x] Tidak ada global `bb_code` blocker tersisa di service/import.

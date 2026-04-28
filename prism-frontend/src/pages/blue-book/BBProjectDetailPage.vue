@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Tag from 'primevue/tag'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import LoITable from '@/components/blue-book/LoITable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
@@ -15,7 +16,7 @@ import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { LoIPayload } from '@/types/blue-book.types'
+import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import type { BappenasPartner } from '@/types/master.types'
 import { joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
@@ -64,11 +65,21 @@ function findPartnerParent(partner?: BappenasPartner) {
 async function loadData() {
   await Promise.all([
     blueBookStore.fetchProject(blueBookId.value, projectId.value),
+    blueBookStore.fetchProjectHistory(projectId.value),
     blueBookStore.fetchLoI(projectId.value),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchLenders(true, { limit: 1000 }),
   ])
+}
+
+function historyRoute(item: BBProjectHistoryItem) {
+  return { name: 'bb-project-detail', params: { bbId: item.blue_book_id, id: item.id } }
+}
+
+function historyLabel(item: BBProjectHistoryItem) {
+  const year = item.revision_year ? ` / ${item.revision_year}` : ''
+  return `${item.book_label} - Rev ${item.revision_number}${year}`
 }
 
 function openLoIDialog() {
@@ -137,9 +148,13 @@ onMounted(() => {
     <div v-if="project" class="space-y-6">
       <div class="rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div class="space-y-2">
             <p class="text-sm text-surface-500">Status</p>
-            <StatusBadge :status="project.status" />
+            <div class="flex flex-wrap items-center gap-2">
+              <StatusBadge :status="project.status" />
+              <Tag v-if="project.is_latest" value="Latest" severity="success" rounded />
+              <Tag v-else-if="project.has_newer_revision" value="Ada revisi lebih baru" severity="warn" rounded />
+            </div>
           </div>
           <div class="text-right">
             <p class="text-sm text-surface-500">Judul Program</p>
@@ -147,6 +162,60 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
+          <Tag :value="`${blueBookStore.projectHistory.length} snapshot`" severity="secondary" rounded />
+        </div>
+        <div class="overflow-auto rounded-lg border border-surface-200">
+          <table class="w-full min-w-[48rem] text-left text-sm">
+            <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+              <tr>
+                <th class="px-4 py-3">Blue Book</th>
+                <th class="px-4 py-3">Kode</th>
+                <th class="px-4 py-3">Status Dokumen</th>
+                <th class="px-4 py-3">Snapshot</th>
+                <th class="px-4 py-3">Downstream</th>
+                <th class="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-100">
+              <tr v-for="item in blueBookStore.projectHistory" :key="item.id">
+                <td class="px-4 py-3 font-medium text-surface-900">{{ historyLabel(item) }}</td>
+                <td class="px-4 py-3 text-surface-700">{{ item.bb_code }}</td>
+                <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.is_latest ? 'Latest' : 'Historical'"
+                    :severity="item.is_latest ? 'success' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.used_by_downstream ? 'Dipakai downstream' : 'Belum dipakai'"
+                    :severity="item.used_by_downstream ? 'info' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <Button
+                    as="router-link"
+                    :to="historyRoute(item)"
+                    icon="pi pi-eye"
+                    severity="secondary"
+                    size="small"
+                    outlined
+                    rounded
+                    aria-label="Lihat snapshot"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>

@@ -38,8 +38,10 @@ export interface LenderSummary {
 export interface BBProjectSummary {
   id: string
   blue_book_id?: string
+  project_identity_id?: string
   bb_code: string
   project_name: string
+  has_newer_revision?: boolean
   lender_indications?: LenderSummaryItem[]
 }
 
@@ -66,8 +68,11 @@ export interface JourneyResponse {
 export interface GBProjectJourney {
   id: string
   green_book_id?: string
+  gb_project_identity_id?: string
   gb_code: string
   project_name: string
+  status?: string
+  has_newer_revision?: boolean
   funding_sources?: JourneyFundingSource[]
   dk_projects: DKProjectJourney[]
 }

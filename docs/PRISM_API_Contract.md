@@ -407,6 +407,7 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
 ```json
 {
   "period_id": "uuid",
+  "replaces_blue_book_id": "uuid-blue-book-sebelumnya",
   "publish_date": "2025-01-15",
   "revision_number": 0,
   "revision_year": null
@@ -419,6 +420,7 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
   "data": {
     "id": "uuid",
     "period": { "id": "uuid", "name": "2025-2029", "year_start": 2025, "year_end": 2029 },
+    "replaces_blue_book_id": null,
     "publish_date": "2025-01-15",
     "revision_number": 0,
     "revision_year": null,
@@ -473,7 +475,7 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
+Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `project_identity_id` yang sama. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
 
 ---
 
@@ -490,6 +492,7 @@ Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid aka
 **`POST /blue-books/:bb_id/projects` Request:**
 ```json
 {
+  "project_identity_id": "uuid-logical-project-opsional",
   "program_title_id": "uuid",
   "bappenas_partner_id": "uuid",
   "bb_code": "BB-2025-001",
@@ -518,6 +521,8 @@ Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid aka
 {
   "data": {
     "id": "uuid",
+    "project_identity_id": "uuid-logical-project",
+    "blue_book_id": "uuid",
     "bb_code": "BB-2025-001",
     "project_name": "Pembangunan Jalan Tol Trans Sumatera",
     "program_title": { "id": "uuid", "title": "Infrastruktur Transportasi" },
@@ -546,9 +551,38 @@ Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid aka
       { "id": "uuid", "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" }, "remarks": "Minat seksi 1-3" }
     ],
     "status": "active",
+    "is_latest": true,
+    "has_newer_revision": false,
     "created_at": "2025-01-15T08:00:00Z",
     "updated_at": "2025-01-15T08:00:00Z"
   }
+}
+```
+
+### BB Project History
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/bb-projects/:id/history` | read: `bb_project` |
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid-bb-project-snapshot",
+      "project_identity_id": "uuid-logical-project",
+      "blue_book_id": "uuid",
+      "bb_code": "BB-2025-001",
+      "project_name": "Pembangunan Jalan Tol Trans Sumatera",
+      "book_label": "BB 2025-2029 Revisi ke-1",
+      "revision_number": 1,
+      "revision_year": 2026,
+      "book_status": "active",
+      "is_latest": true,
+      "used_by_downstream": false
+    }
+  ]
 }
 ```
 
@@ -591,6 +625,7 @@ Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid aka
 ```json
 {
   "publish_year": 2025,
+  "replaces_green_book_id": "uuid-green-book-sebelumnya",
   "revision_number": 0
 }
 ```
@@ -641,7 +676,7 @@ Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB C
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `GB Code` yang sudah ada di database akan di-skip. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
+Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
 
 ---
 
@@ -658,6 +693,7 @@ Baris dengan `GB Code` yang sudah ada di database akan di-skip. Proyek baru waji
 **`POST /green-books/:gb_id/projects` Request:**
 ```json
 {
+  "gb_project_identity_id": "uuid-logical-gb-project-opsional",
   "program_title_id": "uuid",
   "gb_code": "GB-2025-001",
   "project_name": "Trans Sumatra Toll Road Section 1",
@@ -704,6 +740,59 @@ Baris dengan `GB Code` yang sudah ada di database akan di-skip. Proyek baru waji
 ```
 
 > **Catatan:** `funding_allocations[].activity_index` merujuk ke index array `activities` dalam request yang sama. Setelah disimpan, relasi menggunakan `gb_activity_id`.
+> **Versioning:** `bb_project_ids` boleh berisi snapshot lama, tetapi backend selalu menyimpan concrete latest BB Project snapshot untuk logical project tersebut pada saat GB Project dibuat/diupdate.
+
+**`GET /green-books/:gb_id/projects/:id` Response `200` menambahkan field versioning:**
+```json
+{
+  "data": {
+    "id": "uuid-gb-project-snapshot",
+    "gb_project_identity_id": "uuid-logical-gb-project",
+    "green_book_id": "uuid",
+    "gb_code": "GB-2025-001",
+    "is_latest": true,
+    "has_newer_revision": false,
+    "bb_projects": [
+      {
+        "id": "uuid-bb-project-snapshot",
+        "project_identity_id": "uuid-logical-project",
+        "bb_code": "BB-2025-001",
+        "project_name": "Pembangunan Jalan Tol Trans Sumatera",
+        "is_latest": true,
+        "has_newer_revision": false
+      }
+    ]
+  }
+}
+```
+
+### GB Project History
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/gb-projects/:id/history` | read: `gb_project` |
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid-gb-project-snapshot",
+      "gb_project_identity_id": "uuid-logical-gb-project",
+      "green_book_id": "uuid",
+      "gb_code": "GB-2025-001",
+      "project_name": "Trans Sumatra Section 1",
+      "book_label": "GB 2025 Revisi ke-1",
+      "publish_year": 2025,
+      "revision_number": 1,
+      "book_status": "active",
+      "is_latest": true,
+      "used_by_downstream": false,
+      "bb_projects": []
+    }
+  ]
+}
+```
 
 ---
 
@@ -753,6 +842,8 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 
 Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode 3 huruf. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
+
+`GB Project` pada DK di-resolve ke latest GB Project snapshot saat DK Project dibuat atau saat pilihan GB diganti eksplisit. Setelah tersimpan, relasi `dk_project_gb_project` tetap menunjuk concrete snapshot yang tersimpan dan tidak auto-pindah ketika ada revisi BB/GB baru.
 
 ---
 
@@ -1125,7 +1216,7 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 **Permission:** read: `bb_project`
 
-Menampilkan master table seluruh BB Project aktif. Tanpa query filter, endpoint mengembalikan semua project BB yang tersedia dengan pagination.
+Menampilkan master table seluruh BB Project aktif. Tanpa query filter, endpoint default hanya mengembalikan latest snapshot per `project_identity_id` supaya revisi lama tidak double-count. Gunakan `include_history=true` untuk melihat semua snapshot historis.
 
 **Query Params:**
 
@@ -1144,6 +1235,7 @@ Menampilkan master table seluruh BB Project aktif. Tanpa query filter, endpoint 
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
 | `dk_date_from`, `dk_date_to` | Range tanggal DK, format `YYYY-MM-DD` |
 | `search` | Search global untuk nama proyek, indikasi lender, fixed lender Green Book, dan executing agency |
+| `include_history` | `true` untuk menampilkan semua snapshot, default `false` |
 
 Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&loan_types=KSA`), comma-separated value, atau format array query string (`loan_types[]=Bilateral`).
 
@@ -1154,6 +1246,7 @@ Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&lo
     {
       "id": "uuid",
       "blue_book_id": "uuid",
+      "project_identity_id": "uuid-logical-project",
       "bb_code": "BB-2025-001",
       "project_name": "Pembangunan Jalan Tol Trans Sumatera",
       "loan_types": ["Bilateral"],
@@ -1165,7 +1258,10 @@ Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&lo
       "program_title": "Infrastruktur Transportasi",
       "locations": ["Sumatera Utara"],
       "foreign_loan_usd": 250000000,
-      "dk_dates": ["2025-02-01"]
+      "dk_dates": ["2025-02-01"],
+      "is_latest": true,
+      "has_newer_revision": false,
+      "blue_book_revision_label": "BB 2025-2029"
     }
   ],
   "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
@@ -1186,8 +1282,10 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
   "data": {
     "bb_project": {
       "id": "uuid",
+      "project_identity_id": "uuid-logical-project",
       "bb_code": "BB-2025-001",
-      "project_name": "Trans Sumatra Toll Road"
+      "project_name": "Trans Sumatra Toll Road",
+      "has_newer_revision": false
     },
     "loi": [
       { "id": "uuid", "lender": { "name": "JICA" }, "tanggal": "2025-03-10" }
@@ -1195,8 +1293,10 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
     "gb_projects": [
       {
         "id": "uuid",
+        "gb_project_identity_id": "uuid-logical-gb-project",
         "gb_code": "GB-2025-001",
         "project_name": "Trans Sumatra Section 1",
+        "has_newer_revision": false,
         "dk_projects": [
           {
             "id": "uuid",

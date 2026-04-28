@@ -8,9 +8,9 @@
 
 ## Prasyarat
 
-- [ ] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
-- [ ] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
-- [ ] Latest BB Project resolver tersedia dan sudah teruji.
+- [x] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
+- [x] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
+- [x] Latest BB Project resolver tersedia dan sudah teruji.
 
 ---
 
@@ -22,18 +22,18 @@ Files:
 
 Checklist:
 
-- [ ] Tambahkan `GBProjectIdentityID` pada GB Project request/response bila diperlukan.
-- [ ] Tambahkan field response:
-  - [ ] `gb_project_identity_id`.
-  - [ ] `is_latest`.
-  - [ ] `has_newer_revision`.
-- [ ] Tambahkan model history item untuk `GET /gb-projects/:id/history`.
-- [ ] Tambahkan field untuk BB relation jika perlu menampilkan concrete BB snapshot yang tersimpan.
-- [ ] Pastikan JSON field mengikuti contract snake_case.
+- [x] Tambahkan `GBProjectIdentityID` pada GB Project request/response bila diperlukan.
+- [x] Tambahkan field response:
+  - [x] `gb_project_identity_id`.
+  - [x] `is_latest`.
+  - [x] `has_newer_revision`.
+- [x] Tambahkan model history item untuk `GET /gb-projects/:id/history`.
+- [x] Tambahkan field untuk BB relation jika perlu menampilkan concrete BB snapshot yang tersimpan.
+- [x] Pastikan JSON field mengikuti contract snake_case.
 
 Acceptance:
 
-- [ ] Model dapat merepresentasikan GB snapshot dan logical GB identity.
+- [x] Model dapat merepresentasikan GB snapshot dan logical GB identity.
 
 ---
 
@@ -45,21 +45,21 @@ Files:
 
 Checklist:
 
-- [ ] Ganti validasi duplicate dari global code menjadi per `green_book_id`.
-- [ ] Saat create tanpa `gb_project_identity_id`, buat `gb_project_identity` baru dalam transaksi.
-- [ ] Saat create dengan `gb_project_identity_id`, validasi identity ada.
-- [ ] Simpan `gb_project_identity_id` ke `gb_project`.
-- [ ] Untuk setiap input `bb_project_id`, resolve ke latest BB Project dari identity yang sama.
-- [ ] Simpan concrete latest `bb_project_id` hasil resolve ke `gb_project_bb_project`.
-- [ ] Jangan simpan logical id saja pada junction; concrete snapshot tetap wajib.
-- [ ] Build response mengisi latest flags.
-- [ ] Pastikan activities, funding source, disbursement plan, dan funding allocation tetap transaksional.
+- [x] Ganti validasi duplicate dari global code menjadi per `green_book_id`.
+- [x] Saat create tanpa `gb_project_identity_id`, buat `gb_project_identity` baru dalam transaksi.
+- [x] Saat create dengan `gb_project_identity_id`, validasi identity ada.
+- [x] Simpan `gb_project_identity_id` ke `gb_project`.
+- [x] Untuk setiap input `bb_project_id`, resolve ke latest BB Project dari identity yang sama.
+- [x] Simpan concrete latest `bb_project_id` hasil resolve ke `gb_project_bb_project`.
+- [x] Jangan simpan logical id saja pada junction; concrete snapshot tetap wajib.
+- [x] Build response mengisi latest flags.
+- [x] Pastikan activities, funding source, disbursement plan, dan funding allocation tetap transaksional.
 
 Acceptance:
 
-- [ ] GB Project baru selalu terhubung ke latest BB snapshot.
-- [ ] `gb_code` sama bisa dibuat di revisi Green Book berbeda.
-- [ ] Duplicate `gb_code` dalam Green Book yang sama tetap conflict.
+- [x] GB Project baru selalu terhubung ke latest BB snapshot.
+- [x] `gb_code` sama bisa dibuat di revisi Green Book berbeda.
+- [x] Duplicate `gb_code` dalam Green Book yang sama tetap conflict.
 
 ---
 
@@ -71,28 +71,28 @@ Files:
 
 Checklist:
 
-- [ ] Tentukan source revisi:
-  - [ ] Jika request membawa `replaces_green_book_id`, gunakan itu.
-  - [ ] Jika tidak, gunakan Green Book active terakhir pada `publish_year` yang sama sebelum supersede.
-- [ ] Dalam satu transaksi:
-  - [ ] Supersede Green Book lama.
-  - [ ] Create Green Book baru.
-  - [ ] Clone semua active GB Project dari source.
-  - [ ] Reuse `gb_project_identity_id` dari source project.
-  - [ ] Untuk setiap cloned GB Project, resolve BB relation ke latest BB Project saat revisi dibuat.
-  - [ ] Clone institutions.
-  - [ ] Clone locations.
-  - [ ] Clone funding sources.
-  - [ ] Clone disbursement plan.
-  - [ ] Clone activities dan simpan mapping old activity id ke new activity id.
-  - [ ] Clone funding allocation memakai new activity id dari mapping.
-- [ ] Pastikan clone tidak memakai lookup global `gb_code`.
-- [ ] Publish SSE setelah commit berhasil.
+- [x] Tentukan source revisi:
+  - [x] Jika request membawa `replaces_green_book_id`, gunakan itu.
+  - [x] Jika tidak, gunakan Green Book active terakhir pada `publish_year` yang sama sebelum supersede.
+- [x] Dalam satu transaksi:
+  - [x] Supersede Green Book lama.
+  - [x] Create Green Book baru.
+  - [x] Clone semua active GB Project dari source.
+  - [x] Reuse `gb_project_identity_id` dari source project.
+  - [x] Untuk setiap cloned GB Project, resolve BB relation ke latest BB Project saat revisi dibuat.
+  - [x] Clone institutions.
+  - [x] Clone locations.
+  - [x] Clone funding sources.
+  - [x] Clone disbursement plan.
+  - [x] Clone activities dan simpan mapping old activity id ke new activity id.
+  - [x] Clone funding allocation memakai new activity id dari mapping.
+- [x] Pastikan clone tidak memakai lookup global `gb_code`.
+- [x] Publish SSE setelah commit berhasil.
 
 Acceptance:
 
-- [ ] Revisi GB baru berisi snapshot project yang sama dengan GB identity yang sama.
-- [ ] Relasi BB pada revisi GB menunjuk latest BB snapshot saat revisi dibuat.
+- [x] Revisi GB baru berisi snapshot project yang sama dengan GB identity yang sama.
+- [x] Relasi BB pada revisi GB menunjuk latest BB snapshot saat revisi dibuat.
 
 ---
 
@@ -105,23 +105,23 @@ Files:
 
 Checklist:
 
-- [ ] Implement service method `GetGBProjectHistory`.
-- [ ] Implement handler untuk `GET /gb-projects/:id/history`.
-- [ ] Daftarkan route dengan permission `gb_project:read`.
-- [ ] Response history memuat:
-  - [ ] snapshot id.
-  - [ ] `gb_project_identity_id`.
-  - [ ] Green Book id.
-  - [ ] publish year + revision.
-  - [ ] book status.
-  - [ ] `is_latest`.
-  - [ ] concrete BB Project snapshots yang dipakai.
-  - [ ] `used_by_downstream` jika query tersedia.
-- [ ] Return 404 aman jika snapshot tidak ditemukan.
+- [x] Implement service method `GetGBProjectHistory`.
+- [x] Implement handler untuk `GET /gb-projects/:id/history`.
+- [x] Daftarkan route dengan permission `gb_project:read`.
+- [x] Response history memuat:
+  - [x] snapshot id.
+  - [x] `gb_project_identity_id`.
+  - [x] Green Book id.
+  - [x] publish year + revision.
+  - [x] book status.
+  - [x] `is_latest`.
+  - [x] concrete BB Project snapshots yang dipakai.
+  - [x] `used_by_downstream` jika query tersedia.
+- [x] Return 404 aman jika snapshot tidak ditemukan.
 
 Acceptance:
 
-- [ ] User bisa melihat semua revisi GB yang memuat logical GB project yang sama.
+- [x] User bisa melihat semua revisi GB yang memuat logical GB project yang sama.
 
 ---
 
@@ -134,15 +134,15 @@ Checklist:
 - [ ] Tambah/update tests untuk create GB revision clone.
 - [ ] Tambah/update tests untuk funding allocation clone dengan activity mapping.
 - [ ] Tambah/update tests untuk GB Project history endpoint.
-- [ ] Jalankan `go test ./...`.
-- [ ] Jalankan smoke API:
-  - [ ] create BB original + revision.
-  - [ ] create GB using old BB input id.
-  - [ ] verify stored BB relation memakai latest BB snapshot.
-  - [ ] create GB revision.
-  - [ ] call `/gb-projects/:id/history`.
+- [x] Jalankan `go test ./...`.
+- [x] Jalankan smoke API:
+  - [x] create BB original + revision.
+  - [x] create GB using old BB input id.
+  - [x] verify stored BB relation memakai latest BB snapshot.
+  - [x] create GB revision.
+  - [x] call `/gb-projects/:id/history`.
 
 Done Criteria:
 
-- [ ] Green Book revision versioning bekerja end-to-end.
-- [ ] Tidak ada global `gb_code` blocker tersisa di service.
+- [x] Green Book revision versioning bekerja end-to-end.
+- [x] Tidak ada global `gb_code` blocker tersisa di service.

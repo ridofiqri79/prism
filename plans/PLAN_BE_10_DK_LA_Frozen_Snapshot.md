@@ -8,10 +8,10 @@
 
 ## Prasyarat
 
-- [ ] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
-- [ ] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
-- [ ] `PLAN_BE_09_Green_Book_Revision_Versioning.md` selesai.
-- [ ] Latest GB Project resolver tersedia dan sudah teruji.
+- [x] `PLAN_BE_07_Revision_Versioning_Schema.md` selesai.
+- [x] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
+- [x] `PLAN_BE_09_Green_Book_Revision_Versioning.md` selesai.
+- [x] Latest GB Project resolver tersedia dan sudah teruji.
 
 ---
 
@@ -23,17 +23,17 @@ Files:
 
 Checklist:
 
-- [ ] Tambahkan query resolve latest GB Project dari input `gb_project_id`.
-- [ ] Pastikan resolver memakai `gb_project_identity_id`.
-- [ ] Pastikan resolver hanya memilih snapshot aktif dan dokumen/revisi yang valid untuk dipilih.
-- [ ] Pastikan query detail DK tetap membaca concrete `gb_project_id` dari `dk_project_gb_project`.
-- [ ] Pastikan query allowed lender membaca concrete GB/BB path yang tersimpan.
-- [ ] Jalankan `make generate` setelah query berubah.
+- [x] Tambahkan query resolve latest GB Project dari input `gb_project_id`.
+- [x] Pastikan resolver memakai `gb_project_identity_id`.
+- [x] Pastikan resolver hanya memilih snapshot aktif dan dokumen/revisi yang valid untuk dipilih.
+- [x] Pastikan query detail DK tetap membaca concrete `gb_project_id` dari `dk_project_gb_project`.
+- [x] Pastikan query allowed lender membaca concrete GB/BB path yang tersimpan.
+- [x] Jalankan `make generate` setelah query berubah.
 
 Acceptance:
 
-- [ ] DK service punya query untuk resolve latest saat menulis.
-- [ ] DK read/detail tidak berubah menjadi dynamic latest.
+- [x] DK service punya query untuk resolve latest saat menulis.
+- [x] DK read/detail tidak berubah menjadi dynamic latest.
 
 ---
 
@@ -45,18 +45,18 @@ Files:
 
 Checklist:
 
-- [ ] Saat create DK Project, resolve setiap input `gb_project_id` ke latest GB snapshot sebelum insert junction.
-- [ ] Saat update DK Project dan user eksplisit mengganti GB selection, resolve input baru ke latest GB snapshot.
-- [ ] Jangan pernah update `dk_project_gb_project` otomatis hanya karena ada revisi BB/GB baru.
-- [ ] Simpan concrete `gb_project_id` hasil resolve di `dk_project_gb_project`.
-- [ ] Jika DK sudah final dan update dibatasi, pertahankan aturan final yang sudah ada.
-- [ ] Response DK detail menampilkan snapshot yang tersimpan, bukan latest dynamic.
-- [ ] Jika snapshot tersimpan punya newer revision, response boleh membawa `has_newer_revision` untuk UI.
+- [x] Saat create DK Project, resolve setiap input `gb_project_id` ke latest GB snapshot sebelum insert junction.
+- [x] Saat update DK Project dan user eksplisit mengganti GB selection, resolve input baru ke latest GB snapshot.
+- [x] Jangan pernah update `dk_project_gb_project` otomatis hanya karena ada revisi BB/GB baru.
+- [x] Simpan concrete `gb_project_id` hasil resolve di `dk_project_gb_project`.
+- [x] Jika DK sudah final dan update dibatasi, pertahankan aturan final yang sudah ada.
+- [x] Response DK detail menampilkan snapshot yang tersimpan, bukan latest dynamic.
+- [x] Jika snapshot tersimpan punya newer revision, response boleh membawa `has_newer_revision` untuk UI.
 
 Acceptance:
 
-- [ ] DK baru selalu mengambil latest GB saat dipilih.
-- [ ] DK lama tidak berubah setelah revisi GB dibuat.
+- [x] DK baru selalu mengambil latest GB saat dipilih.
+- [x] DK lama tidak berubah setelah revisi GB dibuat.
 
 ---
 
@@ -71,17 +71,17 @@ Files:
 
 Checklist:
 
-- [ ] DK financing lender validation memakai concrete GB Project yang tersimpan.
-- [ ] DK lender validation tetap mengambil lender dari:
-  - [ ] `gb_funding_source` pada concrete GB Project.
-  - [ ] `lender_indication` pada concrete BB Project yang terhubung ke concrete GB Project.
-- [ ] LA lender validation tetap memakai `dk_financing_detail` dari DK Project terkait.
-- [ ] Jangan resolve latest saat membuat LA atau monitoring.
-- [ ] Pastikan validation error tetap memakai format aman dari error handling repo.
+- [x] DK financing lender validation memakai concrete GB Project yang tersimpan.
+- [x] DK lender validation tetap mengambil lender dari:
+  - [x] `gb_funding_source` pada concrete GB Project.
+  - [x] `lender_indication` pada concrete BB Project yang terhubung ke concrete GB Project.
+- [x] LA lender validation tetap memakai `dk_financing_detail` dari DK Project terkait.
+- [x] Jangan resolve latest saat membuat LA atau monitoring.
+- [x] Pastikan validation error tetap memakai format aman dari error handling repo.
 
 Acceptance:
 
-- [ ] Revisi BB/GB setelah DK dibuat tidak mengubah allowed lender untuk DK/LA tersebut.
+- [x] Revisi BB/GB setelah DK dibuat tidak mengubah allowed lender untuk DK/LA tersebut.
 
 ---
 
@@ -90,20 +90,20 @@ Acceptance:
 Checklist:
 
 - [ ] Tambah/update test DK create dengan input GB lama tetapi identity punya snapshot baru.
-- [ ] Verify junction tersimpan menunjuk latest GB snapshot saat create.
+- [x] Verify junction tersimpan menunjuk latest GB snapshot saat create.
 - [ ] Tambah/update test DK tetap menunjuk snapshot lama setelah GB revisi baru dibuat.
 - [ ] Tambah/update test lender validation memakai concrete snapshot.
 - [ ] Tambah/update test LA tetap mengikuti DK Project yang tersimpan.
-- [ ] Jalankan `go test ./...`.
-- [ ] Jalankan smoke API:
-  - [ ] create BB original + revision.
-  - [ ] create GB original + revision.
-  - [ ] create DK dengan input GB identity/snapshot lama.
-  - [ ] verify DK stored relation adalah latest saat create.
-  - [ ] create GB revision baru.
-  - [ ] verify DK relation tidak berubah.
+- [x] Jalankan `go test ./...`.
+- [x] Jalankan smoke API:
+  - [x] create BB original + revision.
+  - [x] create GB original + revision.
+  - [x] create DK dengan input GB identity/snapshot lama.
+  - [x] verify DK stored relation adalah latest saat create.
+  - [x] create GB revision baru.
+  - [x] verify DK relation tidak berubah.
 
 Done Criteria:
 
-- [ ] DK/LA downstream freeze rule terjaga.
-- [ ] Semua write baru memakai latest resolver hanya pada saat link dibuat.
+- [x] DK/LA downstream freeze rule terjaga.
+- [x] Semua write baru memakai latest resolver hanya pada saat link dibuat.

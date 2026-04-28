@@ -7,6 +7,7 @@ import MultiSelect from 'primevue/multiselect'
 import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -151,6 +152,7 @@ function createDefaultFilters(): ProjectMasterFilterState {
     dk_date_from: '',
     dk_date_to: '',
     search: '',
+    include_history: false,
   }
 }
 
@@ -184,6 +186,7 @@ function buildParams(): ProjectMasterListParams {
   if (filters.foreign_loan_max !== null) params.foreign_loan_max = filters.foreign_loan_max
   if (filters.dk_date_from) params.dk_date_from = filters.dk_date_from
   if (filters.dk_date_to) params.dk_date_to = filters.dk_date_to
+  if (filters.include_history) params.include_history = true
 
   params.search = textParam(filters.search)
 
@@ -360,6 +363,7 @@ watch(
     foreignLoanMax: filters.foreign_loan_max,
     dkDateFrom: filters.dk_date_from,
     dkDateTo: filters.dk_date_to,
+    includeHistory: filters.include_history,
   }),
   scheduleFilterRefresh,
   { deep: true },
@@ -409,7 +413,7 @@ onUnmounted(() => {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-semibold text-surface-950">Filter Lanjutan</h2>
-          <p class="text-sm text-surface-500">Default menampilkan semua BB Project aktif.</p>
+          <p class="text-sm text-surface-500">Default menampilkan snapshot latest per project.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <Button
@@ -427,6 +431,11 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="mt-4 space-y-4">
+        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2">
+          <ToggleSwitch v-model="filters.include_history" />
+          <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
+        </label>
+
         <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
@@ -689,7 +698,20 @@ onUnmounted(() => {
                 >
                   {{ project.project_name }}
                 </RouterLink>
-                <span class="mt-1 block text-xs font-medium text-surface-500">{{ project.bb_code }}</span>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <span class="text-xs font-medium text-surface-500">{{ project.bb_code }}</span>
+                  <Tag
+                    :value="project.blue_book_revision_label"
+                    :severity="project.is_latest ? 'success' : 'secondary'"
+                    rounded
+                  />
+                  <Tag
+                    v-if="project.has_newer_revision"
+                    value="Ada revisi lebih baru"
+                    severity="warn"
+                    rounded
+                  />
+                </div>
               </td>
               <td v-for="column in visibleColumns" :key="column.key" :class="bodyCellClass(column)">
                 <div v-if="column.key === 'loan_types'">

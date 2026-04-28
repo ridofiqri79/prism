@@ -5,6 +5,7 @@ WITH project_rows AS (
     SELECT
         bp.id,
         bp.blue_book_id,
+        bp.project_identity_id,
         bp.bb_code,
         bp.project_name,
         bp.program_title_id,
@@ -144,9 +145,56 @@ WITH project_rows AS (
             WHERE gbp.bb_project_id = bp.id
             ORDER BY dk.date::text
         )::text[] AS dk_dates
+        ,
+        (bp.id = (
+            SELECT latest.id
+            FROM bb_project latest
+            JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+            WHERE latest.project_identity_id = bp.project_identity_id
+              AND latest.status = 'active'
+            ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+            LIMIT 1
+        ))::boolean AS is_latest,
+        EXISTS (
+            SELECT 1
+            FROM bb_project newer
+            JOIN blue_book newer_bb ON newer_bb.id = newer.blue_book_id
+            JOIN blue_book current_bb ON current_bb.id = bp.blue_book_id
+            WHERE newer.project_identity_id = bp.project_identity_id
+              AND newer.status = 'active'
+              AND (
+                  newer_bb.revision_number > current_bb.revision_number
+                  OR (
+                      newer_bb.revision_number = current_bb.revision_number
+                      AND newer_bb.created_at > current_bb.created_at
+                  )
+              )
+        )::boolean AS has_newer_revision,
+        CONCAT(
+            'BB ',
+            p.name,
+            CASE
+                WHEN bb.revision_number > 0 THEN CONCAT(' Revisi ke-', bb.revision_number)
+                ELSE ''
+            END
+        )::text AS blue_book_revision_label
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
+    JOIN period p ON p.id = bb.period_id
     LEFT JOIN program_title pt ON pt.id = bp.program_title_id
     WHERE bp.status = 'active'
+      AND (
+          sqlc.arg('include_history')::boolean
+          OR bp.id = (
+              SELECT latest.id
+              FROM bb_project latest
+              JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+              WHERE latest.project_identity_id = bp.project_identity_id
+                AND latest.status = 'active'
+              ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+              LIMIT 1
+          )
+      )
 ),
 filtered_projects AS (
     SELECT *
@@ -193,6 +241,7 @@ filtered_projects AS (
 SELECT
     id,
     blue_book_id,
+    project_identity_id,
     bb_code,
     project_name,
     loan_types,
@@ -204,7 +253,10 @@ SELECT
     program_title,
     locations,
     foreign_loan_usd,
-    dk_dates
+    dk_dates,
+    is_latest,
+    has_newer_revision,
+    blue_book_revision_label
 FROM filtered_projects
 ORDER BY
     CASE WHEN sqlc.arg('sort')::text = 'project_name' AND sqlc.arg('order')::text = 'asc' THEN LOWER(project_name) END ASC,
@@ -239,6 +291,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 WITH project_rows AS (
     SELECT
         bp.id,
+        bp.project_identity_id,
         bp.program_title_id,
         bp.project_name,
         COALESCE((
@@ -371,6 +424,18 @@ WITH project_rows AS (
         )::text[] AS dk_dates
     FROM bb_project bp
     WHERE bp.status = 'active'
+      AND (
+          sqlc.arg('include_history')::boolean
+          OR bp.id = (
+              SELECT latest.id
+              FROM bb_project latest
+              JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+              WHERE latest.project_identity_id = bp.project_identity_id
+                AND latest.status = 'active'
+              ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+              LIMIT 1
+          )
+      )
 )
 SELECT COUNT(*)::bigint
 FROM project_rows

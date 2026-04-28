@@ -2,6 +2,7 @@ import http from '@/services/http'
 import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   BBProject,
+  BBProjectHistoryItem,
   BBProjectPayload,
   BlueBook,
   BlueBookPayload,
@@ -46,6 +47,13 @@ export const BlueBookService = {
   async getProject(blueBookId: string, id: string) {
     const response = await http.get<ApiResponse<BBProject>>(
       `/blue-books/${blueBookId}/projects/${id}`,
+    )
+    return response.data.data
+  },
+
+  async getBBProjectHistory(id: string) {
+    const response = await http.get<ApiResponse<BBProjectHistoryItem[]>>(
+      `/bb-projects/${id}/history`,
     )
     return response.data.data
   },

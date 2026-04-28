@@ -32,8 +32,12 @@ export interface DKProject {
 
 export interface GBProjectSummary {
   id: string
+  gb_project_identity_id?: string
+  green_book_id?: string
   gb_code: string
   project_name: string
+  is_latest?: boolean
+  has_newer_revision?: boolean
 }
 
 export interface DKFinancingDetail {
@@ -117,4 +121,7 @@ export interface DKProjectPayload {
 
 export interface GBProjectOption extends Pick<GBProject, 'id' | 'gb_code' | 'project_name' | 'bb_projects' | 'funding_sources'> {
   green_book_id?: string
+  gb_project_identity_id?: string
+  is_latest?: boolean
+  has_newer_revision?: boolean
 }

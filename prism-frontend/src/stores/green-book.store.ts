@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { GreenBookService } from '@/services/green-book.service'
 import type {
   GBProject,
+  GBProjectHistoryItem,
   GBProjectPayload,
   GreenBook,
   GreenBookPayload,
@@ -15,7 +16,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
   const projects = ref<GBProject[]>([])
   const projectOptions = ref<GBProject[]>([])
   const currentProject = ref<GBProject | null>(null)
+  const projectHistory = ref<GBProjectHistoryItem[]>([])
   const loading = ref(false)
+  const historyLoading = ref(false)
   const templateDownloading = ref(false)
   const importPreviewing = ref(false)
   const importExecuting = ref(false)
@@ -88,6 +91,16 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     })
   }
 
+  async function fetchProjectHistory(id: string) {
+    historyLoading.value = true
+    try {
+      projectHistory.value = await GreenBookService.getGBProjectHistory(id)
+      return projectHistory.value
+    } finally {
+      historyLoading.value = false
+    }
+  }
+
   async function createProject(greenBookId: string, data: GBProjectPayload) {
     return GreenBookService.createProject(greenBookId, data)
   }
@@ -140,7 +153,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projects.value = []
     projectOptions.value = []
     currentProject.value = null
+    projectHistory.value = []
     loading.value = false
+    historyLoading.value = false
     templateDownloading.value = false
     importPreviewing.value = false
     importExecuting.value = false
@@ -154,7 +169,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projects,
     projectOptions,
     currentProject,
+    projectHistory,
     loading,
+    historyLoading,
     templateDownloading,
     importPreviewing,
     importExecuting,
@@ -168,6 +185,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     fetchProjects,
     fetchProjectOptions,
     fetchProject,
+    fetchProjectHistory,
     createProject,
     updateProject,
     deleteProject,

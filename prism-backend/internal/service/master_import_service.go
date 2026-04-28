@@ -983,6 +983,11 @@ func addImportCreated(result *model.MasterImportSheetResult, row int, label stri
 	addImportRow(result, row, masterImportStatusCreate, label, "")
 }
 
+func addImportCreatedWithMessage(result *model.MasterImportSheetResult, row int, label, message string) {
+	result.Inserted++
+	addImportRow(result, row, masterImportStatusCreate, label, message)
+}
+
 func addImportSkipped(result *model.MasterImportSheetResult, row int, label string) {
 	result.Skipped++
 	addImportRow(result, row, masterImportStatusSkip, label, "Data sudah ada, dilewati")

@@ -95,8 +95,8 @@ WHERE monitoring_disbursement_id = $1;
 
 -- name: GetDashboardSummary :one
 SELECT
-    (SELECT COUNT(*) FROM bb_project WHERE status = 'active')::bigint AS total_bb_projects,
-    (SELECT COUNT(*) FROM gb_project WHERE status = 'active')::bigint AS total_gb_projects,
+    (SELECT COUNT(DISTINCT project_identity_id) FROM bb_project WHERE status = 'active')::bigint AS total_bb_projects,
+    (SELECT COUNT(DISTINCT gb_project_identity_id) FROM gb_project WHERE status = 'active')::bigint AS total_gb_projects,
     (SELECT COUNT(*) FROM loan_agreement)::bigint AS total_loan_agreements,
     COALESCE((SELECT SUM(amount_usd) FROM loan_agreement), 0)::numeric AS total_amount_usd,
     COALESCE((SELECT SUM(realized_usd) FROM monitoring_disbursement), 0)::numeric AS total_realized_usd,
@@ -122,9 +122,29 @@ ORDER BY md.budget_year ASC, md.quarter ASC, l.name ASC;
 -- ===== JOURNEY =====
 
 -- name: GetJourneyBBProject :one
-SELECT id, bb_code, project_name
-FROM bb_project
-WHERE id = $1;
+SELECT
+    bp.id,
+    bp.blue_book_id,
+    bp.project_identity_id,
+    bp.bb_code,
+    bp.project_name,
+    EXISTS (
+        SELECT 1
+        FROM bb_project newer
+        JOIN blue_book newer_bb ON newer_bb.id = newer.blue_book_id
+        JOIN blue_book current_bb ON current_bb.id = bp.blue_book_id
+        WHERE newer.project_identity_id = bp.project_identity_id
+          AND newer.status = 'active'
+          AND (
+              newer_bb.revision_number > current_bb.revision_number
+              OR (
+                  newer_bb.revision_number = current_bb.revision_number
+                  AND newer_bb.created_at > current_bb.created_at
+              )
+          )
+    )::boolean AS has_newer_revision
+FROM bb_project bp
+WHERE bp.id = $1;
 
 -- name: ListJourneyLoIsByBBProject :many
 SELECT
@@ -145,9 +165,26 @@ ORDER BY loi.date DESC;
 -- name: ListJourneyGBProjectsByBBProject :many
 SELECT DISTINCT
     gp.id,
+    gp.green_book_id,
+    gp.gb_project_identity_id,
     gp.gb_code,
     gp.project_name,
-    gp.status
+    gp.status,
+    EXISTS (
+        SELECT 1
+        FROM gb_project newer
+        JOIN green_book newer_gb ON newer_gb.id = newer.green_book_id
+        JOIN green_book current_gb ON current_gb.id = gp.green_book_id
+        WHERE newer.gb_project_identity_id = gp.gb_project_identity_id
+          AND newer.status = 'active'
+          AND (
+              newer_gb.revision_number > current_gb.revision_number
+              OR (
+                  newer_gb.revision_number = current_gb.revision_number
+                  AND newer_gb.created_at > current_gb.created_at
+              )
+          )
+    )::boolean AS has_newer_revision
 FROM gb_project_bb_project gbp
 JOIN gb_project gp ON gp.id = gbp.gb_project_id
 WHERE gbp.bb_project_id = $1
@@ -156,9 +193,13 @@ ORDER BY gp.gb_code ASC;
 -- name: ListJourneyDKProjectsByGBProject :many
 SELECT DISTINCT
     dp.id,
-    dp.objectives
+    dp.objectives,
+    dk.id AS dk_id,
+    dk.subject AS dk_subject,
+    dk.date AS dk_date
 FROM dk_project_gb_project dpg
 JOIN dk_project dp ON dp.id = dpg.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
 WHERE dpg.gb_project_id = $1
 ORDER BY dp.id ASC;
 

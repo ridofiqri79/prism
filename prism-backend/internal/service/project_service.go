@@ -105,6 +105,7 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 		Order:               sortOrder,
 		Offset:              int32(offset),
 		Limit:               int32(limit),
+		IncludeHistory:      filter.IncludeHistory,
 		LoanTypes:           loanTypes,
 		IndicationLenderIds: indicationLenderIDs,
 		ExecutingAgencyIds:  executingAgencyIDs,
@@ -136,6 +137,7 @@ func countProjectMasterParams(params queries.ListProjectMasterParams) queries.Co
 		DkDateFrom:          params.DkDateFrom,
 		DkDateTo:            params.DkDateTo,
 		Search:              params.Search,
+		IncludeHistory:      params.IncludeHistory,
 	}
 }
 
@@ -176,20 +178,24 @@ func normalizeProjectMasterSort(sortField, sortOrder string) (string, string, er
 
 func projectMasterResponse(row queries.ListProjectMasterRow) model.ProjectMasterResponse {
 	return model.ProjectMasterResponse{
-		ID:                model.UUIDToString(row.ID),
-		BlueBookID:        model.UUIDToString(row.BlueBookID),
-		BBCode:            row.BbCode,
-		ProjectName:       row.ProjectName,
-		LoanTypes:         safeStringSlice(row.LoanTypes),
-		IndicationLenders: safeStringSlice(row.IndicationLenders),
-		ExecutingAgencies: safeStringSlice(row.ExecutingAgencies),
-		FixedLenders:      safeStringSlice(row.FixedLenders),
-		ProjectStatus:     row.ProjectStatus,
-		PipelineStatus:    row.PipelineStatus,
-		ProgramTitle:      row.ProgramTitle,
-		Locations:         safeStringSlice(row.Locations),
-		ForeignLoanUSD:    floatFromNumeric(row.ForeignLoanUsd),
-		DKDates:           safeStringSlice(row.DkDates),
+		ID:                    model.UUIDToString(row.ID),
+		BlueBookID:            model.UUIDToString(row.BlueBookID),
+		ProjectIdentityID:     model.UUIDToString(row.ProjectIdentityID),
+		BBCode:                row.BbCode,
+		ProjectName:           row.ProjectName,
+		LoanTypes:             safeStringSlice(row.LoanTypes),
+		IndicationLenders:     safeStringSlice(row.IndicationLenders),
+		ExecutingAgencies:     safeStringSlice(row.ExecutingAgencies),
+		FixedLenders:          safeStringSlice(row.FixedLenders),
+		ProjectStatus:         row.ProjectStatus,
+		PipelineStatus:        row.PipelineStatus,
+		ProgramTitle:          row.ProgramTitle,
+		Locations:             safeStringSlice(row.Locations),
+		ForeignLoanUSD:        floatFromNumeric(row.ForeignLoanUsd),
+		DKDates:               safeStringSlice(row.DkDates),
+		IsLatest:              row.IsLatest,
+		HasNewerRevision:      row.HasNewerRevision,
+		BlueBookRevisionLabel: row.BlueBookRevisionLabel,
 	}
 }
 

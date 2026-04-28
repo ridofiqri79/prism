@@ -23,7 +23,6 @@ import { useToast } from '@/composables/useToast'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { BBProject } from '@/types/blue-book.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,10 +38,12 @@ const pageTitle = computed(() => (isEditMode.value ? 'Edit GB Project' : 'Tambah
 const form = useGBProjectForm()
 
 const bbProjectOptions = computed(() =>
-  blueBookStore.projectOptions.map((project) => ({
-    ...project,
-    label: `${project.bb_code} - ${project.project_name}`,
-  })),
+  blueBookStore.projectOptions
+    .filter((project) => project.is_latest !== false)
+    .map((project) => ({
+      ...project,
+      label: `${project.bb_code} - ${project.project_name}`,
+    })),
 )
 
 async function loadData() {

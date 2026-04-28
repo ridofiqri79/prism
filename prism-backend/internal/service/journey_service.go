@@ -45,21 +45,29 @@ func (s *JourneyService) GetProjectJourney(ctx context.Context, bbProjectID pgty
 				return nil, err
 			}
 			dkProjects = append(dkProjects, model.JourneyDKProject{
-				ID:            model.UUIDToString(dk.ID),
-				Objectives:    stringPtrFromText(dk.Objectives),
+				ID:         model.UUIDToString(dk.ID),
+				Objectives: stringPtrFromText(dk.Objectives),
+				DaftarKegiatan: &model.JourneyDKHeader{
+					ID:      model.UUIDToString(dk.DkID),
+					Subject: dk.DkSubject,
+					Date:    dateString(dk.DkDate),
+				},
 				LoanAgreement: loanAgreement,
 			})
 		}
 		gbProjects = append(gbProjects, model.JourneyGBProject{
-			ID:          model.UUIDToString(gb.ID),
-			GBCode:      gb.GbCode,
-			ProjectName: gb.ProjectName,
-			Status:      gb.Status,
-			DKProjects:  dkProjects,
+			ID:                  model.UUIDToString(gb.ID),
+			GreenBookID:         model.UUIDToString(gb.GreenBookID),
+			GBProjectIdentityID: model.UUIDToString(gb.GbProjectIdentityID),
+			GBCode:              gb.GbCode,
+			ProjectName:         gb.ProjectName,
+			Status:              gb.Status,
+			HasNewerRevision:    gb.HasNewerRevision,
+			DKProjects:          dkProjects,
 		})
 	}
 	return &model.JourneyResponse{
-		BBProject:  model.JourneyBBProject{ID: model.UUIDToString(bb.ID), BBCode: bb.BbCode, ProjectName: bb.ProjectName},
+		BBProject:  model.JourneyBBProject{ID: model.UUIDToString(bb.ID), BlueBookID: model.UUIDToString(bb.BlueBookID), ProjectIdentityID: model.UUIDToString(bb.ProjectIdentityID), BBCode: bb.BbCode, ProjectName: bb.ProjectName, HasNewerRevision: bb.HasNewerRevision},
 		LoI:        toJourneyLoIs(lois),
 		GBProjects: gbProjects,
 	}, nil

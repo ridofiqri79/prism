@@ -98,6 +98,7 @@ CREATE TABLE national_priority (
 CREATE TABLE blue_book (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     period_id        UUID NOT NULL REFERENCES period(id),
+    replaces_blue_book_id UUID REFERENCES blue_book(id),
     publish_date     DATE NOT NULL,
     revision_number  INT NOT NULL DEFAULT 0,
     revision_year    INT,                              -- NULL untuk versi awal
@@ -106,12 +107,19 @@ CREATE TABLE blue_book (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE project_identity (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE bb_project (
     id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     blue_book_id         UUID NOT NULL REFERENCES blue_book(id),
+    project_identity_id  UUID NOT NULL REFERENCES project_identity(id),
     program_title_id     UUID REFERENCES program_title(id),
     bappenas_partner_id  UUID REFERENCES bappenas_partner(id), -- Eselon II; Eselon I diturunkan dari hierarki
-    bb_code              VARCHAR(50) NOT NULL UNIQUE,
+    bb_code              VARCHAR(50) NOT NULL,
     project_name         VARCHAR(500) NOT NULL,
     duration             VARCHAR(100),
     objective            TEXT,
@@ -120,7 +128,8 @@ CREATE TABLE bb_project (
     outcomes             TEXT,
     status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (blue_book_id, bb_code)
 );
 
 -- EA & IA Blue Book (multi-select, shared Institution)
@@ -188,24 +197,33 @@ CREATE TABLE loi (
 CREATE TABLE green_book (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     publish_year     INT NOT NULL,
+    replaces_green_book_id UUID REFERENCES green_book(id),
     revision_number  INT NOT NULL DEFAULT 0,
     status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE gb_project_identity (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE gb_project (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     green_book_id    UUID NOT NULL REFERENCES green_book(id),
+    gb_project_identity_id UUID NOT NULL REFERENCES gb_project_identity(id),
     program_title_id UUID REFERENCES program_title(id),
-    gb_code          VARCHAR(50) NOT NULL UNIQUE,
+    gb_code          VARCHAR(50) NOT NULL,
     project_name     VARCHAR(500) NOT NULL,
     duration         VARCHAR(100),
     objective        TEXT,
     scope_of_project TEXT,
     status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (green_book_id, gb_code)
 );
 
 -- Relasi BB Project <-> GB Project (many-to-many)
@@ -477,6 +495,8 @@ CREATE TABLE user_permission (
 
 -- Blue Book
 CREATE INDEX idx_bb_project_blue_book      ON bb_project(blue_book_id);
+CREATE INDEX idx_bb_project_identity       ON bb_project(project_identity_id);
+CREATE INDEX idx_bb_project_book_code      ON bb_project(blue_book_id, bb_code);
 CREATE INDEX idx_bb_project_bb_code        ON bb_project(bb_code);
 CREATE INDEX idx_bb_project_status         ON bb_project(status);
 CREATE INDEX idx_lender_indication_project ON lender_indication(bb_project_id);
@@ -485,6 +505,8 @@ CREATE INDEX idx_loi_lender                ON loi(lender_id);
 
 -- Green Book
 CREATE INDEX idx_gb_project_green_book     ON gb_project(green_book_id);
+CREATE INDEX idx_gb_project_identity       ON gb_project(gb_project_identity_id);
+CREATE INDEX idx_gb_project_book_code      ON gb_project(green_book_id, gb_code);
 CREATE INDEX idx_gb_project_gb_code        ON gb_project(gb_code);
 CREATE INDEX idx_gb_project_status         ON gb_project(status);
 CREATE INDEX idx_gb_activity_project       ON gb_activity(gb_project_id);

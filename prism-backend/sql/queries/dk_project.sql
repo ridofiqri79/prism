@@ -86,6 +86,7 @@ WHERE id = $1;
 SELECT
     gp.id,
     gp.green_book_id,
+    gp.gb_project_identity_id,
     gp.program_title_id,
     gp.gb_code,
     gp.project_name,
@@ -99,6 +100,15 @@ SELECT
 FROM gb_project gp
 JOIN green_book gb ON gb.id = gp.green_book_id
 WHERE gp.status = 'active'
+  AND gp.id = (
+      SELECT latest.id
+      FROM gb_project latest
+      JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
+      WHERE latest.gb_project_identity_id = gp.gb_project_identity_id
+        AND latest.status = 'active'
+      ORDER BY latest_gb.revision_number DESC, latest_gb.created_at DESC
+      LIMIT 1
+  )
 ORDER BY gp.gb_code ASC;
 
 -- ===== DK PROJECT GB PROJECT =====
@@ -107,6 +117,7 @@ ORDER BY gp.gb_code ASC;
 SELECT
     gp.id,
     gp.green_book_id,
+    gp.gb_project_identity_id,
     gp.program_title_id,
     gp.gb_code,
     gp.project_name,
@@ -120,6 +131,20 @@ FROM dk_project_gb_project dkgb
 JOIN gb_project gp ON gp.id = dkgb.gb_project_id
 WHERE dkgb.dk_project_id = $1
 ORDER BY gp.gb_code;
+
+-- name: ResolveLatestGBProjectForDK :one
+SELECT latest.*
+FROM gb_project current_project
+JOIN LATERAL (
+    SELECT gp.*
+    FROM gb_project gp
+    JOIN green_book gb ON gb.id = gp.green_book_id
+    WHERE gp.gb_project_identity_id = current_project.gb_project_identity_id
+      AND gp.status = 'active'
+    ORDER BY gb.revision_number DESC, gb.created_at DESC
+    LIMIT 1
+) latest ON TRUE
+WHERE current_project.id = $1;
 
 -- name: AddDKProjectGBProject :exec
 INSERT INTO dk_project_gb_project (dk_project_id, gb_project_id)

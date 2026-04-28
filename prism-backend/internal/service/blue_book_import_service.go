@@ -37,6 +37,7 @@ type blueBookImportProjectDraft struct {
 	scopeOfWork           *string
 	outputs               *string
 	outcomes              *string
+	projectIdentityID     pgtype.UUID
 	executingAgencyIDs    []string
 	implementingAgencyIDs []string
 	locationIDs           []string
@@ -155,7 +156,7 @@ func (s *BlueBookService) processBlueBookProjectsWorkbook(ctx context.Context, b
 
 func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, blueBook queries.GetBlueBookRow, fileName string) (*model.MasterImportResponse, []string, error) {
 	inputResult := model.MasterImportSheetResult{Sheet: blueBookImportSheetInput}
-	projects, projectsByCode, err := s.parseBlueBookInputRows(ctx, qtx, workbook, lookups, &inputResult)
+	projects, projectsByCode, err := s.parseBlueBookInputRows(ctx, qtx, workbook, lookups, blueBook, &inputResult)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -200,8 +201,18 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 		case draft.failed():
 			addImportError(&inputResult, draft.row, strings.Join(draft.errors, "; "))
 		default:
+			isRevisionSnapshot := draft.projectIdentityID.Valid
+			identityID := draft.projectIdentityID
+			if !identityID.Valid {
+				identity, err := qtx.CreateProjectIdentity(ctx)
+				if err != nil {
+					return nil, nil, fromPg(err)
+				}
+				identityID = identity.ID
+			}
 			created, err := qtx.CreateBBProject(ctx, queries.CreateBBProjectParams{
 				BlueBookID:        blueBook.ID,
+				ProjectIdentityID: identityID,
 				ProgramTitleID:    draft.programTitleID,
 				BappenasPartnerID: draft.bappenasPartnerID,
 				BbCode:            draft.bbCode,
@@ -227,7 +238,11 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 				return nil, nil, err
 			}
 			createdIDs = append(createdIDs, model.UUIDToString(created.ID))
-			addImportCreated(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.bbCode, draft.projectName))
+			message := "Created new logical BB Project"
+			if isRevisionSnapshot {
+				message = "Created revision snapshot for existing logical BB Project"
+			}
+			addImportCreatedWithMessage(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.bbCode, draft.projectName), message)
 		}
 	}
 
@@ -265,7 +280,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 	return response, createdIDs, nil
 }
 
-func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, result *model.MasterImportSheetResult) ([]*blueBookImportProjectDraft, map[string]*blueBookImportProjectDraft, error) {
+func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, blueBook queries.GetBlueBookRow, result *model.MasterImportSheetResult) ([]*blueBookImportProjectDraft, map[string]*blueBookImportProjectDraft, error) {
 	rows, ok := workbook.importRows(blueBookImportSheetInput, []string{"program_title", "bb_code", "project_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")
@@ -304,13 +319,20 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 		seenCodes[codeKey] = struct{}{}
 		projectsByCode[codeKey] = draft
 
-		existing, err := qtx.GetBBProjectByCode(ctx, draft.bbCode)
+		existing, err := qtx.GetBBProjectByBlueBookAndCode(ctx, queries.GetBBProjectByBlueBookAndCodeParams{BlueBookID: blueBook.ID, Lower: draft.bbCode})
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, nil, apperrors.Internal("Gagal memeriksa BB Code")
 		}
 		if err == nil && existing.ID.Valid {
 			draft.skipExisting = true
 			continue
+		}
+		previous, err := qtx.FindPreviousBBProjectByCodeForBlueBook(ctx, queries.FindPreviousBBProjectByCodeForBlueBookParams{ID: blueBook.ID, Lower: draft.bbCode})
+		if err != nil && err != pgx.ErrNoRows {
+			return nil, nil, apperrors.Internal("Gagal memeriksa histori BB Code")
+		}
+		if err == nil && previous.ID.Valid {
+			draft.projectIdentityID = previous.ProjectIdentityID
 		}
 
 		if draft.projectName == "" {

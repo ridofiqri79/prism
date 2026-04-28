@@ -156,6 +156,18 @@ func (h *BlueBookHandler) DeleteBBProject(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *BlueBookHandler) GetBBProjectHistory(c echo.Context) error {
+	id, err := parseIDParam(c, "bbProjectId")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetBBProjectHistory(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[[]model.BBProjectHistoryItem]{Data: res})
+}
+
 func (h *BlueBookHandler) ImportBBProjects(c echo.Context) error {
 	return h.handleImportBBProjects(c, false)
 }

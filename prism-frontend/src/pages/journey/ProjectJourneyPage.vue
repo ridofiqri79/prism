@@ -24,10 +24,12 @@ const loading = ref(false)
 
 const bbProjectId = computed(() => String(route.params.bbProjectId ?? ''))
 const projectOptions = computed<BBProjectOption[]>(() =>
-  blueBookStore.projectOptions.map((project) => ({
-    ...project,
-    label: `${project.bb_code} - ${project.project_name}`,
-  })),
+  blueBookStore.projectOptions
+    .filter((project) => project.is_latest !== false)
+    .map((project) => ({
+      ...project,
+      label: `${project.bb_code} - ${project.project_name}`,
+    })),
 )
 
 function filterProjects(keyword: string) {

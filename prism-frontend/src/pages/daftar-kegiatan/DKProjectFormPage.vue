@@ -37,10 +37,12 @@ const form = useDKProjectForm(null, {
 })
 
 const gbProjectOptions = computed(() =>
-  greenBookStore.projectOptions.map((project) => ({
-    ...project,
-    label: `${project.gb_code} - ${project.project_name}`,
-  })),
+  greenBookStore.projectOptions
+    .filter((project) => project.is_latest !== false)
+    .map((project) => ({
+      ...project,
+      label: `${project.gb_code} - ${project.project_name}`,
+    })),
 )
 
 async function loadData() {

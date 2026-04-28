@@ -7,6 +7,7 @@ export type GBProjectStatus = 'active' | 'deleted'
 export interface GreenBook {
   id: string
   publish_year: number
+  replaces_green_book_id?: string | null
   revision_number: number
   status: GreenBookStatus
   created_at?: string
@@ -15,18 +16,24 @@ export interface GreenBook {
 
 export interface GreenBookPayload {
   publish_year: number
+  replaces_green_book_id?: string | null
   revision_number: number
 }
 
 export interface BBProjectSummary {
   id: string
+  blue_book_id?: string
+  project_identity_id?: string
   bb_code: string
   project_name: string
+  is_latest?: boolean
+  has_newer_revision?: boolean
 }
 
 export interface GBProject {
   id: string
   green_book_id?: string
+  gb_project_identity_id: string
   program_title_id?: string
   gb_code: string
   project_name: string
@@ -43,6 +50,8 @@ export interface GBProject {
   disbursement_plan: GBDisbursementPlan[]
   funding_allocations: GBFundingAllocation[]
   status: GBProjectStatus
+  is_latest: boolean
+  has_newer_revision: boolean
   created_at?: string
   updated_at?: string
 }
@@ -115,6 +124,7 @@ export interface GBFundingAllocationPayload extends GBAllocationValues {
 }
 
 export interface GBProjectPayload {
+  gb_project_identity_id?: string | null
   program_title_id: string
   gb_code: string
   project_name: string
@@ -133,5 +143,22 @@ export interface GBProjectPayload {
 
 export interface BBProjectOption extends Pick<BBProject, 'id' | 'bb_code' | 'project_name'> {
   blue_book_id?: string
+  project_identity_id?: string
+  is_latest?: boolean
+  has_newer_revision?: boolean
 }
 
+export interface GBProjectHistoryItem {
+  id: string
+  gb_project_identity_id: string
+  green_book_id: string
+  gb_code: string
+  project_name: string
+  book_label: string
+  publish_year: number
+  revision_number: number
+  book_status: GreenBookStatus
+  is_latest: boolean
+  used_by_downstream: boolean
+  bb_projects?: BBProjectSummary[]
+}

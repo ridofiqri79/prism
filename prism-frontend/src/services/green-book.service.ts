@@ -2,6 +2,7 @@ import http from '@/services/http'
 import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   GBProject,
+  GBProjectHistoryItem,
   GBProjectPayload,
   GreenBook,
   GreenBookPayload,
@@ -44,6 +45,13 @@ export const GreenBookService = {
   async getProject(greenBookId: string, id: string) {
     const response = await http.get<ApiResponse<GBProject>>(
       `/green-books/${greenBookId}/projects/${id}`,
+    )
+    return response.data.data
+  },
+
+  async getGBProjectHistory(id: string) {
+    const response = await http.get<ApiResponse<GBProjectHistoryItem[]>>(
+      `/gb-projects/${id}/history`,
     )
     return response.data.data
   },

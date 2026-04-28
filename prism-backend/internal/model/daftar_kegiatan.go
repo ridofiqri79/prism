@@ -76,9 +76,13 @@ type DKProjectResponse struct {
 }
 
 type GBProjectSummary struct {
-	ID          string `json:"id"`
-	GBCode      string `json:"gb_code"`
-	ProjectName string `json:"project_name"`
+	ID                  string `json:"id"`
+	GBProjectIdentityID string `json:"gb_project_identity_id,omitempty"`
+	GreenBookID         string `json:"green_book_id,omitempty"`
+	GBCode              string `json:"gb_code"`
+	ProjectName         string `json:"project_name"`
+	IsLatest            bool   `json:"is_latest,omitempty"`
+	HasNewerRevision    bool   `json:"has_newer_revision,omitempty"`
 }
 
 type DKFinancingDetailResponse struct {

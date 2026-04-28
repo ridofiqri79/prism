@@ -124,6 +124,12 @@ watch(
               </RouterLink>
               <span v-else class="font-semibold text-prism-green-deep">Blue Book</span>
               <Tag value="Completed" severity="success" rounded />
+              <Tag
+                v-if="bbProject.has_newer_revision"
+                value="Ada revisi lebih baru"
+                severity="warn"
+                rounded
+              />
             </div>
             <p class="mt-1 text-sm text-surface-900">
               {{ bbProject.bb_code }} - {{ bbProject.project_name }}
@@ -241,6 +247,12 @@ watch(
                         gbProject.gb_code
                       }}</span>
                       <Tag value="Completed" severity="success" rounded />
+                      <Tag
+                        v-if="gbProject.has_newer_revision"
+                        value="Ada revisi lebih baru"
+                        severity="warn"
+                        rounded
+                      />
                     </div>
                     <p class="mt-1 text-sm text-surface-900">{{ gbProject.project_name }}</p>
 

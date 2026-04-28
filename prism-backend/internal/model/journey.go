@@ -7,9 +7,12 @@ type JourneyResponse struct {
 }
 
 type JourneyBBProject struct {
-	ID          string `json:"id"`
-	BBCode      string `json:"bb_code"`
-	ProjectName string `json:"project_name"`
+	ID                string `json:"id"`
+	BlueBookID        string `json:"blue_book_id"`
+	ProjectIdentityID string `json:"project_identity_id"`
+	BBCode            string `json:"bb_code"`
+	ProjectName       string `json:"project_name"`
+	HasNewerRevision  bool   `json:"has_newer_revision"`
 }
 
 type JourneyLoI struct {
@@ -21,17 +24,27 @@ type JourneyLoI struct {
 }
 
 type JourneyGBProject struct {
-	ID          string             `json:"id"`
-	GBCode      string             `json:"gb_code"`
-	ProjectName string             `json:"project_name"`
-	Status      string             `json:"status"`
-	DKProjects  []JourneyDKProject `json:"dk_projects"`
+	ID                  string             `json:"id"`
+	GreenBookID         string             `json:"green_book_id"`
+	GBProjectIdentityID string             `json:"gb_project_identity_id"`
+	GBCode              string             `json:"gb_code"`
+	ProjectName         string             `json:"project_name"`
+	Status              string             `json:"status"`
+	HasNewerRevision    bool               `json:"has_newer_revision"`
+	DKProjects          []JourneyDKProject `json:"dk_projects"`
 }
 
 type JourneyDKProject struct {
-	ID            string                `json:"id"`
-	Objectives    *string               `json:"objectives,omitempty"`
-	LoanAgreement *JourneyLoanAgreement `json:"loan_agreement"`
+	ID             string                `json:"id"`
+	Objectives     *string               `json:"objectives,omitempty"`
+	DaftarKegiatan *JourneyDKHeader      `json:"daftar_kegiatan,omitempty"`
+	LoanAgreement  *JourneyLoanAgreement `json:"loan_agreement"`
+}
+
+type JourneyDKHeader struct {
+	ID      string `json:"id"`
+	Subject string `json:"subject"`
+	Date    string `json:"date"`
 }
 
 type JourneyLoanAgreement struct {

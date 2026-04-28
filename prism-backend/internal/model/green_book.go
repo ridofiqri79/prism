@@ -1,20 +1,23 @@
 package model
 
 type GreenBookRequest struct {
-	PublishYear    int32 `json:"publish_year" validate:"required"`
-	RevisionNumber int32 `json:"revision_number"`
+	PublishYear         int32   `json:"publish_year" validate:"required"`
+	ReplacesGreenBookID *string `json:"replaces_green_book_id"`
+	RevisionNumber      int32   `json:"revision_number"`
 }
 
 type GreenBookResponse struct {
-	ID             string `json:"id"`
-	PublishYear    int32  `json:"publish_year"`
-	RevisionNumber int32  `json:"revision_number"`
-	Status         string `json:"status"`
-	CreatedAt      string `json:"created_at,omitempty"`
-	UpdatedAt      string `json:"updated_at,omitempty"`
+	ID                  string  `json:"id"`
+	PublishYear         int32   `json:"publish_year"`
+	ReplacesGreenBookID *string `json:"replaces_green_book_id,omitempty"`
+	RevisionNumber      int32   `json:"revision_number"`
+	Status              string  `json:"status"`
+	CreatedAt           string  `json:"created_at,omitempty"`
+	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
 
 type CreateGBProjectRequest struct {
+	GBProjectIdentityID   *string                   `json:"gb_project_identity_id"`
 	ProgramTitleID        *string                   `json:"program_title_id"`
 	GBCode                string                    `json:"gb_code" validate:"required"`
 	ProjectName           string                    `json:"project_name" validate:"required"`
@@ -65,6 +68,7 @@ type GBFundingAllocationItem struct {
 type GBProjectResponse struct {
 	ID                   string                        `json:"id"`
 	GreenBookID          string                        `json:"green_book_id"`
+	GBProjectIdentityID  string                        `json:"gb_project_identity_id"`
 	ProgramTitleID       *string                       `json:"program_title_id,omitempty"`
 	GBCode               string                        `json:"gb_code"`
 	ProjectName          string                        `json:"project_name"`
@@ -80,14 +84,35 @@ type GBProjectResponse struct {
 	DisbursementPlan     []GBDisbursementPlanResponse  `json:"disbursement_plan"`
 	FundingAllocations   []GBFundingAllocationResponse `json:"funding_allocations"`
 	Status               string                        `json:"status"`
+	IsLatest             bool                          `json:"is_latest"`
+	HasNewerRevision     bool                          `json:"has_newer_revision"`
 	CreatedAt            string                        `json:"created_at,omitempty"`
 	UpdatedAt            string                        `json:"updated_at,omitempty"`
 }
 
 type BBProjectSummary struct {
-	ID          string `json:"id"`
-	BBCode      string `json:"bb_code"`
-	ProjectName string `json:"project_name"`
+	ID                string `json:"id"`
+	BlueBookID        string `json:"blue_book_id,omitempty"`
+	ProjectIdentityID string `json:"project_identity_id,omitempty"`
+	BBCode            string `json:"bb_code"`
+	ProjectName       string `json:"project_name"`
+	IsLatest          bool   `json:"is_latest,omitempty"`
+	HasNewerRevision  bool   `json:"has_newer_revision,omitempty"`
+}
+
+type GBProjectHistoryItem struct {
+	ID                  string             `json:"id"`
+	GBProjectIdentityID string             `json:"gb_project_identity_id"`
+	GreenBookID         string             `json:"green_book_id"`
+	GBCode              string             `json:"gb_code"`
+	ProjectName         string             `json:"project_name"`
+	BookLabel           string             `json:"book_label"`
+	PublishYear         int32              `json:"publish_year"`
+	RevisionNumber      int32              `json:"revision_number"`
+	BookStatus          string             `json:"book_status"`
+	IsLatest            bool               `json:"is_latest"`
+	UsedByDownstream    bool               `json:"used_by_downstream"`
+	BBProjects          []BBProjectSummary `json:"bb_projects,omitempty"`
 }
 
 type GBActivityResponse struct {

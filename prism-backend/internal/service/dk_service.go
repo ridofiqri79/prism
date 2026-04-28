@@ -230,7 +230,11 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 		if err != nil {
 			return validation("gb_project_ids", "UUID tidak valid")
 		}
-		if err := qtx.AddDKProjectGBProject(ctx, queries.AddDKProjectGBProjectParams{DkProjectID: projectID, GbProjectID: gbProjectID}); err != nil {
+		latestGB, err := qtx.ResolveLatestGBProjectForDK(ctx, gbProjectID)
+		if err != nil {
+			return mapNotFound(err, "GB Project tidak ditemukan")
+		}
+		if err := qtx.AddDKProjectGBProject(ctx, queries.AddDKProjectGBProjectParams{DkProjectID: projectID, GbProjectID: latestGB.ID}); err != nil {
 			return err
 		}
 	}
@@ -342,7 +346,19 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		UpdatedAt:        formatMasterTime(row.UpdatedAt),
 	}
 	for _, item := range gbProjects {
-		res.GBProjects = append(res.GBProjects, model.GBProjectSummary{ID: model.UUIDToString(item.ID), GBCode: item.GbCode, ProjectName: item.ProjectName})
+		summary := model.GBProjectSummary{
+			ID:                  model.UUIDToString(item.ID),
+			GBProjectIdentityID: model.UUIDToString(item.GbProjectIdentityID),
+			GreenBookID:         model.UUIDToString(item.GreenBookID),
+			GBCode:              item.GbCode,
+			ProjectName:         item.ProjectName,
+		}
+		latest, err := s.queries.GetLatestGBProjectByIdentity(ctx, item.GbProjectIdentityID)
+		if err == nil {
+			summary.IsLatest = model.UUIDToString(latest.ID) == summary.ID
+			summary.HasNewerRevision = !summary.IsLatest
+		}
+		res.GBProjects = append(res.GBProjects, summary)
 	}
 	for _, item := range locations {
 		res.Locations = append(res.Locations, toRegionResponse(item))

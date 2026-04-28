@@ -156,6 +156,18 @@ func (h *GreenBookHandler) DeleteGBProject(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *GreenBookHandler) GetGBProjectHistory(c echo.Context) error {
+	id, err := parseIDParam(c, "gbProjectId")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetGBProjectHistory(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[[]model.GBProjectHistoryItem]{Data: res})
+}
+
 func (h *GreenBookHandler) ImportGBProjects(c echo.Context) error {
 	return h.handleImportGBProjects(c, false)
 }

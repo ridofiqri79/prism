@@ -41,6 +41,7 @@ func projectMasterFilter(c echo.Context) model.ProjectMasterFilter {
 		DKDateFrom:          queryStringPtr(c, "dk_date_from"),
 		DKDateTo:            queryStringPtr(c, "dk_date_to"),
 		Search:              queryStringPtr(c, "search"),
+		IncludeHistory:      strings.EqualFold(c.QueryParam("include_history"), "true"),
 	}
 }
 

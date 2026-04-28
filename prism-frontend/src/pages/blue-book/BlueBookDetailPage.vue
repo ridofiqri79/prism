@@ -16,7 +16,7 @@ import { blueBookSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { BBProject, BlueBookPayload } from '@/types/blue-book.types'
-import { formatRevision, joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type BlueBookField = keyof BlueBookPayload
 

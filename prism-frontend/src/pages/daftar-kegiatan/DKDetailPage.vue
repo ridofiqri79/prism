@@ -6,11 +6,12 @@ import AccordionContent from 'primevue/accordioncontent'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionPanel from 'primevue/accordionpanel'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
-import type { DKProject } from '@/types/daftar-kegiatan.types'
+import type { DKProject, GBProjectSummary } from '@/types/daftar-kegiatan.types'
 import { formatDate, joinNames } from './daftar-kegiatan-page-utils'
 
 const route = useRoute()
@@ -25,6 +26,12 @@ async function loadData() {
     dkStore.fetchDK(dkId.value),
     dkStore.fetchProjects(dkId.value, { limit: 1000 }),
   ])
+}
+
+function gbProjectRoute(project: GBProjectSummary) {
+  return project.green_book_id
+    ? { name: 'gb-project-detail', params: { gbId: project.green_book_id, id: project.id } }
+    : { name: 'green-books' }
 }
 
 onMounted(() => {
@@ -92,6 +99,27 @@ onMounted(() => {
               <div class="md:col-span-2">
                 <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>
                 <p class="text-surface-800">{{ project.objectives || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h3 class="font-semibold text-surface-950">GB Project Snapshot yang Dipakai</h3>
+              <div class="flex flex-wrap gap-2">
+                <RouterLink
+                  v-for="gbProject in project.gb_projects"
+                  :key="gbProject.id"
+                  :to="gbProjectRoute(gbProject)"
+                  class="inline-flex items-center gap-2 rounded-full border border-surface-200 px-3 py-1.5 text-sm font-medium text-primary"
+                >
+                  <span>{{ gbProject.gb_code }} - {{ gbProject.project_name }}</span>
+                  <Tag
+                    v-if="gbProject.has_newer_revision"
+                    value="Ada revisi lebih baru"
+                    severity="warn"
+                    rounded
+                  />
+                  <Tag v-else-if="gbProject.is_latest" value="Latest" severity="success" rounded />
+                </RouterLink>
               </div>
             </div>
 

@@ -36,6 +36,7 @@ type greenBookImportProjectDraft struct {
 	duration              *string
 	objective             *string
 	scopeOfProject        *string
+	gbProjectIdentityID   pgtype.UUID
 	bbProjectIDs          []string
 	executingAgencyIDs    []string
 	implementingAgencyIDs []string
@@ -171,7 +172,7 @@ func (s *GreenBookService) processGreenBookProjectsWorkbook(ctx context.Context,
 
 func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, fileName string) (*model.MasterImportResponse, []string, error) {
 	inputResult := model.MasterImportSheetResult{Sheet: greenBookImportSheetInput}
-	projects, projectsByCode, err := s.parseGreenBookInputRows(ctx, qtx, workbook, lookups, &inputResult)
+	projects, projectsByCode, err := s.parseGreenBookInputRows(ctx, qtx, workbook, lookups, greenBook, &inputResult)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -223,14 +224,24 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 		case draft.failed():
 			addImportError(&inputResult, draft.row, strings.Join(draft.errors, "; "))
 		default:
+			isRevisionSnapshot := draft.gbProjectIdentityID.Valid
+			identityID := draft.gbProjectIdentityID
+			if !identityID.Valid {
+				identity, err := qtx.CreateGBProjectIdentity(ctx)
+				if err != nil {
+					return nil, nil, fromPg(err)
+				}
+				identityID = identity.ID
+			}
 			created, err := qtx.CreateGBProject(ctx, queries.CreateGBProjectParams{
-				GreenBookID:    greenBook.ID,
-				ProgramTitleID: draft.programTitleID,
-				GbCode:         draft.gbCode,
-				ProjectName:    draft.projectName,
-				Duration:       nullableTextPtr(draft.duration),
-				Objective:      nullableTextPtr(draft.objective),
-				ScopeOfProject: nullableTextPtr(draft.scopeOfProject),
+				GreenBookID:         greenBook.ID,
+				GbProjectIdentityID: identityID,
+				ProgramTitleID:      draft.programTitleID,
+				GbCode:              draft.gbCode,
+				ProjectName:         draft.projectName,
+				Duration:            nullableTextPtr(draft.duration),
+				Objective:           nullableTextPtr(draft.objective),
+				ScopeOfProject:      nullableTextPtr(draft.scopeOfProject),
 			})
 			if err != nil {
 				return nil, nil, fromPg(err)
@@ -249,7 +260,11 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 				return nil, nil, err
 			}
 			createdIDs = append(createdIDs, model.UUIDToString(created.ID))
-			addImportCreated(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.gbCode, draft.projectName))
+			message := "Created new logical GB Project"
+			if isRevisionSnapshot {
+				message = "Created revision snapshot for existing logical GB Project"
+			}
+			addImportCreatedWithMessage(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.gbCode, draft.projectName), message)
 		}
 	}
 
@@ -289,7 +304,7 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 	return response, createdIDs, nil
 }
 
-func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
+func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
 	rows, ok := workbook.importRows(greenBookImportSheetInput, []string{"program_title", "gb_code", "project_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")
@@ -329,13 +344,20 @@ func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *que
 		seenCodes[codeKey] = struct{}{}
 		projectsByCode[codeKey] = draft
 
-		existing, err := qtx.GetGBProjectByCode(ctx, draft.gbCode)
+		existing, err := qtx.GetGBProjectByGreenBookAndCode(ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: greenBook.ID, Lower: draft.gbCode})
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, nil, apperrors.Internal("Gagal memeriksa GB Code")
 		}
 		if err == nil && existing.ID.Valid {
 			draft.skipExisting = true
 			continue
+		}
+		previous, err := qtx.FindPreviousGBProjectByCodeForGreenBook(ctx, queries.FindPreviousGBProjectByCodeForGreenBookParams{ID: greenBook.ID, Lower: draft.gbCode})
+		if err != nil && err != pgx.ErrNoRows {
+			return nil, nil, apperrors.Internal("Gagal memeriksa histori GB Code")
+		}
+		if err == nil && previous.ID.Valid {
+			draft.gbProjectIdentityID = previous.GbProjectIdentityID
 		}
 
 		if draft.projectName == "" {

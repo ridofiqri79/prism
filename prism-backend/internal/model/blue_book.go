@@ -1,10 +1,11 @@
 package model
 
 type BlueBookRequest struct {
-	PeriodID       string `json:"period_id" validate:"required"`
-	PublishDate    string `json:"publish_date" validate:"required"`
-	RevisionNumber int32  `json:"revision_number"`
-	RevisionYear   *int32 `json:"revision_year"`
+	PeriodID           string  `json:"period_id" validate:"required"`
+	ReplacesBlueBookID *string `json:"replaces_blue_book_id"`
+	PublishDate        string  `json:"publish_date" validate:"required"`
+	RevisionNumber     int32   `json:"revision_number"`
+	RevisionYear       *int32  `json:"revision_year"`
 }
 
 type PeriodInfo struct {
@@ -15,17 +16,19 @@ type PeriodInfo struct {
 }
 
 type BlueBookResponse struct {
-	ID             string     `json:"id"`
-	Period         PeriodInfo `json:"period"`
-	PublishDate    string     `json:"publish_date"`
-	RevisionNumber int32      `json:"revision_number"`
-	RevisionYear   *int32     `json:"revision_year"`
-	Status         string     `json:"status"`
-	CreatedAt      string     `json:"created_at,omitempty"`
-	UpdatedAt      string     `json:"updated_at,omitempty"`
+	ID                 string     `json:"id"`
+	Period             PeriodInfo `json:"period"`
+	ReplacesBlueBookID *string    `json:"replaces_blue_book_id,omitempty"`
+	PublishDate        string     `json:"publish_date"`
+	RevisionNumber     int32      `json:"revision_number"`
+	RevisionYear       *int32     `json:"revision_year"`
+	Status             string     `json:"status"`
+	CreatedAt          string     `json:"created_at,omitempty"`
+	UpdatedAt          string     `json:"updated_at,omitempty"`
 }
 
 type CreateBBProjectRequest struct {
+	ProjectIdentityID     *string                `json:"project_identity_id"`
 	ProgramTitleID        *string                `json:"program_title_id"`
 	BappenasPartnerID     *string                `json:"bappenas_partner_id"`
 	BBCode                string                 `json:"bb_code" validate:"required"`
@@ -59,6 +62,7 @@ type LenderIndicationItem struct {
 type BBProjectResponse struct {
 	ID                   string                     `json:"id"`
 	BlueBookID           string                     `json:"blue_book_id"`
+	ProjectIdentityID    string                     `json:"project_identity_id"`
 	ProgramTitleID       *string                    `json:"program_title_id,omitempty"`
 	BappenasPartnerID    *string                    `json:"bappenas_partner_id,omitempty"`
 	BBCode               string                     `json:"bb_code"`
@@ -75,8 +79,24 @@ type BBProjectResponse struct {
 	ProjectCosts         []ProjectCostResponse      `json:"project_costs"`
 	LenderIndications    []LenderIndicationResponse `json:"lender_indications"`
 	Status               string                     `json:"status"`
+	IsLatest             bool                       `json:"is_latest"`
+	HasNewerRevision     bool                       `json:"has_newer_revision"`
 	CreatedAt            string                     `json:"created_at,omitempty"`
 	UpdatedAt            string                     `json:"updated_at,omitempty"`
+}
+
+type BBProjectHistoryItem struct {
+	ID                string `json:"id"`
+	ProjectIdentityID string `json:"project_identity_id"`
+	BlueBookID        string `json:"blue_book_id"`
+	BBCode            string `json:"bb_code"`
+	ProjectName       string `json:"project_name"`
+	BookLabel         string `json:"book_label"`
+	RevisionNumber    int32  `json:"revision_number"`
+	RevisionYear      *int32 `json:"revision_year"`
+	BookStatus        string `json:"book_status"`
+	IsLatest          bool   `json:"is_latest"`
+	UsedByDownstream  bool   `json:"used_by_downstream"`
 }
 
 type ProjectCostResponse struct {

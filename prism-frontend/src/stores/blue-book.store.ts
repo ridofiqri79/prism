@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { BlueBookService } from '@/services/blue-book.service'
 import type {
   BBProject,
+  BBProjectHistoryItem,
   BBProjectPayload,
   BlueBook,
   BlueBookPayload,
@@ -17,8 +18,10 @@ export const useBlueBookStore = defineStore('blueBook', () => {
   const projects = ref<BBProject[]>([])
   const projectOptions = ref<BBProject[]>([])
   const currentProject = ref<BBProject | null>(null)
+  const projectHistory = ref<BBProjectHistoryItem[]>([])
   const lois = ref<LoI[]>([])
   const loading = ref(false)
+  const historyLoading = ref(false)
   const templateDownloading = ref(false)
   const importPreviewing = ref(false)
   const importExecuting = ref(false)
@@ -89,6 +92,16 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     })
   }
 
+  async function fetchProjectHistory(id: string) {
+    historyLoading.value = true
+    try {
+      projectHistory.value = await BlueBookService.getBBProjectHistory(id)
+      return projectHistory.value
+    } finally {
+      historyLoading.value = false
+    }
+  }
+
   async function createProject(blueBookId: string, data: BBProjectPayload) {
     return BlueBookService.createProject(blueBookId, data)
   }
@@ -157,8 +170,10 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     projects.value = []
     projectOptions.value = []
     currentProject.value = null
+    projectHistory.value = []
     lois.value = []
     loading.value = false
+    historyLoading.value = false
     templateDownloading.value = false
     importPreviewing.value = false
     importExecuting.value = false
@@ -172,8 +187,10 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     projects,
     projectOptions,
     currentProject,
+    projectHistory,
     lois,
     loading,
+    historyLoading,
     templateDownloading,
     importPreviewing,
     importExecuting,
@@ -187,6 +204,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     fetchProjects,
     fetchProjectOptions,
     fetchProject,
+    fetchProjectHistory,
     createProject,
     updateProject,
     deleteProject,

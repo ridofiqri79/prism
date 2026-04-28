@@ -13,7 +13,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { LoanAgreement } from '@/types/loan-agreement.types'
-import { formatDate, parseDateModel, toDateString } from './loan-agreement-page-utils'
+import { formatDate, toDateString } from './loan-agreement-page-utils'
 
 const loanAgreementStore = useLoanAgreementStore()
 const masterStore = useMasterStore()
