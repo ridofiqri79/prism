@@ -42,6 +42,13 @@ type importRow struct {
 	values map[string]string
 }
 
+type masterImportLenderRef struct {
+	ID        pgtype.UUID
+	Name      string
+	Type      string
+	ShortName pgtype.Text
+}
+
 type workbookXML struct {
 	Sheets []workbookSheetXML `xml:"sheets>sheet"`
 }
@@ -97,14 +104,16 @@ type inlineStringXML struct {
 type masterImportLookups struct {
 	countriesByCode        map[string]queries.Country
 	countriesByName        map[string]queries.Country
-	lendersByName          map[string]struct{}
+	lendersByName          map[string]masterImportLenderRef
 	institutionsByName     map[string]queries.Institution
 	regionsByCode          map[string]queries.Region
+	regionsByName          map[string]queries.Region
 	programTitlesByTitle   map[string]queries.ProgramTitle
 	bappenasPartnersByName map[string]queries.BappenasPartner
 	periodsByName          map[string]queries.Period
 	periodsByYears         map[string]queries.Period
 	nationalPriorityKeys   map[string]struct{}
+	nationalPriorities     map[string]queries.ListNationalPrioritiesRow
 }
 
 func (s *MasterService) ImportMasterData(ctx context.Context, fileName string, reader io.Reader, size int64) (*model.MasterImportResponse, error) {
@@ -195,14 +204,16 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	lookups := &masterImportLookups{
 		countriesByCode:        map[string]queries.Country{},
 		countriesByName:        map[string]queries.Country{},
-		lendersByName:          map[string]struct{}{},
+		lendersByName:          map[string]masterImportLenderRef{},
 		institutionsByName:     map[string]queries.Institution{},
 		regionsByCode:          map[string]queries.Region{},
+		regionsByName:          map[string]queries.Region{},
 		programTitlesByTitle:   map[string]queries.ProgramTitle{},
 		bappenasPartnersByName: map[string]queries.BappenasPartner{},
 		periodsByName:          map[string]queries.Period{},
 		periodsByYears:         map[string]queries.Period{},
 		nationalPriorityKeys:   map[string]struct{}{},
+		nationalPriorities:     map[string]queries.ListNationalPrioritiesRow{},
 	}
 
 	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
@@ -218,7 +229,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		return nil, apperrors.Internal("Gagal membaca referensi lender")
 	}
 	for _, lender := range lenders {
-		lookups.lendersByName[normalizeLookupKey(lender.Name)] = struct{}{}
+		lookups.addLender(lender.ID, lender.Name, lender.Type, lender.ShortName)
 	}
 
 	institutions, err := qtx.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilter: pgtype.Text{}, ParentIDFilter: pgtype.UUID{}})
@@ -267,6 +278,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	}
 	for _, priority := range priorities {
 		lookups.nationalPriorityKeys[nationalPriorityKey(model.UUIDToString(priority.PeriodID), priority.Title)] = struct{}{}
+		lookups.nationalPriorities[nationalPriorityKey(model.UUIDToString(priority.PeriodID), priority.Title)] = priority
 	}
 
 	return lookups, nil
@@ -652,7 +664,7 @@ func (s *MasterService) importLenders(ctx context.Context, qtx *queries.Queries,
 		if err != nil {
 			return result, fromPg(err)
 		}
-		lookups.lendersByName[normalizeLookupKey(created.Name)] = struct{}{}
+		lookups.addLender(created.ID, created.Name, created.Type, created.ShortName)
 		addImportCreated(&result, row.number, fmt.Sprintf("%s (%s)", created.Name, created.Type))
 	}
 
@@ -1105,6 +1117,7 @@ func (l *masterImportLookups) addInstitution(institution queries.Institution) {
 
 func (l *masterImportLookups) addRegion(region queries.Region) {
 	l.regionsByCode[strings.ToUpper(region.Code)] = region
+	l.regionsByName[normalizeLookupKey(region.Name)] = region
 }
 
 func (l *masterImportLookups) addProgramTitle(programTitle queries.ProgramTitle) {
@@ -1151,6 +1164,28 @@ func (l *masterImportLookups) countryByNameOrCode(value string) (queries.Country
 	}
 	country, exists := l.countriesByCode[strings.ToUpper(strings.TrimSpace(value))]
 	return country, exists
+}
+
+func (l *masterImportLookups) addLender(id pgtype.UUID, name, lenderType string, shortName pgtype.Text) {
+	l.lendersByName[normalizeLookupKey(name)] = masterImportLenderRef{
+		ID:        id,
+		Name:      name,
+		Type:      lenderType,
+		ShortName: shortName,
+	}
+}
+
+func (l *masterImportLookups) regionByNameOrCode(value string) (queries.Region, bool) {
+	if region, exists := l.regionsByCode[strings.ToUpper(strings.TrimSpace(value))]; exists {
+		return region, true
+	}
+	region, exists := l.regionsByName[normalizeLookupKey(value)]
+	return region, exists
+}
+
+func (l *masterImportLookups) nationalPriorityByPeriodAndTitle(periodID pgtype.UUID, title string) (queries.ListNationalPrioritiesRow, bool) {
+	priority, exists := l.nationalPriorities[nationalPriorityKey(model.UUIDToString(periodID), title)]
+	return priority, exists
 }
 
 func parsePeriodLabelYear(value string) (int, error) {

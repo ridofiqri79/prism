@@ -58,6 +58,14 @@ async function deleteItem(endpoint: string, id: string) {
 }
 
 export const MasterService = {
+  async downloadImportTemplate() {
+    const response = await http.get<Blob>('/master/import-data/template', {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
   async previewImportData(file: File) {
     const formData = new FormData()
     formData.append('file', file)

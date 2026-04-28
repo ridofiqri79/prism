@@ -9,7 +9,7 @@ import type {
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const useBlueBookStore = defineStore('blueBook', () => {
   const blueBooks = ref<BlueBook[]>([])
@@ -19,6 +19,9 @@ export const useBlueBookStore = defineStore('blueBook', () => {
   const currentProject = ref<BBProject | null>(null)
   const lois = ref<LoI[]>([])
   const loading = ref(false)
+  const templateDownloading = ref(false)
+  const importPreviewing = ref(false)
+  const importExecuting = ref(false)
   const total = ref(0)
   const projectTotal = ref(0)
 
@@ -100,6 +103,38 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     await BlueBookService.deleteProject(blueBookId, id)
   }
 
+  async function downloadProjectImportTemplate(blueBookId: string): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await BlueBookService.downloadImportTemplate(blueBookId)
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
+  async function previewProjectImport(
+    blueBookId: string,
+    file: File,
+  ): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await BlueBookService.previewImportProjects(blueBookId, file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
+  async function importProjects(blueBookId: string, file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await BlueBookService.executeImportProjects(blueBookId, file)
+      projectOptions.value = []
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
   async function fetchLoI(projectId: string) {
     lois.value = await BlueBookService.getLoI(projectId)
     return lois.value
@@ -124,6 +159,9 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     currentProject.value = null
     lois.value = []
     loading.value = false
+    templateDownloading.value = false
+    importPreviewing.value = false
+    importExecuting.value = false
     total.value = 0
     projectTotal.value = 0
   }
@@ -136,6 +174,9 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     currentProject,
     lois,
     loading,
+    templateDownloading,
+    importPreviewing,
+    importExecuting,
     total,
     projectTotal,
     fetchBlueBooks,
@@ -149,6 +190,9 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     createProject,
     updateProject,
     deleteProject,
+    downloadProjectImportTemplate,
+    previewProjectImport,
+    importProjects,
     fetchLoI,
     createLoI,
     deleteLoI,

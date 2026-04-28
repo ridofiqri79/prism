@@ -42,6 +42,7 @@ export const useMasterStore = defineStore('master', () => {
   const periods = ref<Period[]>([])
   const nationalPriorities = ref<NationalPriority[]>([])
   const loaded = ref<Record<string, boolean>>({})
+  const downloadingTemplate = ref(false)
   const previewing = ref(false)
   const importing = ref(false)
 
@@ -131,6 +132,15 @@ export const useMasterStore = defineStore('master', () => {
       return await MasterService.previewImportData(file)
     } finally {
       previewing.value = false
+    }
+  }
+
+  async function downloadImportTemplate(): Promise<Blob> {
+    downloadingTemplate.value = true
+    try {
+      return await MasterService.downloadImportTemplate()
+    } finally {
+      downloadingTemplate.value = false
     }
   }
 
@@ -280,6 +290,7 @@ export const useMasterStore = defineStore('master', () => {
     periods.value = []
     nationalPriorities.value = []
     loaded.value = {}
+    downloadingTemplate.value = false
     previewing.value = false
     importing.value = false
   }
@@ -294,6 +305,7 @@ export const useMasterStore = defineStore('master', () => {
     periods,
     nationalPriorities,
     loaded,
+    downloadingTemplate,
     previewing,
     importing,
     fetchCountries,
@@ -304,6 +316,7 @@ export const useMasterStore = defineStore('master', () => {
     fetchBappenasPartners,
     fetchPeriods,
     fetchNationalPriorities,
+    downloadImportTemplate,
     previewMasterData,
     importMasterData,
     createCountry,

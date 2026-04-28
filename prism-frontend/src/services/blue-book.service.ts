@@ -8,7 +8,7 @@ import type {
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const BlueBookService = {
   async getBlueBooks(params?: ListParams) {
@@ -70,6 +70,38 @@ export const BlueBookService = {
     await http.delete(`/blue-books/${blueBookId}/projects/${id}`)
   },
 
+  async downloadImportTemplate(blueBookId: string) {
+    const response = await http.get<Blob>(`/blue-books/${blueBookId}/import-projects/template`, {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
+  async previewImportProjects(blueBookId: string, file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      `/blue-books/${blueBookId}/import-projects/preview`,
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeImportProjects(blueBookId: string, file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      `/blue-books/${blueBookId}/import-projects/execute`,
+      formData,
+    )
+
+    return response.data.data
+  },
+
   async getLoI(projectId: string) {
     const response = await http.get<ApiResponse<LoI[]>>(`/bb-projects/${projectId}/loi`)
     return response.data.data
@@ -84,4 +116,3 @@ export const BlueBookService = {
     await http.delete(`/bb-projects/${projectId}/loi/${id}`)
   },
 }
-

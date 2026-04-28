@@ -145,6 +145,7 @@ func main() {
 	master.POST("/national-priorities", masterHandler.CreateNationalPriority, middleware.Require("national_priority", "create"))
 	master.PUT("/national-priorities/:id", masterHandler.UpdateNationalPriority, middleware.Require("national_priority", "update"))
 	master.DELETE("/national-priorities/:id", masterHandler.DeleteNationalPriority, middleware.Require("national_priority", "delete"))
+	master.GET("/import-data/template", masterHandler.DownloadImportTemplate, middleware.RequireAdmin())
 	master.POST("/import-data/preview", masterHandler.PreviewImportData, middleware.RequireAdmin())
 	master.POST("/import-data/execute", masterHandler.ImportData, middleware.RequireAdmin())
 	master.POST("/import-data", masterHandler.ImportData, middleware.RequireAdmin())
@@ -161,6 +162,9 @@ func main() {
 	blueBooks.GET("/:bbId/projects/:id", blueBookHandler.GetBBProject, middleware.Require("bb_project", "read"))
 	blueBooks.PUT("/:bbId/projects/:id", blueBookHandler.UpdateBBProject, middleware.Require("bb_project", "update"))
 	blueBooks.DELETE("/:bbId/projects/:id", blueBookHandler.DeleteBBProject, middleware.Require("bb_project", "delete"))
+	blueBooks.POST("/:bbId/import-projects/preview", blueBookHandler.PreviewImportBBProjects, middleware.RequireAdmin())
+	blueBooks.POST("/:bbId/import-projects/execute", blueBookHandler.ImportBBProjects, middleware.RequireAdmin())
+	blueBooks.GET("/:bbId/import-projects/template", blueBookHandler.DownloadBBProjectImportTemplate, middleware.RequireAdmin())
 
 	loi := api.Group("/bb-projects/:bbProjectId/loi")
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))

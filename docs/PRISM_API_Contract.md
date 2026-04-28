@@ -139,6 +139,7 @@ Response meta:
 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
+| `GET` | `/master/import-data/template` | ADMIN only |
 | `POST` | `/master/import-data/preview` | ADMIN only |
 | `POST` | `/master/import-data/execute` | ADMIN only |
 
@@ -149,6 +150,9 @@ Response meta:
 | Field | Keterangan |
 |-------|------------|
 | `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, dan `Lenders` |
+
+**Template:**
+`GET /master/import-data/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, header sheet import, dropdown Excel untuk kolom yang punya pilihan master data, dan sheet `Master Data Snapshot` berisi data master yang ada di database saat template dibuat. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown. Response memakai `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dan `Content-Disposition: attachment`.
 
 **Preview:**
 `POST /master/import-data/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -424,6 +428,52 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
   }
 }
 ```
+
+---
+
+### Import Blue Book Projects
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/blue-books/:bb_id/import-projects/template` | ADMIN only |
+| `POST` | `/blue-books/:bb_id/import-projects/preview` | ADMIN only |
+| `POST` | `/blue-books/:bb_id/import-projects/execute` | ADMIN only |
+
+**Content-Type:** `multipart/form-data`
+
+**Form field:**
+
+| Field | Keterangan |
+|-------|------------|
+| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - National Priority`, `Relasi - Project Cost`, dan `Relasi - Lender Indication` |
+
+Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Code (*)` sebagai kunci penghubung ke sheet `Input Data`.
+
+**Template:**
+`GET /blue-books/:bb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, `Master Data`, `Input Data`, dan semua sheet relasi. Kolom relasi memiliki dropdown Excel dari master data dan BB Code pada sheet relasi memiliki dropdown dari `Input Data`. Sheet `Master Data` berisi snapshot master data saat template dibuat; national priority difilter ke period milik Blue Book target. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown.
+
+**Kolom utama workbook:**
+
+| Sheet | Kolom |
+|-------|-------|
+| `Input Data` | `Program Title (*)`, `Bappenas Partner`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
+| `Relasi - EA` | `BB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `BB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `BB Code (*)`, `Location Name (*)` |
+| `Relasi - National Priority` | `BB Code (*)`, `National Priority Name (*)` |
+| `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
+| `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
+
+**Preview:**
+`POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+**Execute:**
+`POST /blue-books/:bb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+
+**Response `200`:**
+Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
+
+Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap period milik Blue Book target.
 
 ---
 

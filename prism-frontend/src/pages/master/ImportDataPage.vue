@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useToast } from '@/composables/useToast'
-import { masterImportFileSchema } from '@/schemas/master.schema'
+import { blueBookImportFileSchema, masterImportFileSchema } from '@/schemas/master.schema'
+import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { ApiErrorResponse } from '@/types/api.types'
+import type { BlueBook } from '@/types/blue-book.types'
 import type {
   MasterImportRowResult,
   MasterImportRowStatus,
@@ -18,7 +21,10 @@ import type {
 } from '@/types/master.types'
 
 type ImportStatusFilter = MasterImportRowStatus | 'all'
+type ImportKind = 'master' | 'blue_book'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
+type ParsedImportInput = { file: File; blueBookId?: string }
+type ImportKindOption = { value: ImportKind; label: string; description: string }
 
 interface ImportPageEvent {
   page: number
@@ -26,9 +32,12 @@ interface ImportPageEvent {
 }
 
 const masterStore = useMasterStore()
+const blueBookStore = useBlueBookStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const activeImportKind = ref<ImportKind>('master')
+const selectedBlueBookId = ref<string | null>(null)
 const selectedFile = ref<File | null>(null)
 const summary = ref<MasterImportSummary | null>(null)
 const executed = ref(false)
@@ -38,7 +47,20 @@ const activeSheetFilter = ref('all')
 const previewPage = ref(1)
 const previewRowsPerPage = ref(10)
 
-const workbookSheets = [
+const importKindOptions: ImportKindOption[] = [
+  {
+    value: 'master',
+    label: 'Master Data',
+    description: 'Program title, instansi, wilayah, periode, prioritas, lender',
+  },
+  {
+    value: 'blue_book',
+    label: 'Blue Book',
+    description: 'Proyek Blue Book beserta EA, IA, lokasi, cost, dan lender indication',
+  },
+]
+
+const masterWorkbookSheets = [
   'Program Titles',
   'Bappenas Partners',
   'Institutions',
@@ -47,6 +69,53 @@ const workbookSheets = [
   'National Priorities',
   'Lenders',
 ]
+
+const blueBookWorkbookSheets = [
+  'Input Data',
+  'Relasi - EA',
+  'Relasi - IA',
+  'Relasi - Locations',
+  'Relasi - National Priority',
+  'Relasi - Project Cost',
+  'Relasi - Lender Indication',
+]
+
+const workbookSheets = computed(() =>
+  activeImportKind.value === 'master' ? masterWorkbookSheets : blueBookWorkbookSheets,
+)
+
+const blueBookOptions = computed(() =>
+  blueBookStore.blueBooks.map((blueBook) => ({
+    id: blueBook.id,
+    label: blueBookOptionLabel(blueBook),
+  })),
+)
+
+const selectedImportKind = computed<ImportKindOption>(
+  () =>
+    importKindOptions.find((item) => item.value === activeImportKind.value) ??
+    (importKindOptions[0] as ImportKindOption),
+)
+
+const importBusy = computed(() =>
+  activeImportKind.value === 'master'
+    ? masterStore.previewing || masterStore.importing
+    : blueBookStore.importPreviewing || blueBookStore.importExecuting,
+)
+
+const previewLoading = computed(() =>
+  activeImportKind.value === 'master' ? masterStore.previewing : blueBookStore.importPreviewing,
+)
+
+const executeLoading = computed(() =>
+  activeImportKind.value === 'master' ? masterStore.importing : blueBookStore.importExecuting,
+)
+
+const templateLoading = computed(() =>
+  activeImportKind.value === 'master'
+    ? masterStore.downloadingTemplate
+    : blueBookStore.templateDownloading,
+)
 
 const selectedFileMeta = computed(() => {
   if (!selectedFile.value) return ''
@@ -115,6 +184,20 @@ watch([activeRowStatus, activeSheetFilter], () => {
   resetPreviewPagination()
 })
 
+watch(activeImportKind, () => {
+  clearFile()
+})
+
+watch(selectedBlueBookId, () => {
+  if (activeImportKind.value === 'blue_book') {
+    clearPreviewResult()
+  }
+})
+
+onMounted(() => {
+  void blueBookStore.fetchBlueBooks({ limit: 1000 })
+})
+
 function openFilePicker() {
   fileInput.value?.click()
 }
@@ -122,6 +205,10 @@ function openFilePicker() {
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   selectedFile.value = target.files?.[0] ?? null
+  clearPreviewResult()
+}
+
+function clearPreviewResult() {
   summary.value = null
   executed.value = false
   errorMessage.value = ''
@@ -132,12 +219,7 @@ function handleFileChange(event: Event) {
 
 function clearFile() {
   selectedFile.value = null
-  summary.value = null
-  executed.value = false
-  errorMessage.value = ''
-  activeRowStatus.value = 'all'
-  activeSheetFilter.value = 'all'
-  resetPreviewPagination()
+  clearPreviewResult()
 
   if (fileInput.value) {
     fileInput.value.value = ''
@@ -155,19 +237,19 @@ function cancelImport() {
 }
 
 async function previewFile() {
-  const parsed = masterImportFileSchema.safeParse({ file: selectedFile.value })
-  if (!parsed.success) {
-    errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
-    return
-  }
+  const input = getImportInput()
+  if (!input) return
 
   errorMessage.value = ''
   executed.value = false
 
   try {
-    summary.value = await masterStore.previewMasterData(parsed.data.file)
+    summary.value =
+      activeImportKind.value === 'master'
+        ? await masterStore.previewMasterData(input.file)
+        : await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
     setDefaultResultFilter(summary.value)
-    toast.success('Preview selesai', `${summary.value.total_inserted} data baru siap ditambahkan`)
+    toast.success('Preview selesai', `${summary.value.total_inserted} baris siap ditambahkan`)
 
     if (summary.value.total_failed > 0) {
       toast.warn('Preview menemukan error', `${summary.value.total_failed} baris perlu diperiksa`)
@@ -183,22 +265,69 @@ async function executeFile() {
     return
   }
 
-  const parsed = masterImportFileSchema.safeParse({ file: selectedFile.value })
-  if (!parsed.success) {
-    errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
-    return
-  }
+  const input = getImportInput()
+  if (!input) return
 
   errorMessage.value = ''
 
   try {
-    summary.value = await masterStore.importMasterData(parsed.data.file)
+    summary.value =
+      activeImportKind.value === 'master'
+        ? await masterStore.importMasterData(input.file)
+        : await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
     executed.value = true
     setDefaultResultFilter(summary.value)
-    toast.success('Import selesai', `${summary.value.total_inserted} data baru ditambahkan`)
+    toast.success('Import selesai', `${summary.value.total_inserted} baris ditambahkan`)
   } catch (error) {
     errorMessage.value = getErrorMessage(error)
   }
+}
+
+async function downloadTemplate() {
+  errorMessage.value = ''
+
+  try {
+    if (activeImportKind.value === 'master') {
+      const blob = await masterStore.downloadImportTemplate()
+      saveBlob(blob, 'master_data_import_template.xlsx')
+      toast.success('Template diunduh', 'Template Master Data sudah dibuat dari snapshot terbaru')
+      return
+    }
+
+    if (!selectedBlueBookId.value) {
+      errorMessage.value = 'Pilih target Blue Book sebelum download template'
+      return
+    }
+
+    const blob = await blueBookStore.downloadProjectImportTemplate(selectedBlueBookId.value)
+    saveBlob(blob, 'blue_book_import_template.xlsx')
+    toast.success('Template diunduh', 'Template Blue Book sudah dibuat dari snapshot master data')
+  } catch (error) {
+    errorMessage.value = getErrorMessage(error)
+  }
+}
+
+function getImportInput(): ParsedImportInput | null {
+  if (activeImportKind.value === 'master') {
+    const parsed = masterImportFileSchema.safeParse({ file: selectedFile.value })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file }
+  }
+
+  const parsed = blueBookImportFileSchema.safeParse({
+    file: selectedFile.value,
+    blue_book_id: selectedBlueBookId.value ?? '',
+  })
+  if (!parsed.success) {
+    errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+    return null
+  }
+
+  return { file: parsed.data.file, blueBookId: parsed.data.blue_book_id }
 }
 
 function getErrorMessage(error: unknown) {
@@ -270,6 +399,26 @@ function rowNumberLabel(row: number) {
   return row > 0 ? row.toString() : 'Otomatis'
 }
 
+function blueBookOptionLabel(blueBook: BlueBook) {
+  const revision =
+    blueBook.revision_number > 0
+      ? `Revisi ${blueBook.revision_number}${blueBook.revision_year ? `/${blueBook.revision_year}` : ''}`
+      : 'Awal'
+
+  return `${blueBook.period.name} - ${revision} - ${blueBook.publish_date}`
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function filterButtonClass(active: boolean) {
   return [
     'rounded-md border px-3 py-2 text-left text-sm transition-colors',
@@ -284,14 +433,42 @@ function filterButtonClass(active: boolean) {
   <section class="space-y-6">
     <PageHeader
       title="Import Data"
-      subtitle="Preview workbook Excel sebelum eksekusi import data master PRISM"
+      subtitle="Preview workbook Excel sebelum eksekusi import data PRISM"
     />
 
     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div class="rounded-lg border border-surface-200 bg-white p-5">
+      <div class="space-y-5 rounded-lg border border-surface-200 bg-white p-5">
+        <div class="grid gap-3 md:grid-cols-2">
+          <button
+            v-for="kind in importKindOptions"
+            :key="kind.value"
+            type="button"
+            :class="filterButtonClass(activeImportKind === kind.value)"
+            @click="activeImportKind = kind.value"
+          >
+            <span class="block font-semibold">{{ kind.label }}</span>
+            <span class="text-xs opacity-80">{{ kind.description }}</span>
+          </button>
+        </div>
+
+        <label v-if="activeImportKind === 'blue_book'" class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Target Blue Book</span>
+          <Select
+            v-model="selectedBlueBookId"
+            :options="blueBookOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Blue Book"
+            class="w-full"
+            :loading="blueBookStore.loading"
+          />
+        </label>
+
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-surface-900">Workbook Excel</p>
+            <p class="text-sm font-semibold text-surface-900">
+              Workbook Excel - {{ selectedImportKind.label }}
+            </p>
             <p class="mt-1 truncate text-sm text-surface-500">
               {{ selectedFileMeta || 'Belum ada file dipilih' }}
             </p>
@@ -305,12 +482,28 @@ function filterButtonClass(active: boolean) {
               class="hidden"
               @change="handleFileChange"
             />
+            <Button
+              label="Template"
+              icon="pi pi-download"
+              outlined
+              :disabled="
+                importBusy ||
+                templateLoading ||
+                (activeImportKind === 'blue_book' && !selectedBlueBookId)
+              "
+              :loading="templateLoading"
+              @click="downloadTemplate"
+            />
             <Button label="Pilih File" icon="pi pi-folder-open" outlined @click="openFilePicker" />
             <Button
               label="Preview"
               icon="pi pi-eye"
-              :disabled="!selectedFile || masterStore.previewing || masterStore.importing"
-              :loading="masterStore.previewing"
+              :disabled="
+                !selectedFile ||
+                importBusy ||
+                (activeImportKind === 'blue_book' && !selectedBlueBookId)
+              "
+              :loading="previewLoading"
               outlined
               @click="previewFile"
             />
@@ -322,10 +515,10 @@ function filterButtonClass(active: boolean) {
                 !summary ||
                 summary.total_failed > 0 ||
                 executed ||
-                masterStore.previewing ||
-                masterStore.importing
+                importBusy ||
+                (activeImportKind === 'blue_book' && !selectedBlueBookId)
               "
-              :loading="masterStore.importing"
+              :loading="executeLoading"
               @click="executeFile"
             />
             <Button
@@ -334,7 +527,7 @@ function filterButtonClass(active: boolean) {
               icon="pi pi-times"
               severity="secondary"
               outlined
-              :disabled="masterStore.previewing || masterStore.importing"
+              :disabled="importBusy"
               @click="cancelImport"
             />
           </div>
@@ -347,6 +540,7 @@ function filterButtonClass(active: boolean) {
 
       <aside class="rounded-lg border border-surface-200 bg-white p-5">
         <p class="text-sm font-semibold text-surface-900">Sheet yang dibaca</p>
+        <p class="mt-1 text-sm text-surface-500">{{ selectedImportKind.description }}</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <Tag
             v-for="sheet in workbookSheets"

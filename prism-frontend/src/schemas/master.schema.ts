@@ -91,3 +91,7 @@ export const masterImportFileSchema = z.object({
     .refine((file) => file.name.toLowerCase().endsWith('.xlsx'), 'File harus berformat .xlsx')
     .refine((file) => file.size <= 20 * 1024 * 1024, 'Ukuran file maksimal 20 MB'),
 })
+
+export const blueBookImportFileSchema = masterImportFileSchema.extend({
+  blue_book_id: z.string().uuid('Blue Book wajib dipilih'),
+})

@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	apperrors "github.com/ridofiqri79/prism-backend/internal/errors"
 	"github.com/ridofiqri79/prism-backend/internal/model"
 	"github.com/ridofiqri79/prism-backend/internal/service"
 )
@@ -153,6 +154,59 @@ func (h *BlueBookHandler) DeleteBBProject(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *BlueBookHandler) ImportBBProjects(c echo.Context) error {
+	return h.handleImportBBProjects(c, false)
+}
+
+func (h *BlueBookHandler) PreviewImportBBProjects(c echo.Context) error {
+	return h.handleImportBBProjects(c, true)
+}
+
+func (h *BlueBookHandler) DownloadBBProjectImportTemplate(c echo.Context) error {
+	bbID, err := parseIDParam(c, "bbId")
+	if err != nil {
+		return err
+	}
+
+	template, err := h.service.BuildProjectImportTemplate(c.Request().Context(), bbID)
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
+func (h *BlueBookHandler) handleImportBBProjects(c echo.Context, preview bool) error {
+	bbID, err := parseIDParam(c, "bbId")
+	if err != nil {
+		return err
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewBlueBookProjects(c.Request().Context(), bbID, file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportBlueBookProjects(c.Request().Context(), bbID, file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
 }
 
 func (h *BlueBookHandler) ListLoI(c echo.Context) error {

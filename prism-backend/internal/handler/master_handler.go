@@ -498,6 +498,16 @@ func (h *MasterHandler) PreviewImportData(c echo.Context) error {
 	return h.handleImportData(c, true)
 }
 
+func (h *MasterHandler) DownloadImportTemplate(c echo.Context) error {
+	template, err := h.service.BuildMasterImportTemplate(c.Request().Context())
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
 func (h *MasterHandler) handleImportData(c echo.Context, preview bool) error {
 	file, err := c.FormFile("file")
 	if err != nil {
