@@ -510,6 +510,8 @@ CREATE INDEX idx_loi_project               ON loi(bb_project_id);
 CREATE INDEX idx_loi_lender                ON loi(lender_id);
 
 -- Green Book
+CREATE UNIQUE INDEX idx_green_book_publish_year_revision
+    ON green_book(publish_year, revision_number);
 CREATE INDEX idx_gb_project_green_book     ON gb_project(green_book_id);
 CREATE INDEX idx_gb_project_identity       ON gb_project(gb_project_identity_id);
 CREATE INDEX idx_gb_project_book_code      ON gb_project(green_book_id, gb_code);

@@ -42,6 +42,19 @@ WHERE publish_year = $1
 ORDER BY revision_number DESC, created_at DESC
 LIMIT 1;
 
+-- name: CountGreenBooksByPublishYearAndRevisionNumber :one
+SELECT COUNT(*)
+FROM green_book
+WHERE publish_year = sqlc.arg('publish_year')
+  AND revision_number = sqlc.arg('revision_number');
+
+-- name: CountGreenBooksByPublishYearAndRevisionNumberExcept :one
+SELECT COUNT(*)
+FROM green_book
+WHERE publish_year = sqlc.arg('publish_year')
+  AND revision_number = sqlc.arg('revision_number')
+  AND id <> sqlc.arg('id');
+
 -- name: SupersedeGreenBook :one
 UPDATE green_book
 SET status = 'superseded',

@@ -630,6 +630,8 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 }
 ```
 
+Validasi: kombinasi `publish_year` + `revision_number` harus unik. Jika sudah ada, backend mengembalikan `409 CONFLICT`.
+
 ---
 
 ### Import Green Book Projects

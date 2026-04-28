@@ -77,6 +77,9 @@ func (s *GreenBookService) CreateGreenBook(ctx context.Context, req model.GreenB
 				return mapNotFound(err, "Green Book sumber revisi tidak ditemukan")
 			}
 		}
+		if err := s.ensureGreenBookVersionAvailable(ctx, qtx, req.PublishYear, req.RevisionNumber, pgtype.UUID{}); err != nil {
+			return err
+		}
 		if err := qtx.SupersedeGreenBooksByPublishYear(ctx, req.PublishYear); err != nil {
 			return err
 		}
@@ -107,6 +110,9 @@ func (s *GreenBookService) UpdateGreenBook(ctx context.Context, id pgtype.UUID, 
 	}
 	var updated queries.GreenBook
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		if err := s.ensureGreenBookVersionAvailable(ctx, qtx, req.PublishYear, req.RevisionNumber, id); err != nil {
+			return err
+		}
 		row, err := qtx.UpdateGreenBook(ctx, queries.UpdateGreenBookParams{
 			ID:             id,
 			PublishYear:    req.PublishYear,
@@ -493,6 +499,32 @@ func (s *GreenBookService) ensureGBCodeAvailable(ctx context.Context, qtx *queri
 		return nil
 	}
 	return apperrors.Internal("Gagal memeriksa GB Code")
+}
+
+func (s *GreenBookService) ensureGreenBookVersionAvailable(ctx context.Context, qtx *queries.Queries, publishYear, revisionNumber int32, excludeID pgtype.UUID) error {
+	var (
+		count int64
+		err   error
+	)
+	if excludeID.Valid {
+		count, err = qtx.CountGreenBooksByPublishYearAndRevisionNumberExcept(ctx, queries.CountGreenBooksByPublishYearAndRevisionNumberExceptParams{
+			PublishYear:    publishYear,
+			RevisionNumber: revisionNumber,
+			ID:             excludeID,
+		})
+	} else {
+		count, err = qtx.CountGreenBooksByPublishYearAndRevisionNumber(ctx, queries.CountGreenBooksByPublishYearAndRevisionNumberParams{
+			PublishYear:    publishYear,
+			RevisionNumber: revisionNumber,
+		})
+	}
+	if err != nil {
+		return apperrors.Internal("Gagal memeriksa versi Green Book")
+	}
+	if count > 0 {
+		return apperrors.Conflict("Green Book dengan Publish Year dan Revision number yang sama sudah ada")
+	}
+	return nil
 }
 
 func (s *GreenBookService) resolveGBProjectIdentity(ctx context.Context, qtx *queries.Queries, identity *string) (pgtype.UUID, error) {

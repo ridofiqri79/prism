@@ -42,6 +42,7 @@
 
 - Hanya satu GB berstatus `active` per `publish_year`.
 - Format revisi: `GB 2025 Revisi ke-1`.
+- Kombinasi `publish_year` + `revision_number` harus unik; Green Book dengan Publish Year dan Revision number yang sama tidak boleh dibuat dua kali.
 - GB Project adalah snapshot di dalam satu Green Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.

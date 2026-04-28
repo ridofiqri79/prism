@@ -36,6 +36,35 @@ func TestGreenBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDo
 	assertAppErrorCode(t, err, "CONFLICT")
 }
 
+func TestCreateGreenBookRejectsDuplicatePublishYearAndRevisionNumber(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	original := env.createGreenBook(t, gbService, 0, nil)
+
+	_, err := gbService.CreateGreenBook(env.ctx, model.GreenBookRequest{
+		PublishYear:    2026,
+		RevisionNumber: 0,
+	})
+	assertAppErrorCode(t, err, "CONFLICT")
+
+	revision := env.createGreenBook(t, gbService, 1, &original.ID)
+	_, err = gbService.CreateGreenBook(env.ctx, model.GreenBookRequest{
+		PublishYear:         2026,
+		ReplacesGreenBookID: &original.ID,
+		RevisionNumber:      1,
+	})
+	assertAppErrorCode(t, err, "CONFLICT")
+
+	current, err := gbService.GetGreenBook(env.ctx, mustParseUUID(t, revision.ID))
+	if err != nil {
+		t.Fatalf("GetGreenBook(revision) error = %v", err)
+	}
+	if current.Status != "active" {
+		t.Fatalf("revision status after duplicate create = %s, want active", current.Status)
+	}
+}
+
 func TestCreateGBProjectResolvesOldBBInputToLatestBBSnapshot(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 	gbService := NewGreenBookService(env.pool, env.queries, nil)
