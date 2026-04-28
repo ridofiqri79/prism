@@ -6,7 +6,7 @@ import type {
   GreenBook,
   GreenBookPayload,
 } from '@/types/green-book.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const GreenBookService = {
   async getGreenBooks(params?: ListParams) {
@@ -67,5 +67,36 @@ export const GreenBookService = {
   async deleteProject(greenBookId: string, id: string) {
     await http.delete(`/green-books/${greenBookId}/projects/${id}`)
   },
-}
 
+  async downloadImportTemplate(greenBookId: string) {
+    const response = await http.get<Blob>(`/green-books/${greenBookId}/import-projects/template`, {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
+  async previewImportProjects(greenBookId: string, file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      `/green-books/${greenBookId}/import-projects/preview`,
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeImportProjects(greenBookId: string, file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      `/green-books/${greenBookId}/import-projects/execute`,
+      formData,
+    )
+
+    return response.data.data
+  },
+}

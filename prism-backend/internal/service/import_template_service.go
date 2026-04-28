@@ -91,6 +91,7 @@ type importTemplateReferenceData struct {
 	NationalPriorities []queries.ListNationalPrioritiesRow
 	Lenders            []queries.ListLendersRow
 	Countries          []queries.Country
+	BBProjects         []queries.ListActiveBBProjectReferencesRow
 }
 
 func textCell(value string) simpleXLSXCell {
@@ -165,6 +166,29 @@ func (s *BlueBookService) BuildProjectImportTemplate(ctx context.Context, bbID p
 
 	return &importTemplateFile{
 		FileName:    fmt.Sprintf("blue_book_%s_import_template.xlsx", safeFileToken(blueBook.PeriodName)),
+		ContentType: importTemplateContentType,
+		Data:        data,
+	}, nil
+}
+
+func (s *GreenBookService) BuildProjectImportTemplate(ctx context.Context, gbID pgtype.UUID) (*importTemplateFile, error) {
+	greenBook, err := s.queries.GetGreenBook(ctx, gbID)
+	if err != nil {
+		return nil, mapNotFound(err, "Green Book tidak ditemukan")
+	}
+
+	workbook, err := s.buildGreenBookProjectImportTemplateWorkbook(ctx, greenBook)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membuat template import Green Book")
+	}
+
+	return &importTemplateFile{
+		FileName:    fmt.Sprintf("green_book_%d_import_template.xlsx", greenBook.PublishYear),
 		ContentType: importTemplateContentType,
 		Data:        data,
 	}, nil
@@ -264,6 +288,77 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 	return simpleXLSXWorkbook{Sheets: sheets, DefinedNames: definedNames}, nil
 }
 
+func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx context.Context, greenBook queries.GreenBook) (simpleXLSXWorkbook, error) {
+	masterSvc := &MasterService{db: s.db, queries: s.queries}
+	reference, err := masterSvc.loadImportTemplateReferenceData(ctx, pgtype.UUID{})
+	if err != nil {
+		return simpleXLSXWorkbook{}, err
+	}
+
+	dropdowns, definedNames := buildDropdownSheet(reference)
+	definedNames = append(definedNames, simpleXLSXDefinedName{
+		Name: "ddInputGBCodes",
+		Ref:  xlsxRangeRef(greenBookImportSheetInput, 2, 2, importTemplateEditableRows+1),
+	}, simpleXLSXDefinedName{
+		Name: "ddInputActivityNos",
+		Ref:  xlsxRangeRef(greenBookImportSheetActivities, 2, 2, importTemplateEditableRows+1),
+	})
+
+	sheets := []simpleXLSXSheet{
+		buildGreenBookGuideSheet(greenBook),
+		buildGreenBookMasterDataSnapshotSheet("Master Data", reference),
+		templateInputSheet(greenBookImportSheetInput, []string{"Program Title (*)", "GB Code (*)", "Project Name (*)", "Duration", "Objective", "Scope of Project"}, []float64{38, 22, 54, 18, 54, 54}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddProgramTitles", "Program Title", "Pilih Program Title dari master data."),
+		}),
+		templateInputSheet(greenBookImportSheetBBProject, []string{"GB Code (*)", "BB Code (*)"}, []float64{22, 22}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddBBProjectCodes", "BB Code", "Pilih BB Project active dari database."),
+		}),
+		templateInputSheet(greenBookImportSheetEA, []string{"GB Code (*)", "Executing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data."),
+		}),
+		templateInputSheet(greenBookImportSheetIA, []string{"GB Code (*)", "Implementing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution dari master data."),
+		}),
+		templateInputSheet(greenBookImportSheetLocations, []string{"GB Code (*)", "Location Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddRegionNames", "Location Name", "Pilih region dari master data. Backend juga menerima kode region bila diketik manual."),
+		}),
+		templateInputSheet(greenBookImportSheetActivities, []string{"GB Code (*)", "Activity No (*)", "Activity Name (*)", "Implementation Location", "PIU", "Sort Order"}, []float64{22, 18, 54, 42, 42, 16}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			integerValidation("B2:B"+inputLastRow(), "Activity No", "Isi nomor aktivitas yang unik per GB Code. Nomor ini dipakai oleh Funding Allocation."),
+			integerValidation("F2:F"+inputLastRow(), "Sort Order", "Isi angka urutan tampilan. Kosong akan mengikuti urutan baris."),
+		}),
+		templateInputSheet(greenBookImportSheetFundingSource, []string{"GB Code (*)", "Lender Name (*)", "Institution Name", "Loan USD", "Grant USD", "Local USD"}, []float64{22, 42, 48, 18, 18, 18}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddLenders", "Lender Name", "Pilih lender dari master data."),
+			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution terkait funding source bila ada."),
+			decimalValidation("D2:D"+inputLastRow(), "Loan USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("E2:E"+inputLastRow(), "Grant USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("F2:F"+inputLastRow(), "Local USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+		}),
+		templateInputSheet(greenBookImportSheetDisbursementPlan, []string{"GB Code (*)", "Year (*)", "Amount USD"}, []float64{22, 18, 20}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			numberValidation("B2:B"+inputLastRow(), "Year", "Isi tahun anggaran dalam angka empat digit. Tahun harus unik per GB Code."),
+			decimalValidation("C2:C"+inputLastRow(), "Amount USD", "Isi total rencana penarikan proyek per tahun, bukan per lender."),
+		}),
+		templateInputSheet(greenBookImportSheetFundingAllocation, []string{"GB Code (*)", "Activity No (*)", "Services", "Constructions", "Goods", "Trainings", "Other"}, []float64{22, 18, 18, 20, 18, 18, 18}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
+			listValidation("B2:B"+inputLastRow(), "ddInputActivityNos", "Activity No", "Pilih Activity No dari sheet Relasi - Activities."),
+			decimalValidation("C2:C"+inputLastRow(), "Services", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("D2:D"+inputLastRow(), "Constructions", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("E2:E"+inputLastRow(), "Goods", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("F2:F"+inputLastRow(), "Trainings", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			decimalValidation("G2:G"+inputLastRow(), "Other", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+		}),
+		dropdowns,
+	}
+
+	return simpleXLSXWorkbook{Sheets: sheets, DefinedNames: definedNames}, nil
+}
+
 func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, periodID pgtype.UUID) (*importTemplateReferenceData, error) {
 	programTitles, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0})
 	if err != nil {
@@ -305,6 +400,11 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		return nil, apperrors.Internal("Gagal membaca snapshot country")
 	}
 
+	bbProjects, err := s.queries.ListActiveBBProjectReferences(ctx)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca snapshot BB Project")
+	}
+
 	return &importTemplateReferenceData{
 		ProgramTitles:      programTitles,
 		BappenasPartners:   partners,
@@ -314,6 +414,7 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		NationalPriorities: priorities,
 		Lenders:            lenders,
 		Countries:          countries,
+		BBProjects:         bbProjects,
 	}, nil
 }
 
@@ -365,6 +466,15 @@ func buildMasterDataSnapshotSheet(name string, reference *importTemplateReferenc
 		FreezeRows:    4,
 		ShowGridLines: false,
 	}
+}
+
+func buildGreenBookMasterDataSnapshotSheet(name string, reference *importTemplateReferenceData) simpleXLSXSheet {
+	sheet := buildMasterDataSnapshotSheet(name, reference)
+	for _, item := range reference.BBProjects {
+		sheet.Rows = append(sheet.Rows, textRow("BB Project", item.BbCode, item.ProjectName, "Active", item.PeriodName, model.UUIDToString(item.ID)))
+	}
+	sheet.AutoFilter = fmt.Sprintf("A4:F%d", len(sheet.Rows))
+	return sheet
 }
 
 func buildMasterGuideSheet() simpleXLSXSheet {
@@ -430,6 +540,39 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 	}
 }
 
+func buildGreenBookGuideSheet(greenBook queries.GreenBook) simpleXLSXSheet {
+	rows := [][]simpleXLSXCell{
+		styledTextRow(xlsxStyleTitle, "Panduan Import Proyek Green Book"),
+		styledTextRow(xlsxStyleSubtitle, "Target Green Book", fmt.Sprintf("GB %d Revisi %d", greenBook.PublishYear, greenBook.RevisionNumber), "Workbook ini menambah GB Project ke target Green Book yang dipilih."),
+		textRow(""),
+		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
+		textRow("1. Isi Input Data", "Satu baris mewakili satu GB Project. GB Code menjadi kunci penghubung ke semua sheet relasi.", "GB Code yang sudah ada di database akan masuk status skip."),
+		textRow("2. Isi sheet relasi", "Gunakan GB Code yang sama dengan Input Data. Ulangi GB Code untuk multi BB Project, EA/IA, lokasi, lender, dan rencana tahunan.", "GB Code pada sheet relasi punya dropdown dari Input Data."),
+		textRow("3. Activities dan allocation", "Activity No wajib unik per GB Code dan dipakai oleh sheet Funding Allocation.", "Activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation 0 agar sinkron."),
+		textRow("4. Preview", "Upload workbook lalu klik Preview untuk memisahkan create, skip, dan failed.", "Preview tidak menyimpan data."),
+		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
+		textRow(""),
+		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
+		textRow("Input Data", "Program Title (*), GB Code (*), Project Name (*)", "Duration dan uraian proyek opsional."),
+		textRow("Relasi - BB Project", "GB Code (*), BB Code (*)", "Minimal satu BB Project active wajib untuk proyek baru."),
+		textRow("Relasi - EA", "GB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib."),
+		textRow("Relasi - IA", "GB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib."),
+		textRow("Relasi - Locations", "GB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region atau ketik kode region."),
+		textRow("Relasi - Activities", "GB Code (*), Activity No (*), Activity Name (*)", "Activity No unik per GB Code. Sort Order opsional."),
+		textRow("Relasi - Funding Source", "GB Code (*), Lender Name (*)", "Loan/Grant/Local USD kosong dianggap 0."),
+		textRow("Relasi - Disbursement Plan", "GB Code (*), Year (*)", "Year harus unik per GB Code. Amount USD adalah total proyek per tahun."),
+		textRow("Relasi - Funding Allocation", "GB Code (*), Activity No (*)", "Isi breakdown per Activity No. Jika tidak diisi, allocation dibuat 0."),
+		textRow(""),
+		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
+	}
+	return simpleXLSXSheet{
+		Name:          "Panduan",
+		Rows:          rows,
+		Columns:       columns(30, 72, 74),
+		ShowGridLines: false,
+	}
+}
+
 func templateInputSheet(name string, headers []string, widths []float64, validations []simpleXLSXValidation) simpleXLSXSheet {
 	return simpleXLSXSheet{
 		Name:          name,
@@ -461,6 +604,7 @@ func buildDropdownSheet(reference *importTemplateReferenceData) (simpleXLSXSheet
 		{Name: "ddNationalPriorities", Header: "National Priorities", Values: uniqueSorted(nationalPriorityValues(reference.NationalPriorities))},
 		{Name: "ddLenders", Header: "Lenders", Values: uniqueSorted(lenderValues(reference.Lenders))},
 		{Name: "ddCountries", Header: "Countries", Values: uniqueSorted(countryValues(reference.Countries))},
+		{Name: "ddBBProjectCodes", Header: "BB Project Codes", Values: uniqueSorted(bbProjectCodeValues(reference.BBProjects))},
 		{Name: "ddBappenasPartnerLevels", Header: "Bappenas Partner Levels", Values: []string{"Eselon I", "Eselon II"}},
 		{Name: "ddInstitutionLevels", Header: "Institution Levels", Values: []string{"Kementerian/Badan/Lembaga", "Eselon I", "BUMN", "Pemerintah Daerah", "BUMD", "Lainnya"}},
 		{Name: "ddRegionLevels", Header: "Region Levels", Values: []string{"COUNTRY", "PROVINCE", "CITY"}},
@@ -541,6 +685,21 @@ func numberValidation(cellRange, title, prompt string) simpleXLSXValidation {
 		Prompt:      prompt,
 		ErrorTitle:  "Angka tidak valid",
 		Error:       "Isi angka tahun empat digit.",
+		ErrorStyle:  "stop",
+		AllowBlank:  true,
+	}
+}
+
+func integerValidation(cellRange, title, prompt string) simpleXLSXValidation {
+	return simpleXLSXValidation{
+		Range:       cellRange,
+		Type:        "whole",
+		Operator:    "greaterThanOrEqual",
+		Formula1:    "0",
+		PromptTitle: title,
+		Prompt:      prompt,
+		ErrorTitle:  "Angka tidak valid",
+		Error:       "Isi angka 0 atau lebih besar.",
 		ErrorStyle:  "stop",
 		AllowBlank:  true,
 	}
@@ -674,6 +833,14 @@ func countryValues(items []queries.Country) []string {
 	values := make([]string, 0, len(items))
 	for _, item := range items {
 		values = append(values, item.Name)
+	}
+	return values
+}
+
+func bbProjectCodeValues(items []queries.ListActiveBBProjectReferencesRow) []string {
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		values = append(values, item.BbCode)
 	}
 	return values
 }

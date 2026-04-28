@@ -185,6 +185,9 @@ func main() {
 	greenBooks.GET("/:gbId/projects/:id", greenBookHandler.GetGBProject, middleware.Require("gb_project", "read"))
 	greenBooks.PUT("/:gbId/projects/:id", greenBookHandler.UpdateGBProject, middleware.Require("gb_project", "update"))
 	greenBooks.DELETE("/:gbId/projects/:id", greenBookHandler.DeleteGBProject, middleware.Require("gb_project", "delete"))
+	greenBooks.POST("/:gbId/import-projects/preview", greenBookHandler.PreviewImportGBProjects, middleware.RequireAdmin())
+	greenBooks.POST("/:gbId/import-projects/execute", greenBookHandler.ImportGBProjects, middleware.RequireAdmin())
+	greenBooks.GET("/:gbId/import-projects/template", greenBookHandler.DownloadGBProjectImportTemplate, middleware.RequireAdmin())
 
 	dk := api.Group("/daftar-kegiatan")
 	dk.GET("", dkHandler.ListDK, middleware.Require("daftar_kegiatan", "read"))

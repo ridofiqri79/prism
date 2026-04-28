@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	apperrors "github.com/ridofiqri79/prism-backend/internal/errors"
 	"github.com/ridofiqri79/prism-backend/internal/model"
 	"github.com/ridofiqri79/prism-backend/internal/service"
 )
@@ -153,4 +154,57 @@ func (h *GreenBookHandler) DeleteGBProject(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *GreenBookHandler) ImportGBProjects(c echo.Context) error {
+	return h.handleImportGBProjects(c, false)
+}
+
+func (h *GreenBookHandler) PreviewImportGBProjects(c echo.Context) error {
+	return h.handleImportGBProjects(c, true)
+}
+
+func (h *GreenBookHandler) DownloadGBProjectImportTemplate(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+
+	template, err := h.service.BuildProjectImportTemplate(c.Request().Context(), gbID)
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
+func (h *GreenBookHandler) handleImportGBProjects(c echo.Context, preview bool) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewGreenBookProjects(c.Request().Context(), gbID, file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportGreenBookProjects(c.Request().Context(), gbID, file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
 }

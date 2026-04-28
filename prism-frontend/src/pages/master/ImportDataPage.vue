@@ -8,11 +8,17 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useToast } from '@/composables/useToast'
-import { blueBookImportFileSchema, masterImportFileSchema } from '@/schemas/master.schema'
+import {
+  blueBookImportFileSchema,
+  greenBookImportFileSchema,
+  masterImportFileSchema,
+} from '@/schemas/master.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
+import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { ApiErrorResponse } from '@/types/api.types'
 import type { BlueBook } from '@/types/blue-book.types'
+import type { GreenBook } from '@/types/green-book.types'
 import type {
   MasterImportRowResult,
   MasterImportRowStatus,
@@ -21,9 +27,9 @@ import type {
 } from '@/types/master.types'
 
 type ImportStatusFilter = MasterImportRowStatus | 'all'
-type ImportKind = 'master' | 'blue_book'
+type ImportKind = 'master' | 'blue_book' | 'green_book'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
-type ParsedImportInput = { file: File; blueBookId?: string }
+type ParsedImportInput = { file: File; blueBookId?: string; greenBookId?: string }
 type ImportKindOption = { value: ImportKind; label: string; description: string }
 
 interface ImportPageEvent {
@@ -33,11 +39,13 @@ interface ImportPageEvent {
 
 const masterStore = useMasterStore()
 const blueBookStore = useBlueBookStore()
+const greenBookStore = useGreenBookStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const activeImportKind = ref<ImportKind>('master')
 const selectedBlueBookId = ref<string | null>(null)
+const selectedGreenBookId = ref<string | null>(null)
 const selectedFile = ref<File | null>(null)
 const summary = ref<MasterImportSummary | null>(null)
 const executed = ref(false)
@@ -57,6 +65,11 @@ const importKindOptions: ImportKindOption[] = [
     value: 'blue_book',
     label: 'Blue Book',
     description: 'Proyek Blue Book beserta EA, IA, lokasi, cost, dan lender indication',
+  },
+  {
+    value: 'green_book',
+    label: 'Green Book',
+    description: 'Proyek Green Book beserta BB Project, activity, funding, dan allocation',
   },
 ]
 
@@ -80,14 +93,36 @@ const blueBookWorkbookSheets = [
   'Relasi - Lender Indication',
 ]
 
-const workbookSheets = computed(() =>
-  activeImportKind.value === 'master' ? masterWorkbookSheets : blueBookWorkbookSheets,
-)
+const greenBookWorkbookSheets = [
+  'Input Data',
+  'Relasi - BB Project',
+  'Relasi - EA',
+  'Relasi - IA',
+  'Relasi - Locations',
+  'Relasi - Activities',
+  'Relasi - Funding Source',
+  'Relasi - Disbursement Plan',
+  'Relasi - Funding Allocation',
+]
+
+const workbookSheets = computed(() => {
+  if (activeImportKind.value === 'master') return masterWorkbookSheets
+  if (activeImportKind.value === 'blue_book') return blueBookWorkbookSheets
+
+  return greenBookWorkbookSheets
+})
 
 const blueBookOptions = computed(() =>
   blueBookStore.blueBooks.map((blueBook) => ({
     id: blueBook.id,
     label: blueBookOptionLabel(blueBook),
+  })),
+)
+
+const greenBookOptions = computed(() =>
+  greenBookStore.greenBooks.map((greenBook) => ({
+    id: greenBook.id,
+    label: greenBookOptionLabel(greenBook),
   })),
 )
 
@@ -100,21 +135,39 @@ const selectedImportKind = computed<ImportKindOption>(
 const importBusy = computed(() =>
   activeImportKind.value === 'master'
     ? masterStore.previewing || masterStore.importing
-    : blueBookStore.importPreviewing || blueBookStore.importExecuting,
+    : activeImportKind.value === 'blue_book'
+      ? blueBookStore.importPreviewing || blueBookStore.importExecuting
+      : greenBookStore.importPreviewing || greenBookStore.importExecuting,
 )
 
 const previewLoading = computed(() =>
-  activeImportKind.value === 'master' ? masterStore.previewing : blueBookStore.importPreviewing,
+  activeImportKind.value === 'master'
+    ? masterStore.previewing
+    : activeImportKind.value === 'blue_book'
+      ? blueBookStore.importPreviewing
+      : greenBookStore.importPreviewing,
 )
 
 const executeLoading = computed(() =>
-  activeImportKind.value === 'master' ? masterStore.importing : blueBookStore.importExecuting,
+  activeImportKind.value === 'master'
+    ? masterStore.importing
+    : activeImportKind.value === 'blue_book'
+      ? blueBookStore.importExecuting
+      : greenBookStore.importExecuting,
 )
 
 const templateLoading = computed(() =>
   activeImportKind.value === 'master'
     ? masterStore.downloadingTemplate
-    : blueBookStore.templateDownloading,
+    : activeImportKind.value === 'blue_book'
+      ? blueBookStore.templateDownloading
+      : greenBookStore.templateDownloading,
+)
+
+const targetMissing = computed(
+  () =>
+    (activeImportKind.value === 'blue_book' && !selectedBlueBookId.value) ||
+    (activeImportKind.value === 'green_book' && !selectedGreenBookId.value),
 )
 
 const selectedFileMeta = computed(() => {
@@ -191,8 +244,17 @@ watch(selectedBlueBookId, () => {
   }
 })
 
+watch(selectedGreenBookId, () => {
+  if (activeImportKind.value === 'green_book') {
+    clearPreviewResult()
+  }
+})
+
 onMounted(() => {
-  void blueBookStore.fetchBlueBooks({ limit: 1000 })
+  void Promise.all([
+    blueBookStore.fetchBlueBooks({ limit: 1000 }),
+    greenBookStore.fetchGreenBooks({ limit: 1000 }),
+  ])
 })
 
 function openFilePicker() {
@@ -241,10 +303,13 @@ async function previewFile() {
   executed.value = false
 
   try {
-    summary.value =
-      activeImportKind.value === 'master'
-        ? await masterStore.previewMasterData(input.file)
-        : await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
+    if (activeImportKind.value === 'master') {
+      summary.value = await masterStore.previewMasterData(input.file)
+    } else if (activeImportKind.value === 'blue_book') {
+      summary.value = await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
+    } else {
+      summary.value = await greenBookStore.previewProjectImport(input.greenBookId ?? '', input.file)
+    }
     setDefaultResultFilter(summary.value)
     toast.success('Preview selesai', `${summary.value.total_inserted} baris siap ditambahkan`)
 
@@ -268,10 +333,13 @@ async function executeFile() {
   errorMessage.value = ''
 
   try {
-    summary.value =
-      activeImportKind.value === 'master'
-        ? await masterStore.importMasterData(input.file)
-        : await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
+    if (activeImportKind.value === 'master') {
+      summary.value = await masterStore.importMasterData(input.file)
+    } else if (activeImportKind.value === 'blue_book') {
+      summary.value = await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
+    } else {
+      summary.value = await greenBookStore.importProjects(input.greenBookId ?? '', input.file)
+    }
     executed.value = true
     setDefaultResultFilter(summary.value)
     toast.success('Import selesai', `${summary.value.total_inserted} baris ditambahkan`)
@@ -291,14 +359,26 @@ async function downloadTemplate() {
       return
     }
 
-    if (!selectedBlueBookId.value) {
-      errorMessage.value = 'Pilih target Blue Book sebelum download template'
+    if (activeImportKind.value === 'blue_book') {
+      if (!selectedBlueBookId.value) {
+        errorMessage.value = 'Pilih target Blue Book sebelum download template'
+        return
+      }
+
+      const blob = await blueBookStore.downloadProjectImportTemplate(selectedBlueBookId.value)
+      saveBlob(blob, 'blue_book_import_template.xlsx')
+      toast.success('Template diunduh', 'Template Blue Book sudah dibuat dari snapshot master data')
       return
     }
 
-    const blob = await blueBookStore.downloadProjectImportTemplate(selectedBlueBookId.value)
-    saveBlob(blob, 'blue_book_import_template.xlsx')
-    toast.success('Template diunduh', 'Template Blue Book sudah dibuat dari snapshot master data')
+    if (!selectedGreenBookId.value) {
+      errorMessage.value = 'Pilih target Green Book sebelum download template'
+      return
+    }
+
+    const blob = await greenBookStore.downloadProjectImportTemplate(selectedGreenBookId.value)
+    saveBlob(blob, 'green_book_import_template.xlsx')
+    toast.success('Template diunduh', 'Template Green Book sudah dibuat dari snapshot master data')
   } catch (error) {
     errorMessage.value = getErrorMessage(error)
   }
@@ -315,16 +395,29 @@ function getImportInput(): ParsedImportInput | null {
     return { file: parsed.data.file }
   }
 
-  const parsed = blueBookImportFileSchema.safeParse({
+  if (activeImportKind.value === 'blue_book') {
+    const parsed = blueBookImportFileSchema.safeParse({
+      file: selectedFile.value,
+      blue_book_id: selectedBlueBookId.value ?? '',
+    })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file, blueBookId: parsed.data.blue_book_id }
+  }
+
+  const parsed = greenBookImportFileSchema.safeParse({
     file: selectedFile.value,
-    blue_book_id: selectedBlueBookId.value ?? '',
+    green_book_id: selectedGreenBookId.value ?? '',
   })
   if (!parsed.success) {
     errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
     return null
   }
 
-  return { file: parsed.data.file, blueBookId: parsed.data.blue_book_id }
+  return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
 }
 
 function getErrorMessage(error: unknown) {
@@ -405,6 +498,12 @@ function blueBookOptionLabel(blueBook: BlueBook) {
   return `${blueBook.period.name} - ${revision} - ${blueBook.publish_date}`
 }
 
+function greenBookOptionLabel(greenBook: GreenBook) {
+  const revision = greenBook.revision_number > 0 ? `Revisi ${greenBook.revision_number}` : 'Awal'
+
+  return `GB ${greenBook.publish_year} - ${revision}`
+}
+
 function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -461,6 +560,19 @@ function filterButtonClass(active: boolean) {
           />
         </label>
 
+        <label v-if="activeImportKind === 'green_book'" class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Target Green Book</span>
+          <Select
+            v-model="selectedGreenBookId"
+            :options="greenBookOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Green Book"
+            class="w-full"
+            :loading="greenBookStore.loading"
+          />
+        </label>
+
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
             <p class="text-sm font-semibold text-surface-900">
@@ -486,7 +598,7 @@ function filterButtonClass(active: boolean) {
               :disabled="
                 importBusy ||
                 templateLoading ||
-                (activeImportKind === 'blue_book' && !selectedBlueBookId)
+                targetMissing
               "
               :loading="templateLoading"
               @click="downloadTemplate"
@@ -498,7 +610,7 @@ function filterButtonClass(active: boolean) {
               :disabled="
                 !selectedFile ||
                 importBusy ||
-                (activeImportKind === 'blue_book' && !selectedBlueBookId)
+                targetMissing
               "
               :loading="previewLoading"
               outlined
@@ -513,7 +625,7 @@ function filterButtonClass(active: boolean) {
                 summary.total_failed > 0 ||
                 executed ||
                 importBusy ||
-                (activeImportKind === 'blue_book' && !selectedBlueBookId)
+                targetMissing
               "
               :loading="executeLoading"
               @click="executeFile"

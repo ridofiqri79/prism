@@ -114,6 +114,7 @@ type masterImportLookups struct {
 	periodsByYears            map[string]queries.Period
 	nationalPriorityKeys      map[string]struct{}
 	nationalPrioritiesByTitle map[string]queries.ListNationalPrioritiesRow
+	bbProjectsByCode          map[string]queries.ListActiveBBProjectReferencesRow
 }
 
 func (s *MasterService) ImportMasterData(ctx context.Context, fileName string, reader io.Reader, size int64) (*model.MasterImportResponse, error) {
@@ -214,6 +215,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		periodsByYears:            map[string]queries.Period{},
 		nationalPriorityKeys:      map[string]struct{}{},
 		nationalPrioritiesByTitle: map[string]queries.ListNationalPrioritiesRow{},
+		bbProjectsByCode:          map[string]queries.ListActiveBBProjectReferencesRow{},
 	}
 
 	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
@@ -282,6 +284,14 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		if _, exists := lookups.nationalPrioritiesByTitle[titleKey]; !exists {
 			lookups.nationalPrioritiesByTitle[titleKey] = priority
 		}
+	}
+
+	bbProjects, err := qtx.ListActiveBBProjectReferences(ctx)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca referensi BB Project")
+	}
+	for _, project := range bbProjects {
+		lookups.addBBProjectReference(project)
 	}
 
 	return lookups, nil
@@ -1189,6 +1199,15 @@ func (l *masterImportLookups) regionByNameOrCode(value string) (queries.Region, 
 func (l *masterImportLookups) nationalPriorityByTitle(title string) (queries.ListNationalPrioritiesRow, bool) {
 	priority, exists := l.nationalPrioritiesByTitle[normalizeLookupKey(title)]
 	return priority, exists
+}
+
+func (l *masterImportLookups) addBBProjectReference(project queries.ListActiveBBProjectReferencesRow) {
+	l.bbProjectsByCode[normalizeLookupKey(project.BbCode)] = project
+}
+
+func (l *masterImportLookups) bbProjectByCode(code string) (queries.ListActiveBBProjectReferencesRow, bool) {
+	project, exists := l.bbProjectsByCode[normalizeLookupKey(code)]
+	return project, exists
 }
 
 func parsePeriodLabelYear(value string) (int, error) {

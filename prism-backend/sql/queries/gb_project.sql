@@ -140,6 +140,22 @@ RETURNING *;
 
 -- ===== GB PROJECT BB PROJECT =====
 
+-- name: ListActiveBBProjectReferences :many
+SELECT
+    bp.id,
+    bp.blue_book_id,
+    bp.bb_code,
+    bp.project_name,
+    p.name AS period_name,
+    bb.publish_date,
+    bb.revision_number,
+    bb.revision_year
+FROM bb_project bp
+JOIN blue_book bb ON bb.id = bp.blue_book_id
+JOIN period p ON p.id = bb.period_id
+WHERE bp.status = 'active'
+ORDER BY bp.bb_code ASC;
+
 -- name: GetGBProjectBBProjects :many
 SELECT bp.*
 FROM gb_project_bb_project gbp

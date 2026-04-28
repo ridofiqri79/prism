@@ -597,6 +597,54 @@ Baris dengan `BB Code` yang sudah ada di database akan di-skip. Relasi valid aka
 
 ---
 
+### Import Green Book Projects
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/green-books/:gb_id/import-projects/template` | ADMIN only |
+| `POST` | `/green-books/:gb_id/import-projects/preview` | ADMIN only |
+| `POST` | `/green-books/:gb_id/import-projects/execute` | ADMIN only |
+
+**Content-Type:** `multipart/form-data`
+
+**Form field:**
+
+| Field | Keterangan |
+|-------|------------|
+| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - BB Project`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - Activities`, `Relasi - Funding Source`, `Relasi - Disbursement Plan`, dan `Relasi - Funding Allocation` |
+
+Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB Code (*)` sebagai kunci penghubung ke sheet `Input Data`. Import ini tidak membuat header Green Book baru.
+
+**Template:**
+`GET /green-books/:gb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data dan BB Project aktif saat template dibuat.
+
+**Kolom utama workbook:**
+
+| Sheet | Kolom |
+|-------|-------|
+| `Input Data` | `Program Title (*)`, `GB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Project` |
+| `Relasi - BB Project` | `GB Code (*)`, `BB Code (*)` |
+| `Relasi - EA` | `GB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `GB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `GB Code (*)`, `Location Name (*)` |
+| `Relasi - Activities` | `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
+| `Relasi - Funding Source` | `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Loan USD`, `Grant USD`, `Local USD` |
+| `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
+| `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+
+**Preview:**
+`POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+**Execute:**
+`POST /green-books/:gb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+
+**Response `200`:**
+Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
+
+Baris dengan `GB Code` yang sudah ada di database akan di-skip. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
+
+---
+
 ### GB Project
 
 | Method | Endpoint | Permission |

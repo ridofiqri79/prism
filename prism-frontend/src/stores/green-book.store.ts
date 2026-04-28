@@ -7,7 +7,7 @@ import type {
   GreenBook,
   GreenBookPayload,
 } from '@/types/green-book.types'
-import type { ListParams } from '@/types/master.types'
+import type { ListParams, MasterImportSummary } from '@/types/master.types'
 
 export const useGreenBookStore = defineStore('greenBook', () => {
   const greenBooks = ref<GreenBook[]>([])
@@ -16,6 +16,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
   const projectOptions = ref<GBProject[]>([])
   const currentProject = ref<GBProject | null>(null)
   const loading = ref(false)
+  const templateDownloading = ref(false)
+  const importPreviewing = ref(false)
+  const importExecuting = ref(false)
   const total = ref(0)
   const projectTotal = ref(0)
 
@@ -99,6 +102,38 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     await GreenBookService.deleteProject(greenBookId, id)
   }
 
+  async function downloadProjectImportTemplate(greenBookId: string): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await GreenBookService.downloadImportTemplate(greenBookId)
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
+  async function previewProjectImport(
+    greenBookId: string,
+    file: File,
+  ): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await GreenBookService.previewImportProjects(greenBookId, file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
+  async function importProjects(greenBookId: string, file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await GreenBookService.executeImportProjects(greenBookId, file)
+      projectOptions.value = []
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
   function $reset() {
     greenBooks.value = []
     currentGreenBook.value = null
@@ -106,6 +141,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projectOptions.value = []
     currentProject.value = null
     loading.value = false
+    templateDownloading.value = false
+    importPreviewing.value = false
+    importExecuting.value = false
     total.value = 0
     projectTotal.value = 0
   }
@@ -117,6 +155,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projectOptions,
     currentProject,
     loading,
+    templateDownloading,
+    importPreviewing,
+    importExecuting,
     total,
     projectTotal,
     fetchGreenBooks,
@@ -130,6 +171,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     createProject,
     updateProject,
     deleteProject,
+    downloadProjectImportTemplate,
+    previewProjectImport,
+    importProjects,
     $reset,
   }
 })
