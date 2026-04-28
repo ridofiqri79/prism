@@ -23,10 +23,15 @@
 
 ## 3. Aturan Blue Book
 
+> Detail versioning BB/GB: `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`.
+
 - Hanya satu BB berstatus `active` per Period.
 - Revisi baru → BB lama jadi `superseded`.
 - Format revisi: `BB 2025-2029 Revisi ke-1 Tahun 2026`.
-- `bb_code` unik global — tidak bisa dipakai ulang meski proyek sudah `deleted`.
+- BB Project adalah snapshot di dalam satu Blue Book/revisi, bukan identitas logical tunggal.
+- Project yang sama lintas revisi harus dihubungkan dengan logical identity.
+- `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
+- Revisi Blue Book boleh menyalin BB Project yang sama persis dari revisi sebelumnya.
 - Bappenas Partner: simpan Eselon II saja — Eselon I diturunkan dari `parent_id`.
 - National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun.
 
@@ -36,7 +41,12 @@
 
 - Hanya satu GB berstatus `active` per `publish_year`.
 - Format revisi: `GB 2025 Revisi ke-1`.
+- GB Project adalah snapshot di dalam satu Green Book/revisi, bukan identitas logical tunggal.
+- Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
+- `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
+- Revisi Green Book boleh menyalin GB Project yang sama persis dari revisi sebelumnya.
 - GB Project wajib mereferensikan minimal 1 BB Project.
+- Saat GB Project dibuat atau direvisi, relasi ke BB Project harus memakai versi BB Project terbaru untuk logical project terkait.
 - `gb_funding_allocation` mereferensikan `gb_activity` — selalu sinkron, jika activity dihapus, allocation ikut terhapus (CASCADE).
 - Disbursement Plan: total proyek per tahun — bukan per lender. Kombinasi `(gb_project_id, year)` unik.
 
@@ -45,6 +55,8 @@
 ## 5. Aturan Daftar Kegiatan
 
 - Final setelah diterbitkan — tidak bisa direvisi. Backend cegah UPDATE kecuali ADMIN.
+- Saat DK Project dibuat, relasi ke GB Project harus memakai versi GB Project terbaru untuk logical project terkait.
+- Setelah DK/LA dibuat, downstream tetap menunjuk ke snapshot GB/BB yang dicantumkan saat DK dibuat; tidak auto-pindah ketika ada revisi BB/GB baru.
 - Activity Details diinput bebas — tidak ada relasi teknis ke Activities GB.
 
 ---

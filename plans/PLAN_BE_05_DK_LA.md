@@ -3,6 +3,7 @@
 > **Scope:** CRUD DK (header + project + sub-tabel multi-currency) dan LA (One-to-One dengan DK).
 > **Deliverable:** DK tersimpan dengan validasi lender. LA tersimpan dengan deteksi perpanjangan.
 > **Referensi:** docs/PRISM_API_Contract.md (DK & LA), docs/PRISM_Business_Rules.md (bagian 5 & 6)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. DK baru harus resolve pilihan GB Project ke versi latest, tetapi setelah DK/LA dibuat relasi downstream tetap frozen pada concrete snapshot yang tersimpan.
 
 ---
 

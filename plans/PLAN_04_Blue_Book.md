@@ -3,6 +3,7 @@
 > **Scope:** CRUD Blue Book (header + BB Project + LoI + Lender Indication + Project Cost).
 > **Deliverable:** Staff bisa input dan melihat Blue Book lengkap.
 > **Referensi:** docs/PRISM_API_Contract.md (Blue Book), docs/PRISM_Business_Rules.md (bagian 3)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. BB Project perlu `project_identity_id`, indikator latest/newer revision, dan section histori revisi.
 
 ---
 

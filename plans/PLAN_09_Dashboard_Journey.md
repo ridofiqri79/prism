@@ -3,6 +3,7 @@
 > **Scope:** Dashboard agregat monitoring dan visualisasi alur proyek BB → Monitoring.
 > **Deliverable:** Halaman dashboard informatif dan journey timeline per proyek.
 > **Referensi:** docs/PRISM_API_Contract.md (Dashboard & Aggregasi)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. Journey harus menampilkan concrete snapshot path yang dipakai downstream dan memberi indikator jika ada BB/GB revisi lebih baru.
 
 ---
 

@@ -3,6 +3,7 @@
 > **Scope:** CRUD GB Project dengan Activities, Funding Source, Disbursement Plan, Funding Allocation.
 > **Deliverable:** GB Project tersimpan lengkap dengan semua sub-tabel dalam satu transaksi.
 > **Referensi:** docs/PRISM_API_Contract.md (Green Book), docs/PRISM_Business_Rules.md (bagian 4)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md` untuk logical identity, clone revisi, latest BB resolver, dan perubahan uniqueness `gb_code` menjadi per `green_book_id`.
 
 ---
 
@@ -50,8 +51,9 @@ func (s *GBProjectService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
         return nil, errors.Validation(errors.FieldError{Field: "bb_project_ids", Message: "Minimal 1 BB Project"})
     }
     // 2. EA dan IA boleh overlap bila sesuai data proyek
-    // 3. gb_code unik global
-    // 4. Tahun disbursement tidak duplikat
+    // 3. gb_code unik dalam Green Book yang sama; boleh sama pada revisi lain via gb_project_identity_id
+    // 4. BB Project yang dipilih di-resolve ke versi latest sebelum disimpan
+    // 5. Tahun disbursement tidak duplikat
     yearSet := map[int]bool{}
     for _, d := range req.DisbursementPlan {
         if yearSet[d.Year] {

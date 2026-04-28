@@ -3,6 +3,7 @@
 > **Scope:** CRUD Blue Book (header + BB Project + LoI + Lender Indication + Project Cost).
 > **Deliverable:** Full CRUD BB Project dengan semua sub-entitas dalam satu transaksi.
 > **Referensi:** docs/PRISM_API_Contract.md (Blue Book), docs/PRISM_Business_Rules.md (bagian 3)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md` untuk logical identity, clone revisi, dan perubahan uniqueness `bb_code` menjadi per `blue_book_id`.
 
 ---
 
@@ -157,10 +158,11 @@ type CreateBBProjectRequest struct {
 ```go
 func (s *BBProjectService) CreateBBProject(ctx context.Context, bbID pgtype.UUID, req model.CreateBBProjectRequest) (*model.BBProjectResponse, error) {
     // Validasi bisnis:
-    // 1. Cek bb_code belum dipakai (termasuk yang deleted)
-    existing, _ := s.queries.GetBBProjectByCode(ctx, req.BBCode)
+    // 1. Cek bb_code belum dipakai dalam Blue Book yang sama.
+    //    Kode yang sama boleh muncul pada revisi Blue Book lain melalui project_identity_id.
+    existing, _ := s.queries.GetBBProjectByBlueBookAndCode(ctx, bbID, req.BBCode)
     if existing != nil {
-        return nil, errors.Conflict("BB Code sudah digunakan")
+        return nil, errors.Conflict("BB Code sudah digunakan di Blue Book ini")
     }
 
     // 2. EA dan IA boleh overlap bila sesuai data proyek

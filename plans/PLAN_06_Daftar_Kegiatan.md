@@ -3,6 +3,7 @@
 > **Scope:** CRUD Daftar Kegiatan (header surat + DK Project + sub-tabel multi-currency).
 > **Deliverable:** Staff bisa input DK lengkap. Lender difilter dari BB/GB terkait.
 > **Referensi:** docs/PRISM_API_Contract.md (Daftar Kegiatan), docs/PRISM_Business_Rules.md (bagian 5)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. Picker GB Project harus default ke latest snapshot, tetapi detail DK harus menampilkan concrete snapshot yang tersimpan saat DK dibuat.
 
 ---
 

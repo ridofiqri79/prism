@@ -3,6 +3,7 @@
 > **Scope:** CRUD GB Project dengan 4 tabel nested (Activities, Funding Source, Disbursement Plan, Funding Allocation).
 > **Deliverable:** Staff bisa input GB Project lengkap. Funding Allocation sinkron otomatis dengan Activities.
 > **Referensi:** docs/PRISM_API_Contract.md (Green Book), docs/PRISM_Business_Rules.md (bagian 4)
+> **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. GB Project perlu `gb_project_identity_id`, picker BB Project harus default ke latest snapshot, dan detail perlu histori revisi.
 
 ---
 
