@@ -60,6 +60,38 @@ func TestBlueBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDoc
 	assertAppErrorCode(t, err, "CONFLICT")
 }
 
+func TestCreateBlueBookRejectsDuplicatePeriodAndVersion(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+
+	_, err := env.service.CreateBlueBook(env.ctx, model.BlueBookRequest{
+		PeriodID:       model.UUIDToString(env.period.ID),
+		PublishDate:    "2026-03-01",
+		RevisionNumber: 0,
+	})
+	assertAppErrorCode(t, err, "CONFLICT")
+
+	revision := env.createBlueBook(t, 1, &original.ID)
+	revisionYear := int32(2026)
+	_, err = env.service.CreateBlueBook(env.ctx, model.BlueBookRequest{
+		PeriodID:           model.UUIDToString(env.period.ID),
+		ReplacesBlueBookID: &original.ID,
+		PublishDate:        "2026-04-01",
+		RevisionNumber:     1,
+		RevisionYear:       &revisionYear,
+	})
+	assertAppErrorCode(t, err, "CONFLICT")
+
+	current, err := env.service.GetBlueBook(env.ctx, mustParseUUID(t, revision.ID))
+	if err != nil {
+		t.Fatalf("GetBlueBook(revision) error = %v", err)
+	}
+	if current.Status != "active" {
+		t.Fatalf("revision status after duplicate create = %s, want active", current.Status)
+	}
+}
+
 func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 

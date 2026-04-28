@@ -499,6 +499,12 @@ CREATE INDEX idx_bb_project_identity       ON bb_project(project_identity_id);
 CREATE INDEX idx_bb_project_book_code      ON bb_project(blue_book_id, bb_code);
 CREATE INDEX idx_bb_project_bb_code        ON bb_project(bb_code);
 CREATE INDEX idx_bb_project_status         ON bb_project(status);
+CREATE UNIQUE INDEX idx_blue_book_period_version_with_year
+    ON blue_book(period_id, revision_number, revision_year)
+    WHERE revision_year IS NOT NULL;
+CREATE UNIQUE INDEX idx_blue_book_period_version_without_year
+    ON blue_book(period_id, revision_number)
+    WHERE revision_year IS NULL;
 CREATE INDEX idx_lender_indication_project ON lender_indication(bb_project_id);
 CREATE INDEX idx_loi_project               ON loi(bb_project_id);
 CREATE INDEX idx_loi_lender                ON loi(lender_id);

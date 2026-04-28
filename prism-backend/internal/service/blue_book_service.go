@@ -85,6 +85,9 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 				return mapNotFound(err, "Blue Book sumber revisi tidak ditemukan")
 			}
 		}
+		if err := s.ensureBlueBookVersionAvailable(ctx, qtx, periodID, req.RevisionNumber, revisionYear, pgtype.UUID{}); err != nil {
+			return err
+		}
 		if err := qtx.SupersedeBlueBooksByPeriod(ctx, periodID); err != nil {
 			return err
 		}
@@ -118,6 +121,13 @@ func (s *BlueBookService) UpdateBlueBook(ctx context.Context, id pgtype.UUID, re
 	}
 	var updated queries.BlueBook
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		current, err := qtx.GetBlueBook(ctx, id)
+		if err != nil {
+			return mapNotFound(err, "Blue Book tidak ditemukan")
+		}
+		if err := s.ensureBlueBookVersionAvailable(ctx, qtx, current.PeriodID, req.RevisionNumber, revisionYear, id); err != nil {
+			return err
+		}
 		row, err := qtx.UpdateBlueBook(ctx, queries.UpdateBlueBookParams{
 			ID:             id,
 			PublishDate:    publishDate,
@@ -514,6 +524,36 @@ func (s *BlueBookService) ensureBBCodeAvailable(ctx context.Context, qtx *querie
 		return nil
 	}
 	return apperrors.Internal("Gagal memeriksa BB Code")
+}
+
+func (s *BlueBookService) ensureBlueBookVersionAvailable(ctx context.Context, qtx *queries.Queries, periodID pgtype.UUID, revisionNumber int32, revisionYear pgtype.Int4, excludeID pgtype.UUID) error {
+	var (
+		count int64
+		err   error
+	)
+	if excludeID.Valid {
+		count, err = qtx.CountBlueBooksByPeriodAndVersionExcept(ctx, queries.CountBlueBooksByPeriodAndVersionExceptParams{
+			PeriodID:          periodID,
+			RevisionNumber:    revisionNumber,
+			RevisionYearValid: revisionYear.Valid,
+			RevisionYear:      revisionYear.Int32,
+			ID:                excludeID,
+		})
+	} else {
+		count, err = qtx.CountBlueBooksByPeriodAndVersion(ctx, queries.CountBlueBooksByPeriodAndVersionParams{
+			PeriodID:          periodID,
+			RevisionNumber:    revisionNumber,
+			RevisionYearValid: revisionYear.Valid,
+			RevisionYear:      revisionYear.Int32,
+		})
+	}
+	if err != nil {
+		return apperrors.Internal("Gagal memeriksa versi Blue Book")
+	}
+	if count > 0 {
+		return apperrors.Conflict("Blue Book dengan period dan version yang sama sudah ada")
+	}
+	return nil
 }
 
 func (s *BlueBookService) resolveProjectIdentity(ctx context.Context, qtx *queries.Queries, identity *string) (pgtype.UUID, error) {

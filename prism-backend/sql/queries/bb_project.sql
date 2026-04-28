@@ -69,6 +69,27 @@ WHERE period_id = $1
 ORDER BY revision_number DESC, created_at DESC
 LIMIT 1;
 
+-- name: CountBlueBooksByPeriodAndVersion :one
+SELECT COUNT(*)
+FROM blue_book
+WHERE period_id = sqlc.arg('period_id')
+  AND revision_number = sqlc.arg('revision_number')
+  AND (
+      (sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year = sqlc.arg('revision_year')::INT)
+      OR (NOT sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year IS NULL)
+  );
+
+-- name: CountBlueBooksByPeriodAndVersionExcept :one
+SELECT COUNT(*)
+FROM blue_book
+WHERE period_id = sqlc.arg('period_id')
+  AND revision_number = sqlc.arg('revision_number')
+  AND (
+      (sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year = sqlc.arg('revision_year')::INT)
+      OR (NOT sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year IS NULL)
+  )
+  AND id <> sqlc.arg('id');
+
 -- name: SupersedeBlueBook :one
 UPDATE blue_book
 SET status = 'superseded',

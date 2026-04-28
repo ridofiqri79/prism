@@ -28,6 +28,7 @@
 - Hanya satu BB berstatus `active` per Period.
 - Revisi baru → BB lama jadi `superseded`.
 - Format revisi: `BB 2025-2029 Revisi ke-1 Tahun 2026`.
+- Kombinasi Period + revision number + revision year harus unik; Blue Book dengan period dan versi yang sama tidak boleh dibuat dua kali.
 - BB Project adalah snapshot di dalam satu Blue Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi harus dihubungkan dengan logical identity.
 - `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
