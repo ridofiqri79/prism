@@ -10,6 +10,7 @@ import type {
   Lender,
   LenderPayload,
   ListParams,
+  MasterImportSummary,
   NationalPriority,
   NationalPriorityPayload,
   Period,
@@ -57,6 +58,30 @@ async function deleteItem(endpoint: string, id: string) {
 }
 
 export const MasterService = {
+  async previewImportData(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/master/import-data/preview',
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeImportData(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/master/import-data/execute',
+      formData,
+    )
+
+    return response.data.data
+  },
+
   getCountries(params?: ListParams) {
     return getList<Country>('/master/countries', params)
   },

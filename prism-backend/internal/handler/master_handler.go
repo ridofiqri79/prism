@@ -490,6 +490,39 @@ func (h *MasterHandler) DeleteNationalPriority(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *MasterHandler) ImportData(c echo.Context) error {
+	return h.handleImportData(c, false)
+}
+
+func (h *MasterHandler) PreviewImportData(c echo.Context) error {
+	return h.handleImportData(c, true)
+}
+
+func (h *MasterHandler) handleImportData(c echo.Context, preview bool) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewMasterData(c.Request().Context(), file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportMasterData(c.Request().Context(), file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
+}
+
 func paginationParams(c echo.Context) model.PaginationParams {
 	return model.PaginationParams{
 		Page:  parseIntQuery(c, "page", 1),

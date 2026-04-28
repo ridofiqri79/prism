@@ -11,6 +11,7 @@ import type {
   Lender,
   LenderPayload,
   ListParams,
+  MasterImportSummary,
   NationalPriority,
   NationalPriorityPayload,
   Period,
@@ -41,6 +42,8 @@ export const useMasterStore = defineStore('master', () => {
   const periods = ref<Period[]>([])
   const nationalPriorities = ref<NationalPriority[]>([])
   const loaded = ref<Record<string, boolean>>({})
+  const previewing = ref(false)
+  const importing = ref(false)
 
   async function fetchCountries(force = false, params?: ListParams) {
     if (loaded.value.countries && !force) return
@@ -92,6 +95,43 @@ export const useMasterStore = defineStore('master', () => {
 
   function invalidate(key: MasterKey) {
     loaded.value[key] = false
+  }
+
+  function invalidateAll() {
+    const keys: MasterKey[] = [
+      'countries',
+      'lenders',
+      'institutions',
+      'regions',
+      'programTitles',
+      'bappenasPartners',
+      'periods',
+      'nationalPriorities',
+    ]
+
+    keys.forEach((key) => {
+      loaded.value[key] = false
+    })
+  }
+
+  async function importMasterData(file: File): Promise<MasterImportSummary> {
+    importing.value = true
+    try {
+      const result = await MasterService.executeImportData(file)
+      invalidateAll()
+      return result
+    } finally {
+      importing.value = false
+    }
+  }
+
+  async function previewMasterData(file: File): Promise<MasterImportSummary> {
+    previewing.value = true
+    try {
+      return await MasterService.previewImportData(file)
+    } finally {
+      previewing.value = false
+    }
   }
 
   async function createCountry(data: CountryPayload) {
@@ -240,6 +280,8 @@ export const useMasterStore = defineStore('master', () => {
     periods.value = []
     nationalPriorities.value = []
     loaded.value = {}
+    previewing.value = false
+    importing.value = false
   }
 
   return {
@@ -252,6 +294,8 @@ export const useMasterStore = defineStore('master', () => {
     periods,
     nationalPriorities,
     loaded,
+    previewing,
+    importing,
     fetchCountries,
     fetchLenders,
     fetchInstitutions,
@@ -260,6 +304,8 @@ export const useMasterStore = defineStore('master', () => {
     fetchBappenasPartners,
     fetchPeriods,
     fetchNationalPriorities,
+    previewMasterData,
+    importMasterData,
     createCountry,
     updateCountry,
     deleteCountry,

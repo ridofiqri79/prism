@@ -84,3 +84,10 @@ export const bappenasPartnerSchema = z
     },
     { message: 'Induk Eselon I wajib dipilih untuk Eselon II', path: ['parent_id'] },
   )
+
+export const masterImportFileSchema = z.object({
+  file: z
+    .instanceof(File, { message: 'File wajib dipilih' })
+    .refine((file) => file.name.toLowerCase().endsWith('.xlsx'), 'File harus berformat .xlsx')
+    .refine((file) => file.size <= 20 * 1024 * 1024, 'Ukuran file maksimal 20 MB'),
+})

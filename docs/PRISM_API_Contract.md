@@ -135,6 +135,68 @@ Response meta:
 
 ## Master Data
 
+### Import Data
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `POST` | `/master/import-data/preview` | ADMIN only |
+| `POST` | `/master/import-data/execute` | ADMIN only |
+
+**Content-Type:** `multipart/form-data`
+
+**Form field:**
+
+| Field | Keterangan |
+|-------|------------|
+| `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, dan `Lenders` |
+
+**Preview:**
+`POST /master/import-data/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+**Execute:**
+`POST /master/import-data/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal. Endpoint lama `/master/import-data` tetap tersedia sebagai alias eksekusi.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "file_name": "master_data_import_template_data_awal.xlsx",
+    "total_inserted": 120,
+    "total_skipped": 10,
+    "total_failed": 0,
+    "sheets": [
+      {
+        "sheet": "Program Titles",
+        "inserted": 12,
+        "skipped": 0,
+        "failed": 0,
+        "rows": [
+          {
+            "row": 2,
+            "status": "create",
+            "label": "Infrastruktur Transportasi"
+          },
+          {
+            "row": 3,
+            "status": "skip",
+            "label": "Energi",
+            "message": "Data sudah ada, dilewati"
+          },
+          {
+            "row": 4,
+            "status": "failed",
+            "label": "Baris 4",
+            "message": "Title wajib diisi"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
+
 ### Country
 
 | Method | Endpoint | Permission |

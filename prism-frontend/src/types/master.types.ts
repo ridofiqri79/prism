@@ -114,6 +114,37 @@ export interface NationalPriorityPayload {
   title: string
 }
 
+export interface MasterImportRowError {
+  row: number
+  message: string
+}
+
+export type MasterImportRowStatus = 'create' | 'skip' | 'failed'
+
+export interface MasterImportRowResult {
+  row: number
+  status: MasterImportRowStatus
+  label: string
+  message?: string
+}
+
+export interface MasterImportSheetResult {
+  sheet: string
+  inserted: number
+  skipped: number
+  failed: number
+  rows?: MasterImportRowResult[]
+  errors?: MasterImportRowError[]
+}
+
+export interface MasterImportSummary {
+  file_name: string
+  total_inserted: number
+  total_skipped: number
+  total_failed: number
+  sheets: MasterImportSheetResult[]
+}
+
 export interface ListParams {
   page?: number
   limit?: number

@@ -145,6 +145,9 @@ func main() {
 	master.POST("/national-priorities", masterHandler.CreateNationalPriority, middleware.Require("national_priority", "create"))
 	master.PUT("/national-priorities/:id", masterHandler.UpdateNationalPriority, middleware.Require("national_priority", "update"))
 	master.DELETE("/national-priorities/:id", masterHandler.DeleteNationalPriority, middleware.Require("national_priority", "delete"))
+	master.POST("/import-data/preview", masterHandler.PreviewImportData, middleware.RequireAdmin())
+	master.POST("/import-data/execute", masterHandler.ImportData, middleware.RequireAdmin())
+	master.POST("/import-data", masterHandler.ImportData, middleware.RequireAdmin())
 
 	blueBooks := api.Group("/blue-books")
 	blueBooks.GET("", blueBookHandler.ListBlueBooks, middleware.Require("blue_book", "read"))

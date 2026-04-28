@@ -49,4 +49,10 @@ export const masterRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/master/NationalPriorityPage.vue'),
     meta: { requiresAuth: true, permission: { module: 'national_priority', action: 'read' } },
   },
+  {
+    path: 'master/import-data',
+    name: 'master-import-data',
+    component: () => import('@/pages/master/ImportDataPage.vue'),
+    meta: { requiresAuth: true, adminOnly: true },
+  },
 ]

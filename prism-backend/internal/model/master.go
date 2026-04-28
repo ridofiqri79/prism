@@ -129,3 +129,32 @@ type NationalPriorityResponse struct {
 	CreatedAt  string `json:"created_at,omitempty"`
 	UpdatedAt  string `json:"updated_at,omitempty"`
 }
+
+type MasterImportResponse struct {
+	FileName      string                    `json:"file_name"`
+	TotalInserted int                       `json:"total_inserted"`
+	TotalSkipped  int                       `json:"total_skipped"`
+	TotalFailed   int                       `json:"total_failed"`
+	Sheets        []MasterImportSheetResult `json:"sheets"`
+}
+
+type MasterImportSheetResult struct {
+	Sheet    string                  `json:"sheet"`
+	Inserted int                     `json:"inserted"`
+	Skipped  int                     `json:"skipped"`
+	Failed   int                     `json:"failed"`
+	Rows     []MasterImportRowResult `json:"rows,omitempty"`
+	Errors   []MasterImportRowError  `json:"errors,omitempty"`
+}
+
+type MasterImportRowResult struct {
+	Row     int    `json:"row"`
+	Status  string `json:"status"`
+	Label   string `json:"label"`
+	Message string `json:"message,omitempty"`
+}
+
+type MasterImportRowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}

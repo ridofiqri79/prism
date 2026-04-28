@@ -41,7 +41,16 @@ const masterItems = computed<NavigationItem[]>(() =>
       icon: 'pi pi-flag',
       module: 'national_priority',
     },
-  ].filter((item) => can(item.module ?? '', 'read')),
+    {
+      label: 'Import Data',
+      to: '/master/import-data',
+      icon: 'pi pi-upload',
+      adminOnly: true,
+    },
+  ].filter((item) => {
+    if (item.adminOnly) return auth.user?.role === 'ADMIN'
+    return can(item.module ?? '', 'read')
+  }),
 )
 
 const items = computed<NavigationItem[]>(() =>
