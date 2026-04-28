@@ -152,10 +152,10 @@ Acceptance:
 
 Checklist:
 
-- [ ] Tambah/update backend tests untuk create BB Project duplicate per Blue Book.
-- [ ] Tambah/update tests untuk create BB revision clone.
-- [ ] Tambah/update tests untuk BB Project history endpoint.
-- [ ] Tambah/update tests untuk import code reuse behavior.
+- [x] Tambah/update backend tests untuk create BB Project duplicate per Blue Book.
+- [x] Tambah/update tests untuk create BB revision clone.
+- [x] Tambah/update tests untuk BB Project history endpoint.
+- [x] Tambah/update tests untuk import code reuse behavior.
 - [x] Jalankan `go test ./...`.
 - [x] Jalankan smoke API:
   - [x] create BB original.

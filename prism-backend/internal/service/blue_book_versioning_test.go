@@ -1,0 +1,454 @@
+package service
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/ridofiqri79/prism-backend/internal/database/queries"
+	apperrors "github.com/ridofiqri79/prism-backend/internal/errors"
+	"github.com/ridofiqri79/prism-backend/internal/model"
+)
+
+type blueBookVersioningTestEnv struct {
+	ctx          context.Context
+	pool         *pgxpool.Pool
+	queries      *queries.Queries
+	service      *BlueBookService
+	period       queries.Period
+	programTitle queries.ProgramTitle
+	ea           queries.Institution
+	ia           queries.Institution
+	region       queries.Region
+}
+
+func TestBlueBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDocument(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
+
+	_, err := env.service.CreateBBProject(env.ctx, mustParseUUID(t, original.ID), env.bbProjectRequest("BB-001", "Duplicate"))
+	assertAppErrorCode(t, err, "CONFLICT")
+
+	revision := env.createBlueBook(t, 1, &original.ID)
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(revision) error = %v", err)
+	}
+	if len(projects.Data) != 1 {
+		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	}
+	cloned := projects.Data[0]
+	if cloned.BBCode != sourceProject.BBCode {
+		t.Fatalf("cloned BBCode = %q, want %q", cloned.BBCode, sourceProject.BBCode)
+	}
+	if cloned.ProjectIdentityID != sourceProject.ProjectIdentityID {
+		t.Fatalf("cloned identity = %s, want %s", cloned.ProjectIdentityID, sourceProject.ProjectIdentityID)
+	}
+
+	_, err = env.service.CreateBBProject(env.ctx, mustParseUUID(t, revision.ID), env.bbProjectRequest("BB-001", "Duplicate in revision"))
+	assertAppErrorCode(t, err, "CONFLICT")
+}
+
+func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
+	revision := env.createBlueBook(t, 1, &original.ID)
+
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(revision) error = %v", err)
+	}
+	if len(projects.Data) != 1 {
+		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	}
+
+	cloned := projects.Data[0]
+	if cloned.ID == sourceProject.ID {
+		t.Fatal("cloned project reused source snapshot id")
+	}
+	if cloned.ProjectIdentityID != sourceProject.ProjectIdentityID {
+		t.Fatalf("cloned identity = %s, want %s", cloned.ProjectIdentityID, sourceProject.ProjectIdentityID)
+	}
+	if len(cloned.ExecutingAgencies) != 1 || len(cloned.ImplementingAgencies) != 1 || len(cloned.Locations) != 1 {
+		t.Fatalf("cloned relations lengths EA=%d IA=%d locations=%d, want 1 each", len(cloned.ExecutingAgencies), len(cloned.ImplementingAgencies), len(cloned.Locations))
+	}
+	if len(cloned.ProjectCosts) != 1 || cloned.ProjectCosts[0].FundingType != "Foreign" || cloned.ProjectCosts[0].FundingCategory != "Loan" {
+		t.Fatalf("cloned project costs = %+v, want one Foreign/Loan row", cloned.ProjectCosts)
+	}
+	if !cloned.IsLatest || cloned.HasNewerRevision {
+		t.Fatalf("cloned latest flags = is_latest:%v has_newer:%v, want latest with no newer", cloned.IsLatest, cloned.HasNewerRevision)
+	}
+
+	sourceAfterRevision, err := env.service.GetBBProject(env.ctx, mustParseUUID(t, original.ID), mustParseUUID(t, sourceProject.ID))
+	if err != nil {
+		t.Fatalf("GetBBProject(source after revision) error = %v", err)
+	}
+	if sourceAfterRevision.IsLatest || !sourceAfterRevision.HasNewerRevision {
+		t.Fatalf("source latest flags = is_latest:%v has_newer:%v, want historical with newer revision", sourceAfterRevision.IsLatest, sourceAfterRevision.HasNewerRevision)
+	}
+}
+
+func TestGetBBProjectHistoryReturnsOrderedSnapshots(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
+	env.createBlueBook(t, 1, &original.ID)
+
+	history, err := env.service.GetBBProjectHistory(env.ctx, mustParseUUID(t, sourceProject.ID))
+	if err != nil {
+		t.Fatalf("GetBBProjectHistory() error = %v", err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("history length = %d, want 2: %+v", len(history), history)
+	}
+	if history[0].ID != sourceProject.ID {
+		t.Fatalf("history[0].ID = %s, want source %s", history[0].ID, sourceProject.ID)
+	}
+	if history[0].BookStatus != "superseded" || history[0].IsLatest {
+		t.Fatalf("history[0] status/latest = %s/%v, want superseded/not latest", history[0].BookStatus, history[0].IsLatest)
+	}
+	if history[1].BookStatus != "active" || !history[1].IsLatest {
+		t.Fatalf("history[1] status/latest = %s/%v, want active/latest", history[1].BookStatus, history[1].IsLatest)
+	}
+	if history[0].ProjectIdentityID != history[1].ProjectIdentityID {
+		t.Fatalf("history identities differ: %s vs %s", history[0].ProjectIdentityID, history[1].ProjectIdentityID)
+	}
+}
+
+func TestBlueBookImportReusesPreviousIdentityForRevisionSnapshot(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
+	if err := env.queries.SupersedeBlueBooksByPeriod(env.ctx, env.period.ID); err != nil {
+		t.Fatalf("SupersedeBlueBooksByPeriod() error = %v", err)
+	}
+	targetRevision, err := env.queries.CreateBlueBook(env.ctx, queries.CreateBlueBookParams{
+		PeriodID:           env.period.ID,
+		ReplacesBlueBookID: mustParseUUID(t, original.ID),
+		PublishDate:        testDate(2026, time.February, 1),
+		RevisionNumber:     1,
+		RevisionYear:       pgtype.Int4{Int32: 2026, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateBlueBook(target revision) error = %v", err)
+	}
+
+	workbook := buildBlueBookRevisionImportWorkbook(t, env, "BB-001", "Flood Control Revision")
+	res, err := env.service.ImportBlueBookProjects(env.ctx, targetRevision.ID, "blue-book-projects.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("ImportBlueBookProjects() error = %v", err)
+	}
+	if res.TotalFailed != 0 {
+		t.Fatalf("TotalFailed = %d, response = %+v", res.TotalFailed, res)
+	}
+	inputSheet := findImportSheet(t, res, blueBookImportSheetInput)
+	if inputSheet.Inserted != 1 || len(inputSheet.Rows) != 1 {
+		t.Fatalf("input sheet inserted/rows = %d/%d, want 1/1: %+v", inputSheet.Inserted, len(inputSheet.Rows), inputSheet)
+	}
+	if !strings.Contains(inputSheet.Rows[0].Message, "revision snapshot") {
+		t.Fatalf("input row message = %q, want revision snapshot message", inputSheet.Rows[0].Message)
+	}
+
+	imported, err := env.queries.GetBBProjectByBlueBookAndCode(env.ctx, queries.GetBBProjectByBlueBookAndCodeParams{BlueBookID: targetRevision.ID, Lower: "BB-001"})
+	if err != nil {
+		t.Fatalf("GetBBProjectByBlueBookAndCode(target) error = %v", err)
+	}
+	if model.UUIDToString(imported.ProjectIdentityID) != sourceProject.ProjectIdentityID {
+		t.Fatalf("imported identity = %s, want %s", model.UUIDToString(imported.ProjectIdentityID), sourceProject.ProjectIdentityID)
+	}
+}
+
+func setupBlueBookVersioningTest(t *testing.T) *blueBookVersioningTestEnv {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping PostgreSQL integration test in short mode")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	t.Cleanup(cancel)
+
+	databaseURL := blueBookVersioningTestDatabaseURL()
+	adminPool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("PostgreSQL test database unavailable: %v", err)
+	}
+	if err := adminPool.Ping(ctx); err != nil {
+		adminPool.Close()
+		t.Skipf("PostgreSQL test database unavailable: %v", err)
+	}
+
+	schemaName := fmt.Sprintf("prism_test_%d", time.Now().UnixNano())
+	if _, err := adminPool.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public`); err != nil {
+		adminPool.Close()
+		t.Fatalf("create uuid extension: %v", err)
+	}
+	if _, err := adminPool.Exec(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		adminPool.Close()
+		t.Fatalf("create test schema: %v", err)
+	}
+
+	ddl := readPrismDDL(t)
+	conn, err := adminPool.Acquire(ctx)
+	if err != nil {
+		adminPool.Close()
+		t.Fatalf("acquire setup connection: %v", err)
+	}
+	_, err = conn.Conn().PgConn().Exec(ctx, "SET search_path TO "+schemaName+", public;\n"+ddl).ReadAll()
+	conn.Release()
+	if err != nil {
+		_, _ = adminPool.Exec(context.Background(), "DROP SCHEMA IF EXISTS "+schemaName+" CASCADE")
+		adminPool.Close()
+		t.Fatalf("apply DDL to test schema: %v", err)
+	}
+
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		adminPool.Close()
+		t.Fatalf("parse test database URL: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName + ",public"
+	cfg.MaxConns = 4
+	cfg.MinConns = 0
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		adminPool.Close()
+		t.Fatalf("create test pool: %v", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		adminPool.Close()
+		t.Fatalf("ping test pool: %v", err)
+	}
+
+	t.Cleanup(func() {
+		pool.Close()
+		_, _ = adminPool.Exec(context.Background(), "DROP SCHEMA IF EXISTS "+schemaName+" CASCADE")
+		adminPool.Close()
+	})
+
+	q := queries.New(pool)
+	env := &blueBookVersioningTestEnv{
+		ctx:     ctx,
+		pool:    pool,
+		queries: q,
+		service: NewBlueBookService(pool, q, nil),
+	}
+	env.seedFixtures(t)
+	return env
+}
+
+func blueBookVersioningTestDatabaseURL() string {
+	if value := strings.TrimSpace(os.Getenv("PRISM_TEST_DATABASE_URL")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL")); value != "" {
+		return value
+	}
+	return "postgres://prism:prism_secret@localhost:5432/prism_dev?sslmode=disable"
+}
+
+func readPrismDDL(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	for i := 0; i < 6; i++ {
+		candidate := filepath.Join(dir, "docs", "prism_ddl.sql")
+		data, err := os.ReadFile(candidate)
+		if err == nil {
+			return string(data)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	t.Fatal("docs/prism_ddl.sql not found from test working directory")
+	return ""
+}
+
+func (env *blueBookVersioningTestEnv) seedFixtures(t *testing.T) {
+	t.Helper()
+	var err error
+	env.period, err = env.queries.CreatePeriod(env.ctx, queries.CreatePeriodParams{Name: "2025-2029", YearStart: 2025, YearEnd: 2029})
+	if err != nil {
+		t.Fatalf("CreatePeriod() error = %v", err)
+	}
+	env.programTitle, err = env.queries.CreateProgramTitle(env.ctx, queries.CreateProgramTitleParams{ParentID: pgtype.UUID{}, Title: "Flood Management"})
+	if err != nil {
+		t.Fatalf("CreateProgramTitle() error = %v", err)
+	}
+	env.ea, err = env.queries.CreateInstitution(env.ctx, queries.CreateInstitutionParams{ParentID: pgtype.UUID{}, Name: "Ministry of Works", ShortName: pgtype.Text{String: "MW", Valid: true}, Level: "Kementerian/Badan/Lembaga"})
+	if err != nil {
+		t.Fatalf("CreateInstitution(EA) error = %v", err)
+	}
+	env.ia, err = env.queries.CreateInstitution(env.ctx, queries.CreateInstitutionParams{ParentID: pgtype.UUID{}, Name: "Directorate of Water", ShortName: pgtype.Text{String: "DW", Valid: true}, Level: "Eselon I"})
+	if err != nil {
+		t.Fatalf("CreateInstitution(IA) error = %v", err)
+	}
+	env.region, err = env.queries.CreateRegion(env.ctx, queries.CreateRegionParams{Code: "ID", Name: "Nasional", Type: "COUNTRY", ParentCode: pgtype.Text{}})
+	if err != nil {
+		t.Fatalf("CreateRegion() error = %v", err)
+	}
+}
+
+func (env *blueBookVersioningTestEnv) createBlueBook(t *testing.T, revisionNumber int32, replacesID *string) *model.BlueBookResponse {
+	t.Helper()
+	var revisionYear *int32
+	if revisionNumber > 0 {
+		value := int32(2026)
+		revisionYear = &value
+	}
+	res, err := env.service.CreateBlueBook(env.ctx, model.BlueBookRequest{
+		PeriodID:           model.UUIDToString(env.period.ID),
+		ReplacesBlueBookID: replacesID,
+		PublishDate:        fmt.Sprintf("2026-%02d-01", revisionNumber+1),
+		RevisionNumber:     revisionNumber,
+		RevisionYear:       revisionYear,
+	})
+	if err != nil {
+		t.Fatalf("CreateBlueBook(revision %d) error = %v", revisionNumber, err)
+	}
+	return res
+}
+
+func (env *blueBookVersioningTestEnv) createBBProject(t *testing.T, blueBookID, code, name string) *model.BBProjectResponse {
+	t.Helper()
+	res, err := env.service.CreateBBProject(env.ctx, mustParseUUID(t, blueBookID), env.bbProjectRequest(code, name))
+	if err != nil {
+		t.Fatalf("CreateBBProject(%s) error = %v", code, err)
+	}
+	return res
+}
+
+func (env *blueBookVersioningTestEnv) bbProjectRequest(code, name string) model.CreateBBProjectRequest {
+	programTitleID := model.UUIDToString(env.programTitle.ID)
+	return model.CreateBBProjectRequest{
+		ProgramTitleID:        &programTitleID,
+		BBCode:                code,
+		ProjectName:           name,
+		ExecutingAgencyIDs:    []string{model.UUIDToString(env.ea.ID)},
+		ImplementingAgencyIDs: []string{model.UUIDToString(env.ia.ID)},
+		LocationIDs:           []string{model.UUIDToString(env.region.ID)},
+		ProjectCosts: []model.ProjectCostItem{{
+			FundingType:     "Foreign",
+			FundingCategory: "Loan",
+			AmountUSD:       1000000,
+		}},
+	}
+}
+
+func buildBlueBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTestEnv, code, projectName string) []byte {
+	t.Helper()
+	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
+		{
+			Name: blueBookImportSheetInput,
+			Rows: [][]simpleXLSXCell{
+				headerRow("Program Title (*)", "BB Code (*)", "Project Name (*)"),
+				textRow(env.programTitle.Title, code, projectName),
+			},
+			Columns:       columns(28, 18, 48),
+			ShowGridLines: false,
+		},
+		{
+			Name: blueBookImportSheetEA,
+			Rows: [][]simpleXLSXCell{
+				headerRow("BB Code (*)", "Executing Agency Name (*)"),
+				textRow(code, env.ea.Name),
+			},
+			Columns:       columns(18, 44),
+			ShowGridLines: false,
+		},
+		{
+			Name: blueBookImportSheetIA,
+			Rows: [][]simpleXLSXCell{
+				headerRow("BB Code (*)", "Implementing Agency Name (*)"),
+				textRow(code, env.ia.Name),
+			},
+			Columns:       columns(18, 44),
+			ShowGridLines: false,
+		},
+		{
+			Name: blueBookImportSheetLocations,
+			Rows: [][]simpleXLSXCell{
+				headerRow("BB Code (*)", "Location Name (*)"),
+				textRow(code, env.region.Name),
+			},
+			Columns:       columns(18, 36),
+			ShowGridLines: false,
+		},
+		emptyImportSheet(blueBookImportSheetNationalPriority, "BB Code (*)", "National Priority Name (*)"),
+		emptyImportSheet(blueBookImportSheetProjectCost, "BB Code (*)", "Funding Type (*)", "Funding Category (*)", "Amount USD"),
+		emptyImportSheet(blueBookImportSheetLenderIndication, "BB Code (*)", "Lender Name (*)", "Remarks"),
+	}}
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		t.Fatalf("buildSimpleXLSX() error = %v", err)
+	}
+	return data
+}
+
+func emptyImportSheet(name string, headers ...string) simpleXLSXSheet {
+	return simpleXLSXSheet{
+		Name:          name,
+		Rows:          [][]simpleXLSXCell{headerRow(headers...)},
+		Columns:       columns(22, 36, 30, 18),
+		ShowGridLines: false,
+	}
+}
+
+func findImportSheet(t *testing.T, res *model.MasterImportResponse, name string) model.MasterImportSheetResult {
+	t.Helper()
+	for _, sheet := range res.Sheets {
+		if sheet.Sheet == name {
+			return sheet
+		}
+	}
+	t.Fatalf("import sheet %q not found in %+v", name, res.Sheets)
+	return model.MasterImportSheetResult{}
+}
+
+func assertAppErrorCode(t *testing.T, err error, code string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error code %s, got nil", code)
+	}
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected AppError %s, got %T: %v", code, err, err)
+	}
+	if appErr.Code != code {
+		t.Fatalf("AppError code = %s, want %s; message=%q", appErr.Code, code, appErr.Message)
+	}
+}
+
+func mustParseUUID(t *testing.T, value string) pgtype.UUID {
+	t.Helper()
+	parsed, err := model.ParseUUID(value)
+	if err != nil {
+		t.Fatalf("parse UUID %q: %v", value, err)
+	}
+	return parsed
+}
+
+func testDate(year int, month time.Month, day int) pgtype.Date {
+	return pgtype.Date{Time: time.Date(year, month, day, 0, 0, 0, 0, time.UTC), Valid: true}
+}

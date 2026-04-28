@@ -129,11 +129,11 @@ Acceptance:
 
 Checklist:
 
-- [ ] Tambah/update backend tests untuk create GB Project duplicate per Green Book.
-- [ ] Tambah/update tests untuk GB Project resolve latest BB.
-- [ ] Tambah/update tests untuk create GB revision clone.
-- [ ] Tambah/update tests untuk funding allocation clone dengan activity mapping.
-- [ ] Tambah/update tests untuk GB Project history endpoint.
+- [x] Tambah/update backend tests untuk create GB Project duplicate per Green Book.
+- [x] Tambah/update tests untuk GB Project resolve latest BB.
+- [x] Tambah/update tests untuk create GB revision clone.
+- [x] Tambah/update tests untuk funding allocation clone dengan activity mapping.
+- [x] Tambah/update tests untuk GB Project history endpoint.
 - [x] Jalankan `go test ./...`.
 - [x] Jalankan smoke API:
   - [x] create BB original + revision.

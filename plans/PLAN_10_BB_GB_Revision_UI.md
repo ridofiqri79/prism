@@ -172,14 +172,14 @@ Checklist:
 
 - [x] Jalankan typecheck/build frontend sesuai script repo.
 - [x] Jalankan lint jika tersedia.
-- [ ] Smoke UI:
-  - [ ] BB detail history tampil.
-  - [ ] GB picker hanya latest.
-  - [ ] GB detail history tampil.
-  - [ ] DK picker hanya latest.
-  - [ ] DK detail tetap concrete snapshot.
-  - [ ] Journey badge newer revision tampil.
-- [ ] Jika melakukan perubahan visual besar, verifikasi di browser lokal.
+- [x] Smoke UI:
+  - [x] BB detail history tampil.
+  - [x] GB picker hanya latest.
+  - [x] GB detail history tampil.
+  - [x] DK picker hanya latest.
+  - [x] DK detail tetap concrete snapshot.
+  - [x] Journey badge newer revision tampil.
+- [x] Jika melakukan perubahan visual besar, verifikasi di browser lokal.
 
 Done Criteria:
 

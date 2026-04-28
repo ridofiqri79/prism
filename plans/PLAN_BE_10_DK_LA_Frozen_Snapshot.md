@@ -89,11 +89,11 @@ Acceptance:
 
 Checklist:
 
-- [ ] Tambah/update test DK create dengan input GB lama tetapi identity punya snapshot baru.
+- [x] Tambah/update test DK create dengan input GB lama tetapi identity punya snapshot baru.
 - [x] Verify junction tersimpan menunjuk latest GB snapshot saat create.
-- [ ] Tambah/update test DK tetap menunjuk snapshot lama setelah GB revisi baru dibuat.
-- [ ] Tambah/update test lender validation memakai concrete snapshot.
-- [ ] Tambah/update test LA tetap mengikuti DK Project yang tersimpan.
+- [x] Tambah/update test DK tetap menunjuk snapshot lama setelah GB revisi baru dibuat.
+- [x] Tambah/update test lender validation memakai concrete snapshot.
+- [x] Tambah/update test LA tetap mengikuti DK Project yang tersimpan.
 - [x] Jalankan `go test ./...`.
 - [x] Jalankan smoke API:
   - [x] create BB original + revision.
