@@ -9,6 +9,7 @@ import { journeyRoutes } from '@/router/routes/journey.routes'
 import { loanAgreementRoutes } from '@/router/routes/loan-agreement.routes'
 import { masterRoutes } from '@/router/routes/master.routes'
 import { monitoringRoutes } from '@/router/routes/monitoring.routes'
+import { projectRoutes } from '@/router/routes/project.routes'
 import { userRoutes } from '@/router/routes/user.routes'
 import { resolveRouteTitle } from '@/utils/route-title'
 
@@ -18,6 +19,7 @@ const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/layouts/AppLayout.vue'),
     children: [
       ...dashboardRoutes,
+      ...projectRoutes,
       ...masterRoutes,
       ...blueBookRoutes,
       ...greenBookRoutes,

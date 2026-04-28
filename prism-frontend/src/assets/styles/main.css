@@ -172,4 +172,68 @@
     background: rgba(60, 203, 107, 0.12);
     color: #157e5c;
   }
+
+  .prism-table-reload-shell {
+    position: relative;
+  }
+
+  .prism-table-reload-content {
+    transition:
+      opacity 200ms ease,
+      filter 200ms ease;
+  }
+
+  .prism-table-reload-shell.is-refreshing .prism-table-reload-content {
+    opacity: 0.62;
+    filter: saturate(0.92);
+  }
+
+  .prism-table-reload-indicator {
+    pointer-events: none;
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(31, 181, 178, 0.2);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.375rem 0.75rem;
+    color: #0f8f8c;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1rem;
+    box-shadow: 0 8px 20px rgba(15, 143, 140, 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .prism-table-reload-indicator i {
+    font-size: 0.7rem;
+  }
+}
+
+@layer components {
+  .prism-table-reload-enter-active,
+  .prism-table-reload-leave-active,
+  .prism-table-row-fade-move,
+  .prism-table-row-fade-enter-active,
+  .prism-table-row-fade-leave-active {
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease;
+  }
+
+  .prism-table-reload-enter-from,
+  .prism-table-reload-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  .prism-table-row-fade-enter-from,
+  .prism-table-row-fade-leave-to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }

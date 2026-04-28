@@ -53,6 +53,7 @@ func main() {
 	monitoringService := service.NewMonitoringService(pool, q, broker)
 	dashboardService := service.NewDashboardService(q)
 	journeyService := service.NewJourneyService(q)
+	projectService := service.NewProjectService(q)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -63,6 +64,7 @@ func main() {
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	journeyHandler := handler.NewJourneyHandler(journeyService)
+	projectHandler := handler.NewProjectHandler(projectService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -215,6 +217,7 @@ func main() {
 	dashboard.GET("/summary", dashboardHandler.Summary)
 	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
 
+	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
 
 	e.GET("/events", handler.SSEHandler(broker))

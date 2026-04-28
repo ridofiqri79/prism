@@ -66,6 +66,7 @@ function filterNavigation(items: NavigationItem[]) {
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-home' },
+    { label: 'Project', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
   ]),
 )

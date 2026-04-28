@@ -20,6 +20,7 @@ import type {
   ProgramTitlePayload,
   Region,
   RegionPayload,
+  RegionType,
 } from '@/types/master.types'
 
 type MasterKey =
@@ -67,6 +68,18 @@ export const useMasterStore = defineStore('master', () => {
   async function fetchRegions(force = false, params?: ListParams) {
     if (loaded.value.regions && !force) return
     regions.value = (await MasterService.getRegions(params)).data
+    loaded.value.regions = true
+  }
+
+  async function fetchAllRegionLevels(force = false) {
+    if (loaded.value.regions && !force) return
+
+    const levels: RegionType[] = ['COUNTRY', 'PROVINCE', 'CITY']
+    const responses = await Promise.all(
+      levels.map((type) => MasterService.getRegions({ type, limit: 10000, sort: 'name', order: 'asc' })),
+    )
+
+    regions.value = responses.flatMap((response) => response.data)
     loaded.value.regions = true
   }
 
@@ -312,6 +325,7 @@ export const useMasterStore = defineStore('master', () => {
     fetchLenders,
     fetchInstitutions,
     fetchRegions,
+    fetchAllRegionLevels,
     fetchProgramTitles,
     fetchBappenasPartners,
     fetchPeriods,

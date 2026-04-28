@@ -5,6 +5,7 @@ import PrimeDataTable from 'primevue/datatable'
 import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/common/EmptyState.vue'
+import TableReloadShell from '@/components/common/TableReloadShell.vue'
 
 export interface ColumnDef {
   field: string
@@ -44,6 +45,8 @@ const emit = defineEmits<{
 
 const first = computed(() => (props.page - 1) * props.limit)
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
+const initialLoading = computed(() => props.loading && props.data.length === 0)
+const refreshingRows = computed(() => props.loading && props.data.length > 0)
 
 function handlePage(event: PageEvent) {
   emit('update:page', event.page + 1)
@@ -64,7 +67,7 @@ function handleSort(event: SortEvent) {
 
 <template>
   <div class="space-y-4">
-    <div v-if="loading" class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+    <div v-if="initialLoading" class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <div
         v-for="row in skeletonRows"
         :key="row"
@@ -77,29 +80,30 @@ function handleSort(event: SortEvent) {
 
     <EmptyState v-else-if="data.length === 0" />
 
-    <PrimeDataTable
-      v-else
-      :value="data"
-      lazy
-      striped-rows
-      data-key="id"
-      class="overflow-hidden rounded-lg border border-surface-200"
-      @sort="handleSort"
-    >
-      <PrimeColumn
-        v-for="column in columns"
-        :key="column.field"
-        :field="column.field"
-        :header="column.header"
-        :sortable="column.sortable"
+    <TableReloadShell v-else :refreshing="refreshingRows">
+      <PrimeDataTable
+        :value="data"
+        lazy
+        striped-rows
+        data-key="id"
+        class="overflow-hidden rounded-lg border border-surface-200"
+        @sort="handleSort"
       >
-        <template #body="{ data: row }">
-          <slot name="body-row" :row="row" :column="column">
-            {{ row[column.field] }}
-          </slot>
-        </template>
-      </PrimeColumn>
-    </PrimeDataTable>
+        <PrimeColumn
+          v-for="column in columns"
+          :key="column.field"
+          :field="column.field"
+          :header="column.header"
+          :sortable="column.sortable"
+        >
+          <template #body="{ data: row }">
+            <slot name="body-row" :row="row" :column="column">
+              {{ row[column.field] }}
+            </slot>
+          </template>
+        </PrimeColumn>
+      </PrimeDataTable>
+    </TableReloadShell>
 
     <Paginator
       :first="first"

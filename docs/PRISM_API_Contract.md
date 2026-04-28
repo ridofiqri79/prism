@@ -1026,6 +1026,59 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ---
 
+### `GET /projects`
+
+**Permission:** read: `bb_project`
+
+Menampilkan master table seluruh BB Project aktif. Tanpa query filter, endpoint mengembalikan semua project BB yang tersedia dengan pagination.
+
+**Query Params:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `page`, `limit` | Pagination standar |
+| `sort`, `order` | Sorting standar. `sort`: `project_name`, `bb_code`, `loan_types`, `indication_lenders`, `executing_agencies`, `fixed_lenders`, `project_status`, `pipeline_status`, `program_title`, `locations`, `foreign_loan_usd`, `dk_dates`. `order`: `asc` atau `desc` |
+| `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
+| `indication_lender_ids` | Multi value UUID lender dari `lender_indication` BB |
+| `executing_agency_ids` | Multi value UUID institution role `Executing Agency` |
+| `fixed_lender_ids` | Multi value UUID lender dari `gb_funding_source` Green Book |
+| `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
+| `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `program_title_ids` | Multi value UUID program title |
+| `region_ids` | Multi value UUID region/location |
+| `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
+| `dk_date_from`, `dk_date_to` | Range tanggal DK, format `YYYY-MM-DD` |
+| `search` | Search global untuk nama proyek, indikasi lender, fixed lender Green Book, dan executing agency |
+
+Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&loan_types=KSA`), comma-separated value, atau format array query string (`loan_types[]=Bilateral`).
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "blue_book_id": "uuid",
+      "bb_code": "BB-2025-001",
+      "project_name": "Pembangunan Jalan Tol Trans Sumatera",
+      "loan_types": ["Bilateral"],
+      "indication_lenders": ["JICA"],
+      "executing_agencies": ["Kementerian PUPR"],
+      "fixed_lenders": ["JICA"],
+      "project_status": "Ongoing",
+      "pipeline_status": "Monitoring",
+      "program_title": "Infrastruktur Transportasi",
+      "locations": ["Sumatera Utara"],
+      "foreign_loan_usd": 250000000,
+      "dk_dates": ["2025-02-01"]
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
+}
+```
+
+---
+
 ### `GET /projects/:bb_project_id/journey`
 
 **Permission:** Authenticated
