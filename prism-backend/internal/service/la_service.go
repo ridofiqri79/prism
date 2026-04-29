@@ -66,6 +66,9 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 		if err := validateLALender(ctx, qtx, parsed.DKProjectID, parsed.LenderID); err != nil {
 			return err
 		}
+		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
+			return err
+		}
 		row, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
 			DkProjectID:         parsed.DKProjectID,
 			LenderID:            parsed.LenderID,
@@ -102,6 +105,9 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 			return mapNotFound(err, "Loan Agreement tidak ditemukan")
 		}
 		if err := validateLALender(ctx, qtx, current.DkProjectID, parsed.LenderID); err != nil {
+			return err
+		}
+		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
 			return err
 		}
 		row, err := qtx.UpdateLoanAgreement(ctx, queries.UpdateLoanAgreementParams{
@@ -205,6 +211,8 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 	if strings.TrimSpace(req.Currency) == "" {
 		return parsedLoanAgreementRequest{}, validation("currency", "wajib diisi")
 	}
+	currency := normalizeCurrency(req.Currency)
+	amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, req.AmountOriginal, req.AmountUSD)
 	return parsedLoanAgreementRequest{
 		DKProjectID:         dkProjectID,
 		LenderID:            lenderID,
@@ -213,9 +221,9 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 		EffectiveDate:       effectiveDate,
 		OriginalClosingDate: originalClosingDate,
 		ClosingDate:         closingDate,
-		Currency:            normalizeCurrency(req.Currency),
-		AmountOriginal:      numericFromFloat(req.AmountOriginal),
-		AmountUsd:           numericFromFloat(req.AmountUSD),
+		Currency:            currency,
+		AmountOriginal:      numericFromFloat(amountOriginal),
+		AmountUsd:           numericFromFloat(amountUSD),
 	}, nil
 }
 

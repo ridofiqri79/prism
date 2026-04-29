@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
@@ -27,7 +28,7 @@ const toast = useToast()
 const blueBookId = computed(() => String(route.params.bbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const isEditMode = computed(() => route.name === 'bb-project-edit')
-const pageTitle = computed(() => (isEditMode.value ? 'Edit BB Project' : 'Tambah BB Project'))
+const pageTitle = computed(() => (isEditMode.value ? 'Edit Proyek Blue Book' : 'Tambah Proyek Blue Book'))
 
 const form = useBBProjectForm()
 
@@ -49,7 +50,7 @@ async function loadData() {
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchInstitutions(true, { limit: 1000 }),
-    masterStore.fetchRegions(true, { limit: 1000 }),
+    masterStore.fetchAllRegionLevels(true),
     masterStore.fetchNationalPriorities(true, { limit: 1000 }),
     masterStore.fetchLenders(true, { limit: 1000 }),
   ])
@@ -63,13 +64,13 @@ async function loadData() {
 const onSubmit = form.submit(async (values) => {
   if (isEditMode.value) {
     await blueBookStore.updateProject(blueBookId.value, projectId.value, values)
-    toast.success('Berhasil', 'BB Project berhasil diperbarui')
+    toast.success('Berhasil', 'Proyek Blue Book berhasil diperbarui')
     await router.push({ name: 'bb-project-detail', params: { bbId: blueBookId.value, id: projectId.value } })
     return
   }
 
   const created = await blueBookStore.createProject(blueBookId.value, values)
-  toast.success('Berhasil', 'BB Project berhasil dibuat')
+  toast.success('Berhasil', 'Proyek Blue Book berhasil dibuat')
   await router.push({ name: 'bb-project-detail', params: { bbId: blueBookId.value, id: created.id } })
 })
 
@@ -125,7 +126,7 @@ onMounted(() => {
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Kode BB</span>
+            <span class="text-sm font-medium text-surface-700">Kode Blue Book</span>
             <InputText v-model="form.values.bb_code" class="w-full" :disabled="isEditMode" />
             <small v-if="form.errors.bb_code" class="text-red-600">{{ form.errors.bb_code }}</small>
           </label>
@@ -135,8 +136,9 @@ onMounted(() => {
             <small v-if="form.errors.project_name" class="text-red-600">{{ form.errors.project_name }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Durasi</span>
-            <InputText v-model="form.values.duration" class="w-full" placeholder="2025-2030" />
+            <span class="text-sm font-medium text-surface-700">Durasi (bulan)</span>
+            <InputNumber v-model="form.values.duration" class="w-full" :min="1" :use-grouping="false" />
+            <small v-if="form.errors.duration" class="text-red-600">{{ form.errors.duration }}</small>
           </label>
         </div>
         <div class="grid gap-4 md:grid-cols-2">

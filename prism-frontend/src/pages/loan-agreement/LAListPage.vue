@@ -29,10 +29,10 @@ const isExtendedOptions = [
   { label: 'Tidak diperpanjang', value: false },
 ]
 const columns: ColumnDef[] = [
-  { field: 'loan_code', header: 'Kode Loan' },
+  { field: 'loan_code', header: 'Kode Pinjaman' },
   { field: 'lender', header: 'Lender' },
   { field: 'effective_date', header: 'Tanggal Efektif' },
-  { field: 'closing_date', header: 'Tanggal Closing' },
+  { field: 'closing_date', header: 'Tanggal Penutupan' },
   { field: 'currency', header: 'Mata Uang' },
   { field: 'amount_usd', header: 'Nilai USD' },
   { field: 'status', header: 'Status' },
@@ -87,7 +87,7 @@ onMounted(() => {
           v-if="can('loan_agreement', 'create')"
           as="router-link"
           :to="{ name: 'loan-agreement-create' }"
-          label="Buat LA"
+          label="Buat Loan Agreement"
           icon="pi pi-plus"
         />
       </template>
@@ -110,7 +110,7 @@ onMounted(() => {
           />
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Closing Sebelum Tanggal</span>
+          <span class="text-sm font-medium text-surface-700">Penutupan Sebelum Tanggal</span>
           <DatePicker v-model="closingDateBefore" date-format="yy-mm-dd" show-icon class="w-full" />
         </label>
         <div class="flex items-end gap-2">

@@ -97,7 +97,7 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.types.ts
 │   │   ├── loan-agreement.types.ts
 │   │   ├── monitoring.types.ts
-│   │   └── master.types.ts  # Country, Lender, Institution, Region, dll
+│   │   └── master.types.ts  # Country, Currency, Lender, Institution, Region, dll
 │   │
 │   ├── schemas/                       # Zod validation schemas — satu file per modul
 │   │   ├── blue-book.schema.ts
@@ -155,6 +155,7 @@ prism-frontend/
 │   │   │
 │   │   ├── master/
 │   │   │   ├── LenderPage.vue
+│   │   │   ├── CurrencyPage.vue
 │   │   │   ├── InstitutionPage.vue
 │   │   │   ├── RegionPage.vue
 │   │   │   ├── ProgramTitlePage.vue
@@ -181,6 +182,7 @@ prism-frontend/
 │       │   ├── LocationMultiSelect.vue    # Multi-select region dengan hierarki
 │       │   ├── InstitutionSelect.vue      # Select institution dengan filter level
 │       │   ├── LenderSelect.vue           # Select lender dengan filter type
+│       │   ├── CurrencySelect.vue         # Select currency dari Master Currency aktif
 │       │   ├── ProgramTitleSelect.vue     # Select program title (parent-child)
 │       │   ├── NationalPriorityMultiSelect.vue
 │       │   └── CurrencyInput.vue          # Input angka dengan format currency
@@ -194,7 +196,7 @@ prism-frontend/
 │       ├── green-book/
 │       │   ├── GBProjectCard.vue
 │       │   ├── ActivitiesTable.vue        # Tabel activities (editable, dengan sort_order)
-│       │   ├── FundingSourceTable.vue     # Tabel funding source cofinancing (editable)
+│       │   ├── FundingSourceTable.vue     # Tabel funding source cofinancing + currency/original/USD
 │       │   ├── DisbursementPlanTable.vue  # Tabel disbursement plan per tahun (editable)
 │       │   └── FundingAllocationTable.vue # Tabel alokasi per activity (editable)
 │       │
@@ -670,7 +672,7 @@ export const gbProjectSchema = z.object({
   program_title_id:    z.string().uuid('Program Title wajib dipilih'),
   gb_code:             z.string().min(1, 'GB Code wajib diisi'),
   project_name:        z.string().min(1, 'Nama proyek wajib diisi'),
-  duration:            z.string().optional(),
+  duration:            z.number().int().positive().optional().nullable(),
   objective:           z.string().optional(),
   scope_of_project:    z.string().optional(),
   bb_project_ids:      z.array(z.string().uuid()).min(1, 'Minimal 1 BB Project'),
@@ -681,6 +683,8 @@ export const gbProjectSchema = z.object({
 
 export type GBProjectFormValues = z.infer<typeof gbProjectSchema>
 ```
+
+`LocationMultiSelect` wajib memuat seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`) melalui `fetchAllRegionLevels()`, bukan hanya daftar default/paginated. Durasi proyek di form BB Project, GB Project, dan DK Project adalah angka bulan (`number | null`) dan dikirim sebagai integer. Currency mulai dicatat pada Funding Source Green Book dengan `CurrencySelect` dari Master Currency aktif; jika currency `USD`, form tidak meminta input USD terpisah dan payload menyamakan nilai USD dengan nilai original. Pada DK Project, picker `GB Project` ditempatkan paling atas dan perubahan pilihan memanggil autofill di `useDKProjectForm()` untuk mengisi field turunan dari GB Project terpilih; hasilnya tetap editable sebelum submit.
 
 ---
 

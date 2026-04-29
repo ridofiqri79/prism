@@ -21,7 +21,7 @@ type CreateGBProjectRequest struct {
 	ProgramTitleID        *string                   `json:"program_title_id"`
 	GBCode                string                    `json:"gb_code" validate:"required"`
 	ProjectName           string                    `json:"project_name" validate:"required"`
-	Duration              *string                   `json:"duration"`
+	Duration              *int32                    `json:"duration"`
 	Objective             *string                   `json:"objective"`
 	ScopeOfProject        *string                   `json:"scope_of_project"`
 	BBProjectIDs          []string                  `json:"bb_project_ids" validate:"required,min=1"`
@@ -46,6 +46,10 @@ type GBActivityItem struct {
 type GBFundingSourceItem struct {
 	LenderID      string  `json:"lender_id" validate:"required"`
 	InstitutionID *string `json:"institution_id"`
+	Currency      string  `json:"currency"`
+	LoanOriginal  float64 `json:"loan_original"`
+	GrantOriginal float64 `json:"grant_original"`
+	LocalOriginal float64 `json:"local_original"`
 	LoanUSD       float64 `json:"loan_usd"`
 	GrantUSD      float64 `json:"grant_usd"`
 	LocalUSD      float64 `json:"local_usd"`
@@ -72,7 +76,7 @@ type GBProjectResponse struct {
 	ProgramTitleID       *string                       `json:"program_title_id,omitempty"`
 	GBCode               string                        `json:"gb_code"`
 	ProjectName          string                        `json:"project_name"`
-	Duration             *string                       `json:"duration"`
+	Duration             *int32                        `json:"duration"`
 	Objective            *string                       `json:"objective"`
 	ScopeOfProject       *string                       `json:"scope_of_project"`
 	BBProjects           []BBProjectSummary            `json:"bb_projects"`
@@ -124,12 +128,16 @@ type GBActivityResponse struct {
 }
 
 type GBFundingSourceResponse struct {
-	ID          string           `json:"id"`
-	Lender      LenderInfo       `json:"lender"`
-	Institution *InstitutionInfo `json:"institution,omitempty"`
-	LoanUSD     float64          `json:"loan_usd"`
-	GrantUSD    float64          `json:"grant_usd"`
-	LocalUSD    float64          `json:"local_usd"`
+	ID            string           `json:"id"`
+	Lender        LenderInfo       `json:"lender"`
+	Institution   *InstitutionInfo `json:"institution,omitempty"`
+	Currency      string           `json:"currency"`
+	LoanOriginal  float64          `json:"loan_original"`
+	GrantOriginal float64          `json:"grant_original"`
+	LocalOriginal float64          `json:"local_original"`
+	LoanUSD       float64          `json:"loan_usd"`
+	GrantUSD      float64          `json:"grant_usd"`
+	LocalUSD      float64          `json:"local_usd"`
 }
 
 type InstitutionInfo struct {

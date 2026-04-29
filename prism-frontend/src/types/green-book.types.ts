@@ -37,7 +37,7 @@ export interface GBProject {
   program_title_id?: string
   gb_code: string
   project_name: string
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_project?: string | null
   program_title?: ProgramTitle
@@ -75,6 +75,10 @@ export interface GBFundingSource {
   id: string
   lender: Lender
   institution?: Institution
+  currency: string
+  loan_original: number
+  grant_original: number
+  local_original: number
   loan_usd: number
   grant_usd: number
   local_usd: number
@@ -83,6 +87,10 @@ export interface GBFundingSource {
 export interface GBFundingSourcePayload {
   lender_id: string
   institution_id?: string | null
+  currency: string
+  loan_original: number
+  grant_original: number
+  local_original: number
   loan_usd: number
   grant_usd: number
   local_usd: number
@@ -128,7 +136,7 @@ export interface GBProjectPayload {
   program_title_id: string
   gb_code: string
   project_name: string
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_project?: string | null
   bb_project_ids: string[]

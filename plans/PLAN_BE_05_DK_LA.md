@@ -38,6 +38,8 @@ VALUES ($1, $2, $3, $4, $5) RETURNING *;
 UPDATE dk_project SET program_title_id=$2, institution_id=$3, duration=$4, objectives=$5, updated_at=NOW()
 WHERE id=$1 RETURNING *;
 
+-- Catatan: duration bertipe integer jumlah bulan, nullable, dan jika diisi harus > 0.
+
 -- name: DeleteDKProject :exec
 DELETE FROM dk_project WHERE id=$1;
 

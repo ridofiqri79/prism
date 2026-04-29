@@ -14,7 +14,7 @@ export interface BBProjectFormValues {
   bappenas_partner_id: string
   bb_code: string
   project_name: string
-  duration: string
+  duration: number | null
   objective: string
   scope_of_work: string
   outputs: string
@@ -45,7 +45,7 @@ function defaultValues(): BBProjectFormValues {
     bappenas_partner_id: '',
     bb_code: '',
     project_name: '',
-    duration: '',
+    duration: null,
     objective: '',
     scope_of_work: '',
     outputs: '',
@@ -65,7 +65,7 @@ function fromProject(project?: BBProject | null): Partial<BBProjectFormValues> {
     bappenas_partner_id: project.bappenas_partner_id ?? project.bappenas_partner?.id ?? '',
     bb_code: project.bb_code,
     project_name: project.project_name,
-    duration: project.duration ?? '',
+    duration: project.duration ?? null,
     objective: project.objective ?? '',
     scope_of_work: project.scope_of_work ?? '',
     outputs: project.outputs ?? '',
@@ -135,7 +135,7 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
   function toPayload(): BBProjectPayload {
     return {
       ...values,
-      duration: values.duration || null,
+      duration: values.duration ?? null,
       objective: values.objective || null,
       scope_of_work: values.scope_of_work || null,
       outputs: values.outputs || null,

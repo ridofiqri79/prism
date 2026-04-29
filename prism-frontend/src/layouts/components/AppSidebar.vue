@@ -94,6 +94,7 @@ const referenceItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Negara', to: '/master/countries', icon: 'pi pi-globe', module: 'country' },
     { label: 'Lender', to: '/master/lenders', icon: 'pi pi-building-columns', module: 'lender' },
+    { label: 'Currency', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
     { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
     { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {

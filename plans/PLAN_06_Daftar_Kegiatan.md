@@ -12,7 +12,7 @@
 **`src/types/daftar-kegiatan.types.ts`:**
 ```typescript
 export interface DaftarKegiatan { id: string; letter_number?: string; subject: string; date: string }
-export interface DKProject { id: string; dk: DaftarKegiatan; program_title?: ProgramTitle; institution?: Institution; duration?: string; objectives?: string; gb_projects: GBProjectSummary[]; locations: Region[]; financing_details: DKFinancingDetail[]; loan_allocations: DKLoanAllocation[]; activity_details: DKActivityDetail[] }
+export interface DKProject { id: string; dk: DaftarKegiatan; program_title?: ProgramTitle; institution?: Institution; duration?: number | null; objectives?: string; gb_projects: GBProjectSummary[]; locations: Region[]; financing_details: DKFinancingDetail[]; loan_allocations: DKLoanAllocation[]; activity_details: DKActivityDetail[] }
 export interface DKFinancingDetail { id: string; lender?: Lender; currency: string; amount_original: number; grant_original: number; counterpart_original: number; amount_usd: number; grant_usd: number; counterpart_usd: number; remarks?: string }
 export interface DKLoanAllocation { id: string; institution?: Institution; currency: string; amount_original: number; grant_original: number; counterpart_original: number; amount_usd: number; grant_usd: number; counterpart_usd: number; remarks?: string }
 export interface DKActivityDetail { id: string; activity_number: number; activity_name: string }
@@ -29,7 +29,7 @@ export const daftarKegiatanSchema = z.object({
 export const dkProjectSchema = z.object({
   program_title_id: z.string().uuid().optional(),
   institution_id: z.string().uuid('Executing Agency wajib dipilih'),
-  duration: z.string().optional(),
+  duration: z.number().int().positive().optional().nullable(),
   objectives: z.string().optional(),
   gb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 GB Project'),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
@@ -100,7 +100,7 @@ export function useDKProjectForm(initialData?) {
 Gunakan `useDKProjectForm()`.
 
 **Section 1 - Header Proyek:**
-program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), duration, objectives, gb_project_ids (MultiSelect GB Project), location_ids (`<LocationMultiSelect>`)
+gb_project_ids (MultiSelect GB Project) ditempatkan paling atas. Saat user memilih GB Project, form mengisi otomatis program_title_id, institution_id dari Executing Agency GB pertama, duration bulan, objectives dari objective GB, location_ids, financing detail dari funding source GB, loan allocation dari institution funding source atau institution proyek GB, dan activity detail dari activities GB. Semua field hasil autofill tetap editable sebelum disimpan. Field setelahnya: program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), duration bulan (`<InputNumber>` integer), location_ids (`<LocationMultiSelect>`), objectives.
 
 **Section 2 - Financing Detail (tabel multi-currency):**
 Kolom: lender_id (`<LenderSelect :allowedIds>`), currency (text input ISO), amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd (`<CurrencyInput>`), remarks. Tombol "Tambah Baris". Tampilkan catatan: "Konversi ke USD dilakukan manual".

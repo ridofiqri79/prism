@@ -21,6 +21,17 @@
 
 ---
 
+## 2a. Aturan Currency
+
+- `currency` memakai kode ISO 4217 dari Master Currency.
+- Currency yang dapat dipilih pada Green Book, DK, dan LA hanya currency dengan `is_active = true`.
+- Pencatatan currency dimulai dari Green Book Funding Source. DK melakukan autofill currency dan nilai original/USD dari Funding Source GB, lalu tetap dapat diedit sebelum disimpan.
+- Jika currency adalah `USD`, user tidak perlu mengisi nilai USD terpisah. Backend menyimpan nilai USD sama dengan nilai original.
+- Seed awal Master Currency berisi mata uang negara donor/lender dan mata uang yang lazim dipakai lembaga multilateral. `XDR` disediakan nonaktif sebagai referensi Special Drawing Rights.
+- Konversi ke USD dan IDR tetap manual oleh Staff. Sistem tidak melakukan konversi otomatis.
+
+---
+
 ## 3. Aturan Blue Book
 
 > Detail versioning BB/GB: `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`.
@@ -49,6 +60,7 @@
 - Revisi Green Book boleh menyalin GB Project yang sama persis dari revisi sebelumnya.
 - GB Project wajib mereferensikan minimal 1 BB Project.
 - Saat GB Project dibuat atau direvisi, relasi ke BB Project harus memakai versi BB Project terbaru untuk logical project terkait.
+- Funding Source Green Book menyimpan `currency`, nilai original, dan nilai USD. Untuk `USD`, nilai original dan USD harus sama.
 - `gb_funding_allocation` mereferensikan `gb_activity` — selalu sinkron, jika activity dihapus, allocation ikut terhapus (CASCADE).
 - Disbursement Plan: total proyek per tahun — bukan per lender. Kombinasi `(gb_project_id, year)` unik.
 
@@ -87,8 +99,16 @@
 ## 8. Aturan Wilayah
 
 - Pilih Nasional → otomatis mencakup seluruh provinsi. Simpan hanya `region_id` Nasional di DB.
-- Frontend nonaktifkan pilihan provinsi jika Nasional sudah dipilih.
-- Location BB, GB, DK: multi-select, bisa level Provinsi atau Kota/Kabupaten.
+- COUNTRY/Nasional juga mencakup seluruh CITY di bawah provinsi turunannya.
+- Frontend nonaktifkan pilihan PROVINCE/CITY jika COUNTRY/Nasional sudah dipilih.
+- Location BB, GB, DK: multi-select dan boleh memilih seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`).
+
+---
+
+## 8a. Aturan Durasi Proyek
+
+- Durasi proyek pada BB Project, GB Project, dan DK Project disimpan sebagai integer jumlah bulan.
+- Durasi kosong boleh `NULL`; jika diisi harus lebih dari 0 bulan.
 
 ---
 
@@ -114,6 +134,7 @@
 | `monitoring_disbursement` | Monitoring + Komponen |
 | `institution` | Master Institution |
 | `lender` | Master Lender |
+| `currency` | Master Currency |
 | `region` | Master Wilayah |
 | `national_priority` | Master National Priority |
 | `program_title` | Master Program Title |

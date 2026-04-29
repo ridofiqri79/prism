@@ -190,7 +190,7 @@ func (s *GreenBookService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
 			ProgramTitleID:      uuidOrInvalid(req.ProgramTitleID),
 			GbCode:              strings.TrimSpace(req.GBCode),
 			ProjectName:         strings.TrimSpace(req.ProjectName),
-			Duration:            nullableTextPtr(req.Duration),
+			Duration:            int4Ptr(req.Duration),
 			Objective:           nullableTextPtr(req.Objective),
 			ScopeOfProject:      nullableTextPtr(req.ScopeOfProject),
 		})
@@ -225,7 +225,7 @@ func (s *GreenBookService) UpdateGBProject(ctx context.Context, gbID, id pgtype.
 			ID:             id,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			ProjectName:    strings.TrimSpace(req.ProjectName),
-			Duration:       nullableTextPtr(req.Duration),
+			Duration:       int4Ptr(req.Duration),
 			Objective:      nullableTextPtr(req.Objective),
 			ScopeOfProject: nullableTextPtr(req.ScopeOfProject),
 		})
@@ -449,13 +449,24 @@ func (s *GreenBookService) replaceGBProjectChildren(ctx context.Context, qtx *qu
 		if err != nil {
 			return err
 		}
+		currency := normalizeCurrency(item.Currency)
+		if err := validateActiveCurrency(ctx, qtx, "funding_sources.currency", currency); err != nil {
+			return err
+		}
+		loanOriginal, loanUSD := normalizeCurrencyAmountPair(currency, item.LoanOriginal, item.LoanUSD)
+		grantOriginal, grantUSD := normalizeCurrencyAmountPair(currency, item.GrantOriginal, item.GrantUSD)
+		localOriginal, localUSD := normalizeCurrencyAmountPair(currency, item.LocalOriginal, item.LocalUSD)
 		if _, err := qtx.CreateGBFundingSource(ctx, queries.CreateGBFundingSourceParams{
 			GbProjectID:   projectID,
 			LenderID:      lenderID,
 			InstitutionID: institutionID,
-			LoanUsd:       numericFromFloat(item.LoanUSD),
-			GrantUsd:      numericFromFloat(item.GrantUSD),
-			LocalUsd:      numericFromFloat(item.LocalUSD),
+			Currency:      currency,
+			LoanOriginal:  numericFromFloat(loanOriginal),
+			GrantOriginal: numericFromFloat(grantOriginal),
+			LocalOriginal: numericFromFloat(localOriginal),
+			LoanUsd:       numericFromFloat(loanUSD),
+			GrantUsd:      numericFromFloat(grantUSD),
+			LocalUsd:      numericFromFloat(localUSD),
 		}); err != nil {
 			return err
 		}
@@ -582,7 +593,7 @@ func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queri
 		ProgramTitleID:      stringPtrFromUUID(row.ProgramTitleID),
 		GBCode:              row.GbCode,
 		ProjectName:         row.ProjectName,
-		Duration:            stringPtrFromText(row.Duration),
+		Duration:            int32PtrFromInt4(row.Duration),
 		Objective:           stringPtrFromText(row.Objective),
 		ScopeOfProject:      stringPtrFromText(row.ScopeOfProject),
 		BBProjects:          make([]model.BBProjectSummary, 0, len(bbProjects)),
@@ -641,6 +652,9 @@ func validateGBProjectRequest(req model.CreateGBProjectRequest, validateCode boo
 	if strings.TrimSpace(req.ProjectName) == "" {
 		return validation("project_name", "wajib diisi")
 	}
+	if req.Duration != nil && *req.Duration <= 0 {
+		return validation("duration", "harus lebih dari 0 bulan")
+	}
 	if len(req.BBProjectIDs) == 0 {
 		return validation("bb_project_ids", "Minimal 1 BB Project")
 	}
@@ -690,11 +704,15 @@ func (s *GreenBookService) bbProjectSummary(ctx context.Context, row queries.BbP
 
 func gbFundingSourceResponse(row queries.ListGBFundingSourcesByProjectRow) model.GBFundingSourceResponse {
 	res := model.GBFundingSourceResponse{
-		ID:       model.UUIDToString(row.ID),
-		Lender:   model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
-		LoanUSD:  floatFromNumeric(row.LoanUsd),
-		GrantUSD: floatFromNumeric(row.GrantUsd),
-		LocalUSD: floatFromNumeric(row.LocalUsd),
+		ID:            model.UUIDToString(row.ID),
+		Lender:        model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
+		Currency:      row.Currency,
+		LoanOriginal:  floatFromNumeric(row.LoanOriginal),
+		GrantOriginal: floatFromNumeric(row.GrantOriginal),
+		LocalOriginal: floatFromNumeric(row.LocalOriginal),
+		LoanUSD:       floatFromNumeric(row.LoanUsd),
+		GrantUSD:      floatFromNumeric(row.GrantUsd),
+		LocalUSD:      floatFromNumeric(row.LocalUsd),
 	}
 	if row.InstitutionID.Valid {
 		res.Institution = &model.InstitutionInfo{ID: model.UUIDToString(row.InstitutionID), Name: row.InstitutionName.String, ShortName: stringPtrFromText(row.InstitutionShortName), Level: row.InstitutionLevel.String}

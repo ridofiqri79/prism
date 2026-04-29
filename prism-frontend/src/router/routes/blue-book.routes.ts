@@ -27,7 +27,7 @@ export const blueBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/blue-book/BBProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Tambah BB Project',
+        title: 'Tambah Proyek Blue Book',
       permission: { module: 'bb_project', action: 'create' },
     },
   },
@@ -37,7 +37,7 @@ export const blueBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/blue-book/BBProjectDetailPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Detail BB Project',
+        title: 'Detail Proyek Blue Book',
       permission: { module: 'bb_project', action: 'read' },
     },
   },
@@ -47,7 +47,7 @@ export const blueBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/blue-book/BBProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Edit BB Project',
+        title: 'Edit Proyek Blue Book',
       permission: { module: 'bb_project', action: 'update' },
     },
   },

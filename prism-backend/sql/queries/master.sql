@@ -31,6 +31,49 @@ RETURNING *;
 DELETE FROM country
 WHERE id = $1;
 
+-- ===== CURRENCY =====
+-- name: ListCurrencies :many
+SELECT *
+FROM currency
+WHERE (sqlc.narg('active_filter')::boolean IS NULL OR is_active = sqlc.narg('active_filter'))
+ORDER BY sort_order ASC, code ASC
+LIMIT $1 OFFSET $2;
+
+-- name: CountCurrencies :one
+SELECT COUNT(*)
+FROM currency
+WHERE (sqlc.narg('active_filter')::boolean IS NULL OR is_active = sqlc.narg('active_filter'));
+
+-- name: GetCurrency :one
+SELECT *
+FROM currency
+WHERE id = $1;
+
+-- name: GetCurrencyByCode :one
+SELECT *
+FROM currency
+WHERE code = $1;
+
+-- name: CreateCurrency :one
+INSERT INTO currency (code, name, symbol, is_active, sort_order)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: UpdateCurrency :one
+UPDATE currency
+SET code = $2,
+    name = $3,
+    symbol = $4,
+    is_active = $5,
+    sort_order = $6,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: DeleteCurrency :exec
+DELETE FROM currency
+WHERE id = $1;
+
 -- ===== LENDER =====
 -- name: ListLenders :many
 SELECT

@@ -73,7 +73,7 @@ function isCoveredBySelectedCountry(region: Region) {
 }
 
 onMounted(() => {
-  void masterStore.fetchRegions()
+  void masterStore.fetchAllRegionLevels()
 })
 </script>
 

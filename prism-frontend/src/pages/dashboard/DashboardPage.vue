@@ -47,8 +47,8 @@ const cards = computed(() => {
   const data = summary.value
 
   return [
-    { label: 'Total BB Projects', value: data?.total_bb_projects ?? 0, format: 'number' as const },
-    { label: 'Total GB Projects', value: data?.total_gb_projects ?? 0, format: 'number' as const },
+  { label: 'Total Proyek Blue Book', value: data?.total_bb_projects ?? 0, format: 'number' as const },
+  { label: 'Total Proyek Green Book', value: data?.total_gb_projects ?? 0, format: 'number' as const },
     { label: 'Total Loan Agreements', value: data?.total_loan_agreements ?? 0, format: 'number' as const },
     { label: 'Total Nilai Pinjaman', value: data?.total_amount_usd ?? 0, unit: 'USD', format: 'currency' as const },
     { label: 'Total Realisasi', value: data?.total_realized_usd ?? 0, unit: 'USD', format: 'currency' as const },

@@ -12,7 +12,7 @@
 **`src/types/blue-book.types.ts`:**
 ```typescript
 export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded' }
-export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partner?: BappenasPartner; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: string; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' | 'deleted' }
+export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partner?: BappenasPartner; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' | 'deleted' }
 export interface LenderIndication { id: string; lender: Lender; remarks?: string }
 export interface LoI { id: string; lender: Lender; subject: string; date: string; letter_number?: string }
 export interface BBProjectCost { id: string; funding_type: 'Foreign' | 'Counterpart'; funding_category: string; amount_usd: number }
@@ -36,7 +36,7 @@ export const bbProjectSchema = z.object({
   bappenas_partner_id: z.string().uuid('Bappenas Partner wajib dipilih'),
   bb_code: z.string().min(1, 'BB Code wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
-  duration: z.string().optional(),
+  duration: z.number().int().positive().optional().nullable(),
   objective: z.string().optional(),
   scope_of_work: z.string().optional(),
   outputs: z.string().optional(),
@@ -78,7 +78,8 @@ export const loiSchema = z.object({
 
 - Info header Blue Book (period, publish_date, revision_number, status badge)
 - Tombol "Edit BB" dan "Tambah Proyek"
-- `<DataTable>` BB Projects: bb_code, project_name, executing agency (first), status badge, actions (View, Edit, Delete)
+- `<DataTable>` BB Projects: bb_code, project_name, executing agency (first), status badge, actions (View, Edit, Tambah Green Book, Delete)
+- Action "Tambah Green Book" membuka dialog Green Book tujuan + checkbox "Gunakan data di Blue Book sebagai data Green Book". Jika tidak dicentang, form GB hanya membawa BB Code dan relasi BB Project; jika dicentang, field BB/GB yang sama dari BB Project sumber terisi otomatis tetapi tetap editable sebelum save.
 
 ---
 
@@ -118,7 +119,7 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues>) {
 Gunakan `useBBProjectForm()`. Layout section vertikal:
 
 **Section 1 — Informasi Umum:**
-program_title_id (`<ProgramTitleSelect>`), bappenas_partner_id (Select Eselon II + tampilkan parent Eselon I read-only), bb_code, project_name, duration, objective, scope_of_work, outputs, outcomes (textarea)
+program_title_id (`<ProgramTitleSelect>`), bappenas_partner_id (Select Eselon II + tampilkan parent Eselon I read-only), bb_code, project_name, duration bulan (`<InputNumber>` integer), objective, scope_of_work, outputs, outcomes (textarea)
 
 **Section 2 — Pihak Terlibat:**
 executing_agency_ids (`<InstitutionSelect multiple>`), implementing_agency_ids (`<InstitutionSelect multiple>`)

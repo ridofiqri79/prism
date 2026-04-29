@@ -106,6 +106,12 @@ func main() {
 	master.PUT("/countries/:id", masterHandler.UpdateCountry, middleware.Require("country", "update"))
 	master.DELETE("/countries/:id", masterHandler.DeleteCountry, middleware.Require("country", "delete"))
 
+	master.GET("/currencies", masterHandler.ListCurrencies, middleware.Require("currency", "read"))
+	master.GET("/currencies/:id", masterHandler.GetCurrency, middleware.Require("currency", "read"))
+	master.POST("/currencies", masterHandler.CreateCurrency, middleware.Require("currency", "create"))
+	master.PUT("/currencies/:id", masterHandler.UpdateCurrency, middleware.Require("currency", "update"))
+	master.DELETE("/currencies/:id", masterHandler.DeleteCurrency, middleware.Require("currency", "delete"))
+
 	master.GET("/lenders", masterHandler.ListLenders, middleware.Require("lender", "read"))
 	master.GET("/lenders/:id", masterHandler.GetLender, middleware.Require("lender", "read"))
 	master.POST("/lenders", masterHandler.CreateLender, middleware.Require("lender", "create"))

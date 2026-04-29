@@ -92,6 +92,90 @@ func (s *MasterService) DeleteCountry(ctx context.Context, id pgtype.UUID) error
 	})
 }
 
+func (s *MasterService) ListCurrencies(ctx context.Context, params model.PaginationParams, active string) (*model.ListResponse[model.CurrencyResponse], error) {
+	page, limit, offset := normalizeList(params)
+	activeFilter, err := nullableBool(active)
+	if err != nil {
+		return nil, validation("active", "harus true atau false")
+	}
+	rows, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: int32(limit), Offset: int32(offset), ActiveFilter: activeFilter})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil daftar currency")
+	}
+	total, err := s.queries.CountCurrencies(ctx, activeFilter)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung currency")
+	}
+	data := make([]model.CurrencyResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toCurrencyResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) GetCurrency(ctx context.Context, id pgtype.UUID) (*model.CurrencyResponse, error) {
+	row, err := s.queries.GetCurrency(ctx, id)
+	if err != nil {
+		return nil, mapNotFound(err, "Currency tidak ditemukan")
+	}
+	res := toCurrencyResponse(row)
+	return &res, nil
+}
+
+func (s *MasterService) CreateCurrency(ctx context.Context, req model.CurrencyRequest) (*model.CurrencyResponse, error) {
+	if err := validateCurrency(req); err != nil {
+		return nil, err
+	}
+	var created queries.Currency
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		row, err := qtx.CreateCurrency(ctx, queries.CreateCurrencyParams{
+			Code:      strings.ToUpper(strings.TrimSpace(req.Code)),
+			Name:      req.Name,
+			Symbol:    nullableTextPtr(req.Symbol),
+			IsActive:  req.IsActive,
+			SortOrder: req.SortOrder,
+		})
+		created = row
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	res := toCurrencyResponse(created)
+	return &res, nil
+}
+
+func (s *MasterService) UpdateCurrency(ctx context.Context, id pgtype.UUID, req model.CurrencyRequest) (*model.CurrencyResponse, error) {
+	if err := validateCurrency(req); err != nil {
+		return nil, err
+	}
+	var updated queries.Currency
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		row, err := qtx.UpdateCurrency(ctx, queries.UpdateCurrencyParams{
+			ID:        id,
+			Code:      strings.ToUpper(strings.TrimSpace(req.Code)),
+			Name:      req.Name,
+			Symbol:    nullableTextPtr(req.Symbol),
+			IsActive:  req.IsActive,
+			SortOrder: req.SortOrder,
+		})
+		if err != nil {
+			return mapNotFound(err, "Currency tidak ditemukan")
+		}
+		updated = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	res := toCurrencyResponse(updated)
+	return &res, nil
+}
+
+func (s *MasterService) DeleteCurrency(ctx context.Context, id pgtype.UUID) error {
+	return s.withTx(ctx, func(qtx *queries.Queries) error {
+		return fromPg(qtx.DeleteCurrency(ctx, id))
+	})
+}
+
 func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderType string) (*model.ListResponse[model.LenderResponse], error) {
 	page, limit, offset := normalizeList(params)
 	typeFilter := nullableText(lenderType)
@@ -660,6 +744,21 @@ func validateCountry(req model.CountryRequest) error {
 	return nil
 }
 
+func validateCurrency(req model.CurrencyRequest) error {
+	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Code) == "" {
+		return validation("name", "name dan code wajib diisi")
+	}
+	if len(strings.TrimSpace(req.Code)) != 3 {
+		return validation("code", "harus 3 karakter")
+	}
+	for _, char := range strings.ToUpper(strings.TrimSpace(req.Code)) {
+		if char < 'A' || char > 'Z' {
+			return validation("code", "harus kode ISO 4217")
+		}
+	}
+	return nil
+}
+
 func validateLender(req model.CreateLenderRequest) error {
 	if req.Type != "Bilateral" && req.Type != "Multilateral" && req.Type != "KSA" {
 		return validation("type", "harus Bilateral, Multilateral, atau KSA")
@@ -739,6 +838,19 @@ func nullableTextPtr(value *string) pgtype.Text {
 	return pgtype.Text{String: *value, Valid: true}
 }
 
+func nullableBool(value string) (pgtype.Bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return pgtype.Bool{}, nil
+	case "true":
+		return pgtype.Bool{Bool: true, Valid: true}, nil
+	case "false":
+		return pgtype.Bool{Bool: false, Valid: true}, nil
+	default:
+		return pgtype.Bool{}, pgx.ErrNoRows
+	}
+}
+
 func stringPtrFromText(value pgtype.Text) *string {
 	if !value.Valid {
 		return nil
@@ -763,6 +875,10 @@ func formatMasterTime(value pgtype.Timestamptz) string {
 
 func toCountryResponse(row queries.Country) model.CountryResponse {
 	return model.CountryResponse{ID: model.UUIDToString(row.ID), Name: row.Name, Code: row.Code, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toCurrencyResponse(row queries.Currency) model.CurrencyResponse {
+	return model.CurrencyResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Symbol: stringPtrFromText(row.Symbol), IsActive: row.IsActive, SortOrder: row.SortOrder, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func toLenderListResponse(row queries.ListLendersRow) model.LenderResponse {

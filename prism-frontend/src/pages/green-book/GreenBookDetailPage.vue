@@ -32,9 +32,9 @@ const form = reactive<GreenBookPayload>({
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'gb_code', header: 'GB Code' },
+  { field: 'gb_code', header: 'Kode Green Book' },
   { field: 'project_name', header: 'Nama Proyek' },
-  { field: 'bb_projects', header: 'BB Project' },
+  { field: 'bb_projects', header: 'Proyek Blue Book' },
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
@@ -71,9 +71,9 @@ async function save() {
 }
 
 function deleteProject(project: GBProject) {
-  confirm.confirmDelete(`GB Project ${project.gb_code}`, async () => {
+  confirm.confirmDelete(`Proyek Green Book ${project.gb_code}`, async () => {
     await greenBookStore.deleteProject(greenBookId.value, project.id)
-    toast.success('Berhasil', 'GB Project berhasil dihapus')
+    toast.success('Berhasil', 'Proyek Green Book berhasil dihapus')
     await greenBookStore.fetchProjects(greenBookId.value, { limit: 1000 })
   })
 }
@@ -86,12 +86,12 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="greenBookStore.currentGreenBook ? `GB ${greenBookStore.currentGreenBook.publish_year}` : 'Green Book Detail'"
+      :title="greenBookStore.currentGreenBook ? `Green Book ${greenBookStore.currentGreenBook.publish_year}` : 'Detail Green Book'"
       :subtitle="greenBookStore.currentGreenBook ? formatGBRevision(greenBookStore.currentGreenBook.revision_number) : undefined"
     >
       <template #actions>
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'green-books' })" />
-        <Button v-if="can('green_book', 'update')" label="Edit GB" icon="pi pi-pencil" outlined @click="openEdit" />
+        <Button v-if="can('green_book', 'update')" label="Edit Green Book" icon="pi pi-pencil" outlined @click="openEdit" />
         <Button
           v-if="can('gb_project', 'create')"
           as="router-link"
@@ -104,11 +104,11 @@ onMounted(() => {
 
     <div v-if="greenBookStore.currentGreenBook" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Publish Year</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Tahun Terbit</p>
         <p class="font-semibold text-surface-950">{{ greenBookStore.currentGreenBook.publish_year }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Revision</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Revisi</p>
         <p class="font-semibold text-surface-950">{{ formatGBRevision(greenBookStore.currentGreenBook.revision_number) }}</p>
       </div>
       <div>
@@ -133,7 +133,7 @@ onMounted(() => {
             as="router-link"
             :to="{ name: 'gb-project-detail', params: { gbId: greenBookId, id: row.id } }"
             icon="pi pi-eye"
-            label="View"
+            label="Lihat"
             size="small"
             outlined
           />
@@ -149,7 +149,7 @@ onMounted(() => {
           <Button
             v-if="can('gb_project', 'delete')"
             icon="pi pi-trash"
-            label="Delete"
+            label="Hapus"
             size="small"
             severity="danger"
             outlined
@@ -163,12 +163,12 @@ onMounted(() => {
     <Dialog v-model:visible="dialogVisible" modal header="Edit Green Book" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Publish Year</span>
+          <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
           <InputNumber v-model="form.publish_year" :use-grouping="false" class="w-full" />
           <small v-if="errors.publish_year" class="text-red-600">{{ errors.publish_year }}</small>
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Revision Number</span>
+          <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
           <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           <small v-if="errors.revision_number" class="text-red-600">{{ errors.revision_number }}</small>
         </label>

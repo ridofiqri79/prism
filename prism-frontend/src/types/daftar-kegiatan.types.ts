@@ -19,7 +19,7 @@ export interface DKProject {
   institution_id?: string | null
   program_title?: ProgramTitle
   institution?: Institution
-  duration?: string | null
+  duration?: number | null
   objectives?: string | null
   gb_projects: GBProjectSummary[]
   locations: Region[]
@@ -110,7 +110,7 @@ export interface DKActivityDetailPayload {
 export interface DKProjectPayload {
   program_title_id?: string | null
   institution_id: string
-  duration?: string | null
+  duration?: number | null
   objectives?: string | null
   gb_project_ids: string[]
   location_ids: string[]
@@ -119,7 +119,22 @@ export interface DKProjectPayload {
   activity_details: DKActivityDetailPayload[]
 }
 
-export interface GBProjectOption extends Pick<GBProject, 'id' | 'gb_code' | 'project_name' | 'bb_projects' | 'funding_sources'> {
+export interface GBProjectOption
+  extends Pick<
+    GBProject,
+    | 'id'
+    | 'gb_code'
+    | 'project_name'
+    | 'program_title_id'
+    | 'duration'
+    | 'objective'
+    | 'bb_projects'
+    | 'executing_agencies'
+    | 'implementing_agencies'
+    | 'locations'
+    | 'activities'
+    | 'funding_sources'
+  > {
   green_book_id?: string
   gb_project_identity_id?: string
   is_latest?: boolean

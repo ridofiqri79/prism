@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -14,6 +15,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { blueBookSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
+import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { BBProject, BlueBookPayload } from '@/types/blue-book.types'
 import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
@@ -23,6 +25,7 @@ type BlueBookField = keyof BlueBookPayload
 const route = useRoute()
 const router = useRouter()
 const blueBookStore = useBlueBookStore()
+const greenBookStore = useGreenBookStore()
 const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
@@ -30,15 +33,21 @@ const { can } = usePermission()
 
 const blueBookId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
+const gbCreateDialogVisible = ref(false)
+const selectedBBProject = ref<BBProject | null>(null)
 const form = reactive<BlueBookPayload>({
   period_id: '',
   publish_date: '',
   revision_number: 0,
   revision_year: null,
 })
+const gbCreateForm = reactive({
+  greenBookId: '',
+  useBBData: false,
+})
 const errors = ref<FormErrors<BlueBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'bb_code', header: 'BB Code' },
+  { field: 'bb_code', header: 'Kode Blue Book' },
   { field: 'project_name', header: 'Nama Proyek' },
   { field: 'executing_agency', header: 'Executing Agency' },
   { field: 'status', header: 'Status' },
@@ -50,8 +59,18 @@ async function loadData() {
     masterStore.fetchPeriods(true, { limit: 1000 }),
     blueBookStore.fetchBlueBook(blueBookId.value),
     blueBookStore.fetchProjects(blueBookId.value, { limit: 1000 }),
+    greenBookStore.fetchGreenBooks({ limit: 1000 }),
   ])
 }
+
+const greenBookOptions = computed(() =>
+  greenBookStore.greenBooks
+    .filter((greenBook) => greenBook.status === 'active')
+    .map((greenBook) => ({
+      ...greenBook,
+      label: `Green Book ${greenBook.publish_year} Rev ${greenBook.revision_number}`,
+    })),
+)
 
 function openEdit() {
   const current = blueBookStore.currentBlueBook
@@ -91,10 +110,32 @@ async function save() {
 }
 
 function deleteProject(project: BBProject) {
-  confirm.confirmDelete(`BB Project ${project.bb_code}`, async () => {
+  confirm.confirmDelete(`Proyek Blue Book ${project.bb_code}`, async () => {
     await blueBookStore.deleteProject(blueBookId.value, project.id)
-    toast.success('Berhasil', 'BB Project berhasil dihapus')
+    toast.success('Berhasil', 'Proyek Blue Book berhasil dihapus')
     await blueBookStore.fetchProjects(blueBookId.value, { limit: 1000 })
+  })
+}
+
+function openGBCreateDialog(project: BBProject) {
+  selectedBBProject.value = project
+  gbCreateForm.greenBookId = greenBookOptions.value[0]?.id ?? ''
+  gbCreateForm.useBBData = false
+  gbCreateDialogVisible.value = true
+}
+
+async function createGBProjectFromBB() {
+  if (!selectedBBProject.value || !gbCreateForm.greenBookId) return
+
+  const source = selectedBBProject.value
+  gbCreateDialogVisible.value = false
+  await router.push({
+    name: 'gb-project-create',
+    params: { gbId: gbCreateForm.greenBookId },
+    query: {
+      source_bb_project_id: source.id,
+      source_mode: gbCreateForm.useBBData ? 'existing' : 'new',
+    },
   })
 }
 
@@ -111,7 +152,7 @@ onMounted(() => {
     >
       <template #actions>
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'blue-books' })" />
-        <Button v-if="can('blue_book', 'update')" label="Edit BB" icon="pi pi-pencil" outlined @click="openEdit" />
+        <Button v-if="can('blue_book', 'update')" label="Edit Blue Book" icon="pi pi-pencil" outlined @click="openEdit" />
         <Button
           v-if="can('bb_project', 'create')"
           as="router-link"
@@ -132,7 +173,7 @@ onMounted(() => {
         <p class="font-semibold text-surface-950">{{ blueBookStore.currentBlueBook.publish_date }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Revision</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Revisi</p>
         <p class="font-semibold text-surface-950">
           {{ formatRevision(blueBookStore.currentBlueBook.revision_number, blueBookStore.currentBlueBook.revision_year) }}
         </p>
@@ -161,7 +202,7 @@ onMounted(() => {
             as="router-link"
             :to="{ name: 'bb-project-detail', params: { bbId: blueBookId, id: row.id } }"
             icon="pi pi-eye"
-            label="View"
+            label="Lihat"
             size="small"
             outlined
           />
@@ -175,9 +216,18 @@ onMounted(() => {
             outlined
           />
           <Button
+            v-if="can('gb_project', 'create')"
+            icon="pi pi-plus"
+            label="Tambah Proyek Green Book"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="openGBCreateDialog(row as BBProject)"
+          />
+          <Button
             v-if="can('bb_project', 'delete')"
             icon="pi pi-trash"
-            label="Delete"
+            label="Hapus"
             size="small"
             severity="danger"
             outlined
@@ -210,11 +260,11 @@ onMounted(() => {
         </label>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Revision Number</span>
+            <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
             <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Revision Year</span>
+            <span class="text-sm font-medium text-surface-700">Tahun Revisi</span>
             <InputNumber v-model="form.revision_year" :use-grouping="false" class="w-full" />
           </label>
         </div>
@@ -223,6 +273,38 @@ onMounted(() => {
           <Button type="submit" label="Simpan" icon="pi pi-save" />
         </div>
       </form>
+    </Dialog>
+
+    <Dialog v-model:visible="gbCreateDialogVisible" modal header="Tambah Proyek Green Book" class="w-[34rem] max-w-[95vw]">
+      <div class="space-y-4">
+        <div class="rounded-lg border border-surface-200 bg-surface-50 p-3">
+          <p class="text-xs uppercase tracking-wide text-surface-500">Proyek Blue Book</p>
+          <p class="mt-1 font-semibold text-surface-950">
+            {{ selectedBBProject?.bb_code }} - {{ selectedBBProject?.project_name }}
+          </p>
+        </div>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Green Book Tujuan</span>
+          <Select
+            v-model="gbCreateForm.greenBookId"
+            :options="greenBookOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Green Book"
+            class="w-full"
+          />
+        </label>
+        <label class="flex items-start gap-3 rounded-lg border border-surface-200 bg-white p-3">
+          <Checkbox v-model="gbCreateForm.useBBData" binary input-id="use-bb-data-for-gb" />
+          <span class="text-sm font-medium text-surface-700">
+            Gunakan data di Blue Book sebagai data Green Book
+          </span>
+        </label>
+        <div class="flex justify-end gap-2 border-t border-surface-200 pt-4">
+          <Button label="Batal" severity="secondary" outlined @click="gbCreateDialogVisible = false" />
+          <Button label="Lanjut" icon="pi pi-arrow-right" :disabled="!gbCreateForm.greenBookId" @click="createGBProjectFromBB" />
+        </div>
+      </div>
     </Dialog>
   </section>
 </template>

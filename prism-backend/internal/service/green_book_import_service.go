@@ -33,7 +33,7 @@ type greenBookImportProjectDraft struct {
 	gbCode                string
 	projectName           string
 	programTitleID        pgtype.UUID
-	duration              *string
+	duration              *int32
 	objective             *string
 	scopeOfProject        *string
 	gbProjectIdentityID   pgtype.UUID
@@ -239,7 +239,7 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 				ProgramTitleID:      draft.programTitleID,
 				GbCode:              draft.gbCode,
 				ProjectName:         draft.projectName,
-				Duration:            nullableTextPtr(draft.duration),
+				Duration:            int4Ptr(draft.duration),
 				Objective:           nullableTextPtr(draft.objective),
 				ScopeOfProject:      nullableTextPtr(draft.scopeOfProject),
 			})
@@ -323,13 +323,17 @@ func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *que
 			row:                  row.number,
 			gbCode:               strings.TrimSpace(row.value("gb_code")),
 			projectName:          strings.TrimSpace(row.value("project_name")),
-			duration:             row.optionalString("duration"),
 			objective:            row.optionalString("objective"),
 			scopeOfProject:       row.optionalString("scope_of_project"),
 			activityIndexByNo:    map[string]int{},
 			disbursementYears:    map[int32]struct{}{},
 			allocationByActivity: map[int]model.GBFundingAllocationItem{},
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		if draft.gbCode == "" {
@@ -697,7 +701,15 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			institutionID = &id
 			institutionKey = id
 		}
-		key := normalizeLookupKey(code) + "|" + model.UUIDToString(lender.ID) + "|" + institutionKey
+		currency, err := parseDKImportCurrency(row.value("currency"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = err.Error()
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		key := normalizeLookupKey(code) + "|" + model.UUIDToString(lender.ID) + "|" + institutionKey + "|" + currency
 		if _, exists := seen[key]; exists {
 			relation.status = masterImportStatusSkip
 			relation.message = "Duplikat relasi di workbook, dilewati"
@@ -712,6 +724,17 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
+		loanOriginal, err := parseImportFloat(row.value("loan_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Loan Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("loan_original") == "" {
+			loanOriginal = loanUSD
+		}
 		grantUSD, err := parseImportFloat(row.value("grant_usd"))
 		if err != nil {
 			relation.status = masterImportStatusFailed
@@ -719,6 +742,17 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			draft.addError(relation.message)
 			relations = append(relations, relation)
 			continue
+		}
+		grantOriginal, err := parseImportFloat(row.value("grant_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Grant Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("grant_original") == "" {
+			grantOriginal = grantUSD
 		}
 		localUSD, err := parseImportFloat(row.value("local_usd"))
 		if err != nil {
@@ -728,10 +762,25 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
+		localOriginal, err := parseImportFloat(row.value("local_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Local Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("local_original") == "" {
+			localOriginal = localUSD
+		}
 		seen[key] = struct{}{}
 		draft.fundingSources = append(draft.fundingSources, model.GBFundingSourceItem{
 			LenderID:      model.UUIDToString(lender.ID),
 			InstitutionID: institutionID,
+			Currency:      currency,
+			LoanOriginal:  loanOriginal,
+			GrantOriginal: grantOriginal,
+			LocalOriginal: localOriginal,
 			LoanUSD:       loanUSD,
 			GrantUSD:      grantUSD,
 			LocalUSD:      localUSD,

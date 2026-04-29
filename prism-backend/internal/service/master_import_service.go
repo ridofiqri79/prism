@@ -1104,6 +1104,22 @@ func parseImportInt(value string) (int, error) {
 	return strconv.Atoi(value)
 }
 
+func parseImportOptionalPositiveInt32(value string) (*int32, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := parseImportInt(value)
+	if err != nil {
+		return nil, err
+	}
+	if parsed <= 0 || parsed > 2147483647 {
+		return nil, fmt.Errorf("invalid positive int32")
+	}
+	result := int32(parsed)
+	return &result, nil
+}
+
 func shouldEnsureIndonesiaRegion(rows []importRow, lookups *masterImportLookups) bool {
 	if _, exists := lookups.regionsByCode["ID"]; exists {
 		return false

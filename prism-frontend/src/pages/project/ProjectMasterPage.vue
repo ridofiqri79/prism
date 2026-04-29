@@ -49,7 +49,7 @@ const columnConfigs: ProjectMasterColumnConfig[] = [
   { key: 'program_title', label: 'Program Title', sortField: 'program_title', defaultVisible: false },
   { key: 'locations', label: 'Region/Location', sortField: 'locations', defaultVisible: false },
   { key: 'foreign_loan_usd', label: 'Nilai Pinjaman', sortField: 'foreign_loan_usd', defaultVisible: true },
-  { key: 'dk_dates', label: 'Tanggal DK', sortField: 'dk_dates', defaultVisible: false },
+  { key: 'dk_dates', label: 'Tanggal Daftar Kegiatan', sortField: 'dk_dates', defaultVisible: false },
 ]
 const visibleColumnKeys = ref<ProjectMasterColumnKey[]>(
   columnConfigs.filter((column) => column.defaultVisible).map((column) => column.key),
@@ -126,16 +126,24 @@ const loanTypeOptions: Array<{ label: string; value: LenderType }> = [
   { label: 'KSA', value: 'KSA' },
 ]
 const projectStatusOptions: Array<{ label: string; value: ProjectStatus }> = [
-  { label: 'Pipeline (BB-DK)', value: 'Pipeline' },
-  { label: 'Ongoing (LA-Monitoring)', value: 'Ongoing' },
+  { label: 'Pipeline (Blue Book-Daftar Kegiatan)', value: 'Pipeline' },
+  { label: 'Ongoing (Loan Agreement-Monitoring)', value: 'Ongoing' },
 ]
 const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus }> = [
-  { label: 'BB', value: 'BB' },
-  { label: 'GB', value: 'GB' },
-  { label: 'DK', value: 'DK' },
-  { label: 'LA', value: 'LA' },
+  { label: 'Blue Book', value: 'BB' },
+  { label: 'Green Book', value: 'GB' },
+  { label: 'Daftar Kegiatan', value: 'DK' },
+  { label: 'Loan Agreement', value: 'LA' },
   { label: 'Monitoring', value: 'Monitoring' },
 ]
+
+const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
+  BB: 'Blue Book',
+  GB: 'Green Book',
+  DK: 'Daftar Kegiatan',
+  LA: 'Loan Agreement',
+  Monitoring: 'Monitoring',
+}
 
 function createDefaultFilters(): ProjectMasterFilterState {
   return {
@@ -234,7 +242,7 @@ function listLabel(values: string[]) {
 }
 
 function statusLabel(project: ProjectMasterRow) {
-  return `${project.project_status} - ${project.pipeline_status}`
+  return `${project.project_status} - ${pipelineStatusLabels[project.pipeline_status]}`
 }
 
 function sortIcon(field: ProjectMasterSortField) {
@@ -388,7 +396,7 @@ onUnmounted(() => {
   <section class="space-y-5">
     <PageHeader
       title="Project"
-      subtitle="Master table seluruh BB Project beserta status pipeline, lender, instansi, lokasi, dan nilai pinjaman"
+      subtitle="Master table seluruh Proyek Blue Book beserta status pipeline, lender, instansi, lokasi, dan nilai pinjaman"
     />
 
     <section class="rounded-lg border border-primary-100 bg-white p-4 shadow-sm">
@@ -601,11 +609,11 @@ onUnmounted(() => {
 
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal DK Dari</span>
+              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Dari</span>
               <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
             </label>
             <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal DK Sampai</span>
+              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Sampai</span>
               <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
             </label>
           </div>

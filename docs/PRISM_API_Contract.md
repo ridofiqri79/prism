@@ -230,6 +230,54 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
 
 ---
 
+### Currency
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/master/currencies` | read: `currency` |
+| `GET` | `/master/currencies/:id` | read: `currency` |
+| `POST` | `/master/currencies` | create: `currency` |
+| `PUT` | `/master/currencies/:id` | update: `currency` |
+| `DELETE` | `/master/currencies/:id` | delete: `currency` |
+
+**`GET /master/currencies` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `active` | Filter `true` atau `false`; kosong mengembalikan semua currency |
+
+**`GET /master/currencies` Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "code": "JPY",
+      "name": "Japanese Yen",
+      "symbol": "JPY",
+      "is_active": true,
+      "sort_order": 30
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 12, "total_pages": 1 }
+}
+```
+
+**`POST /master/currencies` Request:**
+```json
+{
+  "code": "JPY",
+  "name": "Japanese Yen",
+  "symbol": "JPY",
+  "is_active": true,
+  "sort_order": 30
+}
+```
+
+Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar aktif di Master Currency. Seed awal mengikuti mata uang negara donor/lender dan mata uang yang umum digunakan lembaga multilateral.
+
+---
+
 ### Lender
 
 | Method | Endpoint | Permission |
@@ -466,6 +514,8 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 | `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
 | `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
 
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
+
 **Preview:**
 `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
 
@@ -497,7 +547,7 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
   "bappenas_partner_id": "uuid",
   "bb_code": "BB-2025-001",
   "project_name": "Pembangunan Jalan Tol Trans Sumatera",
-  "duration": "2025-2030",
+  "duration": 60,
   "objective": "Meningkatkan konektivitas...",
   "scope_of_work": "Pembangunan 500km...",
   "outputs": "500km jalan tol terbangun",
@@ -665,9 +715,11 @@ Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB C
 | `Relasi - IA` | `GB Code (*)`, `Implementing Agency Name (*)` |
 | `Relasi - Locations` | `GB Code (*)`, `Location Name (*)` |
 | `Relasi - Activities` | `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
-| `Relasi - Funding Source` | `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Loan USD`, `Grant USD`, `Local USD` |
+| `Relasi - Funding Source` | `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Currency`, `Loan Original`, `Grant Original`, `Local Original`, `Loan USD`, `Grant USD`, `Local USD` |
 | `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
 | `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 
 **Preview:**
 `POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -678,7 +730,7 @@ Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB C
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
+Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Currency` kosong dianggap `USD`; jika `USD`, nilai USD disamakan dengan nilai original sehingga user tidak perlu mengisi dua kali. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
 
 ---
 
@@ -699,7 +751,7 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
   "program_title_id": "uuid",
   "gb_code": "GB-2025-001",
   "project_name": "Trans Sumatra Toll Road Section 1",
-  "duration": "2025-2030",
+  "duration": 60,
   "objective": "Meningkatkan konektivitas...",
   "scope_of_project": "Pembangunan 200km...",
   "bb_project_ids": ["uuid-bb-project"],
@@ -718,6 +770,10 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
     {
       "lender_id": "uuid-jica",
       "institution_id": "uuid-ditjen-bina-marga",
+      "currency": "JPY",
+      "loan_original": 45000000000,
+      "grant_original": 0,
+      "local_original": 7500000000,
       "loan_usd": 300000000,
       "grant_usd": 0,
       "local_usd": 50000000
@@ -743,6 +799,9 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 
 > **Catatan:** `funding_allocations[].activity_index` merujuk ke index array `activities` dalam request yang sama. Setelah disimpan, relasi menggunakan `gb_activity_id`.
 > **Versioning:** `bb_project_ids` boleh berisi snapshot lama, tetapi backend selalu menyimpan concrete latest BB Project snapshot untuk logical project tersebut pada saat GB Project dibuat/diupdate.
+> **Currency:** Funding Source GB adalah titik awal pencatatan currency downstream. Jika `funding_sources[].currency` adalah `USD`, backend menyimpan nilai USD sama dengan nilai original.
+
+Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book" dengan query `source_bb_project_id` dan `source_mode`. Dialog memakai checkbox "Gunakan data di Blue Book sebagai data Green Book": tidak dicentang mengirim `source_mode=new` dan hanya membawa BB Code serta relasi BB Project; dicentang mengirim `source_mode=existing` untuk mengisi field yang sama dari BB Project sumber, tetapi tetap editable sebelum disimpan.
 
 **`GET /green-books/:gb_id/projects/:id` Response `200` menambahkan field versioning:**
 ```json
@@ -842,10 +901,14 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode 3 huruf. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
 
 `GB Project` pada DK di-resolve ke latest GB Project snapshot saat DK Project dibuat atau saat pilihan GB diganti eksplisit. Setelah tersimpan, relasi `dk_project_gb_project` tetap menunjuk concrete snapshot yang tersimpan dan tidak auto-pindah ketika ada revisi BB/GB baru.
+
+Pada form create/edit DK Project, picker `GB Project` ditampilkan sebagai field pertama. Saat user memilih GB Project, frontend mengisi otomatis field DK yang memiliki padanan dari GB Project terpilih: program title, executing agency, durasi bulan, tujuan/objective, lokasi, rincian pembiayaan dari funding source, alokasi pinjaman dari institution funding source atau institution proyek, dan rincian kegiatan dari activities GB. Hasil autofill tetap dapat diedit user sebelum request `POST` atau `PUT` dikirim.
+Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah karena backend menyamakan nilai USD dengan nilai original.
 
 ---
 
@@ -885,13 +948,17 @@ Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahny
 {
   "program_title_id": "uuid",
   "institution_id": "uuid-executing-agency",
-  "duration": "2025-2030",
+  "duration": 60,
   "objectives": "Meningkatkan konektivitas...",
   "gb_project_ids": ["uuid-gb-project-1"],
   "location_ids": ["uuid-sumut"],
   "financing_details": [
     {
       "lender_id": "uuid-jica",
+      "currency": "JPY",
+      "amount_original": 45000000000,
+      "grant_original": 0,
+      "counterpart_original": 7500000000,
       "amount_usd": 300000000,
       "grant_usd": 0,
       "counterpart_usd": 50000000,
@@ -901,6 +968,10 @@ Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahny
   "loan_allocations": [
     {
       "institution_id": "uuid-ditjen-bina-marga",
+      "currency": "JPY",
+      "amount_original": 45000000000,
+      "grant_original": 0,
+      "counterpart_original": 7500000000,
       "amount_usd": 300000000,
       "grant_usd": 0,
       "counterpart_usd": 50000000,

@@ -104,7 +104,7 @@ onMounted(async () => {
     <section class="rounded-lg border border-surface-200 bg-white p-4">
       <div class="grid gap-3 md:grid-cols-[1fr_auto]">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Cari BB Project</span>
+        <span class="text-sm font-medium text-surface-700">Cari Proyek Blue Book</span>
           <AutoComplete
             v-model="selectedProject"
             :suggestions="filteredProjects"
@@ -137,7 +137,7 @@ onMounted(async () => {
     </section>
 
     <Message v-if="!bbProjectId && !journeyData" severity="info" :closable="false">
-      Pilih BB Project untuk melihat timeline perjalanan proyek.
+        Pilih Proyek Blue Book untuk melihat timeline perjalanan proyek.
     </Message>
 
     <ProjectTimeline v-if="journeyData" :journey="journeyData" />

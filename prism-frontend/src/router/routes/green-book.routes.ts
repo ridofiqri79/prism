@@ -27,7 +27,7 @@ export const greenBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/green-book/GBProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Tambah GB Project',
+        title: 'Tambah Proyek Green Book',
       permission: { module: 'gb_project', action: 'create' },
     },
   },
@@ -37,7 +37,7 @@ export const greenBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/green-book/GBProjectDetailPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Detail GB Project',
+        title: 'Detail Proyek Green Book',
       permission: { module: 'gb_project', action: 'read' },
     },
   },
@@ -47,7 +47,7 @@ export const greenBookRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/green-book/GBProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Edit GB Project',
+        title: 'Edit Proyek Green Book',
       permission: { module: 'gb_project', action: 'update' },
     },
   },

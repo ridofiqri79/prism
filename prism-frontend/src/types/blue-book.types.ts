@@ -48,7 +48,7 @@ export interface BBProject {
   national_priorities: NationalPriority[]
   project_costs: BBProjectCost[]
   lender_indications: LenderIndication[]
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_work?: string | null
   outputs?: string | null
@@ -90,7 +90,7 @@ export interface BBProjectPayload {
   bappenas_partner_id: string
   bb_code: string
   project_name: string
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_work?: string | null
   outputs?: string | null

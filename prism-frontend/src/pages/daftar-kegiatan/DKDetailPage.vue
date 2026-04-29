@@ -82,7 +82,7 @@ onMounted(() => {
         <AccordionHeader>
           <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
             <span>{{ joinNames((project as DKProject).gb_projects) }}</span>
-            <span class="text-sm font-normal text-surface-500">{{ project.duration || '-' }}</span>
+            <span class="text-sm font-normal text-surface-500">{{ project.duration ? `${project.duration} bulan` : '-' }}</span>
           </div>
         </AccordionHeader>
         <AccordionContent>
@@ -103,7 +103,7 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">GB Project Snapshot yang Dipakai</h3>
+              <h3 class="font-semibold text-surface-950">Snapshot Proyek Green Book yang Dipakai</h3>
               <div class="flex flex-wrap gap-2">
                 <RouterLink
                   v-for="gbProject in project.gb_projects"
@@ -118,7 +118,7 @@ onMounted(() => {
                     severity="warn"
                     rounded
                   />
-                  <Tag v-else-if="gbProject.is_latest" value="Latest" severity="success" rounded />
+                  <Tag v-else-if="gbProject.is_latest" value="Terbaru" severity="success" rounded />
                 </RouterLink>
               </div>
             </div>
@@ -130,10 +130,10 @@ onMounted(() => {
                   <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3">Lender</th>
-                      <th class="px-4 py-3">Currency</th>
-                      <th class="px-4 py-3">Original</th>
+                      <th class="px-4 py-3">Mata Uang</th>
+                      <th class="px-4 py-3">Nilai Asli</th>
                       <th class="px-4 py-3">USD</th>
-                      <th class="px-4 py-3">Remarks</th>
+                      <th class="px-4 py-3">Catatan</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-surface-100">
@@ -156,10 +156,10 @@ onMounted(() => {
                   <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3">Instansi</th>
-                      <th class="px-4 py-3">Currency</th>
-                      <th class="px-4 py-3">Original</th>
+                      <th class="px-4 py-3">Mata Uang</th>
+                      <th class="px-4 py-3">Nilai Asli</th>
                       <th class="px-4 py-3">USD</th>
-                      <th class="px-4 py-3">Remarks</th>
+                      <th class="px-4 py-3">Catatan</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-surface-100">

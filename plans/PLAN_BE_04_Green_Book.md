@@ -54,6 +54,7 @@ func (s *GBProjectService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
     // 3. gb_code unik dalam Green Book yang sama; boleh sama pada revisi lain via gb_project_identity_id
     // 4. BB Project yang dipilih di-resolve ke versi latest sebelum disimpan
     // 5. Tahun disbursement tidak duplikat
+    // 6. Duration, jika diisi, adalah integer jumlah bulan > 0
     yearSet := map[int]bool{}
     for _, d := range req.DisbursementPlan {
         if yearSet[d.Year] {

@@ -22,6 +22,16 @@ export const masterRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: 'master/currencies',
+    name: 'master-currencies',
+    component: () => import('@/pages/master/CurrencyPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Master Currency',
+      permission: { module: 'currency', action: 'read' },
+    },
+  },
+  {
     path: 'master/institutions',
     name: 'master-institutions',
     component: () => import('@/pages/master/InstitutionPage.vue'),

@@ -117,7 +117,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="project?.bb_code ?? 'Detail BB Project'"
+      :title="project?.bb_code ?? 'Detail Proyek Blue Book'"
       :subtitle="project?.project_name"
     >
       <template #actions>
@@ -138,7 +138,7 @@ onMounted(() => {
         <Button
           as="router-link"
           :to="{ name: 'project-journey', params: { bbProjectId: projectId } }"
-          label="Lihat Journey"
+          label="Lihat Perjalanan"
           icon="pi pi-share-alt"
           severity="secondary"
         />
@@ -152,7 +152,7 @@ onMounted(() => {
             <p class="text-sm text-surface-500">Status</p>
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge :status="project.status" />
-              <Tag v-if="project.is_latest" value="Latest" severity="success" rounded />
+              <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
               <Tag v-else-if="project.has_newer_revision" value="Ada revisi lebih baru" severity="warn" rounded />
             </div>
           </div>
@@ -187,14 +187,14 @@ onMounted(() => {
                 <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
                 <td class="px-4 py-3">
                   <Tag
-                    :value="item.is_latest ? 'Latest' : 'Historical'"
+                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
                     :severity="item.is_latest ? 'success' : 'secondary'"
                     rounded
                   />
                 </td>
                 <td class="px-4 py-3">
                   <Tag
-                    :value="item.used_by_downstream ? 'Dipakai downstream' : 'Belum dipakai'"
+                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
                     :severity="item.used_by_downstream ? 'info' : 'secondary'"
                     rounded
                   />
@@ -245,8 +245,8 @@ onMounted(() => {
 
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Duration</p>
-          <p class="mt-1 text-surface-950">{{ project.duration || '-' }}</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
+          <p class="mt-1 text-surface-950">{{ project.duration ? `${project.duration} bulan` : '-' }}</p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Objective</p>

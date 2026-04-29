@@ -19,6 +19,25 @@ type CountryInfo struct {
 	Code string `json:"code"`
 }
 
+type CurrencyRequest struct {
+	Code      string  `json:"code" validate:"required"`
+	Name      string  `json:"name" validate:"required"`
+	Symbol    *string `json:"symbol"`
+	IsActive  bool    `json:"is_active"`
+	SortOrder int32   `json:"sort_order"`
+}
+
+type CurrencyResponse struct {
+	ID        string  `json:"id"`
+	Code      string  `json:"code"`
+	Name      string  `json:"name"`
+	Symbol    *string `json:"symbol"`
+	IsActive  bool    `json:"is_active"`
+	SortOrder int32   `json:"sort_order"`
+	CreatedAt string  `json:"created_at,omitempty"`
+	UpdatedAt string  `json:"updated_at,omitempty"`
+}
+
 type CreateLenderRequest struct {
 	CountryID *string `json:"country_id"`
 	Name      string  `json:"name" validate:"required"`

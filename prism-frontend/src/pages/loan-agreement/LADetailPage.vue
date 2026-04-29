@@ -74,7 +74,7 @@ onMounted(() => {
       <div class="space-y-6">
         <section class="rounded-lg border border-surface-200 bg-white p-5">
           <div class="mb-4 flex flex-wrap items-center gap-3">
-            <h2 class="text-lg font-semibold text-surface-950">Informasi Loan</h2>
+            <h2 class="text-lg font-semibold text-surface-950">Informasi Pinjaman</h2>
             <StatusBadge v-if="loanAgreement.is_extended" status="Extended" />
             <span v-if="loanAgreement.is_extended" class="text-sm font-medium text-prism-gold-deep">
               {{ loanAgreement.extension_days }} hari
@@ -82,7 +82,7 @@ onMounted(() => {
           </div>
           <dl class="grid gap-4 md:grid-cols-2">
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Kode Loan</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Kode Pinjaman</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.loan_code }}</dd>
             </div>
             <div>
@@ -90,7 +90,7 @@ onMounted(() => {
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.lender.name }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Agreement</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Perjanjian</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.agreement_date) }}
               </dd>
@@ -102,13 +102,13 @@ onMounted(() => {
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing Awal</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Penutupan Awal</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.original_closing_date) }}
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Closing</dt>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Penutupan</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.closing_date) }}
               </dd>
@@ -141,16 +141,16 @@ onMounted(() => {
       </div>
 
       <aside class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
-        <h2 class="text-lg font-semibold text-surface-950">Relasi Workflow</h2>
+        <h2 class="text-lg font-semibold text-surface-950">Relasi Alur Kerja</h2>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">DK Project</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Proyek Daftar Kegiatan</p>
           <p class="mt-1 font-medium text-surface-900">{{ formatDKProjectLabel(dkProject) }}</p>
         </div>
         <Button
           v-if="dkProject?.dk_id"
           as="router-link"
           :to="{ name: 'daftar-kegiatan-detail', params: { id: dkProject.dk_id } }"
-          label="Lihat DK Project"
+          label="Lihat Proyek Daftar Kegiatan"
           icon="pi pi-list"
           outlined
           class="w-full"

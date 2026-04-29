@@ -69,7 +69,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="project?.gb_code ?? 'Detail GB Project'" :subtitle="project?.project_name">
+    <PageHeader :title="project?.gb_code ?? 'Detail Proyek Green Book'" :subtitle="project?.project_name">
       <template #actions>
         <Button
           label="Kembali"
@@ -94,7 +94,7 @@ onMounted(() => {
           <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
           <div class="mt-1 flex flex-wrap items-center gap-2">
             <StatusBadge :status="project.status" />
-            <Tag v-if="project.is_latest" value="Latest" severity="success" rounded />
+            <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
             <Tag v-else-if="project.has_newer_revision" value="Ada revisi lebih baru" severity="warn" rounded />
           </div>
         </div>
@@ -103,8 +103,8 @@ onMounted(() => {
           <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Duration</p>
-          <p class="font-semibold text-surface-950">{{ project.duration || '-' }}</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
+          <p class="font-semibold text-surface-950">{{ project.duration ? `${project.duration} bulan` : '-' }}</p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
@@ -121,7 +121,7 @@ onMounted(() => {
       </div>
 
       <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <p class="text-xs uppercase tracking-wide text-surface-500">Referensi BB Projects</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <RouterLink
             v-for="bbProject in project.bb_projects"
@@ -136,7 +136,7 @@ onMounted(() => {
               severity="warn"
               rounded
             />
-            <Tag v-else-if="bbProject.is_latest" value="Latest" severity="success" rounded />
+            <Tag v-else-if="bbProject.is_latest" value="Terbaru" severity="success" rounded />
           </RouterLink>
         </div>
       </div>
@@ -154,7 +154,7 @@ onMounted(() => {
                 <th class="px-4 py-3">Kode</th>
                 <th class="px-4 py-3">Status Dokumen</th>
                 <th class="px-4 py-3">Snapshot</th>
-                <th class="px-4 py-3">Referensi BB</th>
+                <th class="px-4 py-3">Referensi Blue Book</th>
                 <th class="px-4 py-3">Downstream</th>
                 <th class="px-4 py-3 text-right">Aksi</th>
               </tr>
@@ -166,7 +166,7 @@ onMounted(() => {
                 <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
                 <td class="px-4 py-3">
                   <Tag
-                    :value="item.is_latest ? 'Latest' : 'Historical'"
+                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
                     :severity="item.is_latest ? 'success' : 'secondary'"
                     rounded
                   />
@@ -176,7 +176,7 @@ onMounted(() => {
                 </td>
                 <td class="px-4 py-3">
                   <Tag
-                    :value="item.used_by_downstream ? 'Dipakai downstream' : 'Belum dipakai'"
+                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
                     :severity="item.used_by_downstream ? 'info' : 'secondary'"
                     rounded
                   />

@@ -90,6 +90,7 @@ type importTemplateReferenceData struct {
 	Periods            []queries.Period
 	NationalPriorities []queries.ListNationalPrioritiesRow
 	Lenders            []queries.ListLendersRow
+	Currencies         []queries.Currency
 	Countries          []queries.Country
 	BBProjects         []queries.ListActiveBBProjectReferencesRow
 	GBProjects         []queries.ListActiveGBProjectReferencesRow
@@ -351,13 +352,12 @@ func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx conte
 			integerValidation("B2:B"+inputLastRow(), "Activity No", "Isi nomor aktivitas yang unik per GB Code. Nomor ini dipakai oleh Funding Allocation."),
 			integerValidation("F2:F"+inputLastRow(), "Sort Order", "Isi angka urutan tampilan. Kosong akan mengikuti urutan baris."),
 		}),
-		templateInputSheet(greenBookImportSheetFundingSource, []string{"GB Code (*)", "Lender Name (*)", "Institution Name", "Loan USD", "Grant USD", "Local USD"}, []float64{22, 42, 48, 18, 18, 18}, []simpleXLSXValidation{
+		templateInputSheet(greenBookImportSheetFundingSource, []string{"GB Code (*)", "Lender Name (*)", "Institution Name", "Currency", "Loan Original", "Grant Original", "Local Original", "Loan USD", "Grant USD", "Local USD"}, []float64{22, 42, 48, 14, 18, 18, 20, 18, 18, 18}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
 			listValidation("B2:B"+inputLastRow(), "ddLenders", "Lender Name", "Pilih lender dari master data."),
 			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution terkait funding source bila ada."),
-			decimalValidation("D2:D"+inputLastRow(), "Loan USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
-			decimalValidation("E2:E"+inputLastRow(), "Grant USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
-			decimalValidation("F2:F"+inputLastRow(), "Local USD", "Isi angka dalam USD. Kosong akan dianggap 0 oleh backend."),
+			listValidation("D2:D"+inputLastRow(), "ddCurrencies", "Currency", "Kosong akan dianggap USD. Jika USD, nilai original digunakan sebagai nilai USD."),
+			decimalValidation("E2:J"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Jika Currency USD, kolom USD boleh kosong karena backend menyamakan dengan Original."),
 		}),
 		templateInputSheet(greenBookImportSheetDisbursementPlan, []string{"GB Code (*)", "Year (*)", "Amount USD"}, []float64{22, 18, 20}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
@@ -475,6 +475,11 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		return nil, apperrors.Internal("Gagal membaca snapshot lender")
 	}
 
+	currencies, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: masterImportListLimit, Offset: 0, ActiveFilter: pgtype.Bool{}})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca snapshot currency")
+	}
+
 	countries, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot country")
@@ -507,6 +512,7 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		Periods:            periods,
 		NationalPriorities: priorities,
 		Lenders:            lenders,
+		Currencies:         currencies,
 		Countries:          countries,
 		BBProjects:         bbProjects,
 		GBProjects:         gbProjects,
@@ -549,6 +555,13 @@ func buildMasterDataSnapshotSheet(name string, reference *importTemplateReferenc
 	}
 	for _, item := range reference.Lenders {
 		rows = append(rows, textRow("Lender", model.UUIDToString(item.ID), item.Name, item.Type, textFromPg(item.CountryName), textFromPg(item.ShortName)))
+	}
+	for _, item := range reference.Currencies {
+		status := "Nonaktif"
+		if item.IsActive {
+			status = "Aktif"
+		}
+		rows = append(rows, textRow("Currency", item.Code, item.Name, status, strconv.FormatInt(int64(item.SortOrder), 10), textFromPg(item.Symbol)))
 	}
 	for _, item := range reference.Countries {
 		rows = append(rows, textRow("Country", item.Code, item.Name, "", "", ""))
@@ -634,7 +647,7 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
-		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration dan uraian proyek opsional. Bappenas Partner pilih Eselon II bila tersedia."),
+		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional. Bappenas Partner pilih Eselon II bila tersedia."),
 		textRow("Relasi - EA", "BB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib untuk proyek baru."),
 		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Institution yang sama boleh dipakai sebagai EA dan IA pada proyek yang sama."),
 		textRow("Relasi - Locations", "BB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region dari dropdown."),
@@ -665,13 +678,13 @@ func buildGreenBookGuideSheet(greenBook queries.GreenBook) simpleXLSXSheet {
 		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
-		textRow("Input Data", "Program Title (*), GB Code (*), Project Name (*)", "Duration dan uraian proyek opsional."),
+		textRow("Input Data", "Program Title (*), GB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional."),
 		textRow("Relasi - BB Project", "GB Code (*), BB Code (*)", "Minimal satu BB Project active wajib untuk proyek baru."),
 		textRow("Relasi - EA", "GB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib."),
 		textRow("Relasi - IA", "GB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib."),
 		textRow("Relasi - Locations", "GB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region atau ketik kode region."),
 		textRow("Relasi - Activities", "GB Code (*), Activity No (*), Activity Name (*)", "Activity No unik per GB Code. Sort Order opsional."),
-		textRow("Relasi - Funding Source", "GB Code (*), Lender Name (*)", "Loan/Grant/Local USD kosong dianggap 0."),
+		textRow("Relasi - Funding Source", "GB Code (*), Lender Name (*)", "Currency kosong dianggap USD. Jika Currency USD, nilai original dipakai sebagai nilai USD."),
 		textRow("Relasi - Disbursement Plan", "GB Code (*), Year (*)", "Year harus unik per GB Code. Amount USD adalah total proyek per tahun."),
 		textRow("Relasi - Funding Allocation", "GB Code (*), Activity No (*)", "Isi breakdown per Activity No. Jika tidak diisi, allocation dibuat 0."),
 		textRow(""),
@@ -699,7 +712,7 @@ func buildDKGuideSheet() simpleXLSXSheet {
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Daftar Kegiatan", "DK Key (*), Letter Number (*), Subject (*), Date (*)", "Date isi format YYYY-MM-DD. Header existing by Letter Number dilewati."),
-		textRow("Input Data", "DK Key (*), Project Key (*), Executing Agency Name (*)", "Duration dan Objectives opsional. Project Key hanya disimpan sebagai kunci workbook."),
+		textRow("Input Data", "DK Key (*), Project Key (*), Executing Agency Name (*)", "Duration diisi angka bulan; Objectives opsional. Project Key hanya disimpan sebagai kunci workbook."),
 		textRow("Relasi - GB Project", "DK Key (*), Project Key (*), GB Code (*)", "Minimal satu GB Project active wajib untuk project baru."),
 		textRow("Relasi - Locations", "DK Key (*), Project Key (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region atau ketik kode region."),
 		textRow("Relasi - Financing Detail", "DK Key (*), Project Key (*), Lender Name (*)", "Currency kosong dianggap USD. Amount kosong dianggap 0 dan tidak boleh negatif."),
@@ -753,7 +766,7 @@ func buildDropdownSheet(reference *importTemplateReferenceData) (simpleXLSXSheet
 		{Name: "ddInstitutionLevels", Header: "Institution Levels", Values: []string{"Kementerian/Badan/Lembaga", "Eselon I", "BUMN", "Pemerintah Daerah", "BUMD", "Lainnya"}},
 		{Name: "ddRegionLevels", Header: "Region Levels", Values: []string{"COUNTRY", "PROVINCE", "CITY"}},
 		{Name: "ddLenderTypes", Header: "Lender Types", Values: []string{"Bilateral", "Multilateral", "KSA"}},
-		{Name: "ddCurrencies", Header: "Currencies", Values: []string{"USD", "IDR", "JPY", "EUR", "AUD", "GBP", "CNY", "KRW"}},
+		{Name: "ddCurrencies", Header: "Currencies", Values: uniqueSorted(currencyValues(reference.Currencies))},
 		{Name: "ddFundingTypes", Header: "Funding Types", Values: []string{"Foreign", "Counterpart"}},
 		{Name: "ddFundingCategories", Header: "Funding Categories", Values: []string{"Loan", "Grant", "Central Government", "Regional Government", "State-Owned Enterprise", "Others"}},
 	}
@@ -978,6 +991,16 @@ func countryValues(items []queries.Country) []string {
 	values := make([]string, 0, len(items))
 	for _, item := range items {
 		values = append(values, item.Name)
+	}
+	return values
+}
+
+func currencyValues(items []queries.Currency) []string {
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.IsActive {
+			values = append(values, item.Code)
+		}
 	}
 	return values
 }

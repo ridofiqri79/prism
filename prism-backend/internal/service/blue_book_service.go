@@ -210,7 +210,7 @@ func (s *BlueBookService) CreateBBProject(ctx context.Context, bbID pgtype.UUID,
 			BappenasPartnerID: uuidOrInvalid(req.BappenasPartnerID),
 			BbCode:            strings.TrimSpace(req.BBCode),
 			ProjectName:       strings.TrimSpace(req.ProjectName),
-			Duration:          nullableTextPtr(req.Duration),
+			Duration:          int4Ptr(req.Duration),
 			Objective:         nullableTextPtr(req.Objective),
 			ScopeOfWork:       nullableTextPtr(req.ScopeOfWork),
 			Outputs:           nullableTextPtr(req.Outputs),
@@ -252,7 +252,7 @@ func (s *BlueBookService) UpdateBBProject(ctx context.Context, bbID, id pgtype.U
 			ProgramTitleID:    uuidOrInvalid(req.ProgramTitleID),
 			BappenasPartnerID: uuidOrInvalid(req.BappenasPartnerID),
 			ProjectName:       strings.TrimSpace(req.ProjectName),
-			Duration:          nullableTextPtr(req.Duration),
+			Duration:          int4Ptr(req.Duration),
 			Objective:         nullableTextPtr(req.Objective),
 			ScopeOfWork:       nullableTextPtr(req.ScopeOfWork),
 			Outputs:           nullableTextPtr(req.Outputs),
@@ -604,7 +604,7 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 		BappenasPartnerID:  stringPtrFromUUID(row.BappenasPartnerID),
 		BBCode:             row.BbCode,
 		ProjectName:        row.ProjectName,
-		Duration:           stringPtrFromText(row.Duration),
+		Duration:           int32PtrFromInt4(row.Duration),
 		Objective:          stringPtrFromText(row.Objective),
 		ScopeOfWork:        stringPtrFromText(row.ScopeOfWork),
 		Outputs:            stringPtrFromText(row.Outputs),
@@ -653,6 +653,9 @@ func validateBBProjectRequest(req model.CreateBBProjectRequest, validateCode boo
 	}
 	if strings.TrimSpace(req.ProjectName) == "" {
 		return validation("project_name", "wajib diisi")
+	}
+	if req.Duration != nil && *req.Duration <= 0 {
+		return validation("duration", "harus lebih dari 0 bulan")
 	}
 	if len(req.ExecutingAgencyIDs) == 0 {
 		return validation("executing_agency_ids", "minimal satu")

@@ -32,7 +32,7 @@ type blueBookImportProjectDraft struct {
 	projectName           string
 	programTitleID        pgtype.UUID
 	bappenasPartnerID     pgtype.UUID
-	duration              *string
+	duration              *int32
 	objective             *string
 	scopeOfWork           *string
 	outputs               *string
@@ -217,7 +217,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 				BappenasPartnerID: draft.bappenasPartnerID,
 				BbCode:            draft.bbCode,
 				ProjectName:       draft.projectName,
-				Duration:          nullableTextPtr(draft.duration),
+				Duration:          int4Ptr(draft.duration),
 				Objective:         nullableTextPtr(draft.objective),
 				ScopeOfWork:       nullableTextPtr(draft.scopeOfWork),
 				Outputs:           nullableTextPtr(draft.outputs),
@@ -299,12 +299,16 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 			row:         row.number,
 			bbCode:      strings.TrimSpace(row.value("bb_code")),
 			projectName: strings.TrimSpace(row.value("project_name")),
-			duration:    row.optionalString("duration"),
 			objective:   row.optionalString("objective"),
 			scopeOfWork: row.optionalString("scope_of_work"),
 			outputs:     row.optionalString("outputs"),
 			outcomes:    row.optionalString("outcomes"),
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		if draft.bbCode == "" {

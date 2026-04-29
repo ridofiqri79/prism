@@ -5,6 +5,8 @@ import type {
   BappenasPartnerPayload,
   Country,
   CountryPayload,
+  Currency,
+  CurrencyPayload,
   Institution,
   InstitutionPayload,
   Lender,
@@ -23,6 +25,7 @@ import type {
 
 type MasterCollection =
   | Country
+  | Currency
   | Lender
   | Institution
   | Region
@@ -101,6 +104,19 @@ export const MasterService = {
   },
   deleteCountry(id: string) {
     return deleteItem('/master/countries', id)
+  },
+
+  getCurrencies(params?: ListParams) {
+    return getList<Currency>('/master/currencies', params)
+  },
+  createCurrency(data: CurrencyPayload) {
+    return createItem<Currency, CurrencyPayload>('/master/currencies', data)
+  },
+  updateCurrency(id: string, data: Partial<CurrencyPayload>) {
+    return updateItem<Currency, CurrencyPayload>('/master/currencies', id, data)
+  },
+  deleteCurrency(id: string) {
+    return deleteItem('/master/currencies', id)
   },
 
   getLenders(params?: ListParams) {

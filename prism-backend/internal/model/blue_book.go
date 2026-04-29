@@ -33,7 +33,7 @@ type CreateBBProjectRequest struct {
 	BappenasPartnerID     *string                `json:"bappenas_partner_id"`
 	BBCode                string                 `json:"bb_code" validate:"required"`
 	ProjectName           string                 `json:"project_name" validate:"required"`
-	Duration              *string                `json:"duration"`
+	Duration              *int32                 `json:"duration"`
 	Objective             *string                `json:"objective"`
 	ScopeOfWork           *string                `json:"scope_of_work"`
 	Outputs               *string                `json:"outputs"`
@@ -67,7 +67,7 @@ type BBProjectResponse struct {
 	BappenasPartnerID    *string                    `json:"bappenas_partner_id,omitempty"`
 	BBCode               string                     `json:"bb_code"`
 	ProjectName          string                     `json:"project_name"`
-	Duration             *string                    `json:"duration"`
+	Duration             *int32                     `json:"duration"`
 	Objective            *string                    `json:"objective"`
 	ScopeOfWork          *string                    `json:"scope_of_work"`
 	Outputs              *string                    `json:"outputs"`

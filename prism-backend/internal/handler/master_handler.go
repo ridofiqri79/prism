@@ -77,6 +77,65 @@ func (h *MasterHandler) DeleteCountry(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *MasterHandler) ListCurrencies(c echo.Context) error {
+	res, err := h.service.ListCurrencies(c.Request().Context(), paginationParams(c), c.QueryParam("active"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) GetCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetCurrency(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) CreateCurrency(c echo.Context) error {
+	var req model.CurrencyRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.CreateCurrency(c.Request().Context(), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) UpdateCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	var req model.CurrencyRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.UpdateCurrency(c.Request().Context(), id, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) DeleteCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	if err := h.service.DeleteCurrency(c.Request().Context(), id); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *MasterHandler) ListLenders(c echo.Context) error {
 	res, err := h.service.ListLenders(c.Request().Context(), paginationParams(c), c.QueryParam("type"))
 	if err != nil {

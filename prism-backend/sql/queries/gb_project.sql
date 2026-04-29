@@ -458,6 +458,10 @@ SELECT
     gfs.gb_project_id,
     gfs.lender_id,
     gfs.institution_id,
+    gfs.currency,
+    gfs.loan_original,
+    gfs.grant_original,
+    gfs.local_original,
     gfs.loan_usd,
     gfs.grant_usd,
     gfs.local_usd,
@@ -476,17 +480,32 @@ WHERE gfs.gb_project_id = $1
 ORDER BY l.name;
 
 -- name: CreateGBFundingSource :one
-INSERT INTO gb_funding_source (gb_project_id, lender_id, institution_id, loan_usd, grant_usd, local_usd)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO gb_funding_source (
+    gb_project_id,
+    lender_id,
+    institution_id,
+    currency,
+    loan_original,
+    grant_original,
+    local_original,
+    loan_usd,
+    grant_usd,
+    local_usd
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: UpdateGBFundingSource :one
 UPDATE gb_funding_source
 SET lender_id = $2,
     institution_id = $3,
-    loan_usd = $4,
-    grant_usd = $5,
-    local_usd = $6,
+    currency = $4,
+    loan_original = $5,
+    grant_original = $6,
+    local_original = $7,
+    loan_usd = $8,
+    grant_usd = $9,
+    local_usd = $10,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -496,8 +515,29 @@ DELETE FROM gb_funding_source
 WHERE gb_project_id = $1;
 
 -- name: CloneGBFundingSources :exec
-INSERT INTO gb_funding_source (gb_project_id, lender_id, institution_id, loan_usd, grant_usd, local_usd)
-SELECT $2, source.lender_id, source.institution_id, source.loan_usd, source.grant_usd, source.local_usd
+INSERT INTO gb_funding_source (
+    gb_project_id,
+    lender_id,
+    institution_id,
+    currency,
+    loan_original,
+    grant_original,
+    local_original,
+    loan_usd,
+    grant_usd,
+    local_usd
+)
+SELECT
+    $2,
+    source.lender_id,
+    source.institution_id,
+    source.currency,
+    source.loan_original,
+    source.grant_original,
+    source.local_original,
+    source.loan_usd,
+    source.grant_usd,
+    source.local_usd
 FROM gb_funding_source source
 WHERE source.gb_project_id = $1;
 

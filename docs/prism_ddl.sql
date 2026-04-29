@@ -21,6 +21,32 @@ CREATE TABLE country (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE currency (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code        CHAR(3) NOT NULL UNIQUE,
+    name        VARCHAR(255) NOT NULL,
+    symbol      VARCHAR(16),
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order  INT NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO currency (code, name, symbol, is_active, sort_order) VALUES
+('USD', 'United States Dollar', '$', TRUE, 10),
+('EUR', 'Euro', 'EUR', TRUE, 20),
+('JPY', 'Japanese Yen', 'JPY', TRUE, 30),
+('KRW', 'South Korean Won', 'KRW', TRUE, 40),
+('CNY', 'Chinese Yuan', 'CNY', TRUE, 50),
+('AUD', 'Australian Dollar', 'A$', TRUE, 60),
+('CAD', 'Canadian Dollar', 'C$', TRUE, 70),
+('GBP', 'Pound Sterling', 'GBP', TRUE, 80),
+('CHF', 'Swiss Franc', 'CHF', TRUE, 90),
+('SAR', 'Saudi Riyal', 'SAR', TRUE, 100),
+('SGD', 'Singapore Dollar', 'S$', TRUE, 110),
+('IDR', 'Indonesian Rupiah', 'Rp', TRUE, 120),
+('XDR', 'Special Drawing Rights', 'XDR', FALSE, 130);
+
 CREATE TABLE lender (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     country_id  UUID REFERENCES country(id),           -- NULL untuk Multilateral
@@ -121,7 +147,7 @@ CREATE TABLE bb_project (
     bappenas_partner_id  UUID REFERENCES bappenas_partner(id), -- Eselon II; Eselon I diturunkan dari hierarki
     bb_code              VARCHAR(50) NOT NULL,
     project_name         VARCHAR(500) NOT NULL,
-    duration             VARCHAR(100),
+    duration             INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objective            TEXT,
     scope_of_work        TEXT,
     outputs              TEXT,
@@ -217,7 +243,7 @@ CREATE TABLE gb_project (
     program_title_id UUID REFERENCES program_title(id),
     gb_code          VARCHAR(50) NOT NULL,
     project_name     VARCHAR(500) NOT NULL,
-    duration         VARCHAR(100),
+    duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objective        TEXT,
     scope_of_project TEXT,
     status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
@@ -266,6 +292,10 @@ CREATE TABLE gb_funding_source (
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     lender_id      UUID NOT NULL REFERENCES lender(id),
     institution_id UUID REFERENCES institution(id),    -- Implementing Agency per baris
+    currency       VARCHAR(10) NOT NULL DEFAULT 'USD',
+    loan_original  NUMERIC(20, 2) NOT NULL DEFAULT 0,
+    grant_original NUMERIC(20, 2) NOT NULL DEFAULT 0,
+    local_original NUMERIC(20, 2) NOT NULL DEFAULT 0,
     loan_usd       NUMERIC(20, 2) NOT NULL DEFAULT 0,
     grant_usd      NUMERIC(20, 2) NOT NULL DEFAULT 0,
     local_usd      NUMERIC(20, 2) NOT NULL DEFAULT 0,
@@ -316,7 +346,7 @@ CREATE TABLE dk_project (
     dk_id            UUID NOT NULL REFERENCES daftar_kegiatan(id),
     program_title_id UUID REFERENCES program_title(id),
     institution_id   UUID REFERENCES institution(id),  -- Executing Agency
-    duration         VARCHAR(100),
+    duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objectives       TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -478,7 +508,7 @@ CREATE TABLE user_permission (
     module     VARCHAR(50) NOT NULL,
     -- contoh: 'blue_book' | 'bb_project' | 'green_book' | 'gb_project'
     --         'daftar_kegiatan' | 'dk_project' | 'loan_agreement' | 'monitoring_disbursement'
-    --         'institution' | 'lender' | 'region' | 'national_priority' | 'program_title'
+    --         'institution' | 'lender' | 'currency' | 'region' | 'national_priority' | 'program_title'
     can_create BOOLEAN NOT NULL DEFAULT FALSE,
     can_read   BOOLEAN NOT NULL DEFAULT FALSE,
     can_update BOOLEAN NOT NULL DEFAULT FALSE,
@@ -606,6 +636,10 @@ $$;
 -- Master data
 CREATE TRIGGER trg_audit_country
     AFTER INSERT OR UPDATE OR DELETE ON country
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_currency
+    AFTER INSERT OR UPDATE OR DELETE ON currency
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
 CREATE TRIGGER trg_audit_lender

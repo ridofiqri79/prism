@@ -137,7 +137,7 @@ type CreateBBProjectRequest struct {
     BappenasPartnerID   *string  `json:"bappenas_partner_id"`
     BBCode              string   `json:"bb_code" validate:"required"`
     ProjectName         string   `json:"project_name" validate:"required"`
-    Duration            *string  `json:"duration"`
+    Duration            *int32   `json:"duration"` // jumlah bulan
     Objective           *string  `json:"objective"`
     ScopeOfWork         *string  `json:"scope_of_work"`
     Outputs             *string  `json:"outputs"`

@@ -67,17 +67,17 @@ const importKindOptions: ImportKindOption[] = [
   {
     value: 'blue_book',
     label: 'Blue Book',
-    description: 'Proyek Blue Book beserta EA, IA, lokasi, cost, dan lender indication',
+    description: 'Proyek Blue Book beserta Executing Agency, Implementing Agency, lokasi, biaya, dan indikasi lender',
   },
   {
     value: 'green_book',
     label: 'Green Book',
-    description: 'Proyek Green Book beserta BB Project, activity, funding, dan allocation',
+    description: 'Proyek Green Book beserta Proyek Blue Book, kegiatan, funding, dan alokasi',
   },
   {
     value: 'daftar_kegiatan',
     label: 'Daftar Kegiatan',
-    description: 'Header DK baru beserta project, GB Project, pembiayaan, alokasi, dan aktivitas',
+    description: 'Header Daftar Kegiatan baru beserta proyek, Proyek Green Book, pembiayaan, alokasi, dan aktivitas',
   },
 ]
 
@@ -122,6 +122,11 @@ const daftarKegiatanWorkbookSheets = [
   'Relasi - Loan Allocation',
   'Relasi - Activity Detail',
 ]
+
+const sheetDisplayLabels: Record<string, string> = {
+  'Relasi - BB Project': 'Relasi - Proyek Blue Book',
+  'Relasi - GB Project': 'Relasi - Proyek Green Book',
+}
 
 const workbookSheets = computed(() => {
   if (activeImportKind.value === 'master') return masterWorkbookSheets
@@ -251,7 +256,7 @@ const sheetFilterOptions = computed(() => {
     { value: 'all', label: 'Semua sheet', count: statusRows.length },
     ...(summary.value?.sheets.map((sheet) => ({
       value: sheet.sheet,
-      label: sheet.sheet,
+      label: sheetLabel(sheet.sheet),
       count: statusRows.filter((row) => row.sheet === sheet.sheet).length,
     })) ?? []),
   ]
@@ -537,6 +542,10 @@ function rowNumberLabel(row: number) {
   return row > 0 ? row.toString() : 'Otomatis'
 }
 
+function sheetLabel(sheet: string) {
+  return sheetDisplayLabels[sheet] ?? sheet
+}
+
 function blueBookOptionLabel(blueBook: BlueBook) {
   const revision =
     blueBook.revision_number > 0
@@ -549,7 +558,7 @@ function blueBookOptionLabel(blueBook: BlueBook) {
 function greenBookOptionLabel(greenBook: GreenBook) {
   const revision = greenBook.revision_number > 0 ? `Revisi ${greenBook.revision_number}` : 'Awal'
 
-  return `GB ${greenBook.publish_year} - ${revision}`
+  return `Green Book ${greenBook.publish_year} - ${revision}`
 }
 
 function saveBlob(blob: Blob, fileName: string) {
@@ -702,7 +711,7 @@ function filterButtonClass(active: boolean) {
           <Tag
             v-for="sheet in workbookSheets"
             :key="sheet"
-            :value="sheet"
+            :value="sheetLabel(sheet)"
             severity="info"
             rounded
           />
@@ -748,7 +757,7 @@ function filterButtonClass(active: boolean) {
           </thead>
           <tbody class="divide-y divide-surface-100">
             <tr v-for="sheet in summary.sheets" :key="sheet.sheet">
-              <td class="px-3 py-2 font-medium text-surface-900">{{ sheet.sheet }}</td>
+              <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(sheet.sheet) }}</td>
               <td class="px-3 py-2">
                 <Tag
                   :value="sheet.failed > 0 ? 'Perlu cek' : 'Selesai'"
@@ -818,7 +827,7 @@ function filterButtonClass(active: boolean) {
                 v-for="row in paginatedImportRows"
                 :key="`${row.sheet}-${row.row}-${row.status}-${row.label}`"
               >
-                <td class="px-3 py-2 font-medium text-surface-900">{{ row.sheet }}</td>
+                <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(row.sheet) }}</td>
                 <td class="px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
                 <td class="px-3 py-2">
                   <Tag
@@ -867,7 +876,7 @@ function filterButtonClass(active: boolean) {
           :key="`${sheet.sheet}-errors`"
           class="rounded-lg border border-red-100 bg-red-50 p-4"
         >
-          <p class="text-sm font-semibold text-red-800">{{ sheet.sheet }}</p>
+          <p class="text-sm font-semibold text-red-800">{{ sheetLabel(sheet.sheet) }}</p>
           <ul class="mt-2 space-y-1 text-sm text-red-700">
             <li v-for="error in sheet.errors" :key="`${sheet.sheet}-${error.row}-${error.message}`">
               Baris {{ error.row }}: {{ error.message }}

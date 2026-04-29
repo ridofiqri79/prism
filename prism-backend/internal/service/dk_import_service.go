@@ -47,7 +47,7 @@ type dkImportProjectDraft struct {
 	projectKey      string
 	programTitleID  pgtype.UUID
 	institutionID   pgtype.UUID
-	duration        *string
+	duration        *int32
 	objectives      *string
 	gbProjectIDs    []string
 	gbProjectUUIDs  []pgtype.UUID
@@ -275,7 +275,7 @@ func (s *DKService) buildDaftarKegiatanImportPreview(ctx context.Context, qtx *q
 				DkID:           draft.header.createdID,
 				ProgramTitleID: draft.programTitleID,
 				InstitutionID:  draft.institutionID,
-				Duration:       nullableTextPtr(draft.duration),
+				Duration:       int4Ptr(draft.duration),
 				Objectives:     nullableTextPtr(draft.objectives),
 			})
 			if err != nil {
@@ -426,10 +426,14 @@ func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *mas
 			row:             row.number,
 			dkKey:           row.value("dk_key"),
 			projectKey:      row.value("project_key"),
-			duration:        row.optionalString("duration"),
 			objectives:      row.optionalString("objectives"),
 			activityNumbers: map[int32]struct{}{},
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		header := headersByKey[normalizeLookupKey(draft.dkKey)]

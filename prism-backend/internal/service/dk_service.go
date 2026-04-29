@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -153,7 +154,7 @@ func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req m
 			DkID:           dkID,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
-			Duration:       nullableTextPtr(req.Duration),
+			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
 		if err != nil {
@@ -183,7 +184,7 @@ func (s *DKService) UpdateDKProject(ctx context.Context, dkID, id pgtype.UUID, r
 			ID:             id,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
-			Duration:       nullableTextPtr(req.Duration),
+			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
 		if err != nil {
@@ -262,16 +263,23 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 				return apperrors.BusinessRule("Lender tidak terdaftar di GB atau BB terkait")
 			}
 		}
+		currency := normalizeCurrency(item.Currency)
+		if err := validateActiveCurrency(ctx, qtx, "financing_details.currency", currency); err != nil {
+			return err
+		}
+		amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, item.AmountOriginal, item.AmountUSD)
+		grantOriginal, grantUSD := normalizeCurrencyAmountPair(currency, item.GrantOriginal, item.GrantUSD)
+		counterpartOriginal, counterpartUSD := normalizeCurrencyAmountPair(currency, item.CounterpartOriginal, item.CounterpartUSD)
 		if _, err := qtx.CreateDKFinancingDetail(ctx, queries.CreateDKFinancingDetailParams{
 			DkProjectID:         projectID,
 			LenderID:            lenderID,
-			Currency:            normalizeCurrency(item.Currency),
-			AmountOriginal:      numericFromFloat(item.AmountOriginal),
-			GrantOriginal:       numericFromFloat(item.GrantOriginal),
-			CounterpartOriginal: numericFromFloat(item.CounterpartOriginal),
-			AmountUsd:           numericFromFloat(item.AmountUSD),
-			GrantUsd:            numericFromFloat(item.GrantUSD),
-			CounterpartUsd:      numericFromFloat(item.CounterpartUSD),
+			Currency:            currency,
+			AmountOriginal:      numericFromFloat(amountOriginal),
+			GrantOriginal:       numericFromFloat(grantOriginal),
+			CounterpartOriginal: numericFromFloat(counterpartOriginal),
+			AmountUsd:           numericFromFloat(amountUSD),
+			GrantUsd:            numericFromFloat(grantUSD),
+			CounterpartUsd:      numericFromFloat(counterpartUSD),
 			Remarks:             nullableTextPtr(item.Remarks),
 		}); err != nil {
 			return err
@@ -282,16 +290,23 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 		if err != nil {
 			return err
 		}
+		currency := normalizeCurrency(item.Currency)
+		if err := validateActiveCurrency(ctx, qtx, "loan_allocations.currency", currency); err != nil {
+			return err
+		}
+		amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, item.AmountOriginal, item.AmountUSD)
+		grantOriginal, grantUSD := normalizeCurrencyAmountPair(currency, item.GrantOriginal, item.GrantUSD)
+		counterpartOriginal, counterpartUSD := normalizeCurrencyAmountPair(currency, item.CounterpartOriginal, item.CounterpartUSD)
 		if _, err := qtx.CreateDKLoanAllocation(ctx, queries.CreateDKLoanAllocationParams{
 			DkProjectID:         projectID,
 			InstitutionID:       institutionID,
-			Currency:            normalizeCurrency(item.Currency),
-			AmountOriginal:      numericFromFloat(item.AmountOriginal),
-			GrantOriginal:       numericFromFloat(item.GrantOriginal),
-			CounterpartOriginal: numericFromFloat(item.CounterpartOriginal),
-			AmountUsd:           numericFromFloat(item.AmountUSD),
-			GrantUsd:            numericFromFloat(item.GrantUSD),
-			CounterpartUsd:      numericFromFloat(item.CounterpartUSD),
+			Currency:            currency,
+			AmountOriginal:      numericFromFloat(amountOriginal),
+			GrantOriginal:       numericFromFloat(grantOriginal),
+			CounterpartOriginal: numericFromFloat(counterpartOriginal),
+			AmountUsd:           numericFromFloat(amountUSD),
+			GrantUsd:            numericFromFloat(grantUSD),
+			CounterpartUsd:      numericFromFloat(counterpartUSD),
 			Remarks:             nullableTextPtr(item.Remarks),
 		}); err != nil {
 			return err
@@ -335,7 +350,7 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		DKID:             model.UUIDToString(row.DkID),
 		ProgramTitleID:   stringPtrFromUUID(row.ProgramTitleID),
 		InstitutionID:    stringPtrFromUUID(row.InstitutionID),
-		Duration:         stringPtrFromText(row.Duration),
+		Duration:         int32PtrFromInt4(row.Duration),
 		Objectives:       stringPtrFromText(row.Objectives),
 		GBProjects:       make([]model.GBProjectSummary, 0, len(gbProjects)),
 		Locations:        make([]model.RegionResponse, 0, len(locations)),
@@ -400,6 +415,9 @@ func validateDKProjectRequest(req model.CreateDKProjectRequest) error {
 	if len(req.GBProjectIDs) == 0 {
 		return validation("gb_project_ids", "Minimal 1 GB Project")
 	}
+	if req.Duration != nil && *req.Duration <= 0 {
+		return validation("duration", "harus lebih dari 0 bulan")
+	}
 	for _, item := range req.ActivityDetails {
 		if item.ActivityNumber <= 0 {
 			return validation("activity_details.activity_number", "harus lebih dari 0")
@@ -457,4 +475,28 @@ func normalizeCurrency(value string) string {
 		return "USD"
 	}
 	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+func normalizeCurrencyAmountPair(currency string, original, usd float64) (float64, float64) {
+	if normalizeCurrency(currency) != "USD" {
+		return original, usd
+	}
+	if original == 0 && usd != 0 {
+		original = usd
+	}
+	return original, original
+}
+
+func validateActiveCurrency(ctx context.Context, qtx *queries.Queries, field, code string) error {
+	currency, err := qtx.GetCurrencyByCode(ctx, code)
+	if err == pgx.ErrNoRows {
+		return validation(field, "harus terdaftar di Master Currency")
+	}
+	if err != nil {
+		return err
+	}
+	if !currency.IsActive {
+		return validation(field, "tidak aktif di Master Currency")
+	}
+	return nil
 }

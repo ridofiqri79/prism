@@ -37,7 +37,7 @@ const columns: ColumnDef[] = [
   { field: 'budget_year', header: 'Tahun Anggaran' },
   { field: 'quarter', header: 'Triwulan' },
   { field: 'exchange_rate_usd_idr', header: 'USD/IDR' },
-  { field: 'exchange_rate_la_idr', header: 'LA/IDR' },
+  { field: 'exchange_rate_la_idr', header: 'Loan Agreement/IDR' },
   { field: 'planned_usd', header: 'Rencana USD' },
   { field: 'realized_usd', header: 'Realisasi USD' },
   { field: 'absorption_pct', header: 'Penyerapan' },
@@ -84,7 +84,7 @@ onMounted(() => {
     >
       <template #actions>
         <Button
-          label="Kembali ke LA"
+          label="Kembali ke Loan Agreement"
           icon="pi pi-arrow-left"
           outlined
           @click="router.push({ name: 'loan-agreement-detail', params: { id: loanAgreementId } })"
@@ -106,7 +106,7 @@ onMounted(() => {
     </PageHeader>
 
     <Message v-if="isNotEffective" severity="warn" :closable="false">
-      LA belum efektif - monitoring belum bisa diinput. Tanggal efektif:
+      Loan Agreement belum efektif - monitoring belum bisa diinput. Tanggal efektif:
       {{ formatDate(currentLA?.effective_date ?? '') }}
     </Message>
 

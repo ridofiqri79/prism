@@ -160,7 +160,7 @@ func (env *blueBookVersioningTestEnv) dkProjectRequest(gbProjectID string, lende
 	institutionID := model.UUIDToString(env.ea.ID)
 	locationID := model.UUIDToString(env.region.ID)
 	lenderID := model.UUIDToString(lender.ID)
-	duration := "36 months"
+	duration := int32(36)
 	objectives := "Keep downstream relation frozen to the stored GB snapshot"
 
 	return model.CreateDKProjectRequest{

@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const loanAgreementSchema = z
   .object({
-    dk_project_id: z.string().uuid('DK Project wajib dipilih'),
+    dk_project_id: z.string().uuid('Proyek Daftar Kegiatan wajib dipilih'),
     lender_id: z.string().uuid('Lender wajib dipilih'),
     loan_code: z.string().min(1, 'Kode loan wajib diisi'),
     agreement_date: z.string().min(1, 'Tanggal agreement wajib diisi'),
