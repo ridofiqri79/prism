@@ -25,6 +25,7 @@ export const gbProjectSchema = z.object({
   objective: optionalText,
   scope_of_project: optionalText,
   bb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Proyek Blue Book'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   executing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 executing agency'),
   implementing_agency_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 implementing agency'),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),

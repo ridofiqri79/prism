@@ -329,6 +329,9 @@ func (s *GreenBookService) cloneGreenBookProjects(ctx context.Context, qtx *quer
 		if err := qtx.CloneGBProjectBBProjectsWithLatestBB(ctx, queries.CloneGBProjectBBProjectsWithLatestBBParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
 			return err
 		}
+		if err := qtx.CloneGBProjectBappenasPartners(ctx, queries.CloneGBProjectBappenasPartnersParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
+			return err
+		}
 		if err := qtx.CloneGBProjectInstitutions(ctx, queries.CloneGBProjectInstitutionsParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
 			return err
 		}
@@ -374,6 +377,9 @@ func (s *GreenBookService) replaceGBProjectChildren(ctx context.Context, qtx *qu
 	if err := qtx.DeleteGBProjectBBProjects(ctx, projectID); err != nil {
 		return err
 	}
+	if err := qtx.DeleteGBProjectBappenasPartners(ctx, projectID); err != nil {
+		return err
+	}
 	if err := qtx.DeleteGBProjectInstitutions(ctx, projectID); err != nil {
 		return err
 	}
@@ -381,6 +387,7 @@ func (s *GreenBookService) replaceGBProjectChildren(ctx context.Context, qtx *qu
 		return err
 	}
 
+	var firstBlueBookID pgtype.UUID
 	for _, id := range req.BBProjectIDs {
 		bbProjectID, err := model.ParseUUID(id)
 		if err != nil {
@@ -390,9 +397,20 @@ func (s *GreenBookService) replaceGBProjectChildren(ctx context.Context, qtx *qu
 		if err != nil {
 			return mapNotFound(err, "BB Project tidak ditemukan")
 		}
+		if firstBlueBookID.Valid && model.UUIDToString(firstBlueBookID) != model.UUIDToString(latestBB.BlueBookID) {
+			return validation("bb_project_ids", "Semua Proyek Blue Book harus berasal dari header Blue Book yang sama")
+		}
+		if !firstBlueBookID.Valid {
+			firstBlueBookID = latestBB.BlueBookID
+		}
 		if err := qtx.AddGBProjectBBProject(ctx, queries.AddGBProjectBBProjectParams{GbProjectID: projectID, BbProjectID: latestBB.ID}); err != nil {
 			return err
 		}
+	}
+	if err := addProjectBappenasPartners(ctx, qtx, "bappenas_partner_ids", req.BappenasPartnerIDs, func(partnerID pgtype.UUID) error {
+		return qtx.AddGBProjectBappenasPartner(ctx, queries.AddGBProjectBappenasPartnerParams{GbProjectID: projectID, BappenasPartnerID: partnerID})
+	}); err != nil {
+		return err
 	}
 	for _, id := range req.ExecutingAgencyIDs {
 		institutionID, err := model.ParseUUID(id)
@@ -565,6 +583,10 @@ func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queri
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil institution GB Project")
 	}
+	partners, err := s.queries.GetGBProjectBappenasPartners(ctx, row.ID)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil mitra Bappenas GB Project")
+	}
 	locations, err := s.queries.GetGBProjectLocations(ctx, row.ID)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil lokasi GB Project")
@@ -597,6 +619,7 @@ func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queri
 		Objective:           stringPtrFromText(row.Objective),
 		ScopeOfProject:      stringPtrFromText(row.ScopeOfProject),
 		BBProjects:          make([]model.BBProjectSummary, 0, len(bbProjects)),
+		BappenasPartners:    make([]model.BappenasPartnerResponse, 0, len(partners)),
 		Locations:           make([]model.RegionResponse, 0, len(locations)),
 		Activities:          make([]model.GBActivityResponse, 0, len(activities)),
 		FundingSources:      make([]model.GBFundingSourceResponse, 0, len(fundingSources)),
@@ -626,6 +649,9 @@ func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queri
 		if item.Role == roleImplementingAgency {
 			res.ImplementingAgencies = append(res.ImplementingAgencies, institution)
 		}
+	}
+	for _, item := range partners {
+		res.BappenasPartners = append(res.BappenasPartners, toBappenasPartnerResponse(item))
 	}
 	for _, item := range locations {
 		res.Locations = append(res.Locations, toRegionResponse(item))

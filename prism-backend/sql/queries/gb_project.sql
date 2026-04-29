@@ -351,6 +351,36 @@ ON CONFLICT DO NOTHING;
 DELETE FROM gb_project_bb_project
 WHERE gb_project_id = $1;
 
+-- name: CountDistinctBlueBooksForBBProjects :one
+SELECT COUNT(DISTINCT blue_book_id)
+FROM bb_project
+WHERE id = ANY($1::uuid[]);
+
+-- ===== GB BAPPENAS PARTNERS =====
+
+-- name: GetGBProjectBappenasPartners :many
+SELECT bp.*
+FROM gb_project_bappenas_partner gpbp
+JOIN bappenas_partner bp ON bp.id = gpbp.bappenas_partner_id
+WHERE gpbp.gb_project_id = $1
+ORDER BY bp.name;
+
+-- name: AddGBProjectBappenasPartner :exec
+INSERT INTO gb_project_bappenas_partner (gb_project_id, bappenas_partner_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: DeleteGBProjectBappenasPartners :exec
+DELETE FROM gb_project_bappenas_partner
+WHERE gb_project_id = $1;
+
+-- name: CloneGBProjectBappenasPartners :exec
+INSERT INTO gb_project_bappenas_partner (gb_project_id, bappenas_partner_id)
+SELECT $2, source.bappenas_partner_id
+FROM gb_project_bappenas_partner source
+WHERE source.gb_project_id = $1
+ON CONFLICT DO NOTHING;
+
 -- ===== GB PROJECT INSTITUTIONS =====
 
 -- name: GetGBProjectInstitutions :many

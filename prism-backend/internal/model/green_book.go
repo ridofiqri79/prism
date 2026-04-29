@@ -25,6 +25,7 @@ type CreateGBProjectRequest struct {
 	Objective             *string                   `json:"objective"`
 	ScopeOfProject        *string                   `json:"scope_of_project"`
 	BBProjectIDs          []string                  `json:"bb_project_ids" validate:"required,min=1"`
+	BappenasPartnerIDs    []string                  `json:"bappenas_partner_ids"`
 	ExecutingAgencyIDs    []string                  `json:"executing_agency_ids" validate:"required,min=1"`
 	ImplementingAgencyIDs []string                  `json:"implementing_agency_ids" validate:"required,min=1"`
 	LocationIDs           []string                  `json:"location_ids" validate:"required,min=1"`
@@ -80,6 +81,7 @@ type GBProjectResponse struct {
 	Objective            *string                       `json:"objective"`
 	ScopeOfProject       *string                       `json:"scope_of_project"`
 	BBProjects           []BBProjectSummary            `json:"bb_projects"`
+	BappenasPartners     []BappenasPartnerResponse     `json:"bappenas_partners"`
 	ExecutingAgencies    []InstitutionResponse         `json:"executing_agencies"`
 	ImplementingAgencies []InstitutionResponse         `json:"implementing_agencies"`
 	Locations            []RegionResponse              `json:"locations"`

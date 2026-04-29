@@ -152,7 +152,6 @@ CREATE TABLE bb_project (
     blue_book_id         UUID NOT NULL REFERENCES blue_book(id),
     project_identity_id  UUID NOT NULL REFERENCES project_identity(id),
     program_title_id     UUID REFERENCES program_title(id),
-    bappenas_partner_id  UUID REFERENCES bappenas_partner(id), -- Eselon II; Eselon I diturunkan dari hierarki
     bb_code              VARCHAR(50) NOT NULL,
     project_name         VARCHAR(500) NOT NULL,
     duration             INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
@@ -172,6 +171,13 @@ CREATE TABLE bb_project_institution (
     institution_id UUID NOT NULL REFERENCES institution(id),
     role           VARCHAR(30) NOT NULL CHECK (role IN ('Executing Agency', 'Implementing Agency')),
     PRIMARY KEY (bb_project_id, institution_id, role)
+);
+
+-- Mitra Kerja Bappenas Blue Book (multi-select, simpan Eselon II)
+CREATE TABLE bb_project_bappenas_partner (
+    bb_project_id       UUID NOT NULL REFERENCES bb_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (bb_project_id, bappenas_partner_id)
 );
 
 -- Location Blue Book (multi-select)
@@ -265,6 +271,13 @@ CREATE TABLE gb_project_bb_project (
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     bb_project_id  UUID NOT NULL REFERENCES bb_project(id) ON DELETE CASCADE,
     PRIMARY KEY (gb_project_id, bb_project_id)
+);
+
+-- Mitra Kerja Bappenas Green Book (multi-select, simpan Eselon II)
+CREATE TABLE gb_project_bappenas_partner (
+    gb_project_id       UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (gb_project_id, bappenas_partner_id)
 );
 
 -- EA & IA Green Book (multi-select, shared Institution)
@@ -365,6 +378,13 @@ CREATE TABLE dk_project_gb_project (
     dk_project_id  UUID NOT NULL REFERENCES dk_project(id) ON DELETE CASCADE,
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     PRIMARY KEY (dk_project_id, gb_project_id)
+);
+
+-- Mitra Kerja Bappenas Daftar Kegiatan (multi-select, simpan Eselon II)
+CREATE TABLE dk_project_bappenas_partner (
+    dk_project_id       UUID NOT NULL REFERENCES dk_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (dk_project_id, bappenas_partner_id)
 );
 
 -- Location Daftar Kegiatan (multi-select)

@@ -12,7 +12,7 @@
 **`src/types/green-book.types.ts`:**
 ```typescript
 export interface GreenBook { id: string; publish_year: number; revision_number: number; status: 'active' | 'superseded' }
-export interface GBProject { id: string; gb_code: string; project_name: string; duration?: number | null; program_title?: ProgramTitle; bb_projects: BBProjectSummary[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; activities: GBActivity[]; funding_sources: GBFundingSource[]; disbursement_plan: GBDisbursementPlan[]; funding_allocations: GBFundingAllocation[]; status: 'active' | 'deleted' }
+export interface GBProject { id: string; gb_code: string; project_name: string; duration?: number | null; program_title?: ProgramTitle; bb_projects: BBProjectSummary[]; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; activities: GBActivity[]; funding_sources: GBFundingSource[]; disbursement_plan: GBDisbursementPlan[]; funding_allocations: GBFundingAllocation[]; status: 'active' | 'deleted' }
 export interface GBActivity { id: string; activity_name: string; implementation_location?: string; piu?: string; sort_order: number }
 export interface GBFundingSource { id: string; lender: Lender; institution?: Institution; loan_usd: number; grant_usd: number; local_usd: number }
 export interface GBDisbursementPlan { id: string; year: number; amount_usd: number }
@@ -29,6 +29,7 @@ export const gbProjectSchema = z.object({
   objective: z.string().optional(),
   scope_of_project: z.string().optional(),
   bb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 BB Project'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   executing_agency_ids: z.array(z.string().uuid()).min(1),
   implementing_agency_ids: z.array(z.string().uuid()).min(1),
   location_ids: z.array(z.string().uuid()).min(1),
@@ -104,9 +105,11 @@ export function useGBProjectForm(initialData?) {
 
 Gunakan PrimeVue `<TabView>`:
 
-**Tab 1 — Informasi Umum:** program_title_id, gb_code, project_name, duration bulan (`<InputNumber>` integer), objective, scope_of_project, bb_project_ids (MultiSelect), executing_agency_ids, implementing_agency_ids, location_ids
+**Tab 1 — Informasi Umum:** program_title_id, gb_code, project_name, duration bulan (`<InputNumber>` integer), objective, scope_of_project, bb_project_ids (MultiSelect), bappenas_partner_ids (multi-select Eselon II, opsional), executing_agency_ids, implementing_agency_ids, location_ids
 
 Jika form dibuka dari action BB Project "Tambah Green Book", baca query `source_bb_project_id` dan `source_mode`. Dialog BB memakai checkbox "Gunakan data di Blue Book sebagai data Green Book": `source_mode=new` hanya set `bb_project_ids` + `gb_code` dari BB Code, sedangkan `source_mode=existing` juga autofill field yang sama antara BB dan GB (`program_title_id`, `project_name`, `duration`, `objective`, `scope_of_project`, EA, IA, lokasi), namun semua tetap editable sebelum save.
+
+Semua BB Project yang dipilih dalam satu GB Project harus berasal dari header Blue Book yang sama setelah latest resolver dijalankan. Satu BB Project boleh dipakai oleh lebih dari satu GB Project.
 
 **Tab 2 — Activities:** `<ActivitiesTable>` — editable, drag reorder via `sortOrder` + PrimeVue OrderList atau manual up/down button
 
@@ -136,6 +139,7 @@ Tombol "Simpan" di footer (bukan di dalam tab) — submit semua tab sekaligus.
 
 - Header info + status badge
 - Referensi BB Projects (link ke BBProjectDetailPage)
+- Mitra Kerja Bappenas tampil sebagai daftar nama, boleh kosong
 - `<TabView>`: Activities, Funding Source, Disbursement Plan, Funding Allocation (semua read-only)
 - Tombol Edit, Hapus
 

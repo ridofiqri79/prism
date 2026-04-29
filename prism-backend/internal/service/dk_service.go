@@ -226,6 +226,9 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 	if err := qtx.DeleteDKProjectGBProjects(ctx, projectID); err != nil {
 		return err
 	}
+	if err := qtx.DeleteDKProjectBappenasPartners(ctx, projectID); err != nil {
+		return err
+	}
 	for _, id := range req.GBProjectIDs {
 		gbProjectID, err := model.ParseUUID(id)
 		if err != nil {
@@ -238,6 +241,11 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 		if err := qtx.AddDKProjectGBProject(ctx, queries.AddDKProjectGBProjectParams{DkProjectID: projectID, GbProjectID: latestGB.ID}); err != nil {
 			return err
 		}
+	}
+	if err := addProjectBappenasPartners(ctx, qtx, "bappenas_partner_ids", req.BappenasPartnerIDs, func(partnerID pgtype.UUID) error {
+		return qtx.AddDKProjectBappenasPartner(ctx, queries.AddDKProjectBappenasPartnerParams{DkProjectID: projectID, BappenasPartnerID: partnerID})
+	}); err != nil {
+		return err
 	}
 	for _, id := range req.LocationIDs {
 		regionID, err := model.ParseUUID(id)
@@ -329,6 +337,10 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil relasi GB Project")
 	}
+	partners, err := s.queries.GetDKProjectBappenasPartners(ctx, row.ID)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil mitra Bappenas DK Project")
+	}
 	locations, err := s.queries.GetDKProjectLocations(ctx, row.ID)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil lokasi DK Project")
@@ -353,6 +365,7 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		Duration:         int32PtrFromInt4(row.Duration),
 		Objectives:       stringPtrFromText(row.Objectives),
 		GBProjects:       make([]model.GBProjectSummary, 0, len(gbProjects)),
+		BappenasPartners: make([]model.BappenasPartnerResponse, 0, len(partners)),
 		Locations:        make([]model.RegionResponse, 0, len(locations)),
 		FinancingDetails: make([]model.DKFinancingDetailResponse, 0, len(financingDetails)),
 		LoanAllocations:  make([]model.DKLoanAllocationResponse, 0, len(loanAllocations)),
@@ -374,6 +387,9 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 			summary.HasNewerRevision = !summary.IsLatest
 		}
 		res.GBProjects = append(res.GBProjects, summary)
+	}
+	for _, item := range partners {
+		res.BappenasPartners = append(res.BappenasPartners, toBappenasPartnerResponse(item))
 	}
 	for _, item := range locations {
 		res.Locations = append(res.Locations, toRegionResponse(item))

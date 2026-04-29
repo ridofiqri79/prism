@@ -30,7 +30,7 @@ type BlueBookResponse struct {
 type CreateBBProjectRequest struct {
 	ProjectIdentityID     *string                `json:"project_identity_id"`
 	ProgramTitleID        *string                `json:"program_title_id"`
-	BappenasPartnerID     *string                `json:"bappenas_partner_id"`
+	BappenasPartnerIDs    []string               `json:"bappenas_partner_ids"`
 	BBCode                string                 `json:"bb_code" validate:"required"`
 	ProjectName           string                 `json:"project_name" validate:"required"`
 	Duration              *int32                 `json:"duration"`
@@ -64,7 +64,7 @@ type BBProjectResponse struct {
 	BlueBookID           string                     `json:"blue_book_id"`
 	ProjectIdentityID    string                     `json:"project_identity_id"`
 	ProgramTitleID       *string                    `json:"program_title_id,omitempty"`
-	BappenasPartnerID    *string                    `json:"bappenas_partner_id,omitempty"`
+	BappenasPartners     []BappenasPartnerResponse  `json:"bappenas_partners"`
 	BBCode               string                     `json:"bb_code"`
 	ProjectName          string                     `json:"project_name"`
 	Duration             *int32                     `json:"duration"`

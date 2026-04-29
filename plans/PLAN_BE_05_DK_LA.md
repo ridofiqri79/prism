@@ -50,6 +50,13 @@ INSERT INTO dk_project_gb_project (dk_project_id, gb_project_id) VALUES ($1, $2)
 -- name: DeleteDKProjectGBProjects :exec
 DELETE FROM dk_project_gb_project WHERE dk_project_id = $1;
 
+-- ===== DK BAPPENAS PARTNER JUNCTION =====
+-- name: AddDKProjectBappenasPartner :exec
+INSERT INTO dk_project_bappenas_partner (dk_project_id, bappenas_partner_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;
+
+-- name: DeleteDKProjectBappenasPartners :exec
+DELETE FROM dk_project_bappenas_partner WHERE dk_project_id = $1;
+
 -- ===== FINANCING DETAIL =====
 -- name: GetDKFinancingDetails :many
 SELECT df.*, l.name as lender_name FROM dk_financing_detail df
@@ -143,7 +150,8 @@ Jalankan `make generate`.
 
 ```go
 func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req model.CreateDKProjectRequest) (*model.DKProjectResponse, error) {
-    // ... insert DK project dan relasi GB dulu ...
+    // ... insert DK project, relasi GB, dan Mitra Kerja Bappenas dulu ...
+    // Mitra Kerja Bappenas opsional, multi-value, dan hanya boleh Eselon II.
 
     // Setelah GB relations tersimpan, fetch allowed lender IDs
     allowedLenders, _ := qtx.GetAllowedLenderIDsForDK(ctx, dkProject.ID)

@@ -321,7 +321,7 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 - Satu `active` per Period â€” revisi baru â†’ lama jadi `superseded`
 - BB Project adalah snapshot per Blue Book/revisi dan dihubungkan lintas revisi oleh logical identity
 - `bb_code` unik hanya dalam Blue Book yang sama; kode yang sama boleh muncul di revisi lain untuk logical project yang sama
-- Bappenas Partner: simpan Eselon II saja, Eselon I diturunkan dari `parent_id`
+- Mitra Kerja Bappenas: opsional, boleh lebih dari satu; simpan Eselon II saja, Eselon I diturunkan dari `parent_id`
 - National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun
 
 ### Green Book
@@ -330,6 +330,8 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 - `gb_code` unik hanya dalam Green Book yang sama; kode yang sama boleh muncul di revisi lain untuk logical GB Project yang sama
 - Saat GB dibuat/direvisi, relasi ke BB Project harus memakai versi BB Project terbaru
 - GB Project wajib referensikan minimal 1 BB Project
+- GB Project boleh mereferensikan lebih dari satu BB Project hanya jika seluruh BB Project berasal dari header Blue Book yang sama
+- Satu BB Project boleh dipakai oleh lebih dari satu GB Project
 - `gb_funding_allocation` CASCADE dengan `gb_activity` â€” selalu sinkron
 - Disbursement Plan: total proyek per tahun (bukan per lender), `(gb_project_id, year)` unik
 

@@ -207,7 +207,6 @@ func (s *BlueBookService) CreateBBProject(ctx context.Context, bbID pgtype.UUID,
 			BlueBookID:        bbID,
 			ProjectIdentityID: identityID,
 			ProgramTitleID:    uuidOrInvalid(req.ProgramTitleID),
-			BappenasPartnerID: uuidOrInvalid(req.BappenasPartnerID),
 			BbCode:            strings.TrimSpace(req.BBCode),
 			ProjectName:       strings.TrimSpace(req.ProjectName),
 			Duration:          int4Ptr(req.Duration),
@@ -248,15 +247,14 @@ func (s *BlueBookService) UpdateBBProject(ctx context.Context, bbID, id pgtype.U
 			return err
 		}
 		project, err := qtx.UpdateBBProject(ctx, queries.UpdateBBProjectParams{
-			ID:                id,
-			ProgramTitleID:    uuidOrInvalid(req.ProgramTitleID),
-			BappenasPartnerID: uuidOrInvalid(req.BappenasPartnerID),
-			ProjectName:       strings.TrimSpace(req.ProjectName),
-			Duration:          int4Ptr(req.Duration),
-			Objective:         nullableTextPtr(req.Objective),
-			ScopeOfWork:       nullableTextPtr(req.ScopeOfWork),
-			Outputs:           nullableTextPtr(req.Outputs),
-			Outcomes:          nullableTextPtr(req.Outcomes),
+			ID:             id,
+			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
+			ProjectName:    strings.TrimSpace(req.ProjectName),
+			Duration:       int4Ptr(req.Duration),
+			Objective:      nullableTextPtr(req.Objective),
+			ScopeOfWork:    nullableTextPtr(req.ScopeOfWork),
+			Outputs:        nullableTextPtr(req.Outputs),
+			Outcomes:       nullableTextPtr(req.Outcomes),
 		})
 		if err != nil {
 			return mapNotFound(err, "BB Project tidak ditemukan")
@@ -383,7 +381,6 @@ func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *querie
 			BlueBookID:        targetBlueBookID,
 			ProjectIdentityID: source.ProjectIdentityID,
 			ProgramTitleID:    source.ProgramTitleID,
-			BappenasPartnerID: source.BappenasPartnerID,
 			BbCode:            source.BbCode,
 			ProjectName:       source.ProjectName,
 			Duration:          source.Duration,
@@ -396,6 +393,9 @@ func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *querie
 			return err
 		}
 		if err := qtx.CloneBBProjectInstitutions(ctx, queries.CloneBBProjectInstitutionsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
+			return err
+		}
+		if err := qtx.CloneBBProjectBappenasPartners(ctx, queries.CloneBBProjectBappenasPartnersParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
 			return err
 		}
 		if err := qtx.CloneBBProjectLocations(ctx, queries.CloneBBProjectLocationsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
@@ -419,6 +419,9 @@ func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *querie
 
 func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, req model.CreateBBProjectRequest) error {
 	if err := qtx.DeleteBBProjectInstitutions(ctx, projectID); err != nil {
+		return err
+	}
+	if err := qtx.DeleteBBProjectBappenasPartners(ctx, projectID); err != nil {
 		return err
 	}
 	if err := qtx.DeleteBBProjectLocations(ctx, projectID); err != nil {
@@ -451,6 +454,11 @@ func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *que
 		if err := qtx.AddBBProjectInstitution(ctx, queries.AddBBProjectInstitutionParams{BbProjectID: projectID, InstitutionID: institutionID, Role: roleImplementingAgency}); err != nil {
 			return err
 		}
+	}
+	if err := addProjectBappenasPartners(ctx, qtx, "bappenas_partner_ids", req.BappenasPartnerIDs, func(partnerID pgtype.UUID) error {
+		return qtx.AddBBProjectBappenasPartner(ctx, queries.AddBBProjectBappenasPartnerParams{BbProjectID: projectID, BappenasPartnerID: partnerID})
+	}); err != nil {
+		return err
 	}
 	for _, id := range req.LocationIDs {
 		regionID, err := model.ParseUUID(id)
@@ -579,6 +587,10 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil institution BB Project")
 	}
+	partners, err := s.queries.GetBBProjectBappenasPartners(ctx, row.ID)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil mitra Bappenas BB Project")
+	}
 	locations, err := s.queries.GetBBProjectLocations(ctx, row.ID)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil lokasi BB Project")
@@ -601,7 +613,6 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 		BlueBookID:         model.UUIDToString(row.BlueBookID),
 		ProjectIdentityID:  model.UUIDToString(row.ProjectIdentityID),
 		ProgramTitleID:     stringPtrFromUUID(row.ProgramTitleID),
-		BappenasPartnerID:  stringPtrFromUUID(row.BappenasPartnerID),
 		BBCode:             row.BbCode,
 		ProjectName:        row.ProjectName,
 		Duration:           int32PtrFromInt4(row.Duration),
@@ -609,6 +620,7 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 		ScopeOfWork:        stringPtrFromText(row.ScopeOfWork),
 		Outputs:            stringPtrFromText(row.Outputs),
 		Outcomes:           stringPtrFromText(row.Outcomes),
+		BappenasPartners:   make([]model.BappenasPartnerResponse, 0, len(partners)),
 		Locations:          make([]model.RegionResponse, 0, len(locations)),
 		NationalPriorities: make([]model.NationalPriorityResponse, 0, len(priorities)),
 		ProjectCosts:       make([]model.ProjectCostResponse, 0, len(costs)),
@@ -634,6 +646,9 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 		if item.Role == roleImplementingAgency {
 			res.ImplementingAgencies = append(res.ImplementingAgencies, institution)
 		}
+	}
+	for _, item := range partners {
+		res.BappenasPartners = append(res.BappenasPartners, toBappenasPartnerResponse(item))
 	}
 	for _, item := range locations {
 		res.Locations = append(res.Locations, toRegionResponse(item))
@@ -665,6 +680,32 @@ func validateBBProjectRequest(req model.CreateBBProjectRequest, validateCode boo
 	}
 	if len(req.LocationIDs) == 0 {
 		return validation("location_ids", "minimal satu")
+	}
+	return nil
+}
+
+func addProjectBappenasPartners(ctx context.Context, qtx *queries.Queries, field string, ids []string, add func(pgtype.UUID) error) error {
+	seen := map[string]struct{}{}
+	for _, id := range ids {
+		partnerID, err := model.ParseUUID(id)
+		if err != nil {
+			return validation(field, "UUID tidak valid")
+		}
+		key := model.UUIDToString(partnerID)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		partner, err := qtx.GetBappenasPartner(ctx, partnerID)
+		if err != nil {
+			return mapNotFound(err, "Mitra Bappenas tidak ditemukan")
+		}
+		if partner.Level != "Eselon II" {
+			return validation(field, "hanya boleh memilih Mitra Bappenas Eselon II")
+		}
+		if err := add(partnerID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

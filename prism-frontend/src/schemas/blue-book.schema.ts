@@ -37,7 +37,7 @@ export const lenderIndicationSchema = z.object({
 
 export const bbProjectSchema = z.object({
   program_title_id: z.string().uuid('Judul program wajib dipilih'),
-  bappenas_partner_id: z.string().uuid('Mitra Bappenas wajib dipilih'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   bb_code: z.string().min(1, 'Kode Blue Book wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
   duration: optionalDurationMonths,

@@ -47,19 +47,26 @@ const programTitleName = computed(
     masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
     '-',
 )
-const bappenasPartner = computed(
+const bappenasPartnerNames = computed(
   () =>
-    project.value?.bappenas_partner ??
-    masterStore.bappenasPartners.find((item) => item.id === project.value?.bappenas_partner_id),
+    project.value?.bappenas_partners
+      .map((partner) => {
+        const parent = findPartnerParent(partner)
+        return parent === '-' ? partner.name : `${partner.name} / ${parent}`
+      })
+      .join(', ') || '-',
 )
-const bappenasPartnerParent = computed(() => findPartnerParent(bappenasPartner.value))
 const allowedLenderIds = computed(
   () => project.value?.lender_indications.map((item) => item.lender.id) ?? [],
 )
 
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
-  return masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ?? partner.parent?.name ?? '-'
+  return (
+    masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
+    partner.parent?.name ??
+    '-'
+  )
 }
 
 async function loadData() {
@@ -153,7 +160,12 @@ onMounted(() => {
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge :status="project.status" />
               <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
-              <Tag v-else-if="project.has_newer_revision" value="Ada revisi lebih baru" severity="warn" rounded />
+              <Tag
+                v-else-if="project.has_newer_revision"
+                value="Ada revisi lebih baru"
+                severity="warn"
+                rounded
+              />
             </div>
           </div>
           <div class="text-right">
@@ -166,7 +178,11 @@ onMounted(() => {
       <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-          <Tag :value="`${blueBookStore.projectHistory.length} snapshot`" severity="secondary" rounded />
+          <Tag
+            :value="`${blueBookStore.projectHistory.length} snapshot`"
+            severity="secondary"
+            rounded
+          />
         </div>
         <div class="overflow-auto rounded-lg border border-surface-200">
           <table class="w-full min-w-[48rem] text-left text-sm">
@@ -220,17 +236,20 @@ onMounted(() => {
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.executing_agencies) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.executing_agencies) }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.implementing_agencies) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.implementing_agencies) }}
+          </p>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Bappenas Partner</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
           <p class="mt-1 font-medium text-surface-950">
-            {{ bappenasPartner?.name ?? '-' }}
-            <span class="text-surface-500">/ {{ bappenasPartnerParent }}</span>
+            {{ bappenasPartnerNames }}
           </p>
         </div>
         <div>
@@ -239,14 +258,18 @@ onMounted(() => {
         </div>
         <div class="md:col-span-2">
           <p class="text-xs uppercase tracking-wide text-surface-500">Prioritas Nasional</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.national_priorities) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.national_priorities) }}
+          </p>
         </div>
       </div>
 
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
-          <p class="mt-1 text-surface-950">{{ project.duration ? `${project.duration} bulan` : '-' }}</p>
+          <p class="mt-1 text-surface-950">
+            {{ project.duration ? `${project.duration} bulan` : '-' }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Objective</p>
@@ -258,7 +281,9 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Outputs / Outcomes</p>
-          <p class="mt-1 text-surface-950">{{ project.outputs || '-' }} / {{ project.outcomes || '-' }}</p>
+          <p class="mt-1 text-surface-950">
+            {{ project.outputs || '-' }} / {{ project.outcomes || '-' }}
+          </p>
         </div>
       </div>
 
@@ -279,7 +304,12 @@ onMounted(() => {
       />
     </div>
 
-    <Dialog v-model:visible="dialogVisible" modal header="Tambah LoI" class="w-[36rem] max-w-[95vw]">
+    <Dialog
+      v-model:visible="dialogVisible"
+      modal
+      header="Tambah LoI"
+      class="w-[36rem] max-w-[95vw]"
+    >
       <form class="space-y-4" @submit.prevent="saveLoI">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Lender</span>
@@ -297,7 +327,12 @@ onMounted(() => {
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Tanggal</span>
-          <InputText v-model="loiForm.date" type="date" class="w-full" :invalid="Boolean(errors.date)" />
+          <InputText
+            v-model="loiForm.date"
+            type="date"
+            class="w-full"
+            :invalid="Boolean(errors.date)"
+          />
           <small v-if="errors.date" class="text-red-600">{{ errors.date }}</small>
         </label>
         <label class="block space-y-2">

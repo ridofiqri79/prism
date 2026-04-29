@@ -1,5 +1,11 @@
 import type { BBProject } from '@/types/blue-book.types'
-import type { Institution, Lender, ProgramTitle, Region } from '@/types/master.types'
+import type {
+  BappenasPartner,
+  Institution,
+  Lender,
+  ProgramTitle,
+  Region,
+} from '@/types/master.types'
 
 export type GreenBookStatus = 'active' | 'superseded'
 export type GBProjectStatus = 'active' | 'deleted'
@@ -42,6 +48,7 @@ export interface GBProject {
   scope_of_project?: string | null
   program_title?: ProgramTitle
   bb_projects: BBProjectSummary[]
+  bappenas_partners: BappenasPartner[]
   executing_agencies: Institution[]
   implementing_agencies: Institution[]
   locations: Region[]
@@ -140,6 +147,7 @@ export interface GBProjectPayload {
   objective?: string | null
   scope_of_project?: string | null
   bb_project_ids: string[]
+  bappenas_partner_ids: string[]
   executing_agency_ids: string[]
   implementing_agency_ids: string[]
   location_ids: string[]

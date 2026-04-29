@@ -62,7 +62,7 @@ Setiap proyek di Blue Book juga sudah memiliki **unit kerja Bappenas yang bertan
 | Outputs | Keluaran proyek |
 | Outcomes | Hasil proyek |
 | National Priority | Multi-select — satu atau lebih National Priority yang didukung proyek ini |
-| Bappenas Partner (Eselon II) | Unit kerja Bappenas penanggung jawab — Eselon I diturunkan otomatis dari hierarki |
+| Mitra Kerja Bappenas (Eselon II) | Opsional dan boleh lebih dari satu; Eselon I diturunkan otomatis dari hierarki |
 | **Lender Indication** | Lender yang memberikan indikasi ketertarikan *(masih bersifat indikasi, belum pasti)* — memuat: Nama Lender + Keterangan |
 
 #### Project Cost
@@ -414,7 +414,7 @@ Bappenas Publish Blue Book (per 5 tahun)
 - **Daftar Kegiatan** bersifat final (tidak direvisi), terdiri dari header surat dan list proyek GB. Activity Details diinput bebas (tidak dipilih dari Activities GB) — secara konteks merupakan realisasi rencana GB, namun tidak ada relasi teknis langsung.
 - **Period** hanya berlaku untuk Blue Book dan National Priority (5 tahunan); Green Book tidak menggunakan entitas Period.
 - **Program Title** adalah entitas master bersama (shared) antara BB dan GB — dipilih dari daftar, tidak diketik bebas.
-- **Bappenas Partner** pada BB Project cukup menyimpan Eselon II per proyek — Eselon I diturunkan otomatis dari hierarki parent-child.
+- **Mitra Kerja Bappenas** pada BB, GB, dan DK Project bersifat opsional dan boleh lebih dari satu. Simpan Eselon II; Eselon I diturunkan otomatis dari hierarki parent-child.
 - **Executing Agency & Implementing Agency** keduanya bersifat multi-select di BB maupun GB, mengacu ke entitas Institution yang sama (Kementerian/Eselon I).
 - **Lender Indication** dicatat di level BB Project — lender masih bersifat indikasi (belum pasti). Berbeda dengan Funding Source di GB yang sudah hampir pasti.
 - **Funding Source di DK** dipilih dari lender yang sudah terdaftar (dari Lender Indication BB atau Funding Source GB), bukan diinput bebas.

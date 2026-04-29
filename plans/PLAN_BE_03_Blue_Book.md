@@ -41,11 +41,11 @@ SELECT * FROM bb_project WHERE id = $1;
 SELECT * FROM bb_project WHERE bb_code = $1;
 
 -- name: CreateBBProject :one
-INSERT INTO bb_project (blue_book_id, program_title_id, bappenas_partner_id, bb_code, project_name, duration, objective, scope_of_work, outputs, outcomes)
+INSERT INTO bb_project (blue_book_id, project_identity_id, program_title_id, bb_code, project_name, duration, objective, scope_of_work, outputs, outcomes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- name: UpdateBBProject :one
-UPDATE bb_project SET program_title_id=$2, bappenas_partner_id=$3, project_name=$4, duration=$5, objective=$6, scope_of_work=$7, outputs=$8, outcomes=$9, updated_at=NOW()
+UPDATE bb_project SET program_title_id=$2, project_name=$3, duration=$4, objective=$5, scope_of_work=$6, outputs=$7, outcomes=$8, updated_at=NOW()
 WHERE id=$1 RETURNING *;
 
 -- name: SoftDeleteBBProject :one
@@ -134,7 +134,7 @@ Request/response types. Contoh:
 ```go
 type CreateBBProjectRequest struct {
     ProgramTitleID      *string  `json:"program_title_id"`
-    BappenasPartnerID   *string  `json:"bappenas_partner_id"`
+  BappenasPartnerIDs  []string `json:"bappenas_partner_ids"`
     BBCode              string   `json:"bb_code" validate:"required"`
     ProjectName         string   `json:"project_name" validate:"required"`
     Duration            *int32   `json:"duration"` // jumlah bulan

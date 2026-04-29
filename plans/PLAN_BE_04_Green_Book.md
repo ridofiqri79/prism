@@ -12,7 +12,7 @@
 Query mencakup:
 - CRUD `green_book` (header)
 - CRUD `gb_project`
-- Junction: `gb_project_bb_project`, `gb_project_institution`, `gb_project_location`
+- Junction: `gb_project_bb_project`, `gb_project_bappenas_partner`, `gb_project_institution`, `gb_project_location`
 - CRUD `gb_activity` (dengan sort_order)
 - CRUD `gb_funding_source`
 - CRUD `gb_disbursement_plan` (unique constraint year per project)
@@ -53,8 +53,10 @@ func (s *GBProjectService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
     // 2. EA dan IA boleh overlap bila sesuai data proyek
     // 3. gb_code unik dalam Green Book yang sama; boleh sama pada revisi lain via gb_project_identity_id
     // 4. BB Project yang dipilih di-resolve ke versi latest sebelum disimpan
-    // 5. Tahun disbursement tidak duplikat
-    // 6. Duration, jika diisi, adalah integer jumlah bulan > 0
+    // 5. Jika lebih dari satu BB Project dipilih, semuanya harus resolve ke header Blue Book yang sama
+    // 6. Mitra Kerja Bappenas opsional, multi-value, dan hanya boleh Eselon II
+    // 7. Tahun disbursement tidak duplikat
+    // 8. Duration, jika diisi, adalah integer jumlah bulan > 0
     yearSet := map[int]bool{}
     for _, d := range req.DisbursementPlan {
         if yearSet[d.Year] {
@@ -70,7 +72,7 @@ func (s *GBProjectService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
     // Insert project
     project, err := qtx.CreateGBProject(ctx, ...)
 
-    // Insert BB relations, institutions, locations
+    // Insert BB relations, Mitra Kerja Bappenas, institutions, locations
     for _, bbID := range req.BBProjectIDs { qtx.AddGBProjectBBProject(ctx, ...) }
 
     // Insert activities (sorted)

@@ -17,11 +17,15 @@ export interface DKProjectFormValues {
   duration: number | null
   objectives: string
   gb_project_ids: string[]
+  bappenas_partner_ids: string[]
   location_ids: string[]
 }
 
 type DKProjectFormErrors = Partial<
-  Record<keyof DKProjectFormValues | 'financing_details' | 'loan_allocations' | 'activity_details', string>
+  Record<
+    keyof DKProjectFormValues | 'financing_details' | 'loan_allocations' | 'activity_details',
+    string
+  >
 >
 
 function defaultValues(): DKProjectFormValues {
@@ -31,6 +35,7 @@ function defaultValues(): DKProjectFormValues {
     duration: null,
     objectives: '',
     gb_project_ids: [],
+    bappenas_partner_ids: [],
     location_ids: [],
   }
 }
@@ -72,6 +77,7 @@ function fromProject(project?: DKProject | null): Partial<DKProjectFormValues> {
     duration: project.duration ?? null,
     objectives: project.objectives ?? '',
     gb_project_ids: project.gb_projects.map((item) => item.id),
+    bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
     location_ids: project.locations.map((item) => item.id),
   }
 }
@@ -239,6 +245,9 @@ export function useDKProjectForm(
     values.location_ids = uniqueIds(
       selected.flatMap((project) => project.locations.map((location) => location.id)),
     )
+    values.bappenas_partner_ids = uniqueIds(
+      selected.flatMap((project) => project.bappenas_partners.map((partner) => partner.id)),
+    )
 
     const fundingRows = selected.flatMap((project) =>
       project.funding_sources.map((source) => ({
@@ -317,13 +326,18 @@ export function useDKProjectForm(
       duration: values.duration ?? null,
       objectives: values.objectives || null,
       gb_project_ids: values.gb_project_ids,
+      bappenas_partner_ids: values.bappenas_partner_ids,
       location_ids: values.location_ids,
       financing_details: financingDetails.value.map((row) => ({
         ...row,
         currency: normalizeCurrency(row.currency),
         amount_usd: normalizeUSDAmount(row.currency, row.amount_original, row.amount_usd),
         grant_usd: normalizeUSDAmount(row.currency, row.grant_original, row.grant_usd),
-        counterpart_usd: normalizeUSDAmount(row.currency, row.counterpart_original, row.counterpart_usd),
+        counterpart_usd: normalizeUSDAmount(
+          row.currency,
+          row.counterpart_original,
+          row.counterpart_usd,
+        ),
         remarks: row.remarks || null,
       })),
       loan_allocations: loanAllocations.value.map((row) => ({
@@ -331,7 +345,11 @@ export function useDKProjectForm(
         currency: normalizeCurrency(row.currency),
         amount_usd: normalizeUSDAmount(row.currency, row.amount_original, row.amount_usd),
         grant_usd: normalizeUSDAmount(row.currency, row.grant_original, row.grant_usd),
-        counterpart_usd: normalizeUSDAmount(row.currency, row.counterpart_original, row.counterpart_usd),
+        counterpart_usd: normalizeUSDAmount(
+          row.currency,
+          row.counterpart_original,
+          row.counterpart_usd,
+        ),
         remarks: row.remarks || null,
       })),
       activity_details: activityDetails.value.map((row, index) => ({

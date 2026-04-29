@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import Textarea from 'primevue/textarea'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
@@ -28,20 +28,33 @@ const toast = useToast()
 const blueBookId = computed(() => String(route.params.bbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const isEditMode = computed(() => route.name === 'bb-project-edit')
-const pageTitle = computed(() => (isEditMode.value ? 'Edit Proyek Blue Book' : 'Tambah Proyek Blue Book'))
+const pageTitle = computed(() =>
+  isEditMode.value ? 'Edit Proyek Blue Book' : 'Tambah Proyek Blue Book',
+)
 
 const form = useBBProjectForm()
 
 const bappenasPartnerOptions = computed(() =>
   masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
 )
-const selectedPartner = computed(() =>
-  masterStore.bappenasPartners.find((partner) => partner.id === form.values.bappenas_partner_id),
+const selectedPartners = computed(() =>
+  form.values.bappenas_partner_ids
+    .map((id) => masterStore.bappenasPartners.find((partner) => partner.id === id))
+    .filter((partner): partner is BappenasPartner => Boolean(partner)),
 )
-const selectedPartnerParent = computed(() => findPartnerParent(selectedPartner.value))
+const selectedPartnerParents = computed(() => {
+  const parents = selectedPartners.value
+    .map((partner) => findPartnerParent(partner))
+    .filter((name) => name !== '-')
+  return [...new Set(parents)].join(', ') || '-'
+})
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
-  return masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ?? partner.parent?.name ?? '-'
+  return (
+    masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
+    partner.parent?.name ??
+    '-'
+  )
 }
 
 async function loadData() {
@@ -65,13 +78,19 @@ const onSubmit = form.submit(async (values) => {
   if (isEditMode.value) {
     await blueBookStore.updateProject(blueBookId.value, projectId.value, values)
     toast.success('Berhasil', 'Proyek Blue Book berhasil diperbarui')
-    await router.push({ name: 'bb-project-detail', params: { bbId: blueBookId.value, id: projectId.value } })
+    await router.push({
+      name: 'bb-project-detail',
+      params: { bbId: blueBookId.value, id: projectId.value },
+    })
     return
   }
 
   const created = await blueBookStore.createProject(blueBookId.value, values)
   toast.success('Berhasil', 'Proyek Blue Book berhasil dibuat')
-  await router.push({ name: 'bb-project-detail', params: { bbId: blueBookId.value, id: created.id } })
+  await router.push({
+    name: 'bb-project-detail',
+    params: { bbId: blueBookId.value, id: created.id },
+  })
 })
 
 onMounted(() => {
@@ -106,23 +125,28 @@ onMounted(() => {
             </small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Mitra Bappenas (Eselon II)</span>
-            <Select
-              v-model="form.values.bappenas_partner_id"
+            <span class="text-sm font-medium text-surface-700"
+              >Mitra Kerja Bappenas (Eselon II)</span
+            >
+            <MultiSelect
+              v-model="form.values.bappenas_partner_ids"
               :options="bappenasPartnerOptions"
               option-label="name"
               option-value="id"
-              placeholder="Pilih mitra Bappenas"
+              placeholder="Pilih mitra kerja Bappenas"
               filter
+              display="chip"
               class="w-full"
             />
-            <small v-if="form.errors.bappenas_partner_id" class="text-red-600">
-              {{ form.errors.bappenas_partner_id }}
+            <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
+              {{ form.errors.bappenas_partner_ids }}
             </small>
           </label>
         </div>
-        <div class="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700">
-          Induk Eselon I: <strong>{{ selectedPartnerParent }}</strong>
+        <div
+          class="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700"
+        >
+          Induk Eselon I: <strong>{{ selectedPartnerParents }}</strong>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
@@ -133,12 +157,21 @@ onMounted(() => {
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Nama Proyek</span>
             <InputText v-model="form.values.project_name" class="w-full" />
-            <small v-if="form.errors.project_name" class="text-red-600">{{ form.errors.project_name }}</small>
+            <small v-if="form.errors.project_name" class="text-red-600">{{
+              form.errors.project_name
+            }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-surface-700">Durasi (bulan)</span>
-            <InputNumber v-model="form.values.duration" class="w-full" :min="1" :use-grouping="false" />
-            <small v-if="form.errors.duration" class="text-red-600">{{ form.errors.duration }}</small>
+            <InputNumber
+              v-model="form.values.duration"
+              class="w-full"
+              :min="1"
+              :use-grouping="false"
+            />
+            <small v-if="form.errors.duration" class="text-red-600">{{
+              form.errors.duration
+            }}</small>
           </label>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
@@ -191,7 +224,9 @@ onMounted(() => {
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Lokasi</span>
             <LocationMultiSelect v-model="form.values.location_ids" />
-            <small v-if="form.errors.location_ids" class="text-red-600">{{ form.errors.location_ids }}</small>
+            <small v-if="form.errors.location_ids" class="text-red-600">{{
+              form.errors.location_ids
+            }}</small>
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Prioritas Nasional</span>
@@ -222,7 +257,9 @@ onMounted(() => {
         />
       </section>
 
-      <div class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
+      <div
+        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
+      >
         <Button
           label="Batal"
           severity="secondary"

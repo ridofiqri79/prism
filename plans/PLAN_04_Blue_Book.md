@@ -12,7 +12,7 @@
 **`src/types/blue-book.types.ts`:**
 ```typescript
 export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded' }
-export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partner?: BappenasPartner; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' | 'deleted' }
+export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' | 'deleted' }
 export interface LenderIndication { id: string; lender: Lender; remarks?: string }
 export interface LoI { id: string; lender: Lender; subject: string; date: string; letter_number?: string }
 export interface BBProjectCost { id: string; funding_type: 'Foreign' | 'Counterpart'; funding_category: string; amount_usd: number }
@@ -33,7 +33,7 @@ export const blueBookSchema = z.object({
 
 export const bbProjectSchema = z.object({
   program_title_id: z.string().uuid('Program Title wajib dipilih'),
-  bappenas_partner_id: z.string().uuid('Bappenas Partner wajib dipilih'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   bb_code: z.string().min(1, 'BB Code wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
   duration: z.number().int().positive().optional().nullable(),
@@ -119,7 +119,7 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues>) {
 Gunakan `useBBProjectForm()`. Layout section vertikal:
 
 **Section 1 — Informasi Umum:**
-program_title_id (`<ProgramTitleSelect>`), bappenas_partner_id (Select Eselon II + tampilkan parent Eselon I read-only), bb_code, project_name, duration bulan (`<InputNumber>` integer), objective, scope_of_work, outputs, outcomes (textarea)
+program_title_id (`<ProgramTitleSelect>`), bappenas_partner_ids (multi-select Eselon II, opsional, tampilkan parent Eselon I read-only), bb_code, project_name, duration bulan (`<InputNumber>` integer), objective, scope_of_work, outputs, outcomes (textarea)
 
 **Section 2 — Pihak Terlibat:**
 executing_agency_ids (`<InstitutionSelect multiple>`), implementing_agency_ids (`<InstitutionSelect multiple>`)
@@ -143,7 +143,7 @@ Footer: tombol "Simpan" dan "Batal".
 ## Task 8 — BBProjectDetailPage.vue
 
 - Header: bb_code, project_name, status badge
-- Grid info: Executing Agency, Implementing Agency, Bappenas Partner (Eselon II + I parent), Lokasi, National Priority
+- Grid info: Executing Agency, Implementing Agency, Mitra Kerja Bappenas (multi Eselon II + parent Eselon I), Lokasi, National Priority
 - Section Project Cost: tabel read-only
 - Section Lender Indication: tabel read-only
 - Section LoI: tabel dengan kolom lender, subject, date, letter_number + tombol "Tambah LoI"

@@ -46,7 +46,12 @@ onMounted(() => {
       :subtitle="dkStore.currentDK ? formatDate(dkStore.currentDK.date) : undefined"
     >
       <template #actions>
-        <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'daftar-kegiatan' })" />
+        <Button
+          label="Kembali"
+          icon="pi pi-arrow-left"
+          outlined
+          @click="router.push({ name: 'daftar-kegiatan' })"
+        />
         <Button
           v-if="can('daftar_kegiatan', 'create')"
           as="router-link"
@@ -57,7 +62,10 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div v-if="dkStore.currentDK" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
+    <div
+      v-if="dkStore.currentDK"
+      class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3"
+    >
       <div>
         <p class="text-xs uppercase tracking-wide text-surface-500">Perihal</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.subject }}</p>
@@ -82,7 +90,9 @@ onMounted(() => {
         <AccordionHeader>
           <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
             <span>{{ joinNames((project as DKProject).gb_projects) }}</span>
-            <span class="text-sm font-normal text-surface-500">{{ project.duration ? `${project.duration} bulan` : '-' }}</span>
+            <span class="text-sm font-normal text-surface-500">{{
+              project.duration ? `${project.duration} bulan` : '-'
+            }}</span>
           </div>
         </AccordionHeader>
         <AccordionContent>
@@ -90,11 +100,19 @@ onMounted(() => {
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-                <p class="font-medium text-surface-900">{{ project.institution?.name ?? project.institution_id ?? '-' }}</p>
+                <p class="font-medium text-surface-900">
+                  {{ project.institution?.name ?? project.institution_id ?? '-' }}
+                </p>
               </div>
               <div>
                 <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
                 <p class="font-medium text-surface-900">{{ joinNames(project.locations) }}</p>
+              </div>
+              <div class="md:col-span-2">
+                <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
+                <p class="font-medium text-surface-900">
+                  {{ joinNames(project.bappenas_partners) }}
+                </p>
               </div>
               <div class="md:col-span-2">
                 <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>
@@ -103,7 +121,9 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Snapshot Proyek Green Book yang Dipakai</h3>
+              <h3 class="font-semibold text-surface-950">
+                Snapshot Proyek Green Book yang Dipakai
+              </h3>
               <div class="flex flex-wrap gap-2">
                 <RouterLink
                   v-for="gbProject in project.gb_projects"
@@ -140,7 +160,9 @@ onMounted(() => {
                     <tr v-for="row in project.financing_details" :key="row.id">
                       <td class="px-4 py-3">{{ row.lender?.name ?? '-' }}</td>
                       <td class="px-4 py-3">{{ row.currency }}</td>
-                      <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_original" :currency="row.currency" /></td>
+                      <td class="px-4 py-3">
+                        <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
+                      </td>
                       <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_usd" /></td>
                       <td class="px-4 py-3">{{ row.remarks || '-' }}</td>
                     </tr>
@@ -166,7 +188,9 @@ onMounted(() => {
                     <tr v-for="row in project.loan_allocations" :key="row.id">
                       <td class="px-4 py-3">{{ row.institution?.name ?? '-' }}</td>
                       <td class="px-4 py-3">{{ row.currency }}</td>
-                      <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_original" :currency="row.currency" /></td>
+                      <td class="px-4 py-3">
+                        <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
+                      </td>
                       <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_usd" /></td>
                       <td class="px-4 py-3">{{ row.remarks || '-' }}</td>
                     </tr>
@@ -193,7 +217,10 @@ onMounted(() => {
       </AccordionPanel>
     </Accordion>
 
-    <div v-else class="rounded-lg border border-dashed border-surface-300 bg-white p-8 text-center text-surface-500">
+    <div
+      v-else
+      class="rounded-lg border border-dashed border-surface-300 bg-white p-8 text-center text-surface-500"
+    >
       Belum ada proyek dalam surat ini.
     </div>
   </section>

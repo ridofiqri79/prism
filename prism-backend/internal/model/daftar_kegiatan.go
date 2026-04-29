@@ -17,15 +17,16 @@ type DaftarKegiatanResponse struct {
 }
 
 type CreateDKProjectRequest struct {
-	ProgramTitleID   *string                 `json:"program_title_id"`
-	InstitutionID    *string                 `json:"institution_id"`
-	Duration         *int32                  `json:"duration"`
-	Objectives       *string                 `json:"objectives"`
-	GBProjectIDs     []string                `json:"gb_project_ids" validate:"required,min=1"`
-	LocationIDs      []string                `json:"location_ids"`
-	FinancingDetails []DKFinancingDetailItem `json:"financing_details"`
-	LoanAllocations  []DKLoanAllocationItem  `json:"loan_allocations"`
-	ActivityDetails  []DKActivityDetailItem  `json:"activity_details"`
+	ProgramTitleID     *string                 `json:"program_title_id"`
+	InstitutionID      *string                 `json:"institution_id"`
+	Duration           *int32                  `json:"duration"`
+	Objectives         *string                 `json:"objectives"`
+	GBProjectIDs       []string                `json:"gb_project_ids" validate:"required,min=1"`
+	BappenasPartnerIDs []string                `json:"bappenas_partner_ids"`
+	LocationIDs        []string                `json:"location_ids"`
+	FinancingDetails   []DKFinancingDetailItem `json:"financing_details"`
+	LoanAllocations    []DKLoanAllocationItem  `json:"loan_allocations"`
+	ActivityDetails    []DKActivityDetailItem  `json:"activity_details"`
 }
 
 type UpdateDKProjectRequest = CreateDKProjectRequest
@@ -67,6 +68,7 @@ type DKProjectResponse struct {
 	Duration         *int32                      `json:"duration"`
 	Objectives       *string                     `json:"objectives"`
 	GBProjects       []GBProjectSummary          `json:"gb_projects"`
+	BappenasPartners []BappenasPartnerResponse   `json:"bappenas_partners"`
 	Locations        []RegionResponse            `json:"locations"`
 	FinancingDetails []DKFinancingDetailResponse `json:"financing_details"`
 	LoanAllocations  []DKLoanAllocationResponse  `json:"loan_allocations"`

@@ -50,6 +50,7 @@ export const dkProjectSchema = z.object({
   duration: optionalDurationMonths,
   objectives: z.string().optional().nullable(),
   gb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Proyek Green Book'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
   financing_details: z.array(dkFinancingDetailSchema).min(1, 'Minimal 1 rincian pembiayaan'),
   loan_allocations: z.array(dkLoanAllocationSchema).min(1, 'Minimal 1 alokasi pinjaman'),

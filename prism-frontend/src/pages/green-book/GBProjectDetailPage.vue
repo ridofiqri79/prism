@@ -39,7 +39,10 @@ const programTitleName = computed(
 )
 
 function bbProjectBlueBookId(project: BBProjectSummary) {
-  return project.blue_book_id ?? blueBookStore.projectOptions.find((item) => item.id === project.id)?.blue_book_id
+  return (
+    project.blue_book_id ??
+    blueBookStore.projectOptions.find((item) => item.id === project.id)?.blue_book_id
+  )
 }
 
 async function loadData() {
@@ -69,7 +72,10 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="project?.gb_code ?? 'Detail Proyek Green Book'" :subtitle="project?.project_name">
+    <PageHeader
+      :title="project?.gb_code ?? 'Detail Proyek Green Book'"
+      :subtitle="project?.project_name"
+    >
       <template #actions>
         <Button
           label="Kembali"
@@ -95,7 +101,12 @@ onMounted(() => {
           <div class="mt-1 flex flex-wrap items-center gap-2">
             <StatusBadge :status="project.status" />
             <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
-            <Tag v-else-if="project.has_newer_revision" value="Ada revisi lebih baru" severity="warn" rounded />
+            <Tag
+              v-else-if="project.has_newer_revision"
+              value="Ada revisi lebih baru"
+              severity="warn"
+              rounded
+            />
           </div>
         </div>
         <div>
@@ -104,7 +115,9 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
-          <p class="font-semibold text-surface-950">{{ project.duration ? `${project.duration} bulan` : '-' }}</p>
+          <p class="font-semibold text-surface-950">
+            {{ project.duration ? `${project.duration} bulan` : '-' }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
@@ -112,11 +125,17 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="font-semibold text-surface-950">{{ joinNames(project.implementing_agencies) }}</p>
+          <p class="font-semibold text-surface-950">
+            {{ joinNames(project.implementing_agencies) }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
           <p class="font-semibold text-surface-950">{{ joinNames(project.locations) }}</p>
+        </div>
+        <div class="md:col-span-3">
+          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
+          <p class="font-semibold text-surface-950">{{ joinNames(project.bappenas_partners) }}</p>
         </div>
       </div>
 
@@ -144,7 +163,11 @@ onMounted(() => {
       <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-          <Tag :value="`${greenBookStore.projectHistory.length} snapshot`" severity="secondary" rounded />
+          <Tag
+            :value="`${greenBookStore.projectHistory.length} snapshot`"
+            severity="secondary"
+            rounded
+          />
         </div>
         <div class="overflow-auto rounded-lg border border-surface-200">
           <table class="w-full min-w-[52rem] text-left text-sm">

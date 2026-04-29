@@ -31,7 +31,7 @@ type blueBookImportProjectDraft struct {
 	bbCode                string
 	projectName           string
 	programTitleID        pgtype.UUID
-	bappenasPartnerID     pgtype.UUID
+	bappenasPartnerIDs    []string
 	duration              *int32
 	objective             *string
 	scopeOfWork           *string
@@ -214,7 +214,6 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 				BlueBookID:        blueBook.ID,
 				ProjectIdentityID: identityID,
 				ProgramTitleID:    draft.programTitleID,
-				BappenasPartnerID: draft.bappenasPartnerID,
 				BbCode:            draft.bbCode,
 				ProjectName:       draft.projectName,
 				Duration:          int4Ptr(draft.duration),
@@ -229,6 +228,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 			req := model.CreateBBProjectRequest{
 				ExecutingAgencyIDs:    draft.executingAgencyIDs,
 				ImplementingAgencyIDs: draft.implementingAgencyIDs,
+				BappenasPartnerIDs:    draft.bappenasPartnerIDs,
 				LocationIDs:           draft.locationIDs,
 				NationalPriorityIDs:   draft.nationalPriorityIDs,
 				ProjectCosts:          draft.projectCosts,
@@ -352,13 +352,15 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 			draft.addError(fmt.Sprintf("Program Title %q belum ada di master data", programTitle))
 		}
 
-		partnerName := row.value("bappenas_partner")
+		partnerName := row.value("bappenas_partners")
 		if partnerName != "" {
-			partner, exists := lookups.bappenasPartnersByName[normalizeLookupKey(partnerName)]
-			if !exists {
-				draft.addError(fmt.Sprintf("Bappenas Partner %q belum ada di master data", partnerName))
-			} else {
-				draft.bappenasPartnerID = partner.ID
+			for _, name := range splitImportNames(partnerName) {
+				partner, exists := lookups.bappenasPartnersByName[normalizeLookupKey(name)]
+				if !exists {
+					draft.addError(fmt.Sprintf("Mitra Kerja Bappenas %q belum ada di master data", name))
+					continue
+				}
+				draft.bappenasPartnerIDs = append(draft.bappenasPartnerIDs, model.UUIDToString(partner.ID))
 			}
 		}
 	}
@@ -729,6 +731,20 @@ func parseImportFloat(value string) (float64, error) {
 	}
 	value = strings.ReplaceAll(value, ",", "")
 	return strconv.ParseFloat(value, 64)
+}
+
+func splitImportNames(value string) []string {
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func recalculateImportTotals(response *model.MasterImportResponse) {

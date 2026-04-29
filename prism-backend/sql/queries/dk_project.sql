@@ -155,6 +155,24 @@ ON CONFLICT DO NOTHING;
 DELETE FROM dk_project_gb_project
 WHERE dk_project_id = $1;
 
+-- ===== DK PROJECT BAPPENAS PARTNERS =====
+
+-- name: GetDKProjectBappenasPartners :many
+SELECT bp.*
+FROM dk_project_bappenas_partner dpbp
+JOIN bappenas_partner bp ON bp.id = dpbp.bappenas_partner_id
+WHERE dpbp.dk_project_id = $1
+ORDER BY bp.name;
+
+-- name: AddDKProjectBappenasPartner :exec
+INSERT INTO dk_project_bappenas_partner (dk_project_id, bappenas_partner_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: DeleteDKProjectBappenasPartners :exec
+DELETE FROM dk_project_bappenas_partner
+WHERE dk_project_id = $1;
+
 -- ===== DK PROJECT LOCATION =====
 
 -- name: GetDKProjectLocations :many

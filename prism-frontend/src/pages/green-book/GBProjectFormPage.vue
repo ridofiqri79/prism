@@ -39,7 +39,9 @@ const sourceBBProjectId = computed(() => String(route.query.source_bb_project_id
 const sourceMode = computed<GBProjectSourceMode>(() =>
   route.query.source_mode === 'existing' ? 'existing' : 'new',
 )
-const pageTitle = computed(() => (isEditMode.value ? 'Edit Proyek Green Book' : 'Tambah Proyek Green Book'))
+const pageTitle = computed(() =>
+  isEditMode.value ? 'Edit Proyek Green Book' : 'Tambah Proyek Green Book',
+)
 const form = useGBProjectForm()
 
 const bbProjectOptions = computed(() =>
@@ -50,12 +52,16 @@ const bbProjectOptions = computed(() =>
       label: `${project.bb_code} - ${project.project_name}`,
     })),
 )
+const bappenasPartnerOptions = computed(() =>
+  masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
+)
 
 async function loadData() {
   await Promise.all([
     greenBookStore.fetchGreenBook(greenBookId.value),
     blueBookStore.fetchProjectOptions(),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
+    masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchInstitutions(true, { limit: 1000 }),
     masterStore.fetchAllRegionLevels(true),
     masterStore.fetchLenders(true, { limit: 1000 }),
@@ -68,9 +74,14 @@ async function loadData() {
   }
 
   if (sourceBBProjectId.value) {
-    const source = blueBookStore.projectOptions.find((project) => project.id === sourceBBProjectId.value)
+    const source = blueBookStore.projectOptions.find(
+      (project) => project.id === sourceBBProjectId.value,
+    )
     if (!source) {
-      toast.warn('Proyek Blue Book sumber tidak ditemukan', 'Silakan pilih Proyek Blue Book secara manual.')
+      toast.warn(
+        'Proyek Blue Book sumber tidak ditemukan',
+        'Silakan pilih Proyek Blue Book secara manual.',
+      )
       return
     }
     form.applyBBProjectSource(source, sourceMode.value)
@@ -81,13 +92,19 @@ const onSubmit = form.submit(async (values) => {
   if (isEditMode.value) {
     await greenBookStore.updateProject(greenBookId.value, projectId.value, values)
     toast.success('Berhasil', 'Proyek Green Book berhasil diperbarui')
-    await router.push({ name: 'gb-project-detail', params: { gbId: greenBookId.value, id: projectId.value } })
+    await router.push({
+      name: 'gb-project-detail',
+      params: { gbId: greenBookId.value, id: projectId.value },
+    })
     return
   }
 
   const created = await greenBookStore.createProject(greenBookId.value, values)
   toast.success('Berhasil', 'Proyek Green Book berhasil dibuat')
-  await router.push({ name: 'gb-project-detail', params: { gbId: greenBookId.value, id: created.id } })
+  await router.push({
+    name: 'gb-project-detail',
+    params: { gbId: greenBookId.value, id: created.id },
+  })
 })
 
 onMounted(() => {
@@ -148,20 +165,47 @@ onMounted(() => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
+                <label class="block space-y-2 md:col-span-2">
+                  <span class="text-sm font-medium text-surface-700">Mitra Kerja Bappenas</span>
+                  <MultiSelect
+                    v-model="form.values.bappenas_partner_ids"
+                    :options="bappenasPartnerOptions"
+                    option-label="name"
+                    option-value="id"
+                    placeholder="Pilih mitra kerja Bappenas"
+                    filter
+                    display="chip"
+                    class="w-full"
+                  />
+                  <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
+                    {{ form.errors.bappenas_partner_ids }}
+                  </small>
+                </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Kode Green Book</span>
                   <InputText v-model="form.values.gb_code" class="w-full" :disabled="isEditMode" />
-                  <small v-if="form.errors.gb_code" class="text-red-600">{{ form.errors.gb_code }}</small>
+                  <small v-if="form.errors.gb_code" class="text-red-600">{{
+                    form.errors.gb_code
+                  }}</small>
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Nama Proyek</span>
                   <InputText v-model="form.values.project_name" class="w-full" />
-                  <small v-if="form.errors.project_name" class="text-red-600">{{ form.errors.project_name }}</small>
+                  <small v-if="form.errors.project_name" class="text-red-600">{{
+                    form.errors.project_name
+                  }}</small>
                 </label>
                 <label class="block space-y-2 md:col-span-2">
                   <span class="text-sm font-medium text-surface-700">Durasi (bulan)</span>
-                  <InputNumber v-model="form.values.duration" class="w-full" :min="1" :use-grouping="false" />
-                  <small v-if="form.errors.duration" class="text-red-600">{{ form.errors.duration }}</small>
+                  <InputNumber
+                    v-model="form.values.duration"
+                    class="w-full"
+                    :min="1"
+                    :use-grouping="false"
+                  />
+                  <small v-if="form.errors.duration" class="text-red-600">{{
+                    form.errors.duration
+                  }}</small>
                 </label>
               </div>
 
@@ -172,7 +216,12 @@ onMounted(() => {
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Lingkup Proyek</span>
-                  <Textarea v-model="form.values.scope_of_project" auto-resize rows="3" class="w-full" />
+                  <Textarea
+                    v-model="form.values.scope_of_project"
+                    auto-resize
+                    rows="3"
+                    class="w-full"
+                  />
                 </label>
               </div>
 
@@ -194,7 +243,9 @@ onMounted(() => {
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Lokasi</span>
                   <LocationMultiSelect v-model="form.values.location_ids" />
-                  <small v-if="form.errors.location_ids" class="text-red-600">{{ form.errors.location_ids }}</small>
+                  <small v-if="form.errors.location_ids" class="text-red-600">{{
+                    form.errors.location_ids
+                  }}</small>
                 </label>
               </div>
             </div>
@@ -235,7 +286,9 @@ onMounted(() => {
 
           <TabPanel value="4">
             <div class="space-y-3 p-3">
-              <div class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-surface-700">
+              <div
+                class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-surface-700"
+              >
                 Alokasi funding selalu mengikuti jumlah dan urutan kegiatan. Saat kegiatan dihapus,
                 baris alokasi ikut berkurang otomatis.
               </div>
@@ -248,7 +301,9 @@ onMounted(() => {
         </TabPanels>
       </Tabs>
 
-      <div class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
+      <div
+        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
+      >
         <Button
           label="Batal"
           severity="secondary"

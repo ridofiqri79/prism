@@ -557,7 +557,7 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 
 | Sheet | Kolom |
 |-------|-------|
-| `Input Data` | `Program Title (*)`, `Bappenas Partner`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
+| `Input Data` | `Program Title (*)`, `Bappenas Partners`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
 | `Relasi - EA` | `BB Code (*)`, `Executing Agency Name (*)` |
 | `Relasi - IA` | `BB Code (*)`, `Implementing Agency Name (*)` |
 | `Relasi - Locations` | `BB Code (*)`, `Location Name (*)` |
@@ -565,7 +565,7 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 | `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
 | `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
 
-Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma.
 
 **Preview:**
 `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -595,7 +595,7 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 {
   "project_identity_id": "uuid-logical-project-opsional",
   "program_title_id": "uuid",
-  "bappenas_partner_id": "uuid",
+  "bappenas_partner_ids": ["uuid-mitra-bappenas-1", "uuid-mitra-bappenas-2"],
   "bb_code": "BB-2025-001",
   "project_name": "Pembangunan Jalan Tol Trans Sumatera",
   "duration": 60,
@@ -627,12 +627,9 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
     "bb_code": "BB-2025-001",
     "project_name": "Pembangunan Jalan Tol Trans Sumatera",
     "program_title": { "id": "uuid", "title": "Infrastruktur Transportasi" },
-    "bappenas_partner": {
-      "id": "uuid",
-      "name": "Direktorat Transportasi",
-      "level": "Eselon II",
-      "parent": { "id": "uuid", "name": "Deputi Bidang Sarana dan Prasarana", "level": "Eselon I" }
-    },
+    "bappenas_partners": [
+      { "id": "uuid", "name": "Direktorat Transportasi", "level": "Eselon II", "parent_id": "uuid-eselon-i" }
+    ],
     "executing_agencies": [
       { "id": "uuid", "name": "Kementerian PUPR", "level": "Kementerian/Badan/Lembaga" }
     ],
@@ -806,6 +803,7 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
   "objective": "Meningkatkan konektivitas...",
   "scope_of_project": "Pembangunan 200km...",
   "bb_project_ids": ["uuid-bb-project"],
+  "bappenas_partner_ids": ["uuid-mitra-bappenas-1", "uuid-mitra-bappenas-2"],
   "executing_agency_ids": ["uuid"],
   "implementing_agency_ids": ["uuid"],
   "location_ids": ["uuid-sumut"],
@@ -850,6 +848,8 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 
 > **Catatan:** `funding_allocations[].activity_index` merujuk ke index array `activities` dalam request yang sama. Setelah disimpan, relasi menggunakan `gb_activity_id`.
 > **Versioning:** `bb_project_ids` boleh berisi snapshot lama, tetapi backend selalu menyimpan concrete latest BB Project snapshot untuk logical project tersebut pada saat GB Project dibuat/diupdate.
+> **Relasi BB:** semua `bb_project_ids` pada satu GB Project harus resolve ke header Blue Book yang sama. Satu BB Project boleh dipakai oleh lebih dari satu GB Project.
+> **Mitra Kerja Bappenas:** `bappenas_partner_ids` opsional dan boleh kosong pada BB Project, GB Project, dan DK Project.
 > **Currency:** Funding Source GB adalah titik awal pencatatan currency downstream. Jika `funding_sources[].currency` adalah `USD`, backend menyimpan nilai USD sama dengan nilai original.
 
 Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book" dengan query `source_bb_project_id` dan `source_mode`. Dialog memakai checkbox "Gunakan data di Blue Book sebagai data Green Book": tidak dicentang mengirim `source_mode=new` dan hanya membawa BB Code serta relasi BB Project; dicentang mengirim `source_mode=existing` untuk mengisi field yang sama dari BB Project sumber, tetapi tetap editable sebelum disimpan.
@@ -864,6 +864,9 @@ Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book
     "gb_code": "GB-2025-001",
     "is_latest": true,
     "has_newer_revision": false,
+    "bappenas_partners": [
+      { "id": "uuid", "name": "Direktorat Transportasi", "level": "Eselon II", "parent_id": "uuid-eselon-i" }
+    ],
     "bb_projects": [
       {
         "id": "uuid-bb-project-snapshot",
@@ -958,7 +961,7 @@ Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 
 `GB Project` pada DK di-resolve ke latest GB Project snapshot saat DK Project dibuat atau saat pilihan GB diganti eksplisit. Setelah tersimpan, relasi `dk_project_gb_project` tetap menunjuk concrete snapshot yang tersimpan dan tidak auto-pindah ketika ada revisi BB/GB baru.
 
-Pada form create/edit DK Project, picker `GB Project` ditampilkan sebagai field pertama. Saat user memilih GB Project, frontend mengisi otomatis field DK yang memiliki padanan dari GB Project terpilih: program title, executing agency, durasi bulan, tujuan/objective, lokasi, rincian pembiayaan dari funding source, alokasi pinjaman dari institution funding source atau institution proyek, dan rincian kegiatan dari activities GB. Hasil autofill tetap dapat diedit user sebelum request `POST` atau `PUT` dikirim.
+Pada form create/edit DK Project, picker `GB Project` ditampilkan sebagai field pertama. Saat user memilih GB Project, frontend mengisi otomatis field DK yang memiliki padanan dari GB Project terpilih: program title, executing agency, Mitra Kerja Bappenas, durasi bulan, tujuan/objective, lokasi, rincian pembiayaan dari funding source, alokasi pinjaman dari institution funding source atau institution proyek, dan rincian kegiatan dari activities GB. Hasil autofill tetap dapat diedit user sebelum request `POST` atau `PUT` dikirim.
 Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah karena backend menyamakan nilai USD dengan nilai original.
 
 ---
@@ -1002,6 +1005,7 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
   "duration": 60,
   "objectives": "Meningkatkan konektivitas...",
   "gb_project_ids": ["uuid-gb-project-1"],
+  "bappenas_partner_ids": ["uuid-mitra-bappenas-1", "uuid-mitra-bappenas-2"],
   "location_ids": ["uuid-sumut"],
   "financing_details": [
     {
@@ -1036,6 +1040,8 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
   ]
 }
 ```
+
+**`GET /daftar-kegiatan/:dk_id/projects/:id` Response `200`** menyertakan `bappenas_partners` sebagai array Mitra Kerja Bappenas Eselon II. Field ini boleh kosong.
 
 ---
 

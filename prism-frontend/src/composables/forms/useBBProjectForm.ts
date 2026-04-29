@@ -11,7 +11,7 @@ import type {
 
 export interface BBProjectFormValues {
   program_title_id: string
-  bappenas_partner_id: string
+  bappenas_partner_ids: string[]
   bb_code: string
   project_name: string
   duration: number | null
@@ -42,7 +42,7 @@ export function categoriesForFundingType(type: FundingType) {
 function defaultValues(): BBProjectFormValues {
   return {
     program_title_id: '',
-    bappenas_partner_id: '',
+    bappenas_partner_ids: [],
     bb_code: '',
     project_name: '',
     duration: null,
@@ -62,7 +62,7 @@ function fromProject(project?: BBProject | null): Partial<BBProjectFormValues> {
 
   return {
     program_title_id: project.program_title_id ?? project.program_title?.id ?? '',
-    bappenas_partner_id: project.bappenas_partner_id ?? project.bappenas_partner?.id ?? '',
+    bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
     bb_code: project.bb_code,
     project_name: project.project_name,
     duration: project.duration ?? null,

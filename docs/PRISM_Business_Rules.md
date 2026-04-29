@@ -44,7 +44,7 @@
 - Project yang sama lintas revisi harus dihubungkan dengan logical identity.
 - `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
 - Revisi Blue Book boleh menyalin BB Project yang sama persis dari revisi sebelumnya.
-- Bappenas Partner: simpan Eselon II saja — Eselon I diturunkan dari `parent_id`.
+- Mitra Kerja Bappenas bersifat opsional dan boleh lebih dari satu. Simpan Eselon II saja; Eselon I diturunkan dari `parent_id`.
 - National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun.
 
 ---
@@ -59,7 +59,10 @@
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
 - Revisi Green Book boleh menyalin GB Project yang sama persis dari revisi sebelumnya.
 - GB Project wajib mereferensikan minimal 1 BB Project.
+- GB Project boleh menggabungkan lebih dari satu BB Project hanya jika seluruh BB Project berasal dari header Blue Book yang sama (Period, revision number, dan revision year sama). Backend menolak relasi dari header Blue Book berbeda.
+- Satu BB Project boleh dipakai oleh lebih dari satu GB Project dalam header Green Book yang sama untuk mendukung pemecahan satu proyek BB menjadi beberapa proyek GB.
 - Saat GB Project dibuat atau direvisi, relasi ke BB Project harus memakai versi BB Project terbaru untuk logical project terkait.
+- Mitra Kerja Bappenas pada GB Project bersifat opsional dan boleh lebih dari satu.
 - Funding Source Green Book menyimpan `currency`, nilai original, dan nilai USD. Untuk `USD`, nilai original dan USD harus sama.
 - `gb_funding_allocation` mereferensikan `gb_activity` — selalu sinkron, jika activity dihapus, allocation ikut terhapus (CASCADE).
 - Disbursement Plan: total proyek per tahun — bukan per lender. Kombinasi `(gb_project_id, year)` unik.
@@ -71,6 +74,7 @@
 - Final setelah diterbitkan — tidak bisa direvisi. Backend cegah UPDATE kecuali ADMIN.
 - Saat DK Project dibuat, relasi ke GB Project harus memakai versi GB Project terbaru untuk logical project terkait.
 - Setelah DK/LA dibuat, downstream tetap menunjuk ke snapshot GB/BB yang dicantumkan saat DK dibuat; tidak auto-pindah ketika ada revisi BB/GB baru.
+- Mitra Kerja Bappenas pada DK Project bersifat opsional, boleh lebih dari satu, dapat diisi otomatis dari GB Project terpilih, dan tetap dapat diedit sebelum disimpan.
 - Activity Details diinput bebas — tidak ada relasi teknis ke Activities GB.
 
 ---

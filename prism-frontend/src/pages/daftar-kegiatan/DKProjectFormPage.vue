@@ -30,7 +30,9 @@ const toast = useToast()
 const dkId = computed(() => String(route.params.dkId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const isEditMode = computed(() => route.name === 'dk-project-edit')
-const pageTitle = computed(() => (isEditMode.value ? 'Edit Proyek Daftar Kegiatan' : 'Tambah Proyek Daftar Kegiatan'))
+const pageTitle = computed(() =>
+  isEditMode.value ? 'Edit Proyek Daftar Kegiatan' : 'Tambah Proyek Daftar Kegiatan',
+)
 const form = useDKProjectForm(null, {
   gbProjects: () => greenBookStore.projectOptions,
   bbProjects: () => blueBookStore.projectOptions,
@@ -44,6 +46,9 @@ const gbProjectOptions = computed(() =>
       label: `${project.gb_code} - ${project.project_name}`,
     })),
 )
+const bappenasPartnerOptions = computed(() =>
+  masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
+)
 
 async function loadData() {
   await Promise.all([
@@ -51,6 +56,7 @@ async function loadData() {
     greenBookStore.fetchProjectOptions(),
     blueBookStore.fetchProjectOptions(),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
+    masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchInstitutions(true, { limit: 1000 }),
     masterStore.fetchAllRegionLevels(true),
     masterStore.fetchLenders(true, { limit: 1000 }),
@@ -111,7 +117,9 @@ onMounted(() => {
             class="w-full"
             @change="form.applySelectedGBProjects"
           />
-          <small v-if="form.errors.gb_project_ids" class="text-red-600">{{ form.errors.gb_project_ids }}</small>
+          <small v-if="form.errors.gb_project_ids" class="text-red-600">{{
+            form.errors.gb_project_ids
+          }}</small>
         </label>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
@@ -121,17 +129,44 @@ onMounted(() => {
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Executing Agency</span>
             <InstitutionSelect v-model="form.values.institution_id" />
-            <small v-if="form.errors.institution_id" class="text-red-600">{{ form.errors.institution_id }}</small>
+            <small v-if="form.errors.institution_id" class="text-red-600">{{
+              form.errors.institution_id
+            }}</small>
+          </label>
+          <label class="block space-y-2 md:col-span-2">
+            <span class="text-sm font-medium text-surface-700">Mitra Kerja Bappenas</span>
+            <MultiSelect
+              v-model="form.values.bappenas_partner_ids"
+              :options="bappenasPartnerOptions"
+              option-label="name"
+              option-value="id"
+              placeholder="Pilih mitra kerja Bappenas"
+              filter
+              display="chip"
+              class="w-full"
+            />
+            <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
+              {{ form.errors.bappenas_partner_ids }}
+            </small>
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Durasi (bulan)</span>
-            <InputNumber v-model="form.values.duration" class="w-full" :min="1" :use-grouping="false" />
-            <small v-if="form.errors.duration" class="text-red-600">{{ form.errors.duration }}</small>
+            <InputNumber
+              v-model="form.values.duration"
+              class="w-full"
+              :min="1"
+              :use-grouping="false"
+            />
+            <small v-if="form.errors.duration" class="text-red-600">{{
+              form.errors.duration
+            }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-surface-700">Lokasi</span>
             <LocationMultiSelect v-model="form.values.location_ids" />
-            <small v-if="form.errors.location_ids" class="text-red-600">{{ form.errors.location_ids }}</small>
+            <small v-if="form.errors.location_ids" class="text-red-600">{{
+              form.errors.location_ids
+            }}</small>
           </label>
           <label class="block space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
@@ -144,9 +179,12 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Rincian Pembiayaan</h2>
           <p class="text-sm text-surface-500">
-            Pilihan lender hanya berisi lender dari funding source Green Book dan indikasi lender Blue Book proyek terpilih.
+            Pilihan lender hanya berisi lender dari funding source Green Book dan indikasi lender
+            Blue Book proyek terpilih.
           </p>
-          <small v-if="form.errors.financing_details" class="text-red-600">{{ form.errors.financing_details }}</small>
+          <small v-if="form.errors.financing_details" class="text-red-600">{{
+            form.errors.financing_details
+          }}</small>
         </div>
         <FinancingDetailTable
           v-model:rows="form.financingDetails.value"
@@ -159,7 +197,9 @@ onMounted(() => {
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Alokasi Pinjaman</h2>
-          <small v-if="form.errors.loan_allocations" class="text-red-600">{{ form.errors.loan_allocations }}</small>
+          <small v-if="form.errors.loan_allocations" class="text-red-600">{{
+            form.errors.loan_allocations
+          }}</small>
         </div>
         <LoanAllocationTable
           v-model:rows="form.loanAllocations.value"
@@ -171,8 +211,12 @@ onMounted(() => {
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Rincian Kegiatan</h2>
-          <p class="text-sm text-surface-500">Nomor urut otomatis dihitung ulang saat baris dihapus.</p>
-          <small v-if="form.errors.activity_details" class="text-red-600">{{ form.errors.activity_details }}</small>
+          <p class="text-sm text-surface-500">
+            Nomor urut otomatis dihitung ulang saat baris dihapus.
+          </p>
+          <small v-if="form.errors.activity_details" class="text-red-600">{{
+            form.errors.activity_details
+          }}</small>
         </div>
         <ActivityDetailsTable
           v-model:rows="form.activityDetails.value"
@@ -181,7 +225,9 @@ onMounted(() => {
         />
       </section>
 
-      <div class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
+      <div
+        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
+      >
         <Button
           label="Batal"
           severity="secondary"

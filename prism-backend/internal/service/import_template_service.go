@@ -273,9 +273,9 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 	sheets := []simpleXLSXSheet{
 		buildBlueBookGuideSheet(blueBook),
 		buildMasterDataSnapshotSheet("Master Data", reference),
-		templateInputSheet(blueBookImportSheetInput, []string{"Program Title (*)", "Bappenas Partner", "BB Code (*)", "Project Name (*)", "Duration", "Objective", "Scope of Work", "Outputs", "Outcomes"}, []float64{38, 38, 22, 54, 18, 54, 54, 44, 44}, []simpleXLSXValidation{
+		templateInputSheet(blueBookImportSheetInput, []string{"Program Title (*)", "Bappenas Partners", "BB Code (*)", "Project Name (*)", "Duration", "Objective", "Scope of Work", "Outputs", "Outcomes"}, []float64{38, 38, 22, 54, 18, 54, 54, 44, 44}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddProgramTitles", "Program Title", "Pilih Program Title dari master data."),
-			listValidation("B2:B"+inputLastRow(), "ddBappenasPartnersEselonII", "Bappenas Partner", "Pilih Bappenas Partner Eselon II bila ada. Kolom ini opsional."),
+			listValidation("B2:B"+inputLastRow(), "ddBappenasPartnersEselonII", "Bappenas Partners", "Pilih satu atau lebih Mitra Kerja Bappenas Eselon II bila ada. Untuk lebih dari satu, pisahkan dengan koma atau titik koma."),
 		}),
 		templateInputSheet(blueBookImportSheetEA, []string{"BB Code (*)", "Executing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
@@ -647,12 +647,12 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
 		textRow("1. Isi Input Data", "Satu baris mewakili satu proyek. BB Code menjadi kunci penghubung ke semua sheet relasi.", "BB Code yang sudah ada di database akan masuk status skip."),
 		textRow("2. Isi sheet relasi", "Gunakan BB Code yang sama dengan Input Data. Ulangi BB Code di beberapa baris untuk multi EA/IA/lokasi/prioritas/lender.", "BB Code pada sheet relasi punya dropdown dari Input Data."),
-		textRow("3. Gunakan Master Data", "Kolom Program Title, Bappenas Partner, Institution, Location, National Priority, dan Lender memakai dropdown dari master data.", "Jika pilihan tidak ada, tambahkan dulu melalui menu Master Data atau import Master Data."),
+		textRow("3. Gunakan Master Data", "Kolom Program Title, Bappenas Partners, Institution, Location, National Priority, dan Lender memakai dropdown dari master data.", "Jika pilihan tidak ada, tambahkan dulu melalui menu Master Data atau import Master Data."),
 		textRow("4. Preview", "Upload workbook lalu klik Preview untuk memisahkan create, skip, dan failed.", "Preview tidak menyimpan data."),
 		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
-		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional. Bappenas Partner pilih Eselon II bila tersedia."),
+		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional. Bappenas Partners opsional dan bisa lebih dari satu dengan pemisah koma atau titik koma."),
 		textRow("Relasi - EA", "BB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib untuk proyek baru."),
 		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Institution yang sama boleh dipakai sebagai EA dan IA pada proyek yang sama."),
 		textRow("Relasi - Locations", "BB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region dari dropdown."),

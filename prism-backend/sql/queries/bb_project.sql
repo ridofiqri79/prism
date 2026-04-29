@@ -169,7 +169,6 @@ INSERT INTO bb_project (
     blue_book_id,
     project_identity_id,
     program_title_id,
-    bappenas_partner_id,
     bb_code,
     project_name,
     duration,
@@ -178,7 +177,7 @@ INSERT INTO bb_project (
     outputs,
     outcomes
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: ListBBProjectsForClone :many
@@ -285,6 +284,13 @@ FROM bb_project_institution source
 WHERE source.bb_project_id = $1
 ON CONFLICT DO NOTHING;
 
+-- name: CloneBBProjectBappenasPartners :exec
+INSERT INTO bb_project_bappenas_partner (bb_project_id, bappenas_partner_id)
+SELECT $2, source.bappenas_partner_id
+FROM bb_project_bappenas_partner source
+WHERE source.bb_project_id = $1
+ON CONFLICT DO NOTHING;
+
 -- name: CloneBBProjectLocations :exec
 INSERT INTO bb_project_location (bb_project_id, region_id)
 SELECT $2, source.region_id
@@ -320,13 +326,12 @@ WHERE source.bb_project_id = $1;
 -- name: UpdateBBProject :one
 UPDATE bb_project
 SET program_title_id = $2,
-    bappenas_partner_id = $3,
-    project_name = $4,
-    duration = $5,
-    objective = $6,
-    scope_of_work = $7,
-    outputs = $8,
-    outcomes = $9,
+    project_name = $3,
+    duration = $4,
+    objective = $5,
+    scope_of_work = $6,
+    outputs = $7,
+    outcomes = $8,
     updated_at = NOW()
 WHERE id = $1
   AND status = 'active'
@@ -364,6 +369,24 @@ ON CONFLICT DO NOTHING;
 
 -- name: DeleteBBProjectInstitutions :exec
 DELETE FROM bb_project_institution
+WHERE bb_project_id = $1;
+
+-- ===== BB BAPPENAS PARTNERS =====
+
+-- name: GetBBProjectBappenasPartners :many
+SELECT bp.*
+FROM bb_project_bappenas_partner bpbp
+JOIN bappenas_partner bp ON bp.id = bpbp.bappenas_partner_id
+WHERE bpbp.bb_project_id = $1
+ORDER BY bp.name;
+
+-- name: AddBBProjectBappenasPartner :exec
+INSERT INTO bb_project_bappenas_partner (bb_project_id, bappenas_partner_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: DeleteBBProjectBappenasPartners :exec
+DELETE FROM bb_project_bappenas_partner
 WHERE bb_project_id = $1;
 
 -- ===== BB LOCATIONS =====

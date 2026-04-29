@@ -19,6 +19,7 @@ export interface GBProjectFormValues {
   objective: string
   scope_of_project: string
   bb_project_ids: string[]
+  bappenas_partner_ids: string[]
   executing_agency_ids: string[]
   implementing_agency_ids: string[]
   location_ids: string[]
@@ -35,6 +36,7 @@ function defaultValues(): GBProjectFormValues {
     objective: '',
     scope_of_project: '',
     bb_project_ids: [],
+    bappenas_partner_ids: [],
     executing_agency_ids: [],
     implementing_agency_ids: [],
     location_ids: [],
@@ -71,6 +73,7 @@ function fromProject(project?: GBProject | null): Partial<GBProjectFormValues> {
     objective: project.objective ?? '',
     scope_of_project: project.scope_of_project ?? '',
     bb_project_ids: project.bb_projects.map((item) => item.id),
+    bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
     executing_agency_ids: project.executing_agencies.map((item) => item.id),
     implementing_agency_ids: project.implementing_agencies.map((item) => item.id),
     location_ids: project.locations.map((item) => item.id),
@@ -320,7 +323,9 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
       amount_usd: item.amount_usd,
     }))
     allocationValues.value = project.activities.map((activity) => {
-      const allocation = project.funding_allocations.find((item) => item.gb_activity_id === activity.id)
+      const allocation = project.funding_allocations.find(
+        (item) => item.gb_activity_id === activity.id,
+      )
       return allocation
         ? {
             services: allocation.services,
@@ -346,6 +351,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
         duration: project.duration ?? null,
         objective: project.objective ?? '',
         scope_of_project: project.scope_of_work ?? '',
+        bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
         executing_agency_ids: project.executing_agencies.map((item) => item.id),
         implementing_agency_ids: project.implementing_agencies.map((item) => item.id),
         location_ids: project.locations.map((item) => item.id),

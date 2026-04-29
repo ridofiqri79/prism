@@ -37,11 +37,10 @@ export interface BBProject {
   blue_book_id?: string
   project_identity_id: string
   program_title_id?: string
-  bappenas_partner_id?: string
   bb_code: string
   project_name: string
   program_title?: ProgramTitle
-  bappenas_partner?: BappenasPartner
+  bappenas_partners: BappenasPartner[]
   executing_agencies: Institution[]
   implementing_agencies: Institution[]
   locations: Region[]
@@ -87,7 +86,7 @@ export interface LenderIndicationPayload {
 export interface BBProjectPayload {
   project_identity_id?: string | null
   program_title_id: string
-  bappenas_partner_id: string
+  bappenas_partner_ids: string[]
   bb_code: string
   project_name: string
   duration?: number | null
