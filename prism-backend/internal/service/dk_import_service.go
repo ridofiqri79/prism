@@ -480,10 +480,15 @@ func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *mas
 		agencyName := row.value("executing_agency_name")
 		if agencyName == "" {
 			draft.addError("Executing Agency Name wajib diisi")
-		} else if institution, exists := lookups.institutionsByName[normalizeLookupKey(agencyName)]; exists {
-			draft.institutionID = institution.ID
 		} else {
-			draft.addError(fmt.Sprintf("Executing Agency %q belum ada di master institution", agencyName))
+			institution, exists, ambiguous := lookups.lookupInstitutionByName(agencyName)
+			if ambiguous {
+				draft.addError(fmt.Sprintf("Executing Agency %q ambigu karena ada lebih dari satu institution dengan nama sama", agencyName))
+			} else if exists {
+				draft.institutionID = institution.ID
+			} else {
+				draft.addError(fmt.Sprintf("Executing Agency %q belum ada di master institution", agencyName))
+			}
 		}
 	}
 
@@ -765,7 +770,14 @@ func (s *DKService) parseDKLoanAllocationRelation(workbook *xlsxWorkbook, lookup
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(institutionName)]
+		institution, exists, ambiguous := lookups.lookupInstitutionByName(institutionName)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", institutionName)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", institutionName)

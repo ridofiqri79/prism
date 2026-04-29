@@ -403,7 +403,14 @@ func (s *BlueBookService) parseBlueBookInstitutionRelation(workbook *xlsxWorkboo
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(name)]
+		institution, exists, ambiguous := lookups.lookupInstitutionByName(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", name)

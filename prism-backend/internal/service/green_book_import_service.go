@@ -479,7 +479,14 @@ func (s *GreenBookService) parseGreenBookInstitutionRelation(workbook *xlsxWorkb
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(name)]
+		institution, exists, ambiguous := lookups.lookupInstitutionByName(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", name)
@@ -689,7 +696,14 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 		var institutionID *string
 		institutionKey := ""
 		if institutionName != "" {
-			institution, exists := lookups.institutionsByName[normalizeLookupKey(institutionName)]
+			institution, exists, ambiguous := lookups.lookupInstitutionByName(institutionName)
+			if ambiguous {
+				relation.status = masterImportStatusFailed
+				relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", institutionName)
+				draft.addError(relation.message)
+				relations = append(relations, relation)
+				continue
+			}
 			if !exists {
 				relation.status = masterImportStatusFailed
 				relation.message = fmt.Sprintf("Institution %q belum ada di master data", institutionName)

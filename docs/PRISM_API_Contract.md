@@ -202,7 +202,7 @@ Response meta:
 }
 ```
 
-Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
+Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. Jika sebuah `Parent Name` mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
 
 ### Country
 
@@ -346,6 +346,10 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `parent_id` | Filter by parent |
 | `search` | Cari berdasarkan `name` atau `short_name` |
 | `sort` | `name`, `short_name`, `level` |
+
+Validasi nama institution:
+- `parent_id = null` (top-level) tidak boleh memiliki nama yang sama dengan top-level lain.
+- Child tidak boleh memiliki nama yang sama dalam parent yang sama. Nama child yang sama boleh dipakai di parent berbeda.
 
 ---
 

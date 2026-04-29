@@ -106,6 +106,8 @@ type masterImportLookups struct {
 	countriesByName           map[string]queries.Country
 	lendersByName             map[string]masterImportLenderRef
 	institutionsByName        map[string]queries.Institution
+	ambiguousInstitutionNames map[string]struct{}
+	institutionScopeKeys      map[string]struct{}
 	regionsByCode             map[string]queries.Region
 	regionsByName             map[string]queries.Region
 	programTitlesByTitle      map[string]queries.ProgramTitle
@@ -208,6 +210,8 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		countriesByName:           map[string]queries.Country{},
 		lendersByName:             map[string]masterImportLenderRef{},
 		institutionsByName:        map[string]queries.Institution{},
+		ambiguousInstitutionNames: map[string]struct{}{},
+		institutionScopeKeys:      map[string]struct{}{},
 		regionsByCode:             map[string]queries.Region{},
 		regionsByName:             map[string]queries.Region{},
 		programTitlesByTitle:      map[string]queries.ProgramTitle{},
@@ -443,19 +447,23 @@ func (s *MasterService) importInstitutions(ctx context.Context, qtx *queries.Que
 				addImportError(&result, row.number, "Level institution tidak valid")
 				continue
 			}
-			if _, exists := lookups.institutionsByName[normalizeLookupKey(name)]; exists {
-				addImportSkipped(&result, row.number, fmt.Sprintf("%s (%s)", name, level))
-				continue
-			}
 
 			parentID := pgtype.UUID{}
 			if parentName != "" {
-				parent, exists := lookups.institutionsByName[normalizeLookupKey(parentName)]
+				parent, exists, ambiguous := lookups.lookupInstitutionByName(parentName)
+				if ambiguous {
+					addImportError(&result, row.number, fmt.Sprintf("Parent Name %q ambigu karena ada lebih dari satu institution dengan nama sama", parentName))
+					continue
+				}
 				if !exists {
 					addImportError(&result, row.number, fmt.Sprintf("Parent Name %q belum ada", parentName))
 					continue
 				}
 				parentID = parent.ID
+			}
+			if lookups.hasInstitutionInScope(name, parentID) {
+				addImportSkipped(&result, row.number, fmt.Sprintf("%s (%s)", name, level))
+				continue
 			}
 
 			created, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{
@@ -1160,7 +1168,35 @@ func (l *masterImportLookups) addCountry(country queries.Country) {
 }
 
 func (l *masterImportLookups) addInstitution(institution queries.Institution) {
-	l.institutionsByName[normalizeLookupKey(institution.Name)] = institution
+	nameKey := normalizeLookupKey(institution.Name)
+	if existing, exists := l.institutionsByName[nameKey]; exists && model.UUIDToString(existing.ID) != model.UUIDToString(institution.ID) {
+		l.ambiguousInstitutionNames[nameKey] = struct{}{}
+	} else if !exists {
+		l.institutionsByName[nameKey] = institution
+	}
+	l.institutionScopeKeys[institutionScopeKey(institution.Name, institution.ParentID)] = struct{}{}
+}
+
+func (l *masterImportLookups) hasInstitutionInScope(name string, parentID pgtype.UUID) bool {
+	_, exists := l.institutionScopeKeys[institutionScopeKey(name, parentID)]
+	return exists
+}
+
+func (l *masterImportLookups) lookupInstitutionByName(name string) (queries.Institution, bool, bool) {
+	nameKey := normalizeLookupKey(name)
+	if _, ambiguous := l.ambiguousInstitutionNames[nameKey]; ambiguous {
+		return queries.Institution{}, false, true
+	}
+	institution, exists := l.institutionsByName[nameKey]
+	return institution, exists, false
+}
+
+func institutionScopeKey(name string, parentID pgtype.UUID) string {
+	scope := "root"
+	if parentID.Valid {
+		scope = model.UUIDToString(parentID)
+	}
+	return scope + "|" + normalizeLookupKey(name)
 }
 
 func (l *masterImportLookups) addRegion(region queries.Region) {

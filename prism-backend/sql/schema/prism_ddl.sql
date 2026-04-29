@@ -56,6 +56,14 @@ CREATE TABLE institution (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX idx_institution_root_name
+    ON institution (LOWER(BTRIM(name)))
+    WHERE parent_id IS NULL;
+
+CREATE UNIQUE INDEX idx_institution_parent_name
+    ON institution (parent_id, LOWER(BTRIM(name)))
+    WHERE parent_id IS NOT NULL;
+
 CREATE TABLE region (
     id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code         VARCHAR(10) NOT NULL UNIQUE,

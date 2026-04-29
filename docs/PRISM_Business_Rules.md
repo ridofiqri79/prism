@@ -114,6 +114,8 @@
 
 ## 9. Aturan Institution
 
+- Nama institution top-level (`parent_id` NULL) harus unik.
+- Nama institution child harus unik dalam parent yang sama. Nama yang sama boleh digunakan di parent berbeda.
 - Satu institution boleh menjadi EA sekaligus IA pada proyek yang sama bila memang sesuai data proyek.
 
 ---

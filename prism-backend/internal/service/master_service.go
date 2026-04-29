@@ -329,10 +329,15 @@ func (s *MasterService) CreateInstitution(ctx context.Context, req model.Institu
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
+	name := strings.TrimSpace(req.Name)
+	level := strings.TrimSpace(req.Level)
 	shortName := nullableTextPtr(req.ShortName)
 	var created queries.Institution
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		row, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{ParentID: parentID, Name: req.Name, ShortName: shortName, Level: req.Level})
+		if err := ensureInstitutionNameUnique(ctx, qtx, name, parentID, pgtype.UUID{}); err != nil {
+			return err
+		}
+		row, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{ParentID: parentID, Name: name, ShortName: shortName, Level: level})
 		created = row
 		return err
 	}); err != nil {
@@ -350,10 +355,18 @@ func (s *MasterService) UpdateInstitution(ctx context.Context, id pgtype.UUID, r
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
+	name := strings.TrimSpace(req.Name)
+	level := strings.TrimSpace(req.Level)
 	shortName := nullableTextPtr(req.ShortName)
 	var updated queries.Institution
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		row, err := qtx.UpdateInstitution(ctx, queries.UpdateInstitutionParams{ID: id, ParentID: parentID, Name: req.Name, ShortName: shortName, Level: req.Level})
+		if _, err := qtx.GetInstitution(ctx, id); err != nil {
+			return mapNotFound(err, "Institution tidak ditemukan")
+		}
+		if err := ensureInstitutionNameUnique(ctx, qtx, name, parentID, id); err != nil {
+			return err
+		}
+		row, err := qtx.UpdateInstitution(ctx, queries.UpdateInstitutionParams{ID: id, ParentID: parentID, Name: name, ShortName: shortName, Level: level})
 		if err != nil {
 			return mapNotFound(err, "Institution tidak ditemukan")
 		}
@@ -872,6 +885,24 @@ func validateInstitution(req model.InstitutionRequest) error {
 		return validation("level", "level institution tidak valid")
 	}
 	return nil
+}
+
+func ensureInstitutionNameUnique(ctx context.Context, q *queries.Queries, name string, parentID pgtype.UUID, exceptID pgtype.UUID) error {
+	count, err := q.CountInstitutionsByNameScope(ctx, queries.CountInstitutionsByNameScopeParams{
+		Name:     name,
+		ParentID: parentID,
+		ExceptID: exceptID,
+	})
+	if err != nil {
+		return apperrors.Internal("Gagal memeriksa duplikasi institution")
+	}
+	if count == 0 {
+		return nil
+	}
+	if parentID.Valid {
+		return apperrors.Conflict("Nama institution sudah digunakan dalam parent yang sama")
+	}
+	return apperrors.Conflict("Nama institution top-level sudah digunakan")
 }
 
 func isAllowedValue(value string, allowed []string) bool {

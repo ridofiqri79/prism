@@ -232,6 +232,16 @@ FROM institution i
 LEFT JOIN institution p ON p.id = i.parent_id
 WHERE i.id = $1;
 
+-- name: CountInstitutionsByNameScope :one
+SELECT COUNT(*)
+FROM institution
+WHERE LOWER(BTRIM(name)) = LOWER(BTRIM(sqlc.arg('name')::text))
+  AND (
+    (sqlc.narg('parent_id')::uuid IS NULL AND parent_id IS NULL)
+    OR parent_id = sqlc.narg('parent_id')::uuid
+  )
+  AND (sqlc.narg('except_id')::uuid IS NULL OR id <> sqlc.narg('except_id')::uuid);
+
 -- name: CreateInstitution :one
 INSERT INTO institution (parent_id, name, short_name, level)
 VALUES ($1, $2, $3, $4)

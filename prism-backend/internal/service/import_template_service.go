@@ -233,7 +233,7 @@ func (s *MasterService) buildMasterImportTemplateWorkbook(ctx context.Context) (
 		}),
 		templateInputSheet("Institutions", []string{"Name (*)", "Short Name", "Level (*)", "Parent Name"}, []float64{46, 18, 30, 46}, []simpleXLSXValidation{
 			listValidation("C2:C"+inputLastRow(), "ddInstitutionLevels", "Level", "Pilih level institution yang sesuai dengan skema PRISM."),
-			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Parent Name", "Pilih parent institution yang sudah ada jika level ini punya parent."),
+			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Parent Name", "Pilih parent institution yang sudah ada jika level ini punya parent. Nama parent harus tidak ambigu."),
 		}),
 		templateInputSheet("Regions", []string{"Code (*)", "Name (*)", "Level (*)", "Parent Code"}, []float64{18, 42, 20, 18}, []simpleXLSXValidation{
 			listValidation("C2:C"+inputLastRow(), "ddRegionLevels", "Level", "Pilih COUNTRY, PROVINCE, atau CITY. Alias Indonesia seperti Nasional/Provinsi/Kota juga diterima backend."),
@@ -622,7 +622,7 @@ func buildMasterGuideSheet() simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Program Titles", "Title (*)", "Parent Title opsional. Pilih dari dropdown bila parent sudah ada atau dibuat sebagai baris parent tanpa Parent Title."),
 		textRow("Bappenas Partners", "Name (*), Level (*)", "Level hanya Eselon I/Eselon II. Eselon II wajib memilih Parent Name Eselon I."),
-		textRow("Institutions", "Name (*), Level (*)", "Short Name opsional. Parent Name dipakai untuk struktur berjenjang."),
+		textRow("Institutions", "Name (*), Level (*)", "Short Name opsional. Parent Name dipakai untuk struktur berjenjang dan harus tidak ambigu."),
 		textRow("Regions", "Code (*), Name (*), Level (*)", "Level gunakan COUNTRY, PROVINCE, atau CITY. Parent Code wajib jika region punya parent."),
 		textRow("Periods", "Name (*), Year Start (*), Year End (*)", "Year End harus lebih besar dari Year Start."),
 		textRow("National Priorities", "Period Name (*), Title (*)", "Period Name pilih dari sheet Periods atau period yang sudah ada di database."),
