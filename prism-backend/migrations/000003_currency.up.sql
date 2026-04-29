@@ -1,19 +1,3 @@
-CREATE TABLE IF NOT EXISTS currency (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    code        CHAR(3) NOT NULL UNIQUE,
-    name        VARCHAR(255) NOT NULL,
-    symbol      VARCHAR(16),
-    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
-    sort_order  INT NOT NULL DEFAULT 0,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-DROP TRIGGER IF EXISTS trg_audit_currency ON currency;
-
-CREATE TRIGGER trg_audit_currency
-    AFTER INSERT OR UPDATE OR DELETE ON currency
-    FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
 INSERT INTO currency (code, name, symbol, is_active, sort_order) VALUES
 ('USD', 'United States Dollar', '$', TRUE, 10),

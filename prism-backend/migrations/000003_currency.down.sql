@@ -1,2 +1,3 @@
-DROP TRIGGER IF EXISTS trg_audit_currency ON currency;
-DROP TABLE IF EXISTS currency;
+DELETE FROM currency WHERE code IN (
+    'USD', 'EUR', 'JPY', 'KRW', 'CNY', 'AUD', 'CAD', 'GBP', 'CHF', 'SAR', 'SGD', 'IDR', 'XDR'
+);
