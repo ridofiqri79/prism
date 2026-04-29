@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
-import MonitoringChart from '@/components/monitoring/MonitoringChart.vue'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SummaryCard from '@/components/common/SummaryCard.vue'
@@ -18,6 +17,7 @@ import type {
 } from '@/types/dashboard.types'
 import type { MonitoringDisbursement } from '@/types/monitoring.types'
 
+const MonitoringChart = defineAsyncComponent(() => import('@/components/monitoring/MonitoringChart.vue'))
 const currentYear = new Date().getFullYear()
 const summary = ref<DashboardSummary | null>(null)
 const monitoringSummary = ref<MonitoringSummary | null>(null)

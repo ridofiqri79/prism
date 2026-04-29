@@ -1063,14 +1063,18 @@ func normalizeInstitutionLevel(value string) (string, bool) {
 		return "Kementerian/Badan/Lembaga", true
 	case "eselon i":
 		return "Eselon I", true
+	case "eselon ii":
+		return "Eselon II", true
 	case "bumn":
 		return "BUMN", true
-	case "pemerintah daerah":
-		return "Pemerintah Daerah", true
+	case "pemerintah daerah", "pemerintah daerah tk i", "pemerintah daerah tk. i", "pemerintah daerah tingkat i", "pemerintah daerah provinsi":
+		return "Pemerintah Daerah Tk. I", true
+	case "pemerintah daerah tk ii", "pemerintah daerah tk. ii", "pemerintah daerah tingkat ii", "pemerintah daerah kabupaten", "pemerintah daerah kota", "pemerintah daerah kabupaten/kota":
+		return "Pemerintah Daerah Tk. II", true
 	case "bumd":
 		return "BUMD", true
-	case "lainnya":
-		return "Lainnya", true
+	case "lainnya", "lainya":
+		return "Lainya", true
 	default:
 		return "", false
 	}

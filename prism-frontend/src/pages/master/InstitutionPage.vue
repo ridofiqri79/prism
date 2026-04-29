@@ -38,10 +38,12 @@ const errors = ref<FormErrors<InstitutionField>>({})
 const levelOptions: InstitutionLevel[] = [
   'Kementerian/Badan/Lembaga',
   'Eselon I',
+  'Eselon II',
   'BUMN',
-  'Pemerintah Daerah',
+  'Pemerintah Daerah Tk. I',
+  'Pemerintah Daerah Tk. II',
   'BUMD',
-  'Lainnya',
+  'Lainya',
 ]
 const treeNodes = computed(() => buildIdTree(masterStore.institutions))
 const parentOptions = computed(() => masterStore.institutions.filter((item) => item.id !== editing.value?.id))
@@ -136,7 +138,7 @@ watch(selectedLevels, () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Instansi" subtitle="Hierarki instansi sampai 6 level referensi">
+    <PageHeader title="Instansi" subtitle="Hierarki instansi sampai 8 level referensi">
       <template #actions>
         <Button v-if="can('institution', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>

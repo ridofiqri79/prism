@@ -333,8 +333,8 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 ```json
 {
   "name": "Kementerian PUPR",
-  "level": "Kementerian",
-  "parent_id": null           // null untuk Kementerian, uuid untuk Eselon I
+  "level": "Kementerian/Badan/Lembaga",
+  "parent_id": null           // null untuk Kementerian/Badan/Lembaga, uuid untuk child
 }
 ```
 
@@ -342,7 +342,7 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 
 | Param | Keterangan |
 |-------|-----------|
-| `level` | Filter multi-value: `Kementerian/Badan/Lembaga`, `Eselon I`, `BUMN`, `Pemerintah Daerah`, `BUMD`, `Lainnya` |
+| `level` | Filter multi-value: `Kementerian/Badan/Lembaga`, `Eselon I`, `Eselon II`, `BUMN`, `Pemerintah Daerah Tk. I`, `Pemerintah Daerah Tk. II`, `BUMD`, `Lainya` |
 | `parent_id` | Filter by parent |
 | `search` | Cari berdasarkan `name` atau `short_name` |
 | `sort` | `name`, `short_name`, `level` |
@@ -630,7 +630,7 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
       "parent": { "id": "uuid", "name": "Deputi Bidang Sarana dan Prasarana", "level": "Eselon I" }
     },
     "executing_agencies": [
-      { "id": "uuid", "name": "Kementerian PUPR", "level": "Kementerian" }
+      { "id": "uuid", "name": "Kementerian PUPR", "level": "Kementerian/Badan/Lembaga" }
     ],
     "implementing_agencies": [
       { "id": "uuid", "name": "Ditjen Bina Marga", "level": "Eselon I" }

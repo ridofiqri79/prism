@@ -768,7 +768,7 @@ func buildDropdownSheet(reference *importTemplateReferenceData) (simpleXLSXSheet
 		{Name: "ddBBProjectCodes", Header: "BB Project Codes", Values: uniqueSorted(bbProjectCodeValues(reference.BBProjects))},
 		{Name: "ddGBProjectCodes", Header: "GB Project Codes", Values: uniqueSorted(gbProjectCodeValues(reference.GBProjects))},
 		{Name: "ddBappenasPartnerLevels", Header: "Bappenas Partner Levels", Values: []string{"Eselon I", "Eselon II"}},
-		{Name: "ddInstitutionLevels", Header: "Institution Levels", Values: []string{"Kementerian/Badan/Lembaga", "Eselon I", "BUMN", "Pemerintah Daerah", "BUMD", "Lainnya"}},
+		{Name: "ddInstitutionLevels", Header: "Institution Levels", Values: institutionLevels},
 		{Name: "ddRegionLevels", Header: "Region Levels", Values: []string{"COUNTRY", "PROVINCE", "CITY"}},
 		{Name: "ddLenderTypes", Header: "Lender Types", Values: []string{"Bilateral", "Multilateral", "KSA"}},
 		{Name: "ddCurrencies", Header: "Currencies", Values: uniqueSorted(currencyValues(reference.Currencies))},

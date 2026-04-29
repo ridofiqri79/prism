@@ -48,10 +48,12 @@ export const institutionSchema = z.object({
   level: z.enum([
     'Kementerian/Badan/Lembaga',
     'Eselon I',
+    'Eselon II',
     'BUMN',
-    'Pemerintah Daerah',
+    'Pemerintah Daerah Tk. I',
+    'Pemerintah Daerah Tk. II',
     'BUMD',
-    'Lainnya',
+    'Lainya',
   ]),
   parent_id: optionalUuid,
 })

@@ -66,7 +66,7 @@ CREATE TABLE institution (
     parent_id   UUID REFERENCES institution(id),       -- NULL untuk Kementerian (level parent)
     name        VARCHAR(255) NOT NULL,
     short_name  VARCHAR(100),    
-    level       VARCHAR(50) NOT NULL CHECK (level IN ('Kementerian/Badan/Lembaga', 'Eselon I', 'BUMN', 'Pemerintah Daerah', 'BUMD', 'Lainnya')),
+    level       VARCHAR(50) NOT NULL CHECK (level IN ('Kementerian/Badan/Lembaga', 'Eselon I', 'Eselon II', 'BUMN', 'Pemerintah Daerah Tk. I', 'Pemerintah Daerah Tk. II', 'BUMD', 'Lainya')),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -38,10 +38,12 @@ export interface LenderPayload {
 export type InstitutionLevel =
   | 'Kementerian/Badan/Lembaga'
   | 'Eselon I'
+  | 'Eselon II'
   | 'BUMN'
-  | 'Pemerintah Daerah'
+  | 'Pemerintah Daerah Tk. I'
+  | 'Pemerintah Daerah Tk. II'
   | 'BUMD'
-  | 'Lainnya'
+  | 'Lainya'
 
 export interface Institution {
   id: string

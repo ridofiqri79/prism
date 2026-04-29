@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -9,7 +9,6 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
 import MonitoringCard from '@/components/monitoring/MonitoringCard.vue'
-import MonitoringChart from '@/components/monitoring/MonitoringChart.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePagination } from '@/composables/usePagination'
 import { usePermission } from '@/composables/usePermission'
@@ -18,6 +17,7 @@ import { useMonitoringStore } from '@/stores/monitoring.store'
 import type { MonitoringDisbursement } from '@/types/monitoring.types'
 import { formatDate } from '@/pages/loan-agreement/loan-agreement-page-utils'
 
+const MonitoringChart = defineAsyncComponent(() => import('@/components/monitoring/MonitoringChart.vue'))
 const route = useRoute()
 const router = useRouter()
 const monitoringStore = useMonitoringStore()

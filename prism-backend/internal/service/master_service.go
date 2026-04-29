@@ -21,6 +21,17 @@ type MasterService struct {
 	queries *queries.Queries
 }
 
+var institutionLevels = []string{
+	"Kementerian/Badan/Lembaga",
+	"Eselon I",
+	"Eselon II",
+	"BUMN",
+	"Pemerintah Daerah Tk. I",
+	"Pemerintah Daerah Tk. II",
+	"BUMD",
+	"Lainya",
+}
+
 func NewMasterService(db *pgxpool.Pool, queries *queries.Queries) *MasterService {
 	return &MasterService{db: db, queries: queries}
 }
@@ -857,7 +868,19 @@ func validateInstitution(req model.InstitutionRequest) error {
 	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Level) == "" {
 		return validation("name", "name dan level wajib diisi")
 	}
+	if !isAllowedValue(req.Level, institutionLevels) {
+		return validation("level", "level institution tidak valid")
+	}
 	return nil
+}
+
+func isAllowedValue(value string, allowed []string) bool {
+	for _, item := range allowed {
+		if value == item {
+			return true
+		}
+	}
+	return false
 }
 
 func validateRegion(req model.RegionRequest) error {
