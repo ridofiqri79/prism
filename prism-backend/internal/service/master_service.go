@@ -26,12 +26,18 @@ func NewMasterService(db *pgxpool.Pool, queries *queries.Queries) *MasterService
 }
 
 func (s *MasterService) ListCountries(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.CountryResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: int32(limit), Offset: int32(offset)})
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "name", "asc", "code", "name")
+	rows, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		Search:    search,
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar country")
 	}
-	total, err := s.queries.CountCountries(ctx)
+	total, err := s.queries.CountCountries(ctx, search)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung country")
 	}
@@ -93,16 +99,23 @@ func (s *MasterService) DeleteCountry(ctx context.Context, id pgtype.UUID) error
 }
 
 func (s *MasterService) ListCurrencies(ctx context.Context, params model.PaginationParams, active string) (*model.ListResponse[model.CurrencyResponse], error) {
-	page, limit, offset := normalizeList(params)
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "sort_order", "asc", "code", "name", "sort_order", "is_active")
 	activeFilter, err := nullableBool(active)
 	if err != nil {
 		return nil, validation("active", "harus true atau false")
 	}
-	rows, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: int32(limit), Offset: int32(offset), ActiveFilter: activeFilter})
+	rows, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		ActiveFilter: activeFilter,
+		Search:       search,
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar currency")
 	}
-	total, err := s.queries.CountCurrencies(ctx, activeFilter)
+	total, err := s.queries.CountCurrencies(ctx, queries.CountCurrenciesParams{ActiveFilter: activeFilter, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung currency")
 	}
@@ -176,14 +189,20 @@ func (s *MasterService) DeleteCurrency(ctx context.Context, id pgtype.UUID) erro
 	})
 }
 
-func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderType string) (*model.ListResponse[model.LenderResponse], error) {
-	page, limit, offset := normalizeList(params)
-	typeFilter := nullableText(lenderType)
-	rows, err := s.queries.ListLenders(ctx, queries.ListLendersParams{Limit: int32(limit), Offset: int32(offset), TypeFilter: typeFilter})
+func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderTypes []string) (*model.ListResponse[model.LenderResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "name", "asc", "name", "short_name", "type", "country")
+	rows, err := s.queries.ListLenders(ctx, queries.ListLendersParams{
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		TypeFilters: lenderTypes,
+		Search:      search,
+		SortField:   sortField,
+		SortOrder:   sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar lender")
 	}
-	total, err := s.queries.CountLenders(ctx, typeFilter)
+	total, err := s.queries.CountLenders(ctx, queries.CountLendersParams{TypeFilters: lenderTypes, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung lender")
 	}
@@ -252,18 +271,26 @@ func (s *MasterService) DeleteLender(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListInstitutions(ctx context.Context, params model.PaginationParams, level string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
-	page, limit, offset := normalizeList(params)
+func (s *MasterService) ListInstitutions(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "short_name", "level")
 	parentFilter, err := nullableUUID(parentID)
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
-	arg := queries.ListInstitutionsParams{Limit: int32(limit), Offset: int32(offset), LevelFilter: nullableText(level), ParentIDFilter: parentFilter}
+	arg := queries.ListInstitutionsParams{
+		Limit:          int32(limit),
+		Offset:         int32(offset),
+		LevelFilters:   levels,
+		ParentIDFilter: parentFilter,
+		Search:         search,
+		SortField:      sortField,
+		SortOrder:      sortOrder,
+	}
 	rows, err := s.queries.ListInstitutions(ctx, arg)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar institution")
 	}
-	total, err := s.queries.CountInstitutions(ctx, queries.CountInstitutionsParams{LevelFilter: arg.LevelFilter, ParentIDFilter: arg.ParentIDFilter})
+	total, err := s.queries.CountInstitutions(ctx, queries.CountInstitutionsParams{LevelFilters: arg.LevelFilters, ParentIDFilter: arg.ParentIDFilter, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung institution")
 	}
@@ -334,14 +361,22 @@ func (s *MasterService) DeleteInstitution(ctx context.Context, id pgtype.UUID) e
 	})
 }
 
-func (s *MasterService) ListRegions(ctx context.Context, params model.PaginationParams, regionType, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
-	page, limit, offset := normalizeList(params)
-	arg := queries.ListRegionsParams{Limit: int32(limit), Offset: int32(offset), TypeFilter: nullableText(regionType), ParentCodeFilter: nullableText(parentCode)}
+func (s *MasterService) ListRegions(ctx context.Context, params model.PaginationParams, regionTypes []string, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "type", "asc", "code", "name", "type")
+	arg := queries.ListRegionsParams{
+		Limit:            int32(limit),
+		Offset:           int32(offset),
+		TypeFilters:      regionTypes,
+		ParentCodeFilter: nullableText(parentCode),
+		Search:           search,
+		SortField:        sortField,
+		SortOrder:        sortOrder,
+	}
 	rows, err := s.queries.ListRegions(ctx, arg)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar region")
 	}
-	total, err := s.queries.CountRegions(ctx, queries.CountRegionsParams{TypeFilter: arg.TypeFilter, ParentCodeFilter: arg.ParentCodeFilter})
+	total, err := s.queries.CountRegions(ctx, queries.CountRegionsParams{TypeFilters: arg.TypeFilters, ParentCodeFilter: arg.ParentCodeFilter, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung region")
 	}
@@ -403,12 +438,18 @@ func (s *MasterService) DeleteRegion(ctx context.Context, id pgtype.UUID) error 
 }
 
 func (s *MasterService) ListProgramTitles(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.ProgramTitleResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: int32(limit), Offset: int32(offset)})
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title")
+	rows, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		Search:    search,
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar program title")
 	}
-	total, err := s.queries.CountProgramTitles(ctx)
+	total, err := s.queries.CountProgramTitles(ctx, search)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung program title")
 	}
@@ -477,13 +518,20 @@ func (s *MasterService) DeleteProgramTitle(ctx context.Context, id pgtype.UUID) 
 	})
 }
 
-func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.BappenasPartnerResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: int32(limit), Offset: int32(offset)})
+func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "level")
+	rows, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		LevelFilters: levels,
+		Search:       search,
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar bappenas partner")
 	}
-	total, err := s.queries.CountBappenasPartners(ctx)
+	total, err := s.queries.CountBappenasPartners(ctx, queries.CountBappenasPartnersParams{LevelFilters: levels, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung bappenas partner")
 	}
@@ -553,8 +601,13 @@ func (s *MasterService) DeleteBappenasPartner(ctx context.Context, id pgtype.UUI
 }
 
 func (s *MasterService) ListPeriods(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.PeriodResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{Limit: int32(limit), Offset: int32(offset)})
+	page, limit, offset, _, sortField, sortOrder := normalizeMasterList(params, "year_start", "desc", "name", "year_start", "year_end")
+	rows, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar period")
 	}
@@ -619,17 +672,24 @@ func (s *MasterService) DeletePeriod(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListNationalPriorities(ctx context.Context, params model.PaginationParams, periodID *string) (*model.ListResponse[model.NationalPriorityResponse], error) {
-	page, limit, offset := normalizeList(params)
-	periodFilter, err := nullableUUID(periodID)
+func (s *MasterService) ListNationalPriorities(ctx context.Context, params model.PaginationParams, periodIDs []string) (*model.ListResponse[model.NationalPriorityResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title", "period")
+	periodFilters, err := uuidFilters(periodIDs, "period_id")
 	if err != nil {
-		return nil, validation("period_id", "UUID tidak valid")
+		return nil, err
 	}
-	rows, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: int32(limit), Offset: int32(offset), PeriodIDFilter: periodFilter})
+	rows, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{
+		Limit:           int32(limit),
+		Offset:          int32(offset),
+		PeriodIDFilters: periodFilters,
+		Search:          search,
+		SortField:       sortField,
+		SortOrder:       sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar national priority")
 	}
-	total, err := s.queries.CountNationalPriorities(ctx, periodFilter)
+	total, err := s.queries.CountNationalPriorities(ctx, queries.CountNationalPrioritiesParams{PeriodIDFilters: periodFilters, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung national priority")
 	}
@@ -720,6 +780,24 @@ func (s *MasterService) withTx(ctx context.Context, fn func(*queries.Queries) er
 func normalizeList(params model.PaginationParams) (int, int, int) {
 	page, limit := normalizePagination(params.Page, params.Limit)
 	return page, limit, (page - 1) * limit
+}
+
+func normalizeMasterList(params model.PaginationParams, defaultSort, defaultOrder string, allowedSorts ...string) (int, int, int, pgtype.Text, string, string) {
+	page, limit, offset := normalizeList(params)
+	sortField := defaultSort
+	for _, allowed := range allowedSorts {
+		if params.Sort == allowed {
+			sortField = params.Sort
+			break
+		}
+	}
+
+	sortOrder := strings.ToLower(params.Order)
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = defaultOrder
+	}
+
+	return page, limit, offset, nullableText(params.Search), sortField, sortOrder
 }
 
 func listResponse[T any](data []T, page, limit int, total int64) *model.ListResponse[T] {
@@ -822,6 +900,20 @@ func nullableUUID(value *string) (pgtype.UUID, error) {
 		return pgtype.UUID{}, nil
 	}
 	return model.ParseUUID(*value)
+}
+
+func uuidFilters(values []string, field string) ([]pgtype.UUID, error) {
+	filters := make([]pgtype.UUID, 0, len(values))
+
+	for _, value := range values {
+		parsed, err := model.ParseUUID(value)
+		if err != nil {
+			return nil, validation(field, "UUID tidak valid")
+		}
+		filters = append(filters, parsed)
+	}
+
+	return filters, nil
 }
 
 func nullableText(value string) pgtype.Text {

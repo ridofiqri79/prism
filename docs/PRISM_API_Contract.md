@@ -56,6 +56,9 @@ Query params untuk semua endpoint list:
 | `limit` | `20` | Jumlah item per halaman |
 | `sort` | `created_at` | Field untuk sorting |
 | `order` | `desc` | `asc` atau `desc` |
+| `search` | kosong | Kata kunci pencarian; hanya tersedia pada endpoint list yang mencantumkannya di bagian Query Params tambahan |
+
+Filter multi-value dapat dikirim sebagai query berulang atau comma-separated, misalnya `?type=Bilateral&type=KSA` atau `?type=Bilateral,KSA`.
 
 Response meta:
 
@@ -210,6 +213,13 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
 | `PUT` | `/master/negara/:id` | update: `country` |
 | `DELETE` | `/master/negara/:id` | delete: `country` |
 
+**`GET /master/countries` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `search` | Cari berdasarkan `name` atau `code` |
+| `sort` | `name`, `code` |
+
 **`GET /master/countries` Response `200`:**
 ```json
 {
@@ -245,6 +255,8 @@ Baris yang sudah ada akan di-skip. Detail baris preview dikembalikan di `sheets[
 | Param | Keterangan |
 |-------|-----------|
 | `active` | Filter `true` atau `false`; kosong mengembalikan semua currency |
+| `search` | Cari berdasarkan `code` atau `name` |
+| `sort` | `code`, `name`, `sort_order`, `is_active` |
 
 **`GET /master/currencies` Response `200`:**
 ```json
@@ -301,7 +313,9 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 
 | Param | Keterangan |
 |-------|-----------|
-| `type` | Filter: `Bilateral`, `Multilateral`, `KSA` |
+| `type` | Filter multi-value: `Bilateral`, `Multilateral`, `KSA` |
+| `search` | Cari berdasarkan `name` atau `short_name` |
+| `sort` | `name`, `short_name`, `type`, `country` |
 
 ---
 
@@ -328,8 +342,10 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 
 | Param | Keterangan |
 |-------|-----------|
-| `level` | Filter: `Kementerian`, `Eselon I` |
+| `level` | Filter multi-value: `Kementerian/Badan/Lembaga`, `Eselon I`, `BUMN`, `Pemerintah Daerah`, `BUMD`, `Lainnya` |
 | `parent_id` | Filter by parent |
+| `search` | Cari berdasarkan `name` atau `short_name` |
+| `sort` | `name`, `short_name`, `level` |
 
 ---
 
@@ -356,8 +372,10 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 
 | Param | Keterangan |
 |-------|-----------|
-| `type` | Filter: `COUNTRY`, `PROVINCE`, `CITY` |
+| `type` | Filter multi-value: `COUNTRY`, `PROVINCE`, `CITY` |
 | `parent_code` | Filter by parent code — untuk load CITY per PROVINCE |
+| `search` | Cari berdasarkan `name` atau `code` |
+| `sort` | `code`, `name`, `type` |
 
 ---
 
@@ -369,6 +387,13 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `POST` | `/master/program-titles` | create: `program_title` |
 | `PUT` | `/master/program-titles/:id` | update: `program_title` |
 | `DELETE` | `/master/program-titles/:id` | delete: `program_title` |
+
+**`GET /master/program-titles` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `search` | Cari berdasarkan `title` |
+| `sort` | `title` |
 
 **`POST /master/program-titles` Request:**
 ```json
@@ -388,6 +413,14 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `POST` | `/master/bappenas-partners` | create: `bappenas_partner` |
 | `PUT` | `/master/bappenas-partners/:id` | update: `bappenas_partner` |
 | `DELETE` | `/master/bappenas-partners/:id` | delete: `bappenas_partner` |
+
+**`GET /master/bappenas-partners` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `level` | Filter multi-value: `Eselon I`, `Eselon II` |
+| `search` | Cari berdasarkan `name` |
+| `sort` | `name`, `level` |
 
 **`POST /master/bappenas-partners` Request:**
 ```json
@@ -409,6 +442,12 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `PUT` | `/master/periods/:id` | update: `period` |
 | `DELETE` | `/master/periods/:id` | delete: `period` |
 
+**`GET /master/periods` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `sort` | `name`, `year_start`, `year_end` |
+
 **`POST /master/periods` Request:**
 ```json
 {
@@ -428,6 +467,14 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `POST` | `/master/national-priorities` | create: `national_priority` |
 | `PUT` | `/master/national-priorities/:id` | update: `national_priority` |
 | `DELETE` | `/master/national-priorities/:id` | delete: `national_priority` |
+
+**`GET /master/national-priorities` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `period_id` | Filter multi-value berdasarkan periode |
+| `search` | Cari berdasarkan `title` |
+| `sort` | `title`, `period` |
 
 **`POST /master/national-priorities` Request:**
 ```json

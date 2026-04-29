@@ -220,7 +220,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		gbProjectsByCode:          map[string]queries.ListActiveGBProjectReferencesRow{},
 	}
 
-	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
+	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi country")
 	}
@@ -228,7 +228,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addCountry(country)
 	}
 
-	lenders, err := qtx.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}})
+	lenders, err := qtx.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi lender")
 	}
@@ -236,7 +236,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addLender(lender.ID, lender.Name, lender.Type, lender.ShortName)
 	}
 
-	institutions, err := qtx.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilter: pgtype.Text{}, ParentIDFilter: pgtype.UUID{}})
+	institutions, err := qtx.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, ParentIDFilter: pgtype.UUID{}, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi institution")
 	}
@@ -244,7 +244,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addInstitution(institution)
 	}
 
-	regions, err := qtx.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}, ParentCodeFilter: pgtype.Text{}})
+	regions, err := qtx.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, ParentCodeFilter: pgtype.Text{}, Search: pgtype.Text{}, SortField: "type", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi region")
 	}
@@ -252,7 +252,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addRegion(region)
 	}
 
-	programTitles, err := qtx.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0})
+	programTitles, err := qtx.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi program title")
 	}
@@ -260,7 +260,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addProgramTitle(programTitle)
 	}
 
-	partners, err := qtx.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0})
+	partners, err := qtx.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi bappenas partner")
 	}
@@ -268,7 +268,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addBappenasPartner(partner)
 	}
 
-	periods, err := qtx.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0})
+	periods, err := qtx.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0, SortField: "year_start", SortOrder: "desc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi period")
 	}
@@ -276,7 +276,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addPeriod(period)
 	}
 
-	priorities, err := qtx.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilter: pgtype.UUID{}})
+	priorities, err := qtx.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilters: nil, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi national priority")
 	}

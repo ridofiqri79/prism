@@ -440,47 +440,52 @@ func (s *DKService) buildDKImportTemplateWorkbook(ctx context.Context) (simpleXL
 }
 
 func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, periodID pgtype.UUID) (*importTemplateReferenceData, error) {
-	programTitles, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0})
+	programTitles, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot program title")
 	}
 
-	partners, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0})
+	partners, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot bappenas partner")
 	}
 
-	institutions, err := s.queries.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilter: pgtype.Text{}, ParentIDFilter: pgtype.UUID{}})
+	institutions, err := s.queries.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, ParentIDFilter: pgtype.UUID{}, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot institution")
 	}
 
-	regions, err := s.queries.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}, ParentCodeFilter: pgtype.Text{}})
+	regions, err := s.queries.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, ParentCodeFilter: pgtype.Text{}, Search: pgtype.Text{}, SortField: "type", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot region")
 	}
 
-	periods, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0})
+	periods, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0, SortField: "year_start", SortOrder: "desc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot period")
 	}
 
-	priorities, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilter: periodID})
+	periodFilters := make([]pgtype.UUID, 0, 1)
+	if periodID.Valid {
+		periodFilters = append(periodFilters, periodID)
+	}
+
+	priorities, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilters: periodFilters, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot national priority")
 	}
 
-	lenders, err := s.queries.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}})
+	lenders, err := s.queries.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot lender")
 	}
 
-	currencies, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: masterImportListLimit, Offset: 0, ActiveFilter: pgtype.Bool{}})
+	currencies, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: masterImportListLimit, Offset: 0, ActiveFilter: pgtype.Bool{}, Search: pgtype.Text{}, SortField: "sort_order", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot currency")
 	}
 
-	countries, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
+	countries, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot country")
 	}

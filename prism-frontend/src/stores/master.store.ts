@@ -53,33 +53,43 @@ export const useMasterStore = defineStore('master', () => {
 
   async function fetchCountries(force = false, params?: ListParams) {
     if (loaded.value.countries && !force) return
-    countries.value = (await MasterService.getCountries(params)).data
+    const response = await MasterService.getCountries(params)
+    countries.value = response.data
     loaded.value.countries = true
+    return response
   }
 
   async function fetchCurrencies(force = false, params?: ListParams) {
     if (loaded.value.currencies && !force) return
-    currencies.value = (await MasterService.getCurrencies(params)).data
+    const response = await MasterService.getCurrencies(params)
+    currencies.value = response.data
     loaded.value.currencies = true
+    return response
   }
 
   async function fetchLenders(force = false, params?: ListParams) {
     if (loaded.value.lenders && !force) return
-    lenders.value = (await MasterService.getLenders(params)).data
+    const response = await MasterService.getLenders(params)
+    lenders.value = response.data
     loaded.value.lenders = true
+    return response
   }
 
   async function fetchInstitutions(force = false, params?: ListParams) {
     if (loaded.value.institutions && !force) return
-    institutions.value = (await MasterService.getInstitutions(params)).data
+    const response = await MasterService.getInstitutions(params)
+    institutions.value = response.data
     loaded.value.institutions = true
+    return response
   }
 
   async function fetchRegions(force = false, params?: ListParams) {
     if (loaded.value.regions && !force) return
-    regions.value = (await MasterService.getRegions(params)).data
+    const response = await MasterService.getRegions(params)
+    regions.value = response.data
     loaded.value.regions = true
     loaded.value.allRegionLevels = false
+    return response
   }
 
   async function fetchAllRegionLevels(force = false) {
@@ -97,26 +107,34 @@ export const useMasterStore = defineStore('master', () => {
 
   async function fetchProgramTitles(force = false, params?: ListParams) {
     if (loaded.value.programTitles && !force) return
-    programTitles.value = (await MasterService.getProgramTitles(params)).data
+    const response = await MasterService.getProgramTitles(params)
+    programTitles.value = response.data
     loaded.value.programTitles = true
+    return response
   }
 
   async function fetchBappenasPartners(force = false, params?: ListParams) {
     if (loaded.value.bappenasPartners && !force) return
-    bappenasPartners.value = (await MasterService.getBappenasPartners(params)).data
+    const response = await MasterService.getBappenasPartners(params)
+    bappenasPartners.value = response.data
     loaded.value.bappenasPartners = true
+    return response
   }
 
   async function fetchPeriods(force = false, params?: ListParams) {
     if (loaded.value.periods && !force) return
-    periods.value = (await MasterService.getPeriods(params)).data
+    const response = await MasterService.getPeriods(params)
+    periods.value = response.data
     loaded.value.periods = true
+    return response
   }
 
   async function fetchNationalPriorities(force = false, params?: ListParams) {
     if (loaded.value.nationalPriorities && !force) return
-    nationalPriorities.value = (await MasterService.getNationalPriorities(params)).data
+    const response = await MasterService.getNationalPriorities(params)
+    nationalPriorities.value = response.data
     loaded.value.nationalPriorities = true
+    return response
   }
 
   function invalidate(key: MasterKey) {

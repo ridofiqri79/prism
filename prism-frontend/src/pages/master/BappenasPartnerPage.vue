@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import TreeTable from 'primevue/treetable'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -14,7 +14,8 @@ import { useToast } from '@/composables/useToast'
 import { bappenasPartnerSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { BappenasPartner, BappenasPartnerLevel, BappenasPartnerPayload } from '@/types/master.types'
-import { buildIdTree, toFormErrors, type FormErrors } from './master-page-utils'
+import MasterTreeTable from './MasterTreeTable.vue'
+import { buildIdTree, toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
 type PartnerField = keyof BappenasPartnerPayload
 
@@ -22,9 +23,11 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('level', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<BappenasPartner | null>(null)
+const selectedLevels = ref<BappenasPartnerLevel[]>([])
 const form = reactive<BappenasPartnerPayload>({ name: '', level: 'Eselon I', parent_id: undefined })
 const errors = ref<FormErrors<PartnerField>>({})
 const levelOptions: BappenasPartnerLevel[] = ['Eselon I', 'Eselon II']
@@ -35,7 +38,16 @@ const parentOptions = computed(() =>
 )
 
 async function loadData() {
-  await masterStore.fetchBappenasPartners(true, { limit: 1000, sort: 'name', order: 'asc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchBappenasPartners(
+      true,
+      controls.params({ level: selectedLevels.value }),
+    )
+    if (response) controls.syncMeta(response.meta)
+  } finally {
+    controls.loading.value = false
+  }
 }
 
 function openCreate() {
@@ -91,6 +103,14 @@ function deleteItem(partner: BappenasPartner) {
 onMounted(() => {
   void loadData()
 })
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
+
+watch(selectedLevels, () => {
+  controls.resetAndLoad(loadData)
+})
 </script>
 
 <template>
@@ -101,9 +121,42 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
-      <Column field="name" header="Nama" expander />
-      <Column field="level" header="Level">
+    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Mitra Bappenas</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama mitra" />
+        </span>
+      </label>
+
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Filter Level</span>
+        <MultiSelect
+          v-model="selectedLevels"
+          :options="levelOptions"
+          placeholder="Semua level"
+          display="chip"
+          :max-selected-labels="2"
+          class="w-full"
+        />
+      </label>
+    </div>
+
+    <MasterTreeTable
+      :value="treeNodes"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @sort="(value) => controls.handleSort(value, loadData)"
+    >
+      <Column field="name" header="Nama" sortable expander />
+      <Column field="level" header="Level" sortable>
         <template #body="{ node }">
           <Tag :value="node.data.level" severity="info" rounded />
         </template>
@@ -131,7 +184,7 @@ onMounted(() => {
           </div>
         </template>
       </Column>
-    </TreeTable>
+    </MasterTreeTable>
 
     <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Bappenas Partner' : 'Tambah Bappenas Partner'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">

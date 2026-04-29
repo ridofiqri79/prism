@@ -1,5 +1,9 @@
+import { onBeforeUnmount, ref } from 'vue'
 import type { ZodError } from 'zod'
 import type { TreeNode } from 'primevue/treenode'
+import { usePagination, type SortOrder } from '@/composables/usePagination'
+import type { PaginationMeta } from '@/types/api.types'
+import type { ListParams } from '@/types/master.types'
 
 export type FormErrors<T extends string> = Partial<Record<T, string>>
 
@@ -79,4 +83,82 @@ export function buildCodeTree<T extends CodeHierarchyItem>(items: T[]): AppTreeN
   }
 
   return roots
+}
+
+export function useMasterListControls(defaultSort: string, defaultOrder: SortOrder = 'asc') {
+  const pagination = usePagination()
+  pagination.sort.value = defaultSort
+  pagination.order.value = defaultOrder
+
+  const total = ref(0)
+  const loading = ref(false)
+  const search = ref('')
+  let searchTimer: ReturnType<typeof setTimeout> | undefined
+
+  function params(extra: ListParams = {}): ListParams {
+    return {
+      ...pagination.queryParams.value,
+      search: search.value.trim() || undefined,
+      ...extra,
+    }
+  }
+
+  function syncMeta(meta: PaginationMeta) {
+    total.value = meta.total
+    pagination.page.value = meta.page
+    pagination.limit.value = meta.limit
+  }
+
+  function handlePage(value: number, loadData: () => void | Promise<void>) {
+    pagination.page.value = value
+    void loadData()
+  }
+
+  function handleLimit(value: number, loadData: () => void | Promise<void>) {
+    pagination.limit.value = value
+    pagination.resetPage()
+    void loadData()
+  }
+
+  function handleSort(value: { sort: string; order: SortOrder }, loadData: () => void | Promise<void>) {
+    pagination.sort.value = value.sort
+    pagination.order.value = value.order
+    pagination.resetPage()
+    void loadData()
+  }
+
+  function resetAndLoad(loadData: () => void | Promise<void>) {
+    pagination.resetPage()
+    void loadData()
+  }
+
+  function resetAndLoadDebounced(loadData: () => void | Promise<void>) {
+    pagination.resetPage()
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+    }
+    searchTimer = setTimeout(() => {
+      void loadData()
+    }, 250)
+  }
+
+  onBeforeUnmount(() => {
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+    }
+  })
+
+  return {
+    pagination,
+    total,
+    loading,
+    search,
+    params,
+    syncMeta,
+    handlePage,
+    handleLimit,
+    handleSort,
+    resetAndLoad,
+    resetAndLoadDebounced,
+  }
 }

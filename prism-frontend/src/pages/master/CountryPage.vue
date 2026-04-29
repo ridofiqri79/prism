@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -11,7 +11,7 @@ import { useToast } from '@/composables/useToast'
 import { countrySchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Country, CountryPayload } from '@/types/master.types'
-import { toFormErrors, type FormErrors } from './master-page-utils'
+import { toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
 type CountryField = keyof CountryPayload
 
@@ -19,6 +19,7 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('name', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<Country | null>(null)
@@ -32,7 +33,13 @@ const columns: ColumnDef[] = [
 ]
 
 async function loadData() {
-  await masterStore.fetchCountries(true, { limit: 1000, sort: 'name', order: 'asc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchCountries(true, controls.params())
+    if (response) controls.syncMeta(response.meta)
+  } finally {
+    controls.loading.value = false
+  }
 }
 
 function openCreate() {
@@ -79,6 +86,10 @@ function deleteItem(country: Country) {
 onMounted(() => {
   void loadData()
 })
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
 </script>
 
 <template>
@@ -89,13 +100,28 @@ onMounted(() => {
       </template>
     </PageHeader>
 
+    <div class="rounded-lg border border-surface-200 bg-white p-4">
+      <label class="block max-w-md space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Negara</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama atau kode negara" />
+        </span>
+      </label>
+    </div>
+
     <DataTable
       :data="masterStore.countries"
       :columns="columns"
-      :loading="false"
-      :total="masterStore.countries.length"
-      :page="1"
-      :limit="1000"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @sort="(value) => controls.handleSort(value, loadData)"
     >
       <template #body-row="{ row, column }">
         <div v-if="column.field === 'actions'" class="flex flex-wrap gap-2">

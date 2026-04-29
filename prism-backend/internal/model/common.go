@@ -1,10 +1,11 @@
 package model
 
 type PaginationParams struct {
-	Page  int    `query:"page"`
-	Limit int    `query:"limit"`
-	Sort  string `query:"sort"`
-	Order string `query:"order"`
+	Page   int    `query:"page"`
+	Limit  int    `query:"limit"`
+	Sort   string `query:"sort"`
+	Order  string `query:"order"`
+	Search string `query:"search"`
 }
 
 type PaginationMeta struct {

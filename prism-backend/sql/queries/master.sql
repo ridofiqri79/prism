@@ -2,12 +2,27 @@
 -- name: ListCountries :many
 SELECT *
 FROM country
-ORDER BY name ASC
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'asc' THEN code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'desc' THEN code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    name ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountCountries :one
 SELECT COUNT(*)
-FROM country;
+FROM country
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+);
 
 -- name: GetCountry :one
 SELECT *
@@ -36,13 +51,33 @@ WHERE id = $1;
 SELECT *
 FROM currency
 WHERE (sqlc.narg('active_filter')::boolean IS NULL OR is_active = sqlc.narg('active_filter'))
-ORDER BY sort_order ASC, code ASC
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'asc' THEN code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'desc' THEN code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'sort_order' AND sqlc.arg('sort_order')::text = 'asc' THEN sort_order END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'sort_order' AND sqlc.arg('sort_order')::text = 'desc' THEN sort_order END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'is_active' AND sqlc.arg('sort_order')::text = 'asc' THEN is_active END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'is_active' AND sqlc.arg('sort_order')::text = 'desc' THEN is_active END DESC,
+    sort_order ASC,
+    code ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountCurrencies :one
 SELECT COUNT(*)
 FROM currency
-WHERE (sqlc.narg('active_filter')::boolean IS NULL OR is_active = sqlc.narg('active_filter'));
+WHERE (sqlc.narg('active_filter')::boolean IS NULL OR is_active = sqlc.narg('active_filter'))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetCurrency :one
 SELECT *
@@ -88,14 +123,33 @@ SELECT
     c.code AS country_code
 FROM lender l
 LEFT JOIN country c ON c.id = l.country_id
-WHERE (sqlc.narg('type_filter')::text IS NULL OR l.type = sqlc.narg('type_filter'))
-ORDER BY l.name ASC
+WHERE (COALESCE(cardinality(sqlc.arg('type_filters')::text[]), 0) = 0 OR l.type = ANY(sqlc.arg('type_filters')::text[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN l.name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN l.name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'short_name' AND sqlc.arg('sort_order')::text = 'asc' THEN l.short_name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'short_name' AND sqlc.arg('sort_order')::text = 'desc' THEN l.short_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'type' AND sqlc.arg('sort_order')::text = 'asc' THEN l.type END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'type' AND sqlc.arg('sort_order')::text = 'desc' THEN l.type END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'country' AND sqlc.arg('sort_order')::text = 'asc' THEN c.name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'country' AND sqlc.arg('sort_order')::text = 'desc' THEN c.name END DESC,
+    l.name ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountLenders :one
 SELECT COUNT(*)
 FROM lender
-WHERE (sqlc.narg('type_filter')::text IS NULL OR type = sqlc.narg('type_filter'));
+WHERE (COALESCE(cardinality(sqlc.arg('type_filters')::text[]), 0) = 0 OR type = ANY(sqlc.arg('type_filters')::text[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetLender :one
 SELECT
@@ -135,16 +189,34 @@ WHERE id = $1;
 -- name: ListInstitutions :many
 SELECT *
 FROM institution
-WHERE (sqlc.narg('level_filter')::text IS NULL OR level = sqlc.narg('level_filter'))
+WHERE (COALESCE(cardinality(sqlc.arg('level_filters')::text[]), 0) = 0 OR level = ANY(sqlc.arg('level_filters')::text[]))
   AND (sqlc.narg('parent_id_filter')::uuid IS NULL OR parent_id = sqlc.narg('parent_id_filter'))
-ORDER BY level ASC, name ASC
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'short_name' AND sqlc.arg('sort_order')::text = 'asc' THEN short_name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'short_name' AND sqlc.arg('sort_order')::text = 'desc' THEN short_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'level' AND sqlc.arg('sort_order')::text = 'asc' THEN level END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'level' AND sqlc.arg('sort_order')::text = 'desc' THEN level END DESC,
+    level ASC,
+    name ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountInstitutions :one
 SELECT COUNT(*)
 FROM institution
-WHERE (sqlc.narg('level_filter')::text IS NULL OR level = sqlc.narg('level_filter'))
-  AND (sqlc.narg('parent_id_filter')::uuid IS NULL OR parent_id = sqlc.narg('parent_id_filter'));
+WHERE (COALESCE(cardinality(sqlc.arg('level_filters')::text[]), 0) = 0 OR level = ANY(sqlc.arg('level_filters')::text[]))
+  AND (sqlc.narg('parent_id_filter')::uuid IS NULL OR parent_id = sqlc.narg('parent_id_filter'))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetInstitution :one
 SELECT
@@ -183,16 +255,34 @@ WHERE id = $1;
 -- name: ListRegions :many
 SELECT *
 FROM region
-WHERE (sqlc.narg('type_filter')::text IS NULL OR type = sqlc.narg('type_filter'))
+WHERE (COALESCE(cardinality(sqlc.arg('type_filters')::text[]), 0) = 0 OR type = ANY(sqlc.arg('type_filters')::text[]))
   AND (sqlc.narg('parent_code_filter')::text IS NULL OR parent_code = sqlc.narg('parent_code_filter'))
-ORDER BY type ASC, name ASC
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'asc' THEN code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'code' AND sqlc.arg('sort_order')::text = 'desc' THEN code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'type' AND sqlc.arg('sort_order')::text = 'asc' THEN type END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'type' AND sqlc.arg('sort_order')::text = 'desc' THEN type END DESC,
+    type ASC,
+    name ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountRegions :one
 SELECT COUNT(*)
 FROM region
-WHERE (sqlc.narg('type_filter')::text IS NULL OR type = sqlc.narg('type_filter'))
-  AND (sqlc.narg('parent_code_filter')::text IS NULL OR parent_code = sqlc.narg('parent_code_filter'));
+WHERE (COALESCE(cardinality(sqlc.arg('type_filters')::text[]), 0) = 0 OR type = ANY(sqlc.arg('type_filters')::text[]))
+  AND (sqlc.narg('parent_code_filter')::text IS NULL OR parent_code = sqlc.narg('parent_code_filter'))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR code ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetRegion :one
 SELECT *
@@ -222,12 +312,23 @@ WHERE id = $1;
 -- name: ListProgramTitles :many
 SELECT *
 FROM program_title
-ORDER BY title ASC
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR title ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'title' AND sqlc.arg('sort_order')::text = 'asc' THEN title END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'title' AND sqlc.arg('sort_order')::text = 'desc' THEN title END DESC,
+    title ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountProgramTitles :one
 SELECT COUNT(*)
-FROM program_title;
+FROM program_title
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR title ILIKE '%' || sqlc.narg('search')::text || '%'
+);
 
 -- name: GetProgramTitle :one
 SELECT *
@@ -255,12 +356,28 @@ WHERE id = $1;
 -- name: ListBappenasPartners :many
 SELECT *
 FROM bappenas_partner
-ORDER BY level ASC, name ASC
+WHERE (COALESCE(cardinality(sqlc.arg('level_filters')::text[]), 0) = 0 OR level = ANY(sqlc.arg('level_filters')::text[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'level' AND sqlc.arg('sort_order')::text = 'asc' THEN level END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'level' AND sqlc.arg('sort_order')::text = 'desc' THEN level END DESC,
+    level ASC,
+    name ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountBappenasPartners :one
 SELECT COUNT(*)
-FROM bappenas_partner;
+FROM bappenas_partner
+WHERE (COALESCE(cardinality(sqlc.arg('level_filters')::text[]), 0) = 0 OR level = ANY(sqlc.arg('level_filters')::text[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR name ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetBappenasPartner :one
 SELECT *
@@ -289,7 +406,14 @@ WHERE id = $1;
 -- name: ListPeriods :many
 SELECT *
 FROM period
-ORDER BY year_start DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'asc' THEN name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'name' AND sqlc.arg('sort_order')::text = 'desc' THEN name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'year_start' AND sqlc.arg('sort_order')::text = 'asc' THEN year_start END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'year_start' AND sqlc.arg('sort_order')::text = 'desc' THEN year_start END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'year_end' AND sqlc.arg('sort_order')::text = 'asc' THEN year_end END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'year_end' AND sqlc.arg('sort_order')::text = 'desc' THEN year_end END DESC,
+    year_start DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CountPeriods :one
@@ -330,14 +454,27 @@ SELECT
     p.name AS period_name
 FROM national_priority np
 JOIN period p ON p.id = np.period_id
-WHERE (sqlc.narg('period_id_filter')::uuid IS NULL OR np.period_id = sqlc.narg('period_id_filter'))
-ORDER BY np.title ASC
+WHERE (COALESCE(cardinality(sqlc.arg('period_id_filters')::uuid[]), 0) = 0 OR np.period_id = ANY(sqlc.arg('period_id_filters')::uuid[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR np.title ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'title' AND sqlc.arg('sort_order')::text = 'asc' THEN np.title END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'title' AND sqlc.arg('sort_order')::text = 'desc' THEN np.title END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'period' AND sqlc.arg('sort_order')::text = 'asc' THEN p.name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'period' AND sqlc.arg('sort_order')::text = 'desc' THEN p.name END DESC,
+    np.title ASC
 LIMIT $1 OFFSET $2;
 
 -- name: CountNationalPriorities :one
 SELECT COUNT(*)
 FROM national_priority
-WHERE (sqlc.narg('period_id_filter')::uuid IS NULL OR period_id = sqlc.narg('period_id_filter'));
+WHERE (COALESCE(cardinality(sqlc.arg('period_id_filters')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_id_filters')::uuid[]))
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR title ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
 
 -- name: GetNationalPriority :one
 SELECT

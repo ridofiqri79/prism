@@ -245,6 +245,7 @@ Component re-render via reactivity
 ## Pola Global Reload Tabel
 
 - Gunakan `src/components/common/DataTable.vue` untuk tabel list standar; komponen ini sudah mempertahankan data lama saat `loading` dan menampilkan animasi reload yang sama di semua halaman.
+- DataTable list standar harus meneruskan `page`, `limit`, `total`, `sort`, dan `order` dari API/store agar pagination server-side, sorting header, dan resize column tetap konsisten.
 - Untuk tabel custom, bungkus markup tabel dengan `src/components/common/TableReloadShell.vue` dan kirim `refreshing` saat data sedang di-fetch ulang.
 - Skeleton hanya untuk load awal ketika data belum ada. Saat search/filter/pagination memicu fetch ulang, tabel lama tetap tampil dengan opacity transition dan indikator reload global.
 - Jika tabel custom perlu animasi baris, gunakan `<TransitionGroup name="prism-table-row-fade">` agar timing dan geraknya konsisten dengan tabel lain.

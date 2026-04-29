@@ -12,7 +12,7 @@ import { useToast } from '@/composables/useToast'
 import { periodSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Period, PeriodPayload } from '@/types/master.types'
-import { toFormErrors, type FormErrors } from './master-page-utils'
+import { toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
 type PeriodField = keyof PeriodPayload
 
@@ -20,6 +20,7 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('year_start', 'desc')
 
 const dialogVisible = ref(false)
 const editing = ref<Period | null>(null)
@@ -27,13 +28,19 @@ const form = reactive<PeriodPayload>({ name: '', year_start: 2025, year_end: 202
 const errors = ref<FormErrors<PeriodField>>({})
 const columns: ColumnDef[] = [
   { field: 'name', header: 'Nama', sortable: true },
-  { field: 'year_start', header: 'Tahun Awal' },
-  { field: 'year_end', header: 'Tahun Akhir' },
+  { field: 'year_start', header: 'Tahun Awal', sortable: true },
+  { field: 'year_end', header: 'Tahun Akhir', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
-  await masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchPeriods(true, controls.params())
+    if (response) controls.syncMeta(response.meta)
+  } finally {
+    controls.loading.value = false
+  }
 }
 
 function openCreate() {
@@ -97,10 +104,15 @@ onMounted(() => {
     <DataTable
       :data="masterStore.periods"
       :columns="columns"
-      :loading="false"
-      :total="masterStore.periods.length"
-      :page="1"
-      :limit="1000"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @sort="(value) => controls.handleSort(value, loadData)"
     >
       <template #body-row="{ row, column }">
         <div v-if="column.field === 'actions'" class="flex flex-wrap gap-2">

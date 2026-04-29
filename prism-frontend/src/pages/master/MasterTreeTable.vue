@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import PrimeColumn from 'primevue/column'
-import PrimeDataTable from 'primevue/datatable'
 import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
+import TreeTable from 'primevue/treetable'
+import type { TreeNode } from 'primevue/treenode'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
-
-export interface ColumnDef {
-  field: string
-  header: string
-  sortable?: boolean
-}
 
 interface PageEvent {
   page: number
@@ -27,8 +21,7 @@ type SortOrder = 'asc' | 'desc'
 
 const props = withDefaults(
   defineProps<{
-    data: Record<string, unknown>[]
-    columns: ColumnDef[]
+    value: TreeNode[]
     loading?: boolean
     total: number
     page: number
@@ -53,8 +46,8 @@ const tableSortOrder = computed(() => {
   return props.sortOrder === 'asc' ? 1 : -1
 })
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
-const initialLoading = computed(() => props.loading && props.data.length === 0)
-const refreshingRows = computed(() => props.loading && props.data.length > 0)
+const initialLoading = computed(() => props.loading && props.value.length === 0)
+const refreshingRows = computed(() => props.loading && props.value.length > 0)
 
 function handlePage(event: PageEvent) {
   if (event.rows !== props.limit) {
@@ -83,43 +76,31 @@ function handleSort(event: SortEvent) {
       <div
         v-for="row in skeletonRows"
         :key="row"
-        class="grid gap-4 border-b border-surface-100 p-4 last:border-b-0"
-        :style="{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))` }"
+        class="grid grid-cols-4 gap-4 border-b border-surface-100 p-4 last:border-b-0"
       >
-        <Skeleton v-for="column in columns" :key="column.field" height="1.5rem" />
+        <Skeleton height="1.5rem" />
+        <Skeleton height="1.5rem" />
+        <Skeleton height="1.5rem" />
+        <Skeleton height="1.5rem" />
       </div>
     </div>
 
-    <EmptyState v-else-if="data.length === 0" />
+    <EmptyState v-else-if="value.length === 0" />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
-      <PrimeDataTable
-        :value="data"
-        lazy
-        striped-rows
+      <TreeTable
+        :value="value"
+        sort-mode="single"
         removable-sort
         resizable-columns
         column-resize-mode="fit"
-        data-key="id"
         :sort-field="sortField"
         :sort-order="tableSortOrder"
         class="overflow-hidden rounded-lg border border-surface-200"
         @sort="handleSort"
       >
-        <PrimeColumn
-          v-for="column in columns"
-          :key="column.field"
-          :field="column.field"
-          :header="column.header"
-          :sortable="column.sortable"
-        >
-          <template #body="{ data: row }">
-            <slot name="body-row" :row="row" :column="column">
-              {{ row[column.field] }}
-            </slot>
-          </template>
-        </PrimeColumn>
-      </PrimeDataTable>
+        <slot />
+      </TreeTable>
     </TableReloadShell>
 
     <Paginator
