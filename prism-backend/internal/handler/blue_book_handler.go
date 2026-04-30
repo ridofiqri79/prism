@@ -82,11 +82,18 @@ func (h *BlueBookHandler) ListBBProjects(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.ListBBProjects(c.Request().Context(), bbID, paginationParams(c))
+	res, err := h.service.ListBBProjects(c.Request().Context(), bbID, bbProjectListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func bbProjectListFilter(c echo.Context) model.BBProjectListFilter {
+	return model.BBProjectListFilter{
+		ExecutingAgencyIDs: queryStrings(c, "executing_agency_ids"),
+		LocationIDs:        queryStrings(c, "location_ids"),
+	}
 }
 
 func (h *BlueBookHandler) GetBBProject(c echo.Context) error {

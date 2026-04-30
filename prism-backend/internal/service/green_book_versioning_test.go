@@ -307,7 +307,7 @@ func (env *blueBookVersioningTestEnv) createBBRevisionPair(t *testing.T) (*model
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
 	revision := env.createBlueBook(t, 1, &original.ID)
-	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListBBProjects(BB revision) error = %v", err)
 	}

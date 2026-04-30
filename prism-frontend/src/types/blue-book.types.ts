@@ -1,6 +1,7 @@
 import type {
   BappenasPartner,
   Institution,
+  ListParams,
   Lender,
   NationalPriority,
   Period,
@@ -57,6 +58,12 @@ export interface BBProject {
   has_newer_revision: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface BBProjectListParams extends ListParams {
+  executing_agency_ids?: string[]
+  location_ids?: string[]
+  search?: string
 }
 
 export interface BBProjectCost {

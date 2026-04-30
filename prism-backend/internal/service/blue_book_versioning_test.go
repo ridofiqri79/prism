@@ -41,7 +41,7 @@ func TestBlueBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDoc
 	assertAppErrorCode(t, err, "CONFLICT")
 
 	revision := env.createBlueBook(t, 1, &original.ID)
-	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListBBProjects(revision) error = %v", err)
 	}
@@ -99,7 +99,7 @@ func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
 	revision := env.createBlueBook(t, 1, &original.ID)
 
-	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListBBProjects(revision) error = %v", err)
 	}
@@ -131,6 +131,47 @@ func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
 	if sourceAfterRevision.IsLatest || !sourceAfterRevision.HasNewerRevision {
 		t.Fatalf("source latest flags = is_latest:%v has_newer:%v, want historical with newer revision", sourceAfterRevision.IsLatest, sourceAfterRevision.HasNewerRevision)
 	}
+}
+
+func TestListBBProjectsSupportsSearchAndFilters(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	floodProject := env.createBBProject(t, blueBook.ID, "BB-001", "Flood Control")
+	agricultureEA, err := env.queries.CreateInstitution(env.ctx, queries.CreateInstitutionParams{ParentID: pgtype.UUID{}, Name: "Ministry of Agriculture", ShortName: pgtype.Text{String: "MoA", Valid: true}, Level: "Kementerian/Badan/Lembaga"})
+	if err != nil {
+		t.Fatalf("CreateInstitution(agriculture EA) error = %v", err)
+	}
+	province, err := env.queries.CreateRegion(env.ctx, queries.CreateRegionParams{Code: "ID-11", Name: "Aceh", Type: "PROVINCE", ParentCode: pgtype.Text{String: "ID", Valid: true}})
+	if err != nil {
+		t.Fatalf("CreateRegion(province) error = %v", err)
+	}
+
+	foodRequest := env.bbProjectRequest("BB-002", "Food Estate")
+	foodRequest.ExecutingAgencyIDs = []string{model.UUIDToString(agricultureEA.ID)}
+	foodRequest.LocationIDs = []string{model.UUIDToString(province.ID)}
+	foodProject, err := env.service.CreateBBProject(env.ctx, mustParseUUID(t, blueBook.ID), foodRequest)
+	if err != nil {
+		t.Fatalf("CreateBBProject(food) error = %v", err)
+	}
+
+	searchResult, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, blueBook.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10, Search: "Agriculture"})
+	if err != nil {
+		t.Fatalf("ListBBProjects(search) error = %v", err)
+	}
+	assertProjectListIDs(t, searchResult.Data, foodProject.ID)
+
+	eaResult, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, blueBook.ID), model.BBProjectListFilter{ExecutingAgencyIDs: []string{model.UUIDToString(env.ea.ID)}}, model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(EA filter) error = %v", err)
+	}
+	assertProjectListIDs(t, eaResult.Data, floodProject.ID)
+
+	locationResult, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, blueBook.ID), model.BBProjectListFilter{LocationIDs: []string{model.UUIDToString(province.ID)}}, model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(location filter) error = %v", err)
+	}
+	assertProjectListIDs(t, locationResult.Data, foodProject.ID)
 }
 
 func TestGetBBProjectHistoryReturnsOrderedSnapshots(t *testing.T) {
@@ -583,6 +624,18 @@ func assertAppErrorCode(t *testing.T, err error, code string) {
 	}
 	if appErr.Code != code {
 		t.Fatalf("AppError code = %s, want %s; message=%q", appErr.Code, code, appErr.Message)
+	}
+}
+
+func assertProjectListIDs(t *testing.T, projects []model.BBProjectResponse, ids ...string) {
+	t.Helper()
+	if len(projects) != len(ids) {
+		t.Fatalf("project count = %d, want %d: %+v", len(projects), len(ids), projects)
+	}
+	for index, id := range ids {
+		if projects[index].ID != id {
+			t.Fatalf("project[%d].ID = %s, want %s", index, projects[index].ID, id)
+		}
 	}
 }
 

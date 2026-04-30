@@ -624,6 +624,14 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 | `PUT` | `/blue-books/:bb_id/projects/:id` | update: `bb_project` |
 | `DELETE` | `/blue-books/:bb_id/projects/:id` | delete: `bb_project` |
 
+**`GET /blue-books/:bb_id/projects` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|------------|
+| `search` | Cari berdasarkan `project_name` atau nama/nama singkat Executing Agency |
+| `executing_agency_ids` | Multi value UUID institution role `Executing Agency` |
+| `location_ids` | Multi value UUID region lokasi proyek |
+
 **`POST /blue-books/:bb_id/projects` Request:**
 ```json
 {

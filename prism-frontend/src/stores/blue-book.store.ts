@@ -4,6 +4,7 @@ import { BlueBookService } from '@/services/blue-book.service'
 import type {
   BBProject,
   BBProjectHistoryItem,
+  BBProjectListParams,
   BBProjectPayload,
   BlueBook,
   BlueBookPayload,
@@ -67,7 +68,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     await BlueBookService.deleteBlueBook(id)
   }
 
-  async function fetchProjects(blueBookId: string, params?: ListParams) {
+  async function fetchProjects(blueBookId: string, params?: BBProjectListParams) {
     return withLoading(async () => {
       const response = await BlueBookService.getProjects(blueBookId, params)
       projects.value = response.data

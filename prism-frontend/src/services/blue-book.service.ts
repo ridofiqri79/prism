@@ -3,6 +3,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   BBProject,
   BBProjectHistoryItem,
+  BBProjectListParams,
   BBProjectPayload,
   BlueBook,
   BlueBookPayload,
@@ -36,7 +37,7 @@ export const BlueBookService = {
     await http.delete(`/blue-books/${id}`)
   },
 
-  async getProjects(blueBookId: string, params?: ListParams) {
+  async getProjects(blueBookId: string, params?: BBProjectListParams) {
     const response = await http.get<PaginatedResponse<BBProject>>(
       `/blue-books/${blueBookId}/projects`,
       { params },

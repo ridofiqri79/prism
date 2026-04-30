@@ -48,6 +48,11 @@ type CreateBBProjectRequest struct {
 
 type UpdateBBProjectRequest = CreateBBProjectRequest
 
+type BBProjectListFilter struct {
+	ExecutingAgencyIDs []string
+	LocationIDs        []string
+}
+
 type ProjectCostItem struct {
 	FundingType     string  `json:"funding_type" validate:"required"`
 	FundingCategory string  `json:"funding_category" validate:"required"`

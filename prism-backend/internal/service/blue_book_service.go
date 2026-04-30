@@ -154,13 +154,22 @@ func (s *BlueBookService) DeleteBlueBook(ctx context.Context, id pgtype.UUID) er
 	})
 }
 
-func (s *BlueBookService) ListBBProjects(ctx context.Context, bbID pgtype.UUID, params model.PaginationParams) (*model.ListResponse[model.BBProjectResponse], error) {
+func (s *BlueBookService) ListBBProjects(ctx context.Context, bbID pgtype.UUID, filter model.BBProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.BBProjectResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListBBProjectsByBlueBook(ctx, queries.ListBBProjectsByBlueBookParams{BlueBookID: bbID, Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildBBProjectListParams(bbID, filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListBBProjectsByBlueBook(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar BB Project")
 	}
-	total, err := s.queries.CountBBProjectsByBlueBook(ctx, bbID)
+	total, err := s.queries.CountBBProjectsByBlueBook(ctx, queries.CountBBProjectsByBlueBookParams{
+		BlueBookID:         queryParams.BlueBookID,
+		Search:             queryParams.Search,
+		ExecutingAgencyIds: queryParams.ExecutingAgencyIds,
+		LocationIds:        queryParams.LocationIds,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung BB Project")
 	}
@@ -173,6 +182,26 @@ func (s *BlueBookService) ListBBProjects(ctx context.Context, bbID pgtype.UUID, 
 		data = append(data, *res)
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildBBProjectListParams(bbID pgtype.UUID, filter model.BBProjectListFilter, params model.PaginationParams, limit, offset int) (queries.ListBBProjectsByBlueBookParams, error) {
+	executingAgencyIDs, err := uuidArray(filter.ExecutingAgencyIDs, "executing_agency_ids")
+	if err != nil {
+		return queries.ListBBProjectsByBlueBookParams{}, err
+	}
+	locationIDs, err := uuidArray(filter.LocationIDs, "location_ids")
+	if err != nil {
+		return queries.ListBBProjectsByBlueBookParams{}, err
+	}
+
+	return queries.ListBBProjectsByBlueBookParams{
+		BlueBookID:         bbID,
+		Search:             nullableText(params.Search),
+		ExecutingAgencyIds: executingAgencyIDs,
+		LocationIds:        locationIDs,
+		Limit:              int32(limit),
+		Offset:             int32(offset),
+	}, nil
 }
 
 func (s *BlueBookService) GetBBProject(ctx context.Context, bbID, id pgtype.UUID) (*model.BBProjectResponse, error) {

@@ -111,16 +111,84 @@ WHERE id = $1;
 -- name: ListBBProjectsByBlueBook :many
 SELECT *
 FROM bb_project
-WHERE blue_book_id = $1
+WHERE blue_book_id = sqlc.arg('blue_book_id')
   AND status = 'active'
+  AND (
+      sqlc.narg('search')::text IS NULL
+      OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_institution bpi
+          JOIN institution i ON i.id = bpi.institution_id
+          WHERE bpi.bb_project_id = bb_project.id
+            AND bpi.role = 'Executing Agency'
+            AND (
+                i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_institution bpi
+          WHERE bpi.bb_project_id = bb_project.id
+            AND bpi.role = 'Executing Agency'
+            AND bpi.institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_location bpl
+          WHERE bpl.bb_project_id = bb_project.id
+            AND bpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+      )
+  )
 ORDER BY bb_code ASC
-LIMIT $2 OFFSET $3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountBBProjectsByBlueBook :one
 SELECT COUNT(*)
 FROM bb_project
-WHERE blue_book_id = $1
-  AND status = 'active';
+WHERE blue_book_id = sqlc.arg('blue_book_id')
+  AND status = 'active'
+  AND (
+      sqlc.narg('search')::text IS NULL
+      OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_institution bpi
+          JOIN institution i ON i.id = bpi.institution_id
+          WHERE bpi.bb_project_id = bb_project.id
+            AND bpi.role = 'Executing Agency'
+            AND (
+                i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_institution bpi
+          WHERE bpi.bb_project_id = bb_project.id
+            AND bpi.role = 'Executing Agency'
+            AND bpi.institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM bb_project_location bpl
+          WHERE bpl.bb_project_id = bb_project.id
+            AND bpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+      )
+  );
 
 -- name: GetBBProject :one
 SELECT *
