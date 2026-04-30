@@ -25,12 +25,14 @@ export function toFormErrors<T extends string>(error: ZodError, fields: readonly
 export interface HierarchyItem {
   id: string
   parent_id?: string
+  has_children?: boolean
 }
 
 export interface CodeHierarchyItem {
   id: string
   code: string
   parent_code?: string
+  has_children?: boolean
 }
 
 export interface AppTreeNode<T> extends Omit<TreeNode, 'data' | 'children'> {
@@ -83,6 +85,22 @@ export function buildCodeTree<T extends CodeHierarchyItem>(items: T[]): AppTreeN
   }
 
   return roots
+}
+
+export function buildLazyIdNodes<T extends HierarchyItem>(items: T[]): AppTreeNode<T>[] {
+  return items.map((item) => ({
+    key: item.id,
+    data: item,
+    leaf: !item.has_children,
+  }))
+}
+
+export function buildLazyCodeNodes<T extends CodeHierarchyItem>(items: T[]): AppTreeNode<T>[] {
+  return items.map((item) => ({
+    key: item.id,
+    data: item,
+    leaf: !item.has_children,
+  }))
 }
 
 export function useMasterListControls(defaultSort: string, defaultOrder: SortOrder = 'asc') {

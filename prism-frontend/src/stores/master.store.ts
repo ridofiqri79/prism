@@ -77,15 +77,19 @@ export const useMasterStore = defineStore('master', () => {
 
   async function fetchInstitutions(force = false, params?: ListParams) {
     if (loaded.value.institutions && !force) return
-    const response = await MasterService.getInstitutions(params)
+    const response = await MasterService.lookupInstitutions(params)
     institutions.value = response.data
     loaded.value.institutions = true
     return response
   }
 
+  async function fetchInstitutionTree(params?: ListParams) {
+    return MasterService.getInstitutions(params)
+  }
+
   async function fetchRegions(force = false, params?: ListParams) {
     if (loaded.value.regions && !force) return
-    const response = await MasterService.getRegions(params)
+    const response = await MasterService.lookupRegions(params)
     regions.value = response.data
     loaded.value.regions = true
     loaded.value.allRegionLevels = false
@@ -97,7 +101,7 @@ export const useMasterStore = defineStore('master', () => {
 
     const levels: RegionType[] = ['COUNTRY', 'PROVINCE', 'CITY']
     const responses = await Promise.all(
-      levels.map((type) => MasterService.getRegions({ type, limit: 10000, sort: 'name', order: 'asc' })),
+      levels.map((type) => MasterService.lookupRegions({ type, limit: 10000, sort: 'name', order: 'asc' })),
     )
 
     regions.value = responses.flatMap((response) => response.data)
@@ -105,20 +109,32 @@ export const useMasterStore = defineStore('master', () => {
     loaded.value.allRegionLevels = true
   }
 
+  async function fetchRegionTree(params?: ListParams) {
+    return MasterService.getRegions(params)
+  }
+
   async function fetchProgramTitles(force = false, params?: ListParams) {
     if (loaded.value.programTitles && !force) return
-    const response = await MasterService.getProgramTitles(params)
+    const response = await MasterService.lookupProgramTitles(params)
     programTitles.value = response.data
     loaded.value.programTitles = true
     return response
   }
 
+  async function fetchProgramTitleTree(params?: ListParams) {
+    return MasterService.getProgramTitles(params)
+  }
+
   async function fetchBappenasPartners(force = false, params?: ListParams) {
     if (loaded.value.bappenasPartners && !force) return
-    const response = await MasterService.getBappenasPartners(params)
+    const response = await MasterService.lookupBappenasPartners(params)
     bappenasPartners.value = response.data
     loaded.value.bappenasPartners = true
     return response
+  }
+
+  async function fetchBappenasPartnerTree(params?: ListParams) {
+    return MasterService.getBappenasPartners(params)
   }
 
   async function fetchPeriods(force = false, params?: ListParams) {
@@ -378,10 +394,14 @@ export const useMasterStore = defineStore('master', () => {
     fetchCurrencies,
     fetchLenders,
     fetchInstitutions,
+    fetchInstitutionTree,
     fetchRegions,
     fetchAllRegionLevels,
+    fetchRegionTree,
     fetchProgramTitles,
+    fetchProgramTitleTree,
     fetchBappenasPartners,
+    fetchBappenasPartnerTree,
     fetchPeriods,
     fetchNationalPriorities,
     downloadImportTemplate,

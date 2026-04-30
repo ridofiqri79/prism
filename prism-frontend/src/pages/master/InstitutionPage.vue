@@ -15,7 +15,7 @@ import { institutionSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Institution, InstitutionLevel, InstitutionPayload } from '@/types/master.types'
 import MasterTreeTable from './MasterTreeTable.vue'
-import { buildIdTree, toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
+import { buildLazyIdNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type InstitutionField = keyof InstitutionPayload
 
@@ -28,6 +28,8 @@ const controls = useMasterListControls('level', 'asc')
 const dialogVisible = ref(false)
 const editing = ref<Institution | null>(null)
 const selectedLevels = ref<InstitutionLevel[]>([])
+const treeNodes = ref<AppTreeNode<Institution>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<InstitutionPayload>({
   name: '',
   short_name: '',
@@ -45,20 +47,46 @@ const levelOptions: InstitutionLevel[] = [
   'BUMD',
   'Lainya',
 ]
-const treeNodes = computed(() => buildIdTree(masterStore.institutions))
 const parentOptions = computed(() => masterStore.institutions.filter((item) => item.id !== editing.value?.id))
 const showParent = computed(() => form.level !== 'Kementerian/Badan/Lembaga')
 
 async function loadData() {
   controls.loading.value = true
   try {
-    const response = await masterStore.fetchInstitutions(
-      true,
+    const response = await masterStore.fetchInstitutionTree(
       controls.params({ level: selectedLevels.value }),
     )
-    if (response) controls.syncMeta(response.meta)
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyIdNodes(response.data)
+    expandedKeys.value = {}
   } finally {
     controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchInstitutions(true, { limit: 10000, sort: 'level', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<Institution>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchInstitutionTree(
+      controls.params({
+        level: selectedLevels.value,
+        parent_id: node.data.id,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyIdNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
   }
 }
 
@@ -112,19 +140,19 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(institution: Institution) {
   confirm.confirmDelete(`institution ${institution.name}`, async () => {
     await masterStore.deleteInstitution(institution.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Instansi berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
 })
 
 watch(controls.search, () => {
@@ -174,8 +202,10 @@ watch(selectedLevels, () => {
       :limit="controls.pagination.limit.value"
       :sort-field="controls.pagination.sort.value"
       :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
       @update:page="(value) => controls.handlePage(value, loadData)"
       @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<Institution>)"
       @sort="(value) => controls.handleSort(value, loadData)"
     >
       <Column field="name" header="Nama" sortable expander />

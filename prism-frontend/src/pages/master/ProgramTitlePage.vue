@@ -13,7 +13,7 @@ import { programTitleSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { ProgramTitle, ProgramTitlePayload } from '@/types/master.types'
 import MasterTreeTable from './MasterTreeTable.vue'
-import { buildIdTree, toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
+import { buildLazyIdNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type ProgramTitleField = keyof ProgramTitlePayload
 
@@ -25,18 +25,46 @@ const controls = useMasterListControls('title', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<ProgramTitle | null>(null)
+const treeNodes = ref<AppTreeNode<ProgramTitle>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<ProgramTitlePayload>({ title: '', parent_id: undefined })
 const errors = ref<FormErrors<ProgramTitleField>>({})
-const treeNodes = computed(() => buildIdTree(masterStore.programTitles))
 const parentOptions = computed(() => masterStore.programTitles.filter((item) => item.id !== editing.value?.id))
 
 async function loadData() {
   controls.loading.value = true
   try {
-    const response = await masterStore.fetchProgramTitles(true, controls.params())
-    if (response) controls.syncMeta(response.meta)
+    const response = await masterStore.fetchProgramTitleTree(controls.params())
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyIdNodes(response.data)
+    expandedKeys.value = {}
   } finally {
     controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchProgramTitles(true, { limit: 10000, sort: 'title', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<ProgramTitle>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchProgramTitleTree(
+      controls.params({
+        parent_id: node.data.id,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyIdNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
   }
 }
 
@@ -75,19 +103,19 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(programTitle: ProgramTitle) {
   confirm.confirmDelete(`program title ${programTitle.title}`, async () => {
     await masterStore.deleteProgramTitle(programTitle.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Judul program berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
 })
 
 watch(controls.search, () => {
@@ -121,8 +149,10 @@ watch(controls.search, () => {
       :limit="controls.pagination.limit.value"
       :sort-field="controls.pagination.sort.value"
       :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
       @update:page="(value) => controls.handlePage(value, loadData)"
       @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<ProgramTitle>)"
       @sort="(value) => controls.handleSort(value, loadData)"
     >
       <Column field="title" header="Judul" sortable expander />

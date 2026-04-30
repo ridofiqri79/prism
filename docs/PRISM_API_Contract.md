@@ -324,6 +324,7 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
 | `GET` | `/master/institutions` | read: `institution` |
+| `GET` | `/master/institutions/lookup` | read: `institution` |
 | `GET` | `/master/institutions/:id` | read: `institution` |
 | `POST` | `/master/institutions` | create: `institution` |
 | `PUT` | `/master/institutions/:id` | update: `institution` |
@@ -347,6 +348,13 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 | `search` | Cari berdasarkan `name` atau `short_name` |
 | `sort` | `name`, `short_name`, `level` |
 
+Response `/master/institutions` digunakan untuk TreeTable:
+- Tanpa `parent_id`: paginasi dihitung dari root/top-level yang match diri sendiri atau descendant.
+- Dengan `parent_id`: mengembalikan direct child dari parent tersebut untuk lazy expand.
+- Item menyertakan `has_children` jika masih memiliki child.
+
+Response `/master/institutions/lookup` adalah list flat untuk selector/dropdown parent. Endpoint ini tetap mendukung `level`, `parent_id`, `search`, `sort`, `page`, dan `limit`.
+
 Validasi nama institution:
 - `parent_id = null` (top-level) tidak boleh memiliki nama yang sama dengan top-level lain.
 - Child tidak boleh memiliki nama yang sama dalam parent yang sama. Nama child yang sama boleh dipakai di parent berbeda.
@@ -358,6 +366,7 @@ Validasi nama institution:
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
 | `GET` | `/master/regions` | read: `region` |
+| `GET` | `/master/regions/lookup` | read: `region` |
 | `GET` | `/master/wilayah/:id` | read: `region` |
 | `POST` | `/master/regions` | create: `region` |
 | `PUT` | `/master/wilayah/:id` | update: `region` |
@@ -381,6 +390,13 @@ Validasi nama institution:
 | `search` | Cari berdasarkan `name` atau `code` |
 | `sort` | `code`, `name`, `type` |
 
+Response `/master/regions` digunakan untuk TreeTable:
+- Tanpa `parent_code`: paginasi dihitung dari root `COUNTRY` yang match diri sendiri atau descendant.
+- Dengan `parent_code`: mengembalikan direct child dari code parent tersebut untuk lazy expand.
+- Item menyertakan `has_children` jika masih memiliki child.
+
+Response `/master/regions/lookup` adalah list flat untuk selector/dropdown parent. Endpoint ini tetap mendukung `type`, `parent_code`, `search`, `sort`, `page`, dan `limit`.
+
 ---
 
 ### Program Title
@@ -388,6 +404,7 @@ Validasi nama institution:
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
 | `GET` | `/master/program-titles` | read: `program_title` |
+| `GET` | `/master/program-titles/lookup` | read: `program_title` |
 | `POST` | `/master/program-titles` | create: `program_title` |
 | `PUT` | `/master/program-titles/:id` | update: `program_title` |
 | `DELETE` | `/master/program-titles/:id` | delete: `program_title` |
@@ -397,7 +414,15 @@ Validasi nama institution:
 | Param | Keterangan |
 |-------|-----------|
 | `search` | Cari berdasarkan `title` |
+| `parent_id` | Untuk lazy load child di TreeTable |
 | `sort` | `title` |
+
+Response `/master/program-titles` digunakan untuk TreeTable:
+- Tanpa `parent_id`: paginasi dihitung dari root title yang match diri sendiri atau descendant.
+- Dengan `parent_id`: mengembalikan direct child dari parent tersebut untuk lazy expand.
+- Item menyertakan `has_children` jika masih memiliki child.
+
+Response `/master/program-titles/lookup` adalah list flat untuk selector/dropdown parent. Endpoint ini tetap mendukung `search`, `sort`, `page`, dan `limit`.
 
 **`POST /master/program-titles` Request:**
 ```json
@@ -414,6 +439,7 @@ Validasi nama institution:
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
 | `GET` | `/master/bappenas-partners` | read: `bappenas_partner` |
+| `GET` | `/master/bappenas-partners/lookup` | read: `bappenas_partner` |
 | `POST` | `/master/bappenas-partners` | create: `bappenas_partner` |
 | `PUT` | `/master/bappenas-partners/:id` | update: `bappenas_partner` |
 | `DELETE` | `/master/bappenas-partners/:id` | delete: `bappenas_partner` |
@@ -423,8 +449,16 @@ Validasi nama institution:
 | Param | Keterangan |
 |-------|-----------|
 | `level` | Filter multi-value: `Eselon I`, `Eselon II` |
+| `parent_id` | Untuk lazy load child di TreeTable |
 | `search` | Cari berdasarkan `name` |
 | `sort` | `name`, `level` |
+
+Response `/master/bappenas-partners` digunakan untuk TreeTable:
+- Tanpa `parent_id`: paginasi dihitung dari root `Eselon I` yang match diri sendiri atau descendant.
+- Dengan `parent_id`: mengembalikan direct child dari parent tersebut untuk lazy expand.
+- Item menyertakan `has_children` jika masih memiliki child.
+
+Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/dropdown parent. Endpoint ini tetap mendukung `level`, `search`, `sort`, `page`, dan `limit`.
 
 **`POST /master/bappenas-partners` Request:**
 ```json

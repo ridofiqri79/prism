@@ -288,6 +288,60 @@ func (s *MasterService) ListInstitutions(ctx context.Context, params model.Pagin
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
+	if parentFilter.Valid {
+		arg := queries.ListInstitutionTreeChildrenParams{
+			Limit:        int32(limit),
+			Offset:       int32(offset),
+			SortField:    sortField,
+			SortOrder:    sortOrder,
+			ParentID:     parentFilter,
+			LevelFilters: levels,
+			Search:       search,
+		}
+		rows, err := s.queries.ListInstitutionTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak institution")
+		}
+		total, err := s.queries.CountInstitutionTreeChildren(ctx, queries.CountInstitutionTreeChildrenParams{ParentID: parentFilter, LevelFilters: levels, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak institution")
+		}
+		data := make([]model.InstitutionResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toInstitutionTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	arg := queries.ListInstitutionTreeRootsParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+		LevelFilters: levels,
+		Search:       search,
+	}
+	rows, err := s.queries.ListInstitutionTreeRoots(ctx, arg)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root institution")
+	}
+	total, err := s.queries.CountInstitutionTreeRoots(ctx, queries.CountInstitutionTreeRootsParams{LevelFilters: levels, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root institution")
+	}
+	data := make([]model.InstitutionResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toInstitutionTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupInstitutions(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "short_name", "level")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
 	arg := queries.ListInstitutionsParams{
 		Limit:          int32(limit),
 		Offset:         int32(offset),
@@ -387,6 +441,56 @@ func (s *MasterService) DeleteInstitution(ctx context.Context, id pgtype.UUID) e
 
 func (s *MasterService) ListRegions(ctx context.Context, params model.PaginationParams, regionTypes []string, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
 	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "type", "asc", "code", "name", "type")
+	if strings.TrimSpace(parentCode) != "" {
+		arg := queries.ListRegionTreeChildrenParams{
+			Limit:       int32(limit),
+			Offset:      int32(offset),
+			SortField:   sortField,
+			SortOrder:   sortOrder,
+			ParentCode:  strings.TrimSpace(parentCode),
+			TypeFilters: regionTypes,
+			Search:      search,
+		}
+		rows, err := s.queries.ListRegionTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak region")
+		}
+		total, err := s.queries.CountRegionTreeChildren(ctx, queries.CountRegionTreeChildrenParams{ParentCode: arg.ParentCode, TypeFilters: regionTypes, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak region")
+		}
+		data := make([]model.RegionResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toRegionTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	arg := queries.ListRegionTreeRootsParams{
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		SortField:   sortField,
+		SortOrder:   sortOrder,
+		TypeFilters: regionTypes,
+		Search:      search,
+	}
+	rows, err := s.queries.ListRegionTreeRoots(ctx, arg)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root region")
+	}
+	total, err := s.queries.CountRegionTreeRoots(ctx, queries.CountRegionTreeRootsParams{TypeFilters: regionTypes, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root region")
+	}
+	data := make([]model.RegionResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toRegionTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupRegions(ctx context.Context, params model.PaginationParams, regionTypes []string, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "type", "asc", "code", "name", "type")
 	arg := queries.ListRegionsParams{
 		Limit:            int32(limit),
 		Offset:           int32(offset),
@@ -461,7 +565,58 @@ func (s *MasterService) DeleteRegion(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListProgramTitles(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.ProgramTitleResponse], error) {
+func (s *MasterService) ListProgramTitles(ctx context.Context, params model.PaginationParams, parentID *string) (*model.ListResponse[model.ProgramTitleResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
+	if parentFilter.Valid {
+		arg := queries.ListProgramTitleTreeChildrenParams{
+			Limit:     int32(limit),
+			Offset:    int32(offset),
+			SortField: sortField,
+			SortOrder: sortOrder,
+			ParentID:  parentFilter,
+			Search:    search,
+		}
+		rows, err := s.queries.ListProgramTitleTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak program title")
+		}
+		total, err := s.queries.CountProgramTitleTreeChildren(ctx, queries.CountProgramTitleTreeChildrenParams{ParentID: parentFilter, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak program title")
+		}
+		data := make([]model.ProgramTitleResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toProgramTitleTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	rows, err := s.queries.ListProgramTitleTreeRoots(ctx, queries.ListProgramTitleTreeRootsParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		SortField: sortField,
+		SortOrder: sortOrder,
+		Search:    search,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root program title")
+	}
+	total, err := s.queries.CountProgramTitleTreeRoots(ctx, search)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root program title")
+	}
+	data := make([]model.ProgramTitleResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toProgramTitleTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupProgramTitles(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.ProgramTitleResponse], error) {
 	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title")
 	rows, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{
 		Limit:     int32(limit),
@@ -542,7 +697,60 @@ func (s *MasterService) DeleteProgramTitle(ctx context.Context, id pgtype.UUID) 
 	})
 }
 
-func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
+func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "level")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
+	if parentFilter.Valid {
+		arg := queries.ListBappenasPartnerTreeChildrenParams{
+			Limit:        int32(limit),
+			Offset:       int32(offset),
+			SortField:    sortField,
+			SortOrder:    sortOrder,
+			ParentID:     parentFilter,
+			LevelFilters: levels,
+			Search:       search,
+		}
+		rows, err := s.queries.ListBappenasPartnerTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak bappenas partner")
+		}
+		total, err := s.queries.CountBappenasPartnerTreeChildren(ctx, queries.CountBappenasPartnerTreeChildrenParams{ParentID: parentFilter, LevelFilters: levels, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak bappenas partner")
+		}
+		data := make([]model.BappenasPartnerResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toBappenasPartnerTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	rows, err := s.queries.ListBappenasPartnerTreeRoots(ctx, queries.ListBappenasPartnerTreeRootsParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+		LevelFilters: levels,
+		Search:       search,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root bappenas partner")
+	}
+	total, err := s.queries.CountBappenasPartnerTreeRoots(ctx, queries.CountBappenasPartnerTreeRootsParams{LevelFilters: levels, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root bappenas partner")
+	}
+	data := make([]model.BappenasPartnerResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toBappenasPartnerTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
 	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "level")
 	rows, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{
 		Limit:        int32(limit),
@@ -1047,6 +1255,14 @@ func toInstitutionResponse(row queries.Institution) model.InstitutionResponse {
 	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toInstitutionTreeRootResponse(row queries.ListInstitutionTreeRootsRow) model.InstitutionResponse {
+	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toInstitutionTreeChildResponse(row queries.ListInstitutionTreeChildrenRow) model.InstitutionResponse {
+	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toInstitutionDetailResponse(row queries.GetInstitutionRow) model.InstitutionResponse {
 	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), ParentName: stringPtrFromText(row.ParentName), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
@@ -1055,12 +1271,36 @@ func toRegionResponse(row queries.Region) model.RegionResponse {
 	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toRegionTreeRootResponse(row queries.ListRegionTreeRootsRow) model.RegionResponse {
+	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toRegionTreeChildResponse(row queries.ListRegionTreeChildrenRow) model.RegionResponse {
+	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toProgramTitleResponse(row queries.ProgramTitle) model.ProgramTitleResponse {
 	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toProgramTitleTreeRootResponse(row queries.ListProgramTitleTreeRootsRow) model.ProgramTitleResponse {
+	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toProgramTitleTreeChildResponse(row queries.ListProgramTitleTreeChildrenRow) model.ProgramTitleResponse {
+	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toBappenasPartnerResponse(row queries.BappenasPartner) model.BappenasPartnerResponse {
 	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toBappenasPartnerTreeRootResponse(row queries.ListBappenasPartnerTreeRootsRow) model.BappenasPartnerResponse {
+	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toBappenasPartnerTreeChildResponse(row queries.ListBappenasPartnerTreeChildrenRow) model.BappenasPartnerResponse {
+	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func toPeriodResponse(row queries.Period) model.PeriodResponse {

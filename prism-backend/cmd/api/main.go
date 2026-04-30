@@ -119,24 +119,28 @@ func main() {
 	master.DELETE("/lenders/:id", masterHandler.DeleteLender, middleware.Require("lender", "delete"))
 
 	master.GET("/institutions", masterHandler.ListInstitutions, middleware.Require("institution", "read"))
+	master.GET("/institutions/lookup", masterHandler.LookupInstitutions, middleware.Require("institution", "read"))
 	master.GET("/institutions/:id", masterHandler.GetInstitution, middleware.Require("institution", "read"))
 	master.POST("/institutions", masterHandler.CreateInstitution, middleware.Require("institution", "create"))
 	master.PUT("/institutions/:id", masterHandler.UpdateInstitution, middleware.Require("institution", "update"))
 	master.DELETE("/institutions/:id", masterHandler.DeleteInstitution, middleware.Require("institution", "delete"))
 
 	master.GET("/regions", masterHandler.ListRegions, middleware.Require("region", "read"))
+	master.GET("/regions/lookup", masterHandler.LookupRegions, middleware.Require("region", "read"))
 	master.GET("/regions/:id", masterHandler.GetRegion, middleware.Require("region", "read"))
 	master.POST("/regions", masterHandler.CreateRegion, middleware.Require("region", "create"))
 	master.PUT("/regions/:id", masterHandler.UpdateRegion, middleware.Require("region", "update"))
 	master.DELETE("/regions/:id", masterHandler.DeleteRegion, middleware.Require("region", "delete"))
 
 	master.GET("/program-titles", masterHandler.ListProgramTitles, middleware.Require("program_title", "read"))
+	master.GET("/program-titles/lookup", masterHandler.LookupProgramTitles, middleware.Require("program_title", "read"))
 	master.GET("/program-titles/:id", masterHandler.GetProgramTitle, middleware.Require("program_title", "read"))
 	master.POST("/program-titles", masterHandler.CreateProgramTitle, middleware.Require("program_title", "create"))
 	master.PUT("/program-titles/:id", masterHandler.UpdateProgramTitle, middleware.Require("program_title", "update"))
 	master.DELETE("/program-titles/:id", masterHandler.DeleteProgramTitle, middleware.Require("program_title", "delete"))
 
 	master.GET("/bappenas-partners", masterHandler.ListBappenasPartners, middleware.Require("bappenas_partner", "read"))
+	master.GET("/bappenas-partners/lookup", masterHandler.LookupBappenasPartners, middleware.Require("bappenas_partner", "read"))
 	master.GET("/bappenas-partners/:id", masterHandler.GetBappenasPartner, middleware.Require("bappenas_partner", "read"))
 	master.POST("/bappenas-partners", masterHandler.CreateBappenasPartner, middleware.Require("bappenas_partner", "create"))
 	master.PUT("/bappenas-partners/:id", masterHandler.UpdateBappenasPartner, middleware.Require("bappenas_partner", "update"))

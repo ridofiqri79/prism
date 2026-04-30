@@ -52,6 +52,7 @@ export interface Institution {
   level: InstitutionLevel
   parent_id?: string
   parent?: Institution
+  has_children?: boolean
 }
 
 export interface InstitutionPayload {
@@ -69,6 +70,7 @@ export interface Region {
   name: string
   type: RegionType
   parent_code?: string
+  has_children?: boolean
 }
 
 export interface RegionPayload {
@@ -83,6 +85,7 @@ export interface ProgramTitle {
   title: string
   parent_id?: string
   parent?: ProgramTitle
+  has_children?: boolean
 }
 
 export interface ProgramTitlePayload {
@@ -98,6 +101,7 @@ export interface BappenasPartner {
   level: BappenasPartnerLevel
   parent_id?: string
   parent?: BappenasPartner
+  has_children?: boolean
 }
 
 export interface BappenasPartnerPayload {

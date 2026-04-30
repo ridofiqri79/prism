@@ -15,7 +15,7 @@ import { regionSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Region, RegionPayload, RegionType } from '@/types/master.types'
 import MasterTreeTable from './MasterTreeTable.vue'
-import { buildCodeTree, toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
+import { buildLazyCodeNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type RegionField = keyof RegionPayload
 
@@ -28,6 +28,8 @@ const controls = useMasterListControls('type', 'asc')
 const dialogVisible = ref(false)
 const editing = ref<Region | null>(null)
 const selectedTypes = ref<RegionType[]>([])
+const treeNodes = ref<AppTreeNode<Region>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<RegionPayload>({
   code: '',
   name: '',
@@ -37,7 +39,6 @@ const form = reactive<RegionPayload>({
 const errors = ref<FormErrors<RegionField>>({})
 const typeOptions: RegionType[] = ['COUNTRY', 'PROVINCE', 'CITY']
 const showParent = computed(() => form.type !== 'COUNTRY')
-const treeNodes = computed(() => buildCodeTree(masterStore.regions))
 const parentOptions = computed(() => {
   const allowedType: RegionType = form.type === 'CITY' ? 'PROVINCE' : 'COUNTRY'
   return masterStore.regions.filter((region) => region.type === allowedType && region.id !== editing.value?.id)
@@ -46,13 +47,40 @@ const parentOptions = computed(() => {
 async function loadData() {
   controls.loading.value = true
   try {
-    const response = await masterStore.fetchRegions(
-      true,
+    const response = await masterStore.fetchRegionTree(
       controls.params({ type: selectedTypes.value }),
     )
-    if (response) controls.syncMeta(response.meta)
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyCodeNodes(response.data)
+    expandedKeys.value = {}
   } finally {
     controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchRegions(true, { limit: 10000, sort: 'type', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<Region>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchRegionTree(
+      controls.params({
+        type: selectedTypes.value,
+        parent_code: node.data.code,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyCodeNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
   }
 }
 
@@ -100,19 +128,19 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(region: Region) {
   confirm.confirmDelete(`region ${region.name}`, async () => {
     await masterStore.deleteRegion(region.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Wilayah berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
 })
 
 watch(controls.search, () => {
@@ -162,8 +190,10 @@ watch(selectedTypes, () => {
       :limit="controls.pagination.limit.value"
       :sort-field="controls.pagination.sort.value"
       :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
       @update:page="(value) => controls.handlePage(value, loadData)"
       @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<Region>)"
       @sort="(value) => controls.handleSort(value, loadData)"
     >
       <Column field="code" header="Kode" sortable expander />

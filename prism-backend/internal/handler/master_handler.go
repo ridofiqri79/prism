@@ -204,6 +204,14 @@ func (h *MasterHandler) ListInstitutions(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func (h *MasterHandler) LookupInstitutions(c echo.Context) error {
+	res, err := h.service.LookupInstitutions(c.Request().Context(), paginationParams(c), queryStrings(c, "level"), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
 func (h *MasterHandler) GetInstitution(c echo.Context) error {
 	id, err := parseIDParam(c, "id")
 	if err != nil {
@@ -263,6 +271,14 @@ func (h *MasterHandler) ListRegions(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func (h *MasterHandler) LookupRegions(c echo.Context) error {
+	res, err := h.service.LookupRegions(c.Request().Context(), paginationParams(c), queryStrings(c, "type"), c.QueryParam("parent_code"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
 func (h *MasterHandler) GetRegion(c echo.Context) error {
 	id, err := parseIDParam(c, "id")
 	if err != nil {
@@ -315,7 +331,15 @@ func (h *MasterHandler) DeleteRegion(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListProgramTitles(c echo.Context) error {
-	res, err := h.service.ListProgramTitles(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListProgramTitles(c.Request().Context(), paginationParams(c), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupProgramTitles(c echo.Context) error {
+	res, err := h.service.LookupProgramTitles(c.Request().Context(), paginationParams(c))
 	if err != nil {
 		return err
 	}
@@ -374,7 +398,15 @@ func (h *MasterHandler) DeleteProgramTitle(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListBappenasPartners(c echo.Context) error {
-	res, err := h.service.ListBappenasPartners(c.Request().Context(), paginationParams(c), queryStrings(c, "level"))
+	res, err := h.service.ListBappenasPartners(c.Request().Context(), paginationParams(c), queryStrings(c, "level"), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupBappenasPartners(c echo.Context) error {
+	res, err := h.service.LookupBappenasPartners(c.Request().Context(), paginationParams(c), queryStrings(c, "level"))
 	if err != nil {
 		return err
 	}

@@ -135,6 +135,9 @@ export const MasterService = {
   getInstitutions(params?: ListParams) {
     return getList<Institution>('/master/institutions', params)
   },
+  lookupInstitutions(params?: ListParams) {
+    return getList<Institution>('/master/institutions/lookup', params)
+  },
   createInstitution(data: InstitutionPayload) {
     return createItem<Institution, InstitutionPayload>('/master/institutions', data)
   },
@@ -147,6 +150,9 @@ export const MasterService = {
 
   getRegions(params?: ListParams) {
     return getList<Region>('/master/regions', params)
+  },
+  lookupRegions(params?: ListParams) {
+    return getList<Region>('/master/regions/lookup', params)
   },
   createRegion(data: RegionPayload) {
     return createItem<Region, RegionPayload>('/master/regions', data)
@@ -161,6 +167,9 @@ export const MasterService = {
   getProgramTitles(params?: ListParams) {
     return getList<ProgramTitle>('/master/program-titles', params)
   },
+  lookupProgramTitles(params?: ListParams) {
+    return getList<ProgramTitle>('/master/program-titles/lookup', params)
+  },
   createProgramTitle(data: ProgramTitlePayload) {
     return createItem<ProgramTitle, ProgramTitlePayload>('/master/program-titles', data)
   },
@@ -173,6 +182,9 @@ export const MasterService = {
 
   getBappenasPartners(params?: ListParams) {
     return getList<BappenasPartner>('/master/bappenas-partners', params)
+  },
+  lookupBappenasPartners(params?: ListParams) {
+    return getList<BappenasPartner>('/master/bappenas-partners/lookup', params)
   },
   createBappenasPartner(data: BappenasPartnerPayload) {
     return createItem<BappenasPartner, BappenasPartnerPayload>('/master/bappenas-partners', data)

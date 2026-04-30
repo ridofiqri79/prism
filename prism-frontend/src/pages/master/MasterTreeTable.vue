@@ -18,6 +18,7 @@ interface SortEvent {
 }
 
 type SortOrder = 'asc' | 'desc'
+type ExpandedKeys = Record<string, boolean>
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +29,7 @@ const props = withDefaults(
     limit: number
     sortField?: string
     sortOrder?: SortOrder
+    expandedKeys?: ExpandedKeys
   }>(),
   {
     loading: false,
@@ -37,6 +39,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:page': [value: number]
   'update:limit': [value: number]
+  'update:expandedKeys': [value: ExpandedKeys]
+  'node-expand': [value: TreeNode]
   sort: [value: { sort: string; order: SortOrder }]
 }>()
 
@@ -68,6 +72,10 @@ function handleSort(event: SortEvent) {
     order: event.sortOrder === 1 ? 'asc' : 'desc',
   })
 }
+
+function handleExpandedKeys(value: ExpandedKeys) {
+  emit('update:expandedKeys', value)
+}
 </script>
 
 <template>
@@ -90,6 +98,8 @@ function handleSort(event: SortEvent) {
     <TableReloadShell v-else :refreshing="refreshingRows">
       <TreeTable
         :value="value"
+        lazy
+        :expanded-keys="expandedKeys"
         sort-mode="single"
         removable-sort
         resizable-columns
@@ -97,6 +107,8 @@ function handleSort(event: SortEvent) {
         :sort-field="sortField"
         :sort-order="tableSortOrder"
         class="overflow-hidden rounded-lg border border-surface-200"
+        @update:expandedKeys="handleExpandedKeys"
+        @node-expand="(node) => emit('node-expand', node)"
         @sort="handleSort"
       >
         <slot />
