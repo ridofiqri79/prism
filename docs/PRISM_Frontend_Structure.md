@@ -171,6 +171,7 @@ prism-frontend/
 │   └── components/                    # Reusable components
 │       ├── common/
 │       │   ├── DataTable.vue          # Wrapper PrimeVue DataTable dengan pagination
+│       │   ├── SearchFilterBar.vue    # Search + filter drawer standar untuk halaman paginated
 │       │   ├── TableReloadShell.vue   # Shell animasi reload tabel yang mempertahankan data lama
 │       │   ├── PageHeader.vue         # Title + breadcrumb + action button
 │       │   ├── StatusBadge.vue        # Badge status active/deleted/extended
@@ -249,6 +250,17 @@ Component re-render via reactivity
 - Untuk tabel custom, bungkus markup tabel dengan `src/components/common/TableReloadShell.vue` dan kirim `refreshing` saat data sedang di-fetch ulang.
 - Skeleton hanya untuk load awal ketika data belum ada. Saat search/filter/pagination memicu fetch ulang, tabel lama tetap tampil dengan opacity transition dan indikator reload global.
 - Jika tabel custom perlu animasi baris, gunakan `<TransitionGroup name="prism-table-row-fade">` agar timing dan geraknya konsisten dengan tabel lain.
+
+## Pola Search, Filter, dan Pagination
+
+- Halaman yang memiliki tabel paginated dan filter wajib memakai `src/components/common/SearchFilterBar.vue` di atas `DataTable.vue` atau table custom paginated.
+- Search bar tampil full-width sebagai kontrol utama, tanpa label visual terpisah. Gunakan placeholder yang eksplisit dan ikon `pi pi-search` terintegrasi, tetapi input box tetap mengikuti styling standar `InputText` PrimeVue seperti field lain.
+- Search boleh auto-apply dengan debounce pendek. Saat search berubah, reset page ke `1` dan kirim parameter `search` ke endpoint list agar pagination tetap server-side.
+- Filter lanjutan dibuka lewat tombol `Filter` di dalam card yang sama. Drawer harus in-place, bukan modal/pop-up terpisah, agar konteks tabel tidak terputus.
+- Isi drawer memakai grid responsif `xl:grid-cols-6`. Setiap field boleh memakai `xl:col-span-*` sesuai kompleksitas, tetapi layout harus tetap rapi dan tidak membuat card bersarang.
+- Nilai filter dropdown disiapkan sebagai draft. Terapkan filter hanya ketika user menekan `Terapkan`; tombol `Reset` membersihkan search, draft filter, dan filter yang sudah diterapkan.
+- Filter dropdown yang sudah diterapkan wajib muncul sebagai pill aktif langsung di bawah search bar. Search cukup tetap terlihat di input, tidak perlu dibuat pill terpisah. Pill menampilkan nama filter dan ringkasan nilai, serta bisa diklik untuk menghapus filter tersebut.
+- Query parameter multi-value memakai array/repeated values, misalnya `executing_agency_ids` atau `location_ids`, sesuai kontrak API. Jangan mengambil semua data lalu filter lokal jika endpoint sudah paginated.
 
 ---
 

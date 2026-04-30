@@ -10,6 +10,7 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar, { type ActiveFilterPill } from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -24,7 +25,6 @@ import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-
 
 type BlueBookField = keyof BlueBookPayload
 interface ProjectFilterState {
-  search: string
   executing_agency_ids: string[]
   location_ids: string[]
 }
@@ -44,6 +44,7 @@ const gbCreateDialogVisible = ref(false)
 const selectedBBProject = ref<BBProject | null>(null)
 const projectPage = ref(1)
 const projectLimit = ref(20)
+const projectSearch = ref('')
 let projectFilterTimer: ReturnType<typeof setTimeout> | undefined
 const form = reactive<BlueBookPayload>({
   period_id: '',
@@ -52,7 +53,10 @@ const form = reactive<BlueBookPayload>({
   revision_year: null,
 })
 const projectFilters = reactive<ProjectFilterState>({
-  search: '',
+  executing_agency_ids: [],
+  location_ids: [],
+})
+const appliedProjectFilters = reactive<ProjectFilterState>({
   executing_agency_ids: [],
   location_ids: [],
 })
@@ -97,11 +101,30 @@ const locationFilterOptions = computed(() =>
   })),
 )
 
-const hasProjectFilters = computed(
+const activeProjectFilterPills = computed<ActiveFilterPill[]>(() => {
+  const pills: ActiveFilterPill[] = []
+
+  if (appliedProjectFilters.executing_agency_ids.length > 0) {
+    pills.push({
+      key: 'executing_agency_ids',
+      label: 'Executing Agency',
+      value: selectedInstitutionSummary(appliedProjectFilters.executing_agency_ids),
+    })
+  }
+  if (appliedProjectFilters.location_ids.length > 0) {
+    pills.push({
+      key: 'location_ids',
+      label: 'Location',
+      value: selectedRegionSummary(appliedProjectFilters.location_ids),
+    })
+  }
+
+  return pills
+})
+const activeProjectFilterCount = computed(
   () =>
-    projectFilters.search.trim().length > 0 ||
-    projectFilters.executing_agency_ids.length > 0 ||
-    projectFilters.location_ids.length > 0,
+    Number(appliedProjectFilters.executing_agency_ids.length > 0) +
+    Number(appliedProjectFilters.location_ids.length > 0),
 )
 
 async function loadData() {
@@ -120,12 +143,12 @@ async function loadProjects() {
     page: projectPage.value,
     limit: projectLimit.value,
   }
-  const search = projectFilters.search.trim()
+  const search = projectSearch.value.trim()
   if (search) params.search = search
-  if (projectFilters.executing_agency_ids.length > 0) {
-    params.executing_agency_ids = [...projectFilters.executing_agency_ids]
+  if (appliedProjectFilters.executing_agency_ids.length > 0) {
+    params.executing_agency_ids = [...appliedProjectFilters.executing_agency_ids]
   }
-  const locationIDs = expandLocationFilterIds(projectFilters.location_ids)
+  const locationIDs = expandLocationFilterIds(appliedProjectFilters.location_ids)
   if (locationIDs.length > 0) {
     params.location_ids = locationIDs
   }
@@ -205,6 +228,32 @@ function expandLocationFilterIds(locationIDs: string[]) {
 
 function listNames(items: Array<{ name: string }>) {
   return items.map((item) => item.name).join(', ') || '-'
+}
+
+function selectedLabelSummary(labels: string[]) {
+  if (labels.length <= 2) {
+    return labels.join(', ')
+  }
+
+  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
+}
+
+function selectedInstitutionSummary(ids: string[]) {
+  const selected = new Set(ids)
+  const labels = masterStore.institutions
+    .filter((institution) => selected.has(institution.id))
+    .map((institution) => institution.short_name || institution.name)
+
+  return selectedLabelSummary(labels)
+}
+
+function selectedRegionSummary(ids: string[]) {
+  const selected = new Set(ids)
+  const labels = masterStore.regions
+    .filter((region) => selected.has(region.id))
+    .map((region) => region.name)
+
+  return selectedLabelSummary(labels)
 }
 
 function openEdit() {
@@ -298,9 +347,45 @@ function scheduleProjectFilterRefresh() {
 }
 
 function clearProjectFilters() {
-  projectFilters.search = ''
+  const shouldRefreshAfterClear =
+    projectSearch.value.trim().length === 0 &&
+    (appliedProjectFilters.executing_agency_ids.length > 0 ||
+      appliedProjectFilters.location_ids.length > 0)
+
+  projectSearch.value = ''
   projectFilters.executing_agency_ids = []
   projectFilters.location_ids = []
+  appliedProjectFilters.executing_agency_ids = []
+  appliedProjectFilters.location_ids = []
+
+  if (shouldRefreshAfterClear) {
+    void refreshProjectsFromFirstPage()
+  }
+}
+
+function applyProjectFilters() {
+  appliedProjectFilters.executing_agency_ids = [...projectFilters.executing_agency_ids]
+  appliedProjectFilters.location_ids = [...projectFilters.location_ids]
+  void refreshProjectsFromFirstPage()
+}
+
+function removeProjectFilter(key: string) {
+  if (key === 'search') {
+    projectSearch.value = ''
+    return
+  }
+
+  if (key === 'executing_agency_ids') {
+    projectFilters.executing_agency_ids = []
+    appliedProjectFilters.executing_agency_ids = []
+  }
+
+  if (key === 'location_ids') {
+    projectFilters.location_ids = []
+    appliedProjectFilters.location_ids = []
+  }
+
+  void refreshProjectsFromFirstPage()
 }
 
 onMounted(() => {
@@ -327,13 +412,8 @@ watch(projectLimit, () => {
 })
 
 watch(
-  () => ({
-    search: projectFilters.search,
-    executingAgencies: [...projectFilters.executing_agency_ids],
-    locations: [...projectFilters.location_ids],
-  }),
+  projectSearch,
   scheduleProjectFilterRefresh,
-  { deep: true },
 )
 </script>
 
@@ -377,53 +457,47 @@ watch(
       </div>
     </div>
 
-    <div class="rounded-lg border border-surface-200 bg-white p-4 shadow-sm shadow-surface-200/50">
-      <div class="grid gap-3 lg:grid-cols-[minmax(16rem,1.3fr)_minmax(13rem,1fr)_minmax(13rem,1fr)_auto]">
-        <label class="relative block">
-          <span class="sr-only">Cari nama proyek atau executing agency</span>
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText
-            v-model="projectFilters.search"
-            aria-label="Cari nama proyek atau executing agency"
-            class="w-full pl-10"
-            placeholder="Nama proyek / executing agency"
+    <SearchFilterBar
+      v-model:search="projectSearch"
+      search-placeholder="Nama proyek / executing agency"
+      :active-filters="activeProjectFilterPills"
+      :filter-count="activeProjectFilterCount"
+      @apply="applyProjectFilters"
+      @reset="clearProjectFilters"
+      @remove="removeProjectFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Executing Agency</span>
+          <MultiSelect
+            v-model="projectFilters.executing_agency_ids"
+            :options="institutionFilterOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Semua executing agency"
+            filter
+            filter-placeholder="Cari executing agency"
+            display="chip"
+            class="w-full"
           />
         </label>
-        <MultiSelect
-          v-model="projectFilters.executing_agency_ids"
-          :options="institutionFilterOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Semua executing agency"
-          filter
-          filter-placeholder="Cari executing agency"
-          display="chip"
-          class="w-full"
-        />
-        <MultiSelect
-          v-model="projectFilters.location_ids"
-          :options="locationFilterOptions"
-          option-label="label"
-          option-value="value"
-          option-disabled="disabled"
-          placeholder="Semua lokasi"
-          filter
-          filter-placeholder="Cari lokasi"
-          display="chip"
-          class="w-full"
-        />
-        <Button
-          v-tooltip.top="'Reset filter'"
-          icon="pi pi-filter-slash"
-          severity="secondary"
-          outlined
-          :disabled="!hasProjectFilters"
-          aria-label="Reset filter"
-          class="h-11 w-11 justify-self-start lg:justify-self-end"
-          @click="clearProjectFilters"
-        />
-      </div>
-    </div>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Location</span>
+          <MultiSelect
+            v-model="projectFilters.location_ids"
+            :options="locationFilterOptions"
+            option-label="label"
+            option-value="value"
+            option-disabled="disabled"
+            placeholder="Semua lokasi"
+            filter
+            filter-placeholder="Cari lokasi"
+            display="chip"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <DataTable
       v-model:page="projectPage"

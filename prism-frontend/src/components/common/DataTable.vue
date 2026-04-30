@@ -170,7 +170,7 @@ function columnCellStyle(column: ColumnDef): CSSProperties {
       </div>
     </div>
 
-    <EmptyState v-else-if="data.length === 0" />
+    <EmptyState v-else-if="data.length === 0" compact />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
       <PrimeDataTable
@@ -210,14 +210,21 @@ function columnCellStyle(column: ColumnDef): CSSProperties {
       class="rounded-lg border border-surface-200 bg-white px-3 py-3 shadow-sm shadow-surface-200/50"
     >
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-sm font-medium text-surface-600">
-          Menampilkan
-          <span class="font-semibold text-surface-900">{{ pageStart }}-{{ pageEnd }}</span>
-          dari
-          <span class="font-semibold text-surface-900">{{ total }}</span>
-          data
+        <p class="text-sm font-medium text-surface-600 sm:whitespace-nowrap">
+          <template v-if="total > 0">
+            Menampilkan
+            <span class="font-semibold text-surface-900">{{ pageStart }}-{{ pageEnd }}</span>
+            dari
+            <span class="font-semibold text-surface-900">{{ total }}</span>
+            data
+          </template>
+          <template v-else>
+            Menampilkan <span class="font-semibold text-surface-900">0</span> dari
+            <span class="font-semibold text-surface-900">0</span> data
+          </template>
         </p>
         <Paginator
+          v-if="total > 0"
           :first="first"
           :rows="limit"
           :total-records="total"
@@ -227,6 +234,7 @@ function columnCellStyle(column: ColumnDef): CSSProperties {
           :pt="paginatorPt"
           @page="handlePage"
         />
+        <p v-else class="text-sm font-semibold text-surface-500">Tidak ada halaman</p>
       </div>
     </div>
   </div>
