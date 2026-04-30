@@ -58,7 +58,7 @@ Query params untuk semua endpoint list:
 | `order` | `desc` | `asc` atau `desc` |
 | `search` | kosong | Kata kunci pencarian; hanya tersedia pada endpoint list yang mencantumkannya di bagian Query Params tambahan |
 
-Filter multi-value dapat dikirim sebagai query berulang atau comma-separated, misalnya `?type=Bilateral&type=KSA` atau `?type=Bilateral,KSA`.
+Filter multi-value dapat dikirim sebagai query berulang, comma-separated, atau array suffix, misalnya `?type=Bilateral&type=KSA`, `?type=Bilateral,KSA`, atau `?type[]=Bilateral&type[]=KSA`.
 
 Response meta:
 
@@ -536,6 +536,14 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `PUT` | `/blue-books/:id` | update: `blue_book` |
 | `DELETE` | `/blue-books/:id` | delete: `blue_book` |
 
+**`GET /blue-books` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan nama periode, tanggal terbit, tahun revisi, atau status |
+| `period_id` | multi-value UUID | Filter periode Blue Book |
+| `status` | multi-value enum | `active`, `superseded` |
+
 **`POST /blue-books` Request:**
 ```json
 {
@@ -626,11 +634,11 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 
 **`GET /blue-books/:bb_id/projects` Query Params tambahan:**
 
-| Param | Keterangan |
-|-------|------------|
-| `search` | Cari berdasarkan `project_name` atau nama/nama singkat Executing Agency |
-| `executing_agency_ids` | Multi value UUID institution role `Executing Agency` |
-| `location_ids` | Multi value UUID region lokasi proyek |
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan `project_name` atau nama/nama singkat Executing Agency |
+| `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
+| `location_ids` | multi-value UUID | Filter region lokasi proyek |
 
 **`POST /blue-books/:bb_id/projects` Request:**
 ```json
@@ -761,6 +769,14 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 | `PUT` | `/green-books/:id` | update: `green_book` |
 | `DELETE` | `/green-books/:id` | delete: `green_book` |
 
+**`GET /green-books` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan tahun terbit, nomor revisi, atau status |
+| `publish_year` | multi-value number | Filter tahun terbit Green Book |
+| `status` | multi-value enum | `active`, `superseded` |
+
 **`POST /green-books` Request:**
 ```json
 {
@@ -833,6 +849,16 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 | `POST` | `/green-books/:gb_id/projects` | create: `gb_project` |
 | `PUT` | `/green-books/:gb_id/projects/:id` | update: `gb_project` |
 | `DELETE` | `/green-books/:gb_id/projects/:id` | delete: `gb_project` |
+
+**`GET /green-books/:gb_id/projects` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan kode/nama proyek Green Book, kode/nama proyek Blue Book terkait, Executing Agency, lokasi, atau lender funding source |
+| `bb_project_ids` | multi-value UUID | Filter relasi proyek Blue Book |
+| `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
+| `location_ids` | multi-value UUID | Filter region lokasi proyek |
+| `status` | multi-value enum | `active`, `deleted` |
 
 **`POST /green-books/:gb_id/projects` Request:**
 ```json
@@ -1018,6 +1044,14 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `PUT` | `/daftar-kegiatan/:id` | update: `daftar_kegiatan` |
 | `DELETE` | `/daftar-kegiatan/:id` | delete: `daftar_kegiatan` |
 
+**`GET /daftar-kegiatan` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan `subject`, `letter_number`, atau tanggal surat |
+| `date_from` | date `YYYY-MM-DD` | Batas awal tanggal surat |
+| `date_to` | date `YYYY-MM-DD` | Batas akhir tanggal surat |
+
 **`POST /daftar-kegiatan` Request:**
 ```json
 {
@@ -1038,6 +1072,16 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `POST` | `/daftar-kegiatan/:dk_id/projects` | create: `daftar_kegiatan` |
 | `PUT` | `/daftar-kegiatan/:dk_id/projects/:id` | update: `daftar_kegiatan` |
 | `DELETE` | `/daftar-kegiatan/:dk_id/projects/:id` | delete: `daftar_kegiatan` |
+
+**`GET /daftar-kegiatan/:dk_id/projects` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan proyek Green Book terkait, objectives, lokasi, lender, atau activity detail |
+| `gb_project_ids` | multi-value UUID | Filter relasi proyek Green Book |
+| `executing_agency_ids` | multi-value UUID | Filter institution/executing agency DK Project |
+| `location_ids` | multi-value UUID | Filter region lokasi proyek |
+| `lender_ids` | multi-value UUID | Filter lender financing detail |
 
 **`POST /daftar-kegiatan/:dk_id/projects` Request:**
 ```json
@@ -1140,6 +1184,7 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 
 | Param | Keterangan |
 |-------|-----------|
+| `search` | Cari berdasarkan `loan_code`, nama lender, atau short name lender |
 | `lender_id` | Filter by lender |
 | `is_extended` | Filter: `true` / `false` |
 | `closing_date_before` | Filter LA yang akan berakhir sebelum tanggal ini |
@@ -1157,6 +1202,14 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `POST` | `/loan-agreements/:la_id/monitoring` | create: `monitoring_disbursement` |
 | `PUT` | `/loan-agreements/:la_id/monitoring/:id` | update: `monitoring_disbursement` |
 | `DELETE` | `/loan-agreements/:la_id/monitoring/:id` | delete: `monitoring_disbursement` |
+
+**`GET /loan-agreements/:la_id/monitoring` Query Params tambahan:**
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `search` | string | Cari berdasarkan tahun anggaran, triwulan, atau nama komponen |
+| `budget_year` | number | Filter tahun anggaran |
+| `quarter` | enum | `TW1`, `TW2`, `TW3`, `TW4` |
 
 **`POST /loan-agreements/:la_id/monitoring` Request:**
 ```json

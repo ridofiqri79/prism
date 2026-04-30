@@ -3,11 +3,28 @@
 -- name: ListDaftarKegiatan :many
 SELECT *
 FROM daftar_kegiatan
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR subject ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR date::text ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (sqlc.narg('date_from')::date IS NULL OR date >= sqlc.narg('date_from')::date)
+AND (sqlc.narg('date_to')::date IS NULL OR date <= sqlc.narg('date_to')::date)
 ORDER BY date DESC, created_at DESC
-LIMIT $1 OFFSET $2;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountDaftarKegiatan :one
-SELECT COUNT(*) FROM daftar_kegiatan;
+SELECT COUNT(*)
+FROM daftar_kegiatan
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR subject ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR date::text ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (sqlc.narg('date_from')::date IS NULL OR date >= sqlc.narg('date_from')::date)
+AND (sqlc.narg('date_to')::date IS NULL OR date <= sqlc.narg('date_to')::date);
 
 -- name: GetDaftarKegiatan :one
 SELECT *
@@ -43,14 +60,122 @@ WHERE id = $1;
 -- name: ListDKProjectsByDK :many
 SELECT *
 FROM dk_project
-WHERE dk_id = $1
+WHERE dk_id = sqlc.arg('dk_id')
+AND (
+    sqlc.narg('search')::text IS NULL
+    OR COALESCE(objectives, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM institution i
+        WHERE i.id = dk_project.institution_id
+          AND (
+              i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dkgb
+        JOIN gb_project gp ON gp.id = dkgb.gb_project_id
+        WHERE dkgb.dk_project_id = dk_project.id
+          AND (
+              gp.gb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR gp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('gb_project_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dkgb
+        WHERE dkgb.dk_project_id = dk_project.id
+          AND dkgb.gb_project_id = ANY(sqlc.arg('gb_project_ids')::uuid[])
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+    OR institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_location dkpl
+        WHERE dkpl.dk_project_id = dk_project.id
+          AND dkpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('lender_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_financing_detail dfd
+        WHERE dfd.dk_project_id = dk_project.id
+          AND dfd.lender_id = ANY(sqlc.arg('lender_ids')::uuid[])
+    )
+)
 ORDER BY created_at DESC
-LIMIT $2 OFFSET $3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountDKProjectsByDK :one
 SELECT COUNT(*)
 FROM dk_project
-WHERE dk_id = $1;
+WHERE dk_id = sqlc.arg('dk_id')
+AND (
+    sqlc.narg('search')::text IS NULL
+    OR COALESCE(objectives, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM institution i
+        WHERE i.id = dk_project.institution_id
+          AND (
+              i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dkgb
+        JOIN gb_project gp ON gp.id = dkgb.gb_project_id
+        WHERE dkgb.dk_project_id = dk_project.id
+          AND (
+              gp.gb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR gp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('gb_project_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dkgb
+        WHERE dkgb.dk_project_id = dk_project.id
+          AND dkgb.gb_project_id = ANY(sqlc.arg('gb_project_ids')::uuid[])
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+    OR institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_project_location dkpl
+        WHERE dkpl.dk_project_id = dk_project.id
+          AND dkpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+    )
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('lender_ids')::uuid[]), 0) = 0
+    OR EXISTS (
+        SELECT 1
+        FROM dk_financing_detail dfd
+        WHERE dfd.dk_project_id = dk_project.id
+          AND dfd.lender_id = ANY(sqlc.arg('lender_ids')::uuid[])
+    )
+);
 
 -- name: GetDKProject :one
 SELECT *

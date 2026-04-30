@@ -7,11 +7,12 @@ import type {
   BBProjectListParams,
   BBProjectPayload,
   BlueBook,
+  BlueBookListParams,
   BlueBookPayload,
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const useBlueBookStore = defineStore('blueBook', () => {
   const blueBooks = ref<BlueBook[]>([])
@@ -38,7 +39,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     }
   }
 
-  async function fetchBlueBooks(params?: ListParams) {
+  async function fetchBlueBooks(params?: BlueBookListParams) {
     return withLoading(async () => {
       const response = await BlueBookService.getBlueBooks(params)
       blueBooks.value = response.data

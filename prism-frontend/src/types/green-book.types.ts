@@ -2,6 +2,7 @@ import type { BBProject } from '@/types/blue-book.types'
 import type {
   BappenasPartner,
   Institution,
+  ListParams,
   Lender,
   ProgramTitle,
   Region,
@@ -24,6 +25,20 @@ export interface GreenBookPayload {
   publish_year: number
   replaces_green_book_id?: string | null
   revision_number: number
+}
+
+export interface GreenBookListParams extends ListParams {
+  search?: string
+  publish_year?: number[]
+  status?: GreenBookStatus[]
+}
+
+export interface GBProjectListParams extends ListParams {
+  search?: string
+  bb_project_ids?: string[]
+  executing_agency_ids?: string[]
+  location_ids?: string[]
+  status?: GBProjectStatus[]
 }
 
 export interface BBProjectSummary {

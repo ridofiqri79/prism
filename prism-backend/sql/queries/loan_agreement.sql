@@ -20,11 +20,43 @@ SELECT
     l.short_name AS lender_short_name
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
+AND (
+    sqlc.narg('is_extended')::boolean IS NULL
+    OR (la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
+)
+AND (
+    sqlc.narg('closing_date_before')::date IS NULL
+    OR la.closing_date <= sqlc.narg('closing_date_before')::date
+)
 ORDER BY la.created_at DESC
-LIMIT $1 OFFSET $2;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountLoanAgreements :one
-SELECT COUNT(*) FROM loan_agreement;
+SELECT COUNT(*)
+FROM loan_agreement la
+JOIN lender l ON l.id = la.lender_id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
+AND (
+    sqlc.narg('is_extended')::boolean IS NULL
+    OR (la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
+)
+AND (
+    sqlc.narg('closing_date_before')::date IS NULL
+    OR la.closing_date <= sqlc.narg('closing_date_before')::date
+);
 
 -- name: GetLoanAgreement :one
 SELECT

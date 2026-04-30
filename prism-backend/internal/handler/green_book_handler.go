@@ -19,11 +19,18 @@ func NewGreenBookHandler(service *service.GreenBookService) *GreenBookHandler {
 }
 
 func (h *GreenBookHandler) ListGreenBooks(c echo.Context) error {
-	res, err := h.service.ListGreenBooks(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListGreenBooks(c.Request().Context(), greenBookListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func greenBookListFilter(c echo.Context) model.GreenBookListFilter {
+	return model.GreenBookListFilter{
+		PublishYears: queryStrings(c, "publish_year"),
+		Statuses:     queryStrings(c, "status"),
+	}
 }
 
 func (h *GreenBookHandler) GetGreenBook(c echo.Context) error {
@@ -82,11 +89,20 @@ func (h *GreenBookHandler) ListGBProjects(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.ListGBProjects(c.Request().Context(), gbID, paginationParams(c))
+	res, err := h.service.ListGBProjects(c.Request().Context(), gbID, gbProjectListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func gbProjectListFilter(c echo.Context) model.GBProjectListFilter {
+	return model.GBProjectListFilter{
+		BBProjectIDs:       queryStrings(c, "bb_project_ids"),
+		ExecutingAgencyIDs: queryStrings(c, "executing_agency_ids"),
+		LocationIDs:        queryStrings(c, "location_ids"),
+		Statuses:           queryStrings(c, "status"),
+	}
 }
 
 func (h *GreenBookHandler) GetGBProject(c echo.Context) error {

@@ -2,6 +2,7 @@ import type { GBProject } from '@/types/green-book.types'
 import type {
   BappenasPartner,
   Institution,
+  ListParams,
   Lender,
   ProgramTitle,
   Region,
@@ -83,6 +84,20 @@ export interface DaftarKegiatanPayload {
   letter_number?: string | null
   subject: string
   date: string
+}
+
+export interface DaftarKegiatanListParams extends ListParams {
+  search?: string
+  date_from?: string
+  date_to?: string
+}
+
+export interface DKProjectListParams extends ListParams {
+  search?: string
+  gb_project_ids?: string[]
+  executing_agency_ids?: string[]
+  location_ids?: string[]
+  lender_ids?: string[]
 }
 
 export interface DKFinancingDetailPayload {

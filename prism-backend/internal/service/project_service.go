@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -240,6 +241,28 @@ func uuidArray(values []string, field string) ([]pgtype.UUID, error) {
 	return ids, nil
 }
 
+func int32Array(values []string, field string) ([]int32, error) {
+	items := make([]int32, 0, len(values))
+	seen := map[int32]struct{}{}
+	for _, value := range values {
+		raw := strings.TrimSpace(value)
+		if raw == "" {
+			continue
+		}
+		parsed, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			return nil, validation(field, "harus angka")
+		}
+		item := int32(parsed)
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 func optionalNumeric(value *string, field string) (pgtype.Numeric, error) {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return pgtype.Numeric{}, nil
@@ -249,6 +272,17 @@ func optionalNumeric(value *string, field string) (pgtype.Numeric, error) {
 		return pgtype.Numeric{}, validation(field, "harus angka")
 	}
 	return numeric, nil
+}
+
+func optionalInt4(value *string, field string) (pgtype.Int4, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Int4{}, nil
+	}
+	parsed, err := strconv.ParseInt(strings.TrimSpace(*value), 10, 32)
+	if err != nil {
+		return pgtype.Int4{}, validation(field, "harus angka")
+	}
+	return pgtype.Int4{Int32: int32(parsed), Valid: true}, nil
 }
 
 func optionalDate(value *string, field string) (pgtype.Date, error) {

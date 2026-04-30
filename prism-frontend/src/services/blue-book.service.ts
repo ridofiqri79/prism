@@ -6,14 +6,15 @@ import type {
   BBProjectListParams,
   BBProjectPayload,
   BlueBook,
+  BlueBookListParams,
   BlueBookPayload,
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const BlueBookService = {
-  async getBlueBooks(params?: ListParams) {
+  async getBlueBooks(params?: BlueBookListParams) {
     const response = await http.get<PaginatedResponse<BlueBook>>('/blue-books', { params })
     return response.data
   },

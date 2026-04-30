@@ -2,14 +2,16 @@ import http from '@/services/http'
 import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   DaftarKegiatan,
+  DaftarKegiatanListParams,
   DaftarKegiatanPayload,
   DKProject,
+  DKProjectListParams,
   DKProjectPayload,
 } from '@/types/daftar-kegiatan.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const DaftarKegiatanService = {
-  async getDaftarKegiatan(params?: ListParams) {
+  async getDaftarKegiatan(params?: DaftarKegiatanListParams) {
     const response = await http.get<PaginatedResponse<DaftarKegiatan>>('/daftar-kegiatan', {
       params,
     })
@@ -67,7 +69,7 @@ export const DaftarKegiatanService = {
     return response.data.data
   },
 
-  async getProjects(dkId: string, params?: ListParams) {
+  async getProjects(dkId: string, params?: DKProjectListParams) {
     const response = await http.get<PaginatedResponse<DKProject>>(
       `/daftar-kegiatan/${dkId}/projects`,
       { params },

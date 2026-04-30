@@ -19,11 +19,18 @@ func NewBlueBookHandler(service *service.BlueBookService) *BlueBookHandler {
 }
 
 func (h *BlueBookHandler) ListBlueBooks(c echo.Context) error {
-	res, err := h.service.ListBlueBooks(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListBlueBooks(c.Request().Context(), blueBookListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func blueBookListFilter(c echo.Context) model.BlueBookListFilter {
+	return model.BlueBookListFilter{
+		PeriodIDs: queryStrings(c, "period_id"),
+		Statuses:  queryStrings(c, "status"),
+	}
 }
 
 func (h *BlueBookHandler) GetBlueBook(c echo.Context) error {

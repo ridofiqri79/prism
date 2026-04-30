@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
-import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useMasterStore } from '@/stores/master.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -32,14 +34,34 @@ const projectStore = useProjectStore()
 const masterStore = useMasterStore()
 const { can } = usePermission()
 
-const page = ref(1)
-const limit = ref(20)
-const filtersExpanded = ref(false)
-const sortField = ref<ProjectMasterSortField>('project_name')
-const sortOrder = ref<ProjectMasterSortOrder>('asc')
-const filters = reactive<ProjectMasterFilterState>(createDefaultFilters())
-const filterDebounceMs = 500
-let filterDebounceTimer: ReturnType<typeof window.setTimeout> | undefined
+const listControls = useListControls<ProjectMasterFilterState>({
+  initialFilters: createDefaultFilters(),
+  initialSort: 'project_name',
+  initialOrder: 'asc',
+  searchDebounceMs: 500,
+  filterLabels: {
+    loan_types: 'Jenis Pinjaman',
+    indication_lender_ids: 'Indikasi Lender',
+    executing_agency_ids: 'Executing Agency',
+    fixed_lender_ids: 'Fixed Lender',
+    project_statuses: 'Status Project',
+    pipeline_statuses: 'Status Pipeline',
+    program_title_ids: 'Program Title',
+    region_ids: 'Region/Location',
+    foreign_loan_min: 'Foreign Loan Min',
+    foreign_loan_max: 'Foreign Loan Max',
+    dk_date_from: 'Tanggal DK dari',
+    dk_date_to: 'Tanggal DK sampai',
+    include_history: 'Snapshot historis',
+  },
+  formatFilterValue: (key, value) => formatProjectFilterValue(key, value),
+})
+const page = listControls.page
+const limit = listControls.limit
+const sortField = listControls.sort as Ref<ProjectMasterSortField>
+const sortOrder = listControls.order as Ref<ProjectMasterSortOrder>
+const filters = listControls.draftFilters
+const appliedFilters = listControls.appliedFilters
 const columnConfigs: ProjectMasterColumnConfig[] = [
   { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: true },
   { key: 'indication_lenders', label: 'Indikasi Lender', sortField: 'indication_lenders', defaultVisible: false },
@@ -55,31 +77,12 @@ const visibleColumnKeys = ref<ProjectMasterColumnKey[]>(
   columnConfigs.filter((column) => column.defaultVisible).map((column) => column.key),
 )
 
-const first = computed(() => (page.value - 1) * limit.value)
 const skeletonRows = computed(() => Array.from({ length: Math.min(limit.value, 10) }, (_, index) => index))
 const visibleColumns = computed(() =>
   columnConfigs.filter((column) => visibleColumnKeys.value.includes(column.key)),
 )
 const initialTableLoading = computed(() => projectStore.loading && projectStore.projects.length === 0)
 const refreshingExistingRows = computed(() => projectStore.loading && projectStore.projects.length > 0)
-const activeAdvancedFilterCount = computed(() => {
-  const multiFilters = [
-    filters.loan_types,
-    filters.indication_lender_ids,
-    filters.executing_agency_ids,
-    filters.fixed_lender_ids,
-    filters.project_statuses,
-    filters.pipeline_statuses,
-    filters.program_title_ids,
-    filters.region_ids,
-  ].filter((values) => values.length > 0).length
-  const rangeFilters = [
-    filters.foreign_loan_min !== null || filters.foreign_loan_max !== null,
-    Boolean(filters.dk_date_from || filters.dk_date_to),
-  ].filter(Boolean).length
-
-  return multiFilters + rangeFilters
-})
 const columnSelectionLabel = computed(() => `${visibleColumns.value.length + 2} kolom tampil`)
 const programTitleOptions = computed(() =>
   masterStore.programTitles.map((programTitle) => ({
@@ -177,26 +180,38 @@ function buildParams(): ProjectMasterListParams {
     order: sortOrder.value,
   }
 
-  if (filters.loan_types.length > 0) params.loan_types = [...filters.loan_types]
-  if (filters.indication_lender_ids.length > 0) {
-    params.indication_lender_ids = [...filters.indication_lender_ids]
+  if (appliedFilters.loan_types.length > 0) params.loan_types = [...appliedFilters.loan_types]
+  if (appliedFilters.indication_lender_ids.length > 0) {
+    params.indication_lender_ids = [...appliedFilters.indication_lender_ids]
   }
-  if (filters.executing_agency_ids.length > 0) {
-    params.executing_agency_ids = [...filters.executing_agency_ids]
+  if (appliedFilters.executing_agency_ids.length > 0) {
+    params.executing_agency_ids = [...appliedFilters.executing_agency_ids]
   }
-  if (filters.fixed_lender_ids.length > 0) params.fixed_lender_ids = [...filters.fixed_lender_ids]
-  if (filters.project_statuses.length > 0) params.project_statuses = [...filters.project_statuses]
-  if (filters.pipeline_statuses.length > 0) params.pipeline_statuses = [...filters.pipeline_statuses]
-  if (filters.program_title_ids.length > 0) params.program_title_ids = [...filters.program_title_ids]
-  const expandedRegionIds = expandRegionFilterIds(filters.region_ids)
+  if (appliedFilters.fixed_lender_ids.length > 0) {
+    params.fixed_lender_ids = [...appliedFilters.fixed_lender_ids]
+  }
+  if (appliedFilters.project_statuses.length > 0) {
+    params.project_statuses = [...appliedFilters.project_statuses]
+  }
+  if (appliedFilters.pipeline_statuses.length > 0) {
+    params.pipeline_statuses = [...appliedFilters.pipeline_statuses]
+  }
+  if (appliedFilters.program_title_ids.length > 0) {
+    params.program_title_ids = [...appliedFilters.program_title_ids]
+  }
+  const expandedRegionIds = expandRegionFilterIds(appliedFilters.region_ids)
   if (expandedRegionIds.length > 0) params.region_ids = expandedRegionIds
-  if (filters.foreign_loan_min !== null) params.foreign_loan_min = filters.foreign_loan_min
-  if (filters.foreign_loan_max !== null) params.foreign_loan_max = filters.foreign_loan_max
-  if (filters.dk_date_from) params.dk_date_from = filters.dk_date_from
-  if (filters.dk_date_to) params.dk_date_to = filters.dk_date_to
-  if (filters.include_history) params.include_history = true
+  if (appliedFilters.foreign_loan_min !== null) {
+    params.foreign_loan_min = appliedFilters.foreign_loan_min
+  }
+  if (appliedFilters.foreign_loan_max !== null) {
+    params.foreign_loan_max = appliedFilters.foreign_loan_max
+  }
+  if (appliedFilters.dk_date_from) params.dk_date_from = appliedFilters.dk_date_from
+  if (appliedFilters.dk_date_to) params.dk_date_to = appliedFilters.dk_date_to
+  if (appliedFilters.include_history) params.include_history = true
 
-  params.search = textParam(filters.search)
+  params.search = textParam(listControls.debouncedSearch.value)
 
   return params
 }
@@ -214,14 +229,7 @@ async function refreshFromFirstPage() {
   await loadProjectMaster()
 }
 
-function scheduleFilterRefresh() {
-  window.clearTimeout(filterDebounceTimer)
-  filterDebounceTimer = window.setTimeout(() => {
-    void refreshFromFirstPage()
-  }, filterDebounceMs)
-}
-
-async function sortBy(field: ProjectMasterSortField) {
+function sortBy(field: ProjectMasterSortField) {
   if (sortField.value === field) {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
   } else {
@@ -229,12 +237,7 @@ async function sortBy(field: ProjectMasterSortField) {
     sortOrder.value = 'asc'
   }
 
-  await refreshFromFirstPage()
-}
-
-function handlePage(event: { page: number; rows: number }) {
-  page.value = event.page + 1
-  limit.value = event.rows
+  page.value = 1
 }
 
 function listLabel(values: string[]) {
@@ -321,6 +324,64 @@ function projectStatusSeverity(status: ProjectStatus) {
   return status === 'Ongoing' ? 'success' : 'info'
 }
 
+function selectedLabelSummary(labels: string[]) {
+  if (labels.length <= 2) {
+    return labels.join(', ')
+  }
+
+  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
+}
+
+function formatProjectFilterValue(key: string, value: unknown) {
+  if (Array.isArray(value)) {
+    if (key === 'indication_lender_ids' || key === 'fixed_lender_ids') {
+      const selected = new Set(value)
+      return selectedLabelSummary(
+        masterStore.lenders
+          .filter((lender) => selected.has(lender.id))
+          .map((lender) => lender.short_name || lender.name),
+      )
+    }
+
+    if (key === 'executing_agency_ids') {
+      const selected = new Set(value)
+      return selectedLabelSummary(
+        masterStore.institutions
+          .filter((institution) => selected.has(institution.id))
+          .map((institution) => institution.short_name || institution.name),
+      )
+    }
+
+    if (key === 'program_title_ids') {
+      const selected = new Set(value)
+      return selectedLabelSummary(
+        masterStore.programTitles
+          .filter((programTitle) => selected.has(programTitle.id))
+          .map(formatProgramTitle),
+      )
+    }
+
+    if (key === 'region_ids') {
+      const selected = new Set(value)
+      return selectedLabelSummary(
+        masterStore.regions.filter((region) => selected.has(region.id)).map((region) => region.name),
+      )
+    }
+
+    if (key === 'pipeline_statuses') {
+      return selectedLabelSummary(value.map((item) => pipelineStatusLabels[item as ProjectPipelineStatus] ?? item))
+    }
+
+    return selectedLabelSummary(value.map(String))
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Ditampilkan' : 'Tidak'
+  }
+
+  return String(value)
+}
+
 function expandRegionFilterIds(regionIds: string[]) {
   if (regionIds.length === 0) {
     return []
@@ -357,24 +418,10 @@ watch([page, limit], () => {
 })
 
 watch(
-  () => ({
-    search: filters.search,
-    loanTypes: [...filters.loan_types],
-    indicationLenders: [...filters.indication_lender_ids],
-    executingAgencies: [...filters.executing_agency_ids],
-    fixedLenders: [...filters.fixed_lender_ids],
-    projectStatuses: [...filters.project_statuses],
-    pipelineStatuses: [...filters.pipeline_statuses],
-    programTitles: [...filters.program_title_ids],
-    regions: [...filters.region_ids],
-    foreignLoanMin: filters.foreign_loan_min,
-    foreignLoanMax: filters.foreign_loan_max,
-    dkDateFrom: filters.dk_date_from,
-    dkDateTo: filters.dk_date_to,
-    includeHistory: filters.include_history,
-  }),
-  scheduleFilterRefresh,
-  { deep: true },
+  [listControls.debouncedSearch, () => JSON.stringify(appliedFilters), sortField, sortOrder],
+  () => {
+    void refreshFromFirstPage()
+  },
 )
 
 onMounted(() => {
@@ -388,7 +435,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.clearTimeout(filterDebounceTimer)
+  listControls.dispose()
 })
 </script>
 
@@ -399,53 +446,23 @@ onUnmounted(() => {
       subtitle="Master table seluruh Proyek Blue Book beserta status pipeline, lender, instansi, lokasi, dan nilai pinjaman"
     />
 
-    <section class="rounded-lg border border-primary-100 bg-white p-4 shadow-sm">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0 flex-1">
-          <h2 class="text-lg font-semibold text-surface-950">Pencarian Project</h2>
-          <p class="text-sm text-surface-500">Cari pada nama proyek, lender, dan executing agency.</p>
-        </div>
-      </div>
-
-      <label class="mt-4 block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Kata Kunci</span>
-        <InputText
-          v-model="filters.search"
-          placeholder="Cari nama proyek, indikasi lender, fixed lender, atau executing agency"
-          class="w-full"
-        />
-      </label>
-    </section>
-
-    <section class="rounded-lg border border-surface-200 bg-white p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-surface-950">Filter Lanjutan</h2>
-          <p class="text-sm text-surface-500">Default menampilkan snapshot latest per project.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button
-            :label="filtersExpanded ? 'Tutup Filter' : 'Buka Filter'"
-            :icon="filtersExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-            severity="secondary"
-            outlined
-            @click="filtersExpanded = !filtersExpanded"
-          />
-        </div>
-      </div>
-
-      <div v-if="!filtersExpanded" class="mt-3 rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-600">
-        {{ activeAdvancedFilterCount > 0 ? 'Filter lanjutan sedang diterapkan.' : 'Filter lanjutan disembunyikan.' }}
-      </div>
-
-      <div v-else class="mt-4 space-y-4">
-        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2">
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari nama proyek, indikasi lender, fixed lender, atau executing agency"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
           <ToggleSwitch v-model="filters.include_history" />
           <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
         </label>
 
-        <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <label class="block space-y-2">
+        <div class="contents">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
             <MultiSelect
               v-model="filters.loan_types"
@@ -460,7 +477,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Indikasi Lender</span>
             <MultiSelect
               v-model="filters.indication_lender_ids"
@@ -482,7 +499,7 @@ onUnmounted(() => {
             </MultiSelect>
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Executing Agency</span>
             <MultiSelect
               v-model="filters.executing_agency_ids"
@@ -497,7 +514,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Fixed Lender (Green Book)</span>
             <MultiSelect
               v-model="filters.fixed_lender_ids"
@@ -519,7 +536,7 @@ onUnmounted(() => {
             </MultiSelect>
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Status Project</span>
             <MultiSelect
               v-model="filters.project_statuses"
@@ -534,7 +551,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Status Pipeline</span>
             <MultiSelect
               v-model="filters.pipeline_statuses"
@@ -549,7 +566,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Program Title</span>
             <MultiSelect
               v-model="filters.program_title_ids"
@@ -564,7 +581,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="block space-y-2">
+          <label class="block space-y-2 xl:col-span-2">
             <span class="text-sm font-medium text-surface-700">Region/Location</span>
             <MultiSelect
               v-model="filters.region_ids"
@@ -580,7 +597,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Foreign Loan Min</span>
               <InputNumber
@@ -607,7 +624,7 @@ onUnmounted(() => {
             </label>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Dari</span>
               <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
@@ -618,8 +635,8 @@ onUnmounted(() => {
             </label>
           </div>
         </div>
-      </div>
-    </section>
+      </template>
+    </SearchFilterBar>
 
     <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200 p-4">
@@ -815,13 +832,11 @@ onUnmounted(() => {
         </table>
       </TableReloadShell>
 
-      <div class="border-t border-surface-200 px-2 py-3">
-        <Paginator
-          :first="first"
-          :rows="limit"
-          :total-records="projectStore.total"
-          :rows-per-page-options="[10, 20, 50, 100]"
-          @page="handlePage"
+      <div class="border-t border-surface-200 p-3">
+        <ListPaginationFooter
+          v-model:page="page"
+          v-model:limit="limit"
+          :total="projectStore.total"
         />
       </div>
     </section>

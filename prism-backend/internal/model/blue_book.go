@@ -27,6 +27,11 @@ type BlueBookResponse struct {
 	UpdatedAt          string     `json:"updated_at,omitempty"`
 }
 
+type BlueBookListFilter struct {
+	PeriodIDs []string
+	Statuses  []string
+}
+
 type CreateBBProjectRequest struct {
 	ProjectIdentityID     *string                `json:"project_identity_id"`
 	ProgramTitleID        *string                `json:"program_title_id"`

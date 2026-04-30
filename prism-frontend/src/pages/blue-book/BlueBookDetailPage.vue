@@ -10,9 +10,10 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import SearchFilterBar, { type ActiveFilterPill } from '@/components/common/SearchFilterBar.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { blueBookSchema } from '@/schemas/blue-book.schema'
@@ -42,24 +43,32 @@ const blueBookId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
 const gbCreateDialogVisible = ref(false)
 const selectedBBProject = ref<BBProject | null>(null)
-const projectPage = ref(1)
-const projectLimit = ref(20)
-const projectSearch = ref('')
-let projectFilterTimer: ReturnType<typeof setTimeout> | undefined
+const projectControls = useListControls<ProjectFilterState>({
+  initialFilters: {
+    executing_agency_ids: [],
+    location_ids: [],
+  },
+  filterLabels: {
+    executing_agency_ids: 'Executing Agency',
+    location_ids: 'Location',
+  },
+  formatFilterValue: (key, value) => {
+    if (key === 'executing_agency_ids' && Array.isArray(value)) {
+      return selectedInstitutionSummary(value)
+    }
+    if (key === 'location_ids' && Array.isArray(value)) {
+      return selectedRegionSummary(value)
+    }
+    return Array.isArray(value) ? selectedLabelSummary(value) : String(value)
+  },
+})
 const form = reactive<BlueBookPayload>({
   period_id: '',
   publish_date: '',
   revision_number: 0,
   revision_year: null,
 })
-const projectFilters = reactive<ProjectFilterState>({
-  executing_agency_ids: [],
-  location_ids: [],
-})
-const appliedProjectFilters = reactive<ProjectFilterState>({
-  executing_agency_ids: [],
-  location_ids: [],
-})
+const projectFilters = projectControls.draftFilters
 const gbCreateForm = reactive({
   greenBookId: '',
   useBBData: false,
@@ -74,7 +83,7 @@ const columns: ColumnDef[] = [
 ]
 
 const selectedCountryCodes = computed(() => {
-  const selected = new Set(projectFilters.location_ids)
+  const selected = new Set(projectControls.draftFilters.location_ids)
 
   return masterStore.regions
     .filter((region) => region.type === 'COUNTRY' && selected.has(region.id))
@@ -101,32 +110,6 @@ const locationFilterOptions = computed(() =>
   })),
 )
 
-const activeProjectFilterPills = computed<ActiveFilterPill[]>(() => {
-  const pills: ActiveFilterPill[] = []
-
-  if (appliedProjectFilters.executing_agency_ids.length > 0) {
-    pills.push({
-      key: 'executing_agency_ids',
-      label: 'Executing Agency',
-      value: selectedInstitutionSummary(appliedProjectFilters.executing_agency_ids),
-    })
-  }
-  if (appliedProjectFilters.location_ids.length > 0) {
-    pills.push({
-      key: 'location_ids',
-      label: 'Location',
-      value: selectedRegionSummary(appliedProjectFilters.location_ids),
-    })
-  }
-
-  return pills
-})
-const activeProjectFilterCount = computed(
-  () =>
-    Number(appliedProjectFilters.executing_agency_ids.length > 0) +
-    Number(appliedProjectFilters.location_ids.length > 0),
-)
-
 async function loadData() {
   await Promise.all([
     masterStore.fetchPeriods(true, { limit: 1000 }),
@@ -139,21 +122,17 @@ async function loadData() {
 }
 
 async function loadProjects() {
-  const params: BBProjectListParams = {
-    page: projectPage.value,
-    limit: projectLimit.value,
-  }
-  const search = projectSearch.value.trim()
-  if (search) params.search = search
-  if (appliedProjectFilters.executing_agency_ids.length > 0) {
-    params.executing_agency_ids = [...appliedProjectFilters.executing_agency_ids]
-  }
-  const locationIDs = expandLocationFilterIds(appliedProjectFilters.location_ids)
+  await blueBookStore.fetchProjects(blueBookId.value, buildProjectParams())
+}
+
+function buildProjectParams(): BBProjectListParams {
+  const params = projectControls.buildParams() as BBProjectListParams
+  const locationIDs = expandLocationFilterIds(projectControls.appliedFilters.location_ids)
   if (locationIDs.length > 0) {
     params.location_ids = locationIDs
   }
 
-  await blueBookStore.fetchProjects(blueBookId.value, params)
+  return params
 }
 
 const greenBookOptions = computed(() =>
@@ -297,8 +276,8 @@ function deleteProject(project: BBProject) {
   confirm.confirmDelete(`Proyek Blue Book ${project.bb_code}`, async () => {
     await blueBookStore.deleteProject(blueBookId.value, project.id)
     toast.success('Berhasil', 'Proyek Blue Book berhasil dihapus')
-    if (blueBookStore.projects.length === 1 && projectPage.value > 1) {
-      projectPage.value -= 1
+    if (blueBookStore.projects.length === 1 && projectControls.page.value > 1) {
+      projectControls.page.value -= 1
     } else {
       await loadProjects()
     }
@@ -327,93 +306,24 @@ async function createGBProjectFromBB() {
   })
 }
 
-async function refreshProjectsFromFirstPage() {
-  if (projectPage.value !== 1) {
-    projectPage.value = 1
-    return
-  }
-
-  await loadProjects()
-}
-
-function scheduleProjectFilterRefresh() {
-  if (projectFilterTimer) {
-    clearTimeout(projectFilterTimer)
-  }
-
-  projectFilterTimer = setTimeout(() => {
-    void refreshProjectsFromFirstPage()
-  }, 250)
-}
-
-function clearProjectFilters() {
-  const shouldRefreshAfterClear =
-    projectSearch.value.trim().length === 0 &&
-    (appliedProjectFilters.executing_agency_ids.length > 0 ||
-      appliedProjectFilters.location_ids.length > 0)
-
-  projectSearch.value = ''
-  projectFilters.executing_agency_ids = []
-  projectFilters.location_ids = []
-  appliedProjectFilters.executing_agency_ids = []
-  appliedProjectFilters.location_ids = []
-
-  if (shouldRefreshAfterClear) {
-    void refreshProjectsFromFirstPage()
-  }
-}
-
-function applyProjectFilters() {
-  appliedProjectFilters.executing_agency_ids = [...projectFilters.executing_agency_ids]
-  appliedProjectFilters.location_ids = [...projectFilters.location_ids]
-  void refreshProjectsFromFirstPage()
-}
-
-function removeProjectFilter(key: string) {
-  if (key === 'search') {
-    projectSearch.value = ''
-    return
-  }
-
-  if (key === 'executing_agency_ids') {
-    projectFilters.executing_agency_ids = []
-    appliedProjectFilters.executing_agency_ids = []
-  }
-
-  if (key === 'location_ids') {
-    projectFilters.location_ids = []
-    appliedProjectFilters.location_ids = []
-  }
-
-  void refreshProjectsFromFirstPage()
-}
-
 onMounted(() => {
   void loadData()
 })
 
 onUnmounted(() => {
-  if (projectFilterTimer) {
-    clearTimeout(projectFilterTimer)
-  }
-})
-
-watch(projectPage, () => {
-  void loadProjects()
-})
-
-watch(projectLimit, () => {
-  if (projectPage.value === 1) {
-    void loadProjects()
-    return
-  }
-
-  projectPage.value = 1
+  projectControls.dispose()
 })
 
 watch(
-  projectSearch,
-  scheduleProjectFilterRefresh,
+  [
+    projectControls.page,
+    projectControls.limit,
+    projectControls.debouncedSearch,
+    () => JSON.stringify(projectControls.appliedFilters),
+  ],
+  () => {
+    void loadProjects()
+  },
 )
 </script>
 
@@ -458,13 +368,13 @@ watch(
     </div>
 
     <SearchFilterBar
-      v-model:search="projectSearch"
+      v-model:search="projectControls.search.value"
       search-placeholder="Nama proyek / executing agency"
-      :active-filters="activeProjectFilterPills"
-      :filter-count="activeProjectFilterCount"
-      @apply="applyProjectFilters"
-      @reset="clearProjectFilters"
-      @remove="removeProjectFilter"
+      :active-filters="projectControls.activeFilterPills.value"
+      :filter-count="projectControls.activeFilterCount.value"
+      @apply="projectControls.applyFilters"
+      @reset="projectControls.resetFilters"
+      @remove="projectControls.removeFilter"
     >
       <template #filters>
         <label class="block space-y-2 xl:col-span-3">
@@ -500,8 +410,8 @@ watch(
     </SearchFilterBar>
 
     <DataTable
-      v-model:page="projectPage"
-      v-model:limit="projectLimit"
+      v-model:page="projectControls.page.value"
+      v-model:limit="projectControls.limit.value"
       :data="blueBookStore.projects"
       :columns="columns"
       :loading="blueBookStore.loading"

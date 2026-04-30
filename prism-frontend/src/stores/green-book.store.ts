@@ -4,11 +4,13 @@ import { GreenBookService } from '@/services/green-book.service'
 import type {
   GBProject,
   GBProjectHistoryItem,
+  GBProjectListParams,
   GBProjectPayload,
   GreenBook,
+  GreenBookListParams,
   GreenBookPayload,
 } from '@/types/green-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const useGreenBookStore = defineStore('greenBook', () => {
   const greenBooks = ref<GreenBook[]>([])
@@ -34,7 +36,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     }
   }
 
-  async function fetchGreenBooks(params?: ListParams) {
+  async function fetchGreenBooks(params?: GreenBookListParams) {
     return withLoading(async () => {
       const response = await GreenBookService.getGreenBooks(params)
       greenBooks.value = response.data
@@ -64,7 +66,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     await GreenBookService.deleteGreenBook(id)
   }
 
-  async function fetchProjects(greenBookId: string, params?: ListParams) {
+  async function fetchProjects(greenBookId: string, params?: GBProjectListParams) {
     return withLoading(async () => {
       const response = await GreenBookService.getProjects(greenBookId, params)
       projects.value = response.data

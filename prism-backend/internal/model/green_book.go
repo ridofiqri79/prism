@@ -16,6 +16,11 @@ type GreenBookResponse struct {
 	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
 
+type GreenBookListFilter struct {
+	PublishYears []string
+	Statuses     []string
+}
+
 type CreateGBProjectRequest struct {
 	GBProjectIdentityID   *string                   `json:"gb_project_identity_id"`
 	ProgramTitleID        *string                   `json:"program_title_id"`
@@ -36,6 +41,13 @@ type CreateGBProjectRequest struct {
 }
 
 type UpdateGBProjectRequest = CreateGBProjectRequest
+
+type GBProjectListFilter struct {
+	BBProjectIDs       []string
+	ExecutingAgencyIDs []string
+	LocationIDs        []string
+	Statuses           []string
+}
 
 type GBActivityItem struct {
 	ActivityName           string  `json:"activity_name" validate:"required"`

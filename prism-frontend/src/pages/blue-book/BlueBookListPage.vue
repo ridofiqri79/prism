@@ -4,29 +4,51 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { blueBookSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { BlueBook, BlueBookPayload } from '@/types/blue-book.types'
+import type { BlueBook, BlueBookListParams, BlueBookPayload, BlueBookStatus } from '@/types/blue-book.types'
 import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type BlueBookField = keyof BlueBookPayload
+interface BlueBookFilterState {
+  period_id: string[]
+  status: BlueBookStatus[]
+}
 
 const blueBookStore = useBlueBookStore()
 const masterStore = useMasterStore()
 const toast = useToast()
 const { can } = usePermission()
 
-const page = ref(1)
-const limit = ref(20)
-const periodFilter = ref<string | null>(null)
-const statusFilter = ref<string | null>(null)
+const listControls = useListControls<BlueBookFilterState>({
+  initialFilters: {
+    period_id: [],
+    status: [],
+  },
+  filterLabels: {
+    period_id: 'Periode',
+    status: 'Status',
+  },
+  formatFilterValue: (key, value) => {
+    if (key === 'period_id' && Array.isArray(value)) {
+      return selectedPeriodSummary(value)
+    }
+    if (key === 'status' && Array.isArray(value)) {
+      return value.join(', ')
+    }
+    return Array.isArray(value) ? value.join(', ') : String(value)
+  },
+})
 const dialogVisible = ref(false)
 const form = reactive<BlueBookPayload>({
   period_id: '',
@@ -45,16 +67,24 @@ const columns: ColumnDef[] = [
 ]
 const statusOptions = ['active', 'superseded']
 
+function buildListParams(): BlueBookListParams {
+  return listControls.buildParams() as BlueBookListParams
+}
+
+async function loadBlueBooks() {
+  await blueBookStore.fetchBlueBooks(buildListParams())
+}
+
 async function loadData() {
   await Promise.all([
     masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' }),
-    blueBookStore.fetchBlueBooks({ page: page.value, limit: limit.value }),
+    loadBlueBooks(),
   ])
 }
 
 function openCreate() {
   Object.assign(form, {
-    period_id: periodFilter.value ?? '',
+    period_id: listControls.draftFilters.period_id[0] ?? '',
     publish_date: '',
     revision_number: 0,
     revision_year: null,
@@ -85,18 +115,35 @@ async function save() {
   })
   toast.success('Berhasil', 'Blue Book berhasil dibuat')
   dialogVisible.value = false
-  await loadData()
+  await loadBlueBooks()
 }
 
-function matchesFilters(blueBook: BlueBook) {
-  if (periodFilter.value && blueBook.period.id !== periodFilter.value) return false
-  if (statusFilter.value && blueBook.status !== statusFilter.value) return false
-  return true
+function selectedLabelSummary(labels: string[]) {
+  if (labels.length <= 2) {
+    return labels.join(', ')
+  }
+
+  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
 }
 
-watch([page, limit], () => {
-  void loadData()
-})
+function selectedPeriodSummary(ids: string[]) {
+  const selected = new Set(ids)
+  return selectedLabelSummary(
+    masterStore.periods.filter((period) => selected.has(period.id)).map((period) => period.name),
+  )
+}
+
+watch(
+  [
+    listControls.page,
+    listControls.limit,
+    listControls.debouncedSearch,
+    () => JSON.stringify(listControls.appliedFilters),
+  ],
+  () => {
+    void loadBlueBooks()
+  },
+)
 
 onMounted(() => {
   void loadData()
@@ -116,35 +163,46 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-2">
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Periode</span>
-        <Select
-          v-model="periodFilter"
-          :options="masterStore.periods"
-          option-label="name"
-          option-value="id"
-          placeholder="Semua period"
-          show-clear
-          class="w-full"
-        />
-      </label>
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Status</span>
-        <Select
-          v-model="statusFilter"
-          :options="statusOptions"
-          placeholder="Semua status"
-          show-clear
-          class="w-full"
-        />
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari periode atau status Blue Book"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Periode</span>
+          <MultiSelect
+            v-model="listControls.draftFilters.period_id"
+            :options="masterStore.periods"
+            option-label="name"
+            option-value="id"
+            placeholder="Semua periode"
+            filter
+            display="chip"
+            class="w-full"
+          />
+        </label>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Status</span>
+          <MultiSelect
+            v-model="listControls.draftFilters.status"
+            :options="statusOptions"
+            placeholder="Semua status"
+            display="chip"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <DataTable
-      v-model:page="page"
-      v-model:limit="limit"
-      :data="blueBookStore.blueBooks.filter(matchesFilters)"
+      v-model:page="listControls.page.value"
+      v-model:limit="listControls.limit.value"
+      :data="blueBookStore.blueBooks"
       :columns="columns"
       :loading="blueBookStore.loading"
       :total="blueBookStore.total"

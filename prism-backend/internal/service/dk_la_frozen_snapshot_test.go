@@ -123,7 +123,7 @@ func (env *blueBookVersioningTestEnv) gbProjectRequestWithFundingLender(bbProjec
 
 func (env *blueBookVersioningTestEnv) singleGBProject(t *testing.T, service *GreenBookService, greenBookID string) *model.GBProjectResponse {
 	t.Helper()
-	projects, err := service.ListGBProjects(env.ctx, mustParseUUID(t, greenBookID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := service.ListGBProjects(env.ctx, mustParseUUID(t, greenBookID), model.GBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListGBProjects(%s) error = %v", greenBookID, err)
 	}

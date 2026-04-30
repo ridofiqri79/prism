@@ -3,14 +3,16 @@ import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   GBProject,
   GBProjectHistoryItem,
+  GBProjectListParams,
   GBProjectPayload,
   GreenBook,
+  GreenBookListParams,
   GreenBookPayload,
 } from '@/types/green-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const GreenBookService = {
-  async getGreenBooks(params?: ListParams) {
+  async getGreenBooks(params?: GreenBookListParams) {
     const response = await http.get<PaginatedResponse<GreenBook>>('/green-books', { params })
     return response.data
   },
@@ -34,7 +36,7 @@ export const GreenBookService = {
     await http.delete(`/green-books/${id}`)
   },
 
-  async getProjects(greenBookId: string, params?: ListParams) {
+  async getProjects(greenBookId: string, params?: GBProjectListParams) {
     const response = await http.get<PaginatedResponse<GBProject>>(
       `/green-books/${greenBookId}/projects`,
       { params },

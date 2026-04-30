@@ -22,11 +22,18 @@ func (h *MonitoringHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.ListMonitoring(c.Request().Context(), laID, paginationParams(c))
+	res, err := h.service.ListMonitoring(c.Request().Context(), laID, monitoringListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func monitoringListFilter(c echo.Context) model.MonitoringListFilter {
+	return model.MonitoringListFilter{
+		BudgetYear: queryStringPtr(c, "budget_year"),
+		Quarter:    queryStringPtr(c, "quarter"),
+	}
 }
 
 func (h *MonitoringHandler) Get(c echo.Context) error {

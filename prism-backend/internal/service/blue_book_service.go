@@ -33,13 +33,21 @@ func NewBlueBookService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.
 	return &BlueBookService{db: db, queries: queries, broker: broker}
 }
 
-func (s *BlueBookService) ListBlueBooks(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.BlueBookResponse], error) {
+func (s *BlueBookService) ListBlueBooks(ctx context.Context, filter model.BlueBookListFilter, params model.PaginationParams) (*model.ListResponse[model.BlueBookResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListBlueBooks(ctx, queries.ListBlueBooksParams{Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildBlueBookListParams(filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListBlueBooks(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar Blue Book")
 	}
-	total, err := s.queries.CountBlueBooks(ctx)
+	total, err := s.queries.CountBlueBooks(ctx, queries.CountBlueBooksParams{
+		Search:    queryParams.Search,
+		PeriodIds: queryParams.PeriodIds,
+		Statuses:  queryParams.Statuses,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung Blue Book")
 	}
@@ -48,6 +56,24 @@ func (s *BlueBookService) ListBlueBooks(ctx context.Context, params model.Pagina
 		data = append(data, blueBookFromListRow(row))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildBlueBookListParams(filter model.BlueBookListFilter, params model.PaginationParams, limit, offset int) (queries.ListBlueBooksParams, error) {
+	periodIDs, err := uuidArray(filter.PeriodIDs, "period_id")
+	if err != nil {
+		return queries.ListBlueBooksParams{}, err
+	}
+	statuses, err := allowedValues(filter.Statuses, map[string]struct{}{"active": {}, "superseded": {}}, "status")
+	if err != nil {
+		return queries.ListBlueBooksParams{}, err
+	}
+	return queries.ListBlueBooksParams{
+		Search:    nullableText(params.Search),
+		PeriodIds: periodIDs,
+		Statuses:  statuses,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	}, nil
 }
 
 func (s *BlueBookService) GetBlueBook(ctx context.Context, id pgtype.UUID) (*model.BlueBookResponse, error) {

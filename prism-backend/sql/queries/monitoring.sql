@@ -3,14 +3,40 @@
 -- name: ListMonitoringByLA :many
 SELECT *
 FROM monitoring_disbursement
-WHERE loan_agreement_id = $1
+WHERE loan_agreement_id = sqlc.arg('loan_agreement_id')
+AND (
+    sqlc.narg('search')::text IS NULL
+    OR budget_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR quarter ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM monitoring_komponen mk
+        WHERE mk.monitoring_disbursement_id = monitoring_disbursement.id
+          AND mk.component_name ILIKE '%' || sqlc.narg('search')::text || '%'
+    )
+)
+AND (sqlc.narg('budget_year')::int IS NULL OR budget_year = sqlc.narg('budget_year')::int)
+AND (sqlc.narg('quarter')::varchar IS NULL OR quarter = sqlc.narg('quarter')::varchar)
 ORDER BY budget_year ASC, quarter ASC
-LIMIT $2 OFFSET $3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountMonitoringByLA :one
 SELECT COUNT(*)
 FROM monitoring_disbursement
-WHERE loan_agreement_id = $1;
+WHERE loan_agreement_id = sqlc.arg('loan_agreement_id')
+AND (
+    sqlc.narg('search')::text IS NULL
+    OR budget_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR quarter ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM monitoring_komponen mk
+        WHERE mk.monitoring_disbursement_id = monitoring_disbursement.id
+          AND mk.component_name ILIKE '%' || sqlc.narg('search')::text || '%'
+    )
+)
+AND (sqlc.narg('budget_year')::int IS NULL OR budget_year = sqlc.narg('budget_year')::int)
+AND (sqlc.narg('quarter')::varchar IS NULL OR quarter = sqlc.narg('quarter')::varchar);
 
 -- name: GetMonitoring :one
 SELECT *

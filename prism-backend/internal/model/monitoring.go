@@ -44,6 +44,11 @@ type MonitoringResponse struct {
 	UpdatedAt          string                       `json:"updated_at,omitempty"`
 }
 
+type MonitoringListFilter struct {
+	BudgetYear *string
+	Quarter    *string
+}
+
 type MonitoringKomponenResponse struct {
 	ID            string  `json:"id"`
 	ComponentName string  `json:"component_name"`

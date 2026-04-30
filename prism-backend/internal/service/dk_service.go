@@ -25,13 +25,21 @@ func NewDKService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.Broker
 	return &DKService{db: db, queries: queries, broker: broker}
 }
 
-func (s *DKService) ListDaftarKegiatan(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.DaftarKegiatanResponse], error) {
+func (s *DKService) ListDaftarKegiatan(ctx context.Context, filter model.DaftarKegiatanListFilter, params model.PaginationParams) (*model.ListResponse[model.DaftarKegiatanResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListDaftarKegiatan(ctx, queries.ListDaftarKegiatanParams{Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildDaftarKegiatanListParams(filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListDaftarKegiatan(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar kegiatan")
 	}
-	total, err := s.queries.CountDaftarKegiatan(ctx)
+	total, err := s.queries.CountDaftarKegiatan(ctx, queries.CountDaftarKegiatanParams{
+		Search:   queryParams.Search,
+		DateFrom: queryParams.DateFrom,
+		DateTo:   queryParams.DateTo,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung daftar kegiatan")
 	}
@@ -40,6 +48,27 @@ func (s *DKService) ListDaftarKegiatan(ctx context.Context, params model.Paginat
 		data = append(data, daftarKegiatanResponse(row))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildDaftarKegiatanListParams(filter model.DaftarKegiatanListFilter, params model.PaginationParams, limit, offset int) (queries.ListDaftarKegiatanParams, error) {
+	dateFrom, err := optionalDate(filter.DateFrom, "date_from")
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
+	dateTo, err := optionalDate(filter.DateTo, "date_to")
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
+	if dateFrom.Valid && dateTo.Valid && dateFrom.Time.After(dateTo.Time) {
+		return queries.ListDaftarKegiatanParams{}, validation("date_to", "harus setelah tanggal mulai")
+	}
+	return queries.ListDaftarKegiatanParams{
+		Search:   nullableText(params.Search),
+		DateFrom: dateFrom,
+		DateTo:   dateTo,
+		Limit:    int32(limit),
+		Offset:   int32(offset),
+	}, nil
 }
 
 func (s *DKService) GetDaftarKegiatan(ctx context.Context, id pgtype.UUID) (*model.DaftarKegiatanResponse, error) {
@@ -112,13 +141,24 @@ func (s *DKService) DeleteDaftarKegiatan(ctx context.Context, id pgtype.UUID) er
 	})
 }
 
-func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, params model.PaginationParams) (*model.ListResponse[model.DKProjectResponse], error) {
+func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, filter model.DKProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.DKProjectResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListDKProjectsByDK(ctx, queries.ListDKProjectsByDKParams{DkID: dkID, Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildDKProjectListParams(dkID, filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListDKProjectsByDK(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil DK Project")
 	}
-	total, err := s.queries.CountDKProjectsByDK(ctx, dkID)
+	total, err := s.queries.CountDKProjectsByDK(ctx, queries.CountDKProjectsByDKParams{
+		DkID:               queryParams.DkID,
+		Search:             queryParams.Search,
+		GbProjectIds:       queryParams.GbProjectIds,
+		ExecutingAgencyIds: queryParams.ExecutingAgencyIds,
+		LocationIds:        queryParams.LocationIds,
+		LenderIds:          queryParams.LenderIds,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung DK Project")
 	}
@@ -131,6 +171,35 @@ func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, params
 		data = append(data, *res)
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter, params model.PaginationParams, limit, offset int) (queries.ListDKProjectsByDKParams, error) {
+	gbProjectIDs, err := uuidArray(filter.GBProjectIDs, "gb_project_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	executingAgencyIDs, err := uuidArray(filter.ExecutingAgencyIDs, "executing_agency_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	locationIDs, err := uuidArray(filter.LocationIDs, "location_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	lenderIDs, err := uuidArray(filter.LenderIDs, "lender_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	return queries.ListDKProjectsByDKParams{
+		DkID:               dkID,
+		Search:             nullableText(params.Search),
+		GbProjectIds:       gbProjectIDs,
+		ExecutingAgencyIds: executingAgencyIDs,
+		LocationIds:        locationIDs,
+		LenderIds:          lenderIDs,
+		Limit:              int32(limit),
+		Offset:             int32(offset),
+	}, nil
 }
 
 func (s *DKService) GetDKProject(ctx context.Context, dkID, id pgtype.UUID) (*model.DKProjectResponse, error) {

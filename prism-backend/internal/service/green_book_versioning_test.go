@@ -22,7 +22,7 @@ func TestGreenBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDo
 	assertAppErrorCode(t, err, "CONFLICT")
 
 	revision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
-	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.GBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}
@@ -97,7 +97,7 @@ func TestGreenBookRevisionClonePreservesIdentityAndUsesLatestBB(t *testing.T) {
 	sourceGBProject := env.createGBProject(t, gbService, greenBook.ID, oldBBProject.ID, "GB-001", "Flood Control GB")
 	revision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
 
-	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.GBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}
@@ -140,7 +140,7 @@ func TestGreenBookRevisionCloneMapsFundingAllocationToClonedActivity(t *testing.
 	sourceGBProject := env.createGBProject(t, gbService, greenBook.ID, oldBBProject.ID, "GB-001", "Flood Control GB")
 	revision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
 
-	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.PaginationParams{Page: 1, Limit: 10})
+	projects, err := gbService.ListGBProjects(env.ctx, mustParseUUID(t, revision.ID), model.GBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}

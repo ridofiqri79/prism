@@ -18,11 +18,19 @@ func NewLAHandler(service *service.LAService) *LAHandler {
 }
 
 func (h *LAHandler) ListLA(c echo.Context) error {
-	res, err := h.service.ListLoanAgreements(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListLoanAgreements(c.Request().Context(), loanAgreementListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func loanAgreementListFilter(c echo.Context) model.LoanAgreementListFilter {
+	return model.LoanAgreementListFilter{
+		LenderID:          queryStringPtr(c, "lender_id"),
+		IsExtended:        queryStringPtr(c, "is_extended"),
+		ClosingDateBefore: queryStringPtr(c, "closing_date_before"),
+	}
 }
 
 func (h *LAHandler) GetLA(c echo.Context) error {

@@ -1,5 +1,5 @@
 import type { DKProject } from '@/types/daftar-kegiatan.types'
-import type { Lender } from '@/types/master.types'
+import type { Lender, ListParams } from '@/types/master.types'
 
 export interface DKProjectSummary {
   id: string
@@ -41,9 +41,8 @@ export interface LoanAgreementPayload {
   amount_usd: number
 }
 
-export interface LoanAgreementListParams {
-  page?: number
-  limit?: number
+export interface LoanAgreementListParams extends ListParams {
+  search?: string
   lender_id?: string
   is_extended?: boolean
   closing_date_before?: string

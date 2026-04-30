@@ -16,11 +16,41 @@ SELECT
     p.year_end
 FROM blue_book bb
 JOIN period p ON p.id = bb.period_id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR p.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR bb.publish_date::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR bb.status ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+    OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+    OR bb.status = ANY(sqlc.arg('statuses')::text[])
+)
 ORDER BY bb.created_at DESC
-LIMIT $1 OFFSET $2;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountBlueBooks :one
-SELECT COUNT(*) FROM blue_book;
+SELECT COUNT(*)
+FROM blue_book bb
+JOIN period p ON p.id = bb.period_id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR p.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR bb.publish_date::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR bb.status ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+    OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+    OR bb.status = ANY(sqlc.arg('statuses')::text[])
+);
 
 -- name: GetBlueBook :one
 SELECT

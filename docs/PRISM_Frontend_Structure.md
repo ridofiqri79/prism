@@ -77,7 +77,8 @@ prism-frontend/
 │   ├── composables/                   # Reusable logic (Composition API)
 │   │   ├── useAuth.ts                 # Login, logout, cek permission
 │   │   ├── usePermission.ts           # can('bb_project', 'create') helper
-│   │   ├── usePagination.ts           # Pagination state & handler
+│   │   ├── usePagination.ts           # Pagination sederhana untuk flow lama/non-list
+│   │   ├── useListControls.ts         # Search, filter draft/applied, pagination, sort, active pills untuk list server-side
 │   │   ├── useSSE.ts                  # Subscribe/unsubscribe SSE events
 │   │   ├── useToast.ts                # Wrapper PrimeVue toast
 │   │   ├── useConfirm.ts              # Wrapper dialog konfirmasi delete
@@ -171,6 +172,7 @@ prism-frontend/
 │   └── components/                    # Reusable components
 │       ├── common/
 │       │   ├── DataTable.vue          # Wrapper PrimeVue DataTable dengan pagination
+│       │   ├── ListPaginationFooter.vue # Footer pagination reusable untuk DataTable dan tabel custom
 │       │   ├── SearchFilterBar.vue    # Search + filter drawer standar untuk halaman paginated
 │       │   ├── TableReloadShell.vue   # Shell animasi reload tabel yang mempertahankan data lama
 │       │   ├── PageHeader.vue         # Title + breadcrumb + action button
@@ -247,20 +249,23 @@ Component re-render via reactivity
 
 - Gunakan `src/components/common/DataTable.vue` untuk tabel list standar; komponen ini sudah mempertahankan data lama saat `loading` dan menampilkan animasi reload yang sama di semua halaman.
 - DataTable list standar harus meneruskan `page`, `limit`, `total`, `sort`, dan `order` dari API/store agar pagination server-side, sorting header, dan resize column tetap konsisten.
+- `DataTable.vue` wajib memakai `src/components/common/ListPaginationFooter.vue`. Tabel custom seperti Project dan detail Daftar Kegiatan juga memakai `ListPaginationFooter.vue`, bukan `Paginator` page-local.
 - Untuk tabel custom, bungkus markup tabel dengan `src/components/common/TableReloadShell.vue` dan kirim `refreshing` saat data sedang di-fetch ulang.
 - Skeleton hanya untuk load awal ketika data belum ada. Saat search/filter/pagination memicu fetch ulang, tabel lama tetap tampil dengan opacity transition dan indikator reload global.
 - Jika tabel custom perlu animasi baris, gunakan `<TransitionGroup name="prism-table-row-fade">` agar timing dan geraknya konsisten dengan tabel lain.
 
 ## Pola Search, Filter, dan Pagination
 
-- Halaman yang memiliki tabel paginated dan filter wajib memakai `src/components/common/SearchFilterBar.vue` di atas `DataTable.vue` atau table custom paginated.
+- Halaman yang memiliki tabel paginated dan filter wajib memakai `src/components/common/SearchFilterBar.vue` di atas `DataTable.vue` atau tabel custom paginated.
+- State list wajib memakai `src/composables/useListControls.ts` untuk `page`, `limit`, `sort`, `order`, `search`, draft filters, applied filters, active pills, debounce search, apply/reset/remove filter, dan build params.
 - Search bar tampil full-width sebagai kontrol utama, tanpa label visual terpisah. Gunakan placeholder yang eksplisit dan ikon `pi pi-search` terintegrasi, tetapi input box tetap mengikuti styling standar `InputText` PrimeVue seperti field lain.
-- Search boleh auto-apply dengan debounce pendek. Saat search berubah, reset page ke `1` dan kirim parameter `search` ke endpoint list agar pagination tetap server-side.
-- Filter lanjutan dibuka lewat tombol `Filter` di dalam card yang sama. Drawer harus in-place, bukan modal/pop-up terpisah, agar konteks tabel tidak terputus.
-- Isi drawer memakai grid responsif `xl:grid-cols-6`. Setiap field boleh memakai `xl:col-span-*` sesuai kompleksitas, tetapi layout harus tetap rapi dan tidak membuat card bersarang.
-- Nilai filter dropdown disiapkan sebagai draft. Terapkan filter hanya ketika user menekan `Terapkan`; tombol `Reset` membersihkan search, draft filter, dan filter yang sudah diterapkan.
-- Filter dropdown yang sudah diterapkan wajib muncul sebagai pill aktif langsung di bawah search bar. Search cukup tetap terlihat di input, tidak perlu dibuat pill terpisah. Pill menampilkan nama filter dan ringkasan nilai, serta bisa diklik untuk menghapus filter tersebut.
-- Query parameter multi-value memakai array/repeated values, misalnya `executing_agency_ids` atau `location_ids`, sesuai kontrak API. Jangan mengambil semua data lalu filter lokal jika endpoint sudah paginated.
+- Search auto-apply dengan debounce pendek. Saat search berubah, reset page ke `1` dan kirim parameter `search` ke endpoint list agar pagination tetap server-side.
+- Filter lanjutan dibuka lewat tombol `Filter` di dalam surface yang sama. Panel harus in-place, bukan modal/pop-up terpisah, agar konteks tabel tidak terputus.
+- Isi panel memakai grid responsif `xl:grid-cols-6`. Setiap field boleh memakai `xl:col-span-*` sesuai kompleksitas, tetapi layout harus tetap rapi dan tidak membuat card bersarang.
+- Nilai filter dropdown disiapkan sebagai draft. Terapkan filter hanya ketika user menekan `Terapkan`; tombol `Reset` membersihkan search, draft filter, applied filter, active pills, dan mengembalikan page ke `1`.
+- Filter dropdown yang sudah diterapkan wajib muncul sebagai pill aktif langsung di bawah search bar. Search cukup tetap terlihat di input, tidak perlu dibuat pill terpisah. Pill menampilkan nama filter dan ringkasan nilai, serta bisa diklik untuk menghapus filter tersebut lalu refetch page `1`.
+- Query parameter multi-value memakai salah satu format yang diterima API: repeated query (`ids=a&ids=b`), comma-separated (`ids=a,b`), atau array suffix (`ids[]=a&ids[]=b`). Jangan mengambil semua data lalu filter lokal jika endpoint sudah paginated.
+- Target list yang wajib mengikuti pola ini: Project (`/projects`), Blue Book list dan project detail, Green Book list dan project detail, Daftar Kegiatan list dan project detail, Loan Agreement list, dan Monitoring list.
 
 ---
 

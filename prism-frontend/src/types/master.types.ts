@@ -167,7 +167,7 @@ export interface ListParams {
   limit?: number
   sort?: string
   order?: 'asc' | 'desc'
-  [key: string]: string | string[] | number | boolean | undefined
+  [key: string]: string | string[] | number | number[] | boolean | undefined
 }
 
 export type CreatePayload<T extends { id: string }> = Omit<T, 'id'>

@@ -5,21 +5,39 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { daftarKegiatanSchema } from '@/schemas/daftar-kegiatan.schema'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
-import type { DaftarKegiatan, DaftarKegiatanPayload } from '@/types/daftar-kegiatan.types'
+import type {
+  DaftarKegiatan,
+  DaftarKegiatanListParams,
+  DaftarKegiatanPayload,
+} from '@/types/daftar-kegiatan.types'
 import { formatDate, toFormErrors, type FormErrors } from './daftar-kegiatan-page-utils'
 
 type DKField = keyof DaftarKegiatanPayload
+interface DKFilterState {
+  date_from: string
+  date_to: string
+}
 
 const dkStore = useDaftarKegiatanStore()
 const toast = useToast()
 const { can } = usePermission()
 
-const page = ref(1)
-const limit = ref(20)
+const listControls = useListControls<DKFilterState>({
+  initialFilters: {
+    date_from: '',
+    date_to: '',
+  },
+  filterLabels: {
+    date_from: 'Tanggal dari',
+    date_to: 'Tanggal sampai',
+  },
+})
 const dialogVisible = ref(false)
 const form = reactive<DaftarKegiatanPayload>({
   subject: '',
@@ -35,8 +53,12 @@ const columns: ColumnDef[] = [
   { field: 'actions', header: 'Aksi' },
 ]
 
+function buildListParams(): DaftarKegiatanListParams {
+  return listControls.buildParams() as DaftarKegiatanListParams
+}
+
 async function loadData() {
-  await dkStore.fetchDaftarKegiatan({ page: page.value, limit: limit.value })
+  await dkStore.fetchDaftarKegiatan(buildListParams())
 }
 
 function openCreate() {
@@ -65,9 +87,17 @@ async function save() {
   await loadData()
 }
 
-watch([page, limit], () => {
-  void loadData()
-})
+watch(
+  [
+    listControls.page,
+    listControls.limit,
+    listControls.debouncedSearch,
+    () => JSON.stringify(listControls.appliedFilters),
+  ],
+  () => {
+    void loadData()
+  },
+)
 
 onMounted(() => {
   void loadData()
@@ -87,9 +117,30 @@ onMounted(() => {
       </template>
     </PageHeader>
 
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari perihal, nomor surat, atau tanggal"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Tanggal dari</span>
+          <InputText v-model="listControls.draftFilters.date_from" type="date" class="w-full" />
+        </label>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Tanggal sampai</span>
+          <InputText v-model="listControls.draftFilters.date_to" type="date" class="w-full" />
+        </label>
+      </template>
+    </SearchFilterBar>
+
     <DataTable
-      v-model:page="page"
-      v-model:limit="limit"
+      v-model:page="listControls.page.value"
+      v-model:limit="listControls.limit.value"
       :data="dkStore.daftarKegiatan as unknown as Record<string, unknown>[]"
       :columns="columns"
       :loading="dkStore.loading"

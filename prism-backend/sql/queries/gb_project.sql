@@ -3,11 +3,38 @@
 -- name: ListGreenBooks :many
 SELECT *
 FROM green_book
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR publish_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR status ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('publish_years')::int[]), 0) = 0
+    OR publish_year = ANY(sqlc.arg('publish_years')::int[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+    OR status = ANY(sqlc.arg('statuses')::text[])
+)
 ORDER BY publish_year DESC, revision_number DESC
-LIMIT $1 OFFSET $2;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountGreenBooks :one
-SELECT COUNT(*) FROM green_book;
+SELECT COUNT(*)
+FROM green_book
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR publish_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR status ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('publish_years')::int[]), 0) = 0
+    OR publish_year = ANY(sqlc.arg('publish_years')::int[])
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+    OR status = ANY(sqlc.arg('statuses')::text[])
+);
 
 -- name: GetGreenBook :one
 SELECT *
@@ -76,16 +103,143 @@ WHERE id = $1;
 -- name: ListGBProjectsByGreenBook :many
 SELECT *
 FROM gb_project
-WHERE green_book_id = $1
-  AND status = 'active'
+WHERE green_book_id = sqlc.arg('green_book_id')
+  AND (
+      (
+          COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+          AND status = 'active'
+      )
+      OR (
+          COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) > 0
+          AND status = ANY(sqlc.arg('statuses')::text[])
+      )
+  )
+  AND (
+      sqlc.narg('search')::text IS NULL
+      OR gb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_institution gpi
+          JOIN institution i ON i.id = gpi.institution_id
+          WHERE gpi.gb_project_id = gb_project.id
+            AND gpi.role = 'Executing Agency'
+            AND (
+                i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN bb_project bp ON bp.id = gbp.bb_project_id
+          WHERE gbp.gb_project_id = gb_project.id
+            AND (
+                bp.bb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR bp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('bb_project_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          WHERE gbp.gb_project_id = gb_project.id
+            AND gbp.bb_project_id = ANY(sqlc.arg('bb_project_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_institution gpi
+          WHERE gpi.gb_project_id = gb_project.id
+            AND gpi.role = 'Executing Agency'
+            AND gpi.institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_location gpl
+          WHERE gpl.gb_project_id = gb_project.id
+            AND gpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+      )
+  )
 ORDER BY gb_code ASC
-LIMIT $2 OFFSET $3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountGBProjectsByGreenBook :one
 SELECT COUNT(*)
 FROM gb_project
-WHERE green_book_id = $1
-  AND status = 'active';
+WHERE green_book_id = sqlc.arg('green_book_id')
+  AND (
+      (
+          COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
+          AND status = 'active'
+      )
+      OR (
+          COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) > 0
+          AND status = ANY(sqlc.arg('statuses')::text[])
+      )
+  )
+  AND (
+      sqlc.narg('search')::text IS NULL
+      OR gb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_institution gpi
+          JOIN institution i ON i.id = gpi.institution_id
+          WHERE gpi.gb_project_id = gb_project.id
+            AND gpi.role = 'Executing Agency'
+            AND (
+                i.name ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR COALESCE(i.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN bb_project bp ON bp.id = gbp.bb_project_id
+          WHERE gbp.gb_project_id = gb_project.id
+            AND (
+                bp.bb_code ILIKE '%' || sqlc.narg('search')::text || '%'
+                OR bp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('bb_project_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          WHERE gbp.gb_project_id = gb_project.id
+            AND gbp.bb_project_id = ANY(sqlc.arg('bb_project_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_institution gpi
+          WHERE gpi.gb_project_id = gb_project.id
+            AND gpi.role = 'Executing Agency'
+            AND gpi.institution_id = ANY(sqlc.arg('executing_agency_ids')::uuid[])
+      )
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('location_ids')::uuid[]), 0) = 0
+      OR EXISTS (
+          SELECT 1
+          FROM gb_project_location gpl
+          WHERE gpl.gb_project_id = gb_project.id
+            AND gpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
+      )
+  )
+;
 
 -- name: GetGBProject :one
 SELECT *

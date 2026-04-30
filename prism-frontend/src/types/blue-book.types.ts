@@ -33,6 +33,12 @@ export interface BlueBookPayload {
   revision_year?: number | null
 }
 
+export interface BlueBookListParams extends ListParams {
+  search?: string
+  period_id?: string[]
+  status?: BlueBookStatus[]
+}
+
 export interface BBProject {
   id: string
   blue_book_id?: string

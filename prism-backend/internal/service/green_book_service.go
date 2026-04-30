@@ -26,13 +26,21 @@ func NewGreenBookService(db *pgxpool.Pool, queries *queries.Queries, broker *sse
 	return &GreenBookService{db: db, queries: queries, broker: broker}
 }
 
-func (s *GreenBookService) ListGreenBooks(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.GreenBookResponse], error) {
+func (s *GreenBookService) ListGreenBooks(ctx context.Context, filter model.GreenBookListFilter, params model.PaginationParams) (*model.ListResponse[model.GreenBookResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListGreenBooks(ctx, queries.ListGreenBooksParams{Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildGreenBookListParams(filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListGreenBooks(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar Green Book")
 	}
-	total, err := s.queries.CountGreenBooks(ctx)
+	total, err := s.queries.CountGreenBooks(ctx, queries.CountGreenBooksParams{
+		Search:       queryParams.Search,
+		PublishYears: queryParams.PublishYears,
+		Statuses:     queryParams.Statuses,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung Green Book")
 	}
@@ -41,6 +49,24 @@ func (s *GreenBookService) ListGreenBooks(ctx context.Context, params model.Pagi
 		data = append(data, greenBookResponse(row))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildGreenBookListParams(filter model.GreenBookListFilter, params model.PaginationParams, limit, offset int) (queries.ListGreenBooksParams, error) {
+	publishYears, err := int32Array(filter.PublishYears, "publish_year")
+	if err != nil {
+		return queries.ListGreenBooksParams{}, err
+	}
+	statuses, err := allowedValues(filter.Statuses, map[string]struct{}{"active": {}, "superseded": {}}, "status")
+	if err != nil {
+		return queries.ListGreenBooksParams{}, err
+	}
+	return queries.ListGreenBooksParams{
+		Search:       nullableText(params.Search),
+		PublishYears: publishYears,
+		Statuses:     statuses,
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+	}, nil
 }
 
 func (s *GreenBookService) GetGreenBook(ctx context.Context, id pgtype.UUID) (*model.GreenBookResponse, error) {
@@ -138,13 +164,24 @@ func (s *GreenBookService) DeleteGreenBook(ctx context.Context, id pgtype.UUID) 
 	})
 }
 
-func (s *GreenBookService) ListGBProjects(ctx context.Context, gbID pgtype.UUID, params model.PaginationParams) (*model.ListResponse[model.GBProjectResponse], error) {
+func (s *GreenBookService) ListGBProjects(ctx context.Context, gbID pgtype.UUID, filter model.GBProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.GBProjectResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListGBProjectsByGreenBook(ctx, queries.ListGBProjectsByGreenBookParams{GreenBookID: gbID, Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildGBProjectListParams(gbID, filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListGBProjectsByGreenBook(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar GB Project")
 	}
-	total, err := s.queries.CountGBProjectsByGreenBook(ctx, gbID)
+	total, err := s.queries.CountGBProjectsByGreenBook(ctx, queries.CountGBProjectsByGreenBookParams{
+		GreenBookID:        queryParams.GreenBookID,
+		Search:             queryParams.Search,
+		BbProjectIds:       queryParams.BbProjectIds,
+		ExecutingAgencyIds: queryParams.ExecutingAgencyIds,
+		LocationIds:        queryParams.LocationIds,
+		Statuses:           queryParams.Statuses,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung GB Project")
 	}
@@ -157,6 +194,35 @@ func (s *GreenBookService) ListGBProjects(ctx context.Context, gbID pgtype.UUID,
 		data = append(data, *res)
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildGBProjectListParams(gbID pgtype.UUID, filter model.GBProjectListFilter, params model.PaginationParams, limit, offset int) (queries.ListGBProjectsByGreenBookParams, error) {
+	bbProjectIDs, err := uuidArray(filter.BBProjectIDs, "bb_project_ids")
+	if err != nil {
+		return queries.ListGBProjectsByGreenBookParams{}, err
+	}
+	executingAgencyIDs, err := uuidArray(filter.ExecutingAgencyIDs, "executing_agency_ids")
+	if err != nil {
+		return queries.ListGBProjectsByGreenBookParams{}, err
+	}
+	locationIDs, err := uuidArray(filter.LocationIDs, "location_ids")
+	if err != nil {
+		return queries.ListGBProjectsByGreenBookParams{}, err
+	}
+	statuses, err := allowedValues(filter.Statuses, map[string]struct{}{"active": {}, "deleted": {}}, "status")
+	if err != nil {
+		return queries.ListGBProjectsByGreenBookParams{}, err
+	}
+	return queries.ListGBProjectsByGreenBookParams{
+		GreenBookID:        gbID,
+		Search:             nullableText(params.Search),
+		BbProjectIds:       bbProjectIDs,
+		ExecutingAgencyIds: executingAgencyIDs,
+		LocationIds:        locationIDs,
+		Statuses:           statuses,
+		Limit:              int32(limit),
+		Offset:             int32(offset),
+	}, nil
 }
 
 func (s *GreenBookService) GetGBProject(ctx context.Context, gbID, id pgtype.UUID) (*model.GBProjectResponse, error) {

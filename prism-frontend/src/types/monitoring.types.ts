@@ -1,3 +1,5 @@
+import type { ListParams } from '@/types/master.types'
+
 export type Quarter = 'TW1' | 'TW2' | 'TW3' | 'TW4'
 
 export interface MonitoringKomponen {
@@ -44,9 +46,10 @@ export interface MonitoringPayload {
   komponen?: MonitoringKomponen[]
 }
 
-export interface MonitoringListParams {
-  page?: number
-  limit?: number
+export interface MonitoringListParams extends ListParams {
+  search?: string
+  budget_year?: number
+  quarter?: Quarter
 }
 
 export type MonitoringApiResponse = Omit<MonitoringDisbursement, 'absorption_pct'> & {

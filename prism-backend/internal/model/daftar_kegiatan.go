@@ -16,6 +16,11 @@ type DaftarKegiatanResponse struct {
 	UpdatedAt    string  `json:"updated_at,omitempty"`
 }
 
+type DaftarKegiatanListFilter struct {
+	DateFrom *string
+	DateTo   *string
+}
+
 type CreateDKProjectRequest struct {
 	ProgramTitleID     *string                 `json:"program_title_id"`
 	InstitutionID      *string                 `json:"institution_id"`
@@ -30,6 +35,13 @@ type CreateDKProjectRequest struct {
 }
 
 type UpdateDKProjectRequest = CreateDKProjectRequest
+
+type DKProjectListFilter struct {
+	GBProjectIDs       []string
+	ExecutingAgencyIDs []string
+	LocationIDs        []string
+	LenderIDs          []string
+}
 
 type DKFinancingDetailItem struct {
 	LenderID            *string `json:"lender_id"`
