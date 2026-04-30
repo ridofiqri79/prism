@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
@@ -35,6 +35,8 @@ const blueBookId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
 const gbCreateDialogVisible = ref(false)
 const selectedBBProject = ref<BBProject | null>(null)
+const projectPage = ref(1)
+const projectLimit = ref(20)
 const form = reactive<BlueBookPayload>({
   period_id: '',
   publish_date: '',
@@ -47,20 +49,27 @@ const gbCreateForm = reactive({
 })
 const errors = ref<FormErrors<BlueBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'bb_code', header: 'Kode Blue Book' },
-  { field: 'project_name', header: 'Nama Proyek' },
-  { field: 'executing_agency', header: 'Executing Agency' },
-  { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Aksi' },
+  { field: 'bb_code', header: 'Kode Blue Book', width: '11rem' },
+  { field: 'project_name', header: 'Nama Proyek', width: '34%' },
+  { field: 'executing_agency', header: 'Executing Agency', width: '28%' },
+  { field: 'status', header: 'Status', width: '7rem' },
+  { field: 'actions', header: 'Aksi', align: 'right', width: '12rem' },
 ]
 
 async function loadData() {
   await Promise.all([
     masterStore.fetchPeriods(true, { limit: 1000 }),
     blueBookStore.fetchBlueBook(blueBookId.value),
-    blueBookStore.fetchProjects(blueBookId.value, { limit: 1000 }),
+    loadProjects(),
     greenBookStore.fetchGreenBooks({ limit: 1000 }),
   ])
+}
+
+async function loadProjects() {
+  await blueBookStore.fetchProjects(blueBookId.value, {
+    page: projectPage.value,
+    limit: projectLimit.value,
+  })
 }
 
 const greenBookOptions = computed(() =>
@@ -113,7 +122,11 @@ function deleteProject(project: BBProject) {
   confirm.confirmDelete(`Proyek Blue Book ${project.bb_code}`, async () => {
     await blueBookStore.deleteProject(blueBookId.value, project.id)
     toast.success('Berhasil', 'Proyek Blue Book berhasil dihapus')
-    await blueBookStore.fetchProjects(blueBookId.value, { limit: 1000 })
+    if (blueBookStore.projects.length === 1 && projectPage.value > 1) {
+      projectPage.value -= 1
+    } else {
+      await loadProjects()
+    }
   })
 }
 
@@ -141,6 +154,19 @@ async function createGBProjectFromBB() {
 
 onMounted(() => {
   void loadData()
+})
+
+watch(projectPage, () => {
+  void loadProjects()
+})
+
+watch(projectLimit, () => {
+  if (projectPage.value === 1) {
+    void loadProjects()
+    return
+  }
+
+  projectPage.value = 1
 })
 </script>
 
@@ -185,52 +211,60 @@ onMounted(() => {
     </div>
 
     <DataTable
+      v-model:page="projectPage"
+      v-model:limit="projectLimit"
       :data="blueBookStore.projects"
       :columns="columns"
       :loading="blueBookStore.loading"
       :total="blueBookStore.projectTotal"
-      :page="1"
-      :limit="1000"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'executing_agency'">
           {{ (row as BBProject).executing_agencies[0]?.name ?? '-' }}
         </span>
         <StatusBadge v-else-if="column.field === 'status'" :status="String(row.status)" />
-        <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
+        <div v-else-if="column.field === 'actions'" class="flex flex-wrap justify-end gap-1.5">
           <Button
+            v-tooltip.top="'Lihat proyek'"
             as="router-link"
             :to="{ name: 'bb-project-detail', params: { bbId: blueBookId, id: row.id } }"
             icon="pi pi-eye"
-            label="Lihat"
             size="small"
             outlined
+            rounded
+            aria-label="Lihat proyek"
           />
           <Button
             v-if="can('bb_project', 'update')"
+            v-tooltip.top="'Edit proyek'"
             as="router-link"
             :to="{ name: 'bb-project-edit', params: { bbId: blueBookId, id: row.id } }"
             icon="pi pi-pencil"
-            label="Edit"
             size="small"
             outlined
+            rounded
+            aria-label="Edit proyek"
           />
           <Button
             v-if="can('gb_project', 'create')"
+            v-tooltip.top="'Tambah ke Green Book'"
             icon="pi pi-plus"
-            label="Tambah Proyek Green Book"
             size="small"
             severity="secondary"
             outlined
+            rounded
+            aria-label="Tambah proyek Green Book"
             @click="openGBCreateDialog(row as BBProject)"
           />
           <Button
             v-if="can('bb_project', 'delete')"
+            v-tooltip.top="'Hapus proyek'"
             icon="pi pi-trash"
-            label="Hapus"
             size="small"
             severity="danger"
             outlined
+            rounded
+            aria-label="Hapus proyek"
             @click="deleteProject(row as BBProject)"
           />
         </div>
