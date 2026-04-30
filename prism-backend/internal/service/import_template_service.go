@@ -233,7 +233,7 @@ func (s *MasterService) buildMasterImportTemplateWorkbook(ctx context.Context) (
 		}),
 		templateInputSheet("Institutions", []string{"Name (*)", "Short Name", "Level (*)", "Parent Name"}, []float64{46, 18, 30, 46}, []simpleXLSXValidation{
 			listValidation("C2:C"+inputLastRow(), "ddInstitutionLevels", "Level", "Pilih level institution yang sesuai dengan skema PRISM."),
-			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Parent Name", "Pilih parent institution yang sudah ada jika level ini punya parent. Nama parent harus tidak ambigu."),
+			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Parent Name", "Pilih parent institution dari dropdown path. Nama polos tetap boleh jika tidak ambigu."),
 		}),
 		templateInputSheet("Regions", []string{"Code (*)", "Name (*)", "Level (*)", "Parent Code"}, []float64{18, 42, 20, 18}, []simpleXLSXValidation{
 			listValidation("C2:C"+inputLastRow(), "ddRegionLevels", "Level", "Pilih COUNTRY, PROVINCE, atau CITY. Alias Indonesia seperti Nasional/Provinsi/Kota juga diterima backend."),
@@ -279,11 +279,11 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 		}),
 		templateInputSheet(blueBookImportSheetEA, []string{"BB Code (*)", "Executing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data. Institution yang sama boleh dipakai sebagai EA dan IA bila memang sesuai data proyek."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution path dari master data. Nama polos tetap boleh jika tidak ambigu."),
 		}),
 		templateInputSheet(blueBookImportSheetIA, []string{"BB Code (*)", "Implementing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution dari master data. Boleh sama dengan EA untuk BB Code yang sama."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution path dari master data. Boleh sama dengan EA untuk BB Code yang sama."),
 		}),
 		templateInputSheet(blueBookImportSheetLocations, []string{"BB Code (*)", "Location Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputBBCodes", "BB Code", "Pilih BB Code dari sheet Input Data."),
@@ -337,11 +337,11 @@ func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx conte
 		}),
 		templateInputSheet(greenBookImportSheetEA, []string{"GB Code (*)", "Executing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution path dari master data. Nama polos tetap boleh jika tidak ambigu."),
 		}),
 		templateInputSheet(greenBookImportSheetIA, []string{"GB Code (*)", "Implementing Agency Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
-			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution dari master data."),
+			listValidation("B2:B"+inputLastRow(), "ddInstitutions", "Implementing Agency", "Pilih institution path dari master data. Nama polos tetap boleh jika tidak ambigu."),
 		}),
 		templateInputSheet(greenBookImportSheetLocations, []string{"GB Code (*)", "Location Name (*)"}, []float64{22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
@@ -355,7 +355,7 @@ func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx conte
 		templateInputSheet(greenBookImportSheetFundingSource, []string{"GB Code (*)", "Lender Name (*)", "Institution Name", "Currency", "Loan Original", "Grant Original", "Local Original", "Loan USD", "Grant USD", "Local USD"}, []float64{22, 42, 48, 14, 18, 18, 20, 18, 18, 18}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddInputGBCodes", "GB Code", "Pilih GB Code dari sheet Input Data."),
 			listValidation("B2:B"+inputLastRow(), "ddLenders", "Lender Name", "Pilih lender dari master data."),
-			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution terkait funding source bila ada."),
+			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution path terkait funding source bila ada. Nama polos tetap boleh jika tidak ambigu."),
 			listValidation("D2:D"+inputLastRow(), "ddCurrencies", "Currency", "Kosong akan dianggap USD. Jika USD, nilai original digunakan sebagai nilai USD."),
 			decimalValidation("E2:J"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Jika Currency USD, kolom USD boleh kosong karena backend menyamakan dengan Original."),
 		}),
@@ -402,7 +402,7 @@ func (s *DKService) buildDKImportTemplateWorkbook(ctx context.Context) (simpleXL
 		templateInputSheet(dkImportSheetInput, []string{"DK Key (*)", "Project Key (*)", "Program Title", "Executing Agency Name (*)", "Duration", "Objectives"}, []float64{22, 24, 38, 48, 18, 64}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddDKKeys", "DK Key", "Pilih DK Key dari sheet Daftar Kegiatan."),
 			listValidation("C2:C"+inputLastRow(), "ddProgramTitles", "Program Title", "Opsional. Jika diisi harus sesuai master Program Title."),
-			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution dari master data."),
+			listValidation("D2:D"+inputLastRow(), "ddInstitutions", "Executing Agency", "Pilih institution path dari master data. Nama polos tetap boleh jika tidak ambigu."),
 		}),
 		templateInputSheet(dkImportSheetGBProject, []string{"DK Key (*)", "Project Key (*)", "GB Code (*)"}, []float64{22, 24, 22}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddDKKeys", "DK Key", "Pilih DK Key dari sheet Daftar Kegiatan."),
@@ -424,7 +424,7 @@ func (s *DKService) buildDKImportTemplateWorkbook(ctx context.Context) (simpleXL
 		templateInputSheet(dkImportSheetLoanAllocation, []string{"DK Key (*)", "Project Key (*)", "Institution Name (*)", "Currency", "Amount Original", "Grant Original", "Counterpart Original", "Amount USD", "Grant USD", "Counterpart USD", "Remarks"}, []float64{22, 24, 48, 14, 18, 18, 22, 18, 18, 22, 48}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddDKKeys", "DK Key", "Pilih DK Key dari sheet Daftar Kegiatan."),
 			listValidation("B2:B"+inputLastRow(), "ddProjectKeys", "Project Key", "Pilih Project Key dari sheet Input Data."),
-			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution dari master data."),
+			listValidation("C2:C"+inputLastRow(), "ddInstitutions", "Institution Name", "Pilih institution path dari master data. Nama polos tetap boleh jika tidak ambigu."),
 			listValidation("D2:D"+inputLastRow(), "ddCurrencies", "Currency", "Kosong akan dianggap USD. Jika diketik manual, gunakan kode 3 huruf."),
 			decimalValidation("E2:J"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Kosong akan dianggap 0 oleh backend."),
 		}),
@@ -539,8 +539,12 @@ func buildMasterDataSnapshotSheet(name string, reference *importTemplateReferenc
 	for _, item := range reference.BappenasPartners {
 		rows = append(rows, textRow("Bappenas Partner", model.UUIDToString(item.ID), item.Name, item.Level, uuidText(item.ParentID), ""))
 	}
+	institutionsByID := make(map[string]queries.Institution, len(reference.Institutions))
 	for _, item := range reference.Institutions {
-		rows = append(rows, textRow("Institution", model.UUIDToString(item.ID), item.Name, item.Level, uuidText(item.ParentID), textFromPg(item.ShortName)))
+		institutionsByID[model.UUIDToString(item.ID)] = item
+	}
+	for _, item := range reference.Institutions {
+		rows = append(rows, textRow("Institution", model.UUIDToString(item.ID), item.Name, item.Level, uuidText(item.ParentID), institutionPathLabel(item, institutionsByID)))
 	}
 	for _, item := range reference.Regions {
 		rows = append(rows, textRow("Region", item.Code, item.Name, item.Type, textFromPg(item.ParentCode), ""))
@@ -622,14 +626,15 @@ func buildMasterGuideSheet() simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Program Titles", "Title (*)", "Parent Title opsional. Pilih dari dropdown bila parent sudah ada atau dibuat sebagai baris parent tanpa Parent Title."),
 		textRow("Bappenas Partners", "Name (*), Level (*)", "Level hanya Eselon I/Eselon II. Eselon II wajib memilih Parent Name Eselon I."),
-		textRow("Institutions", "Name (*), Level (*)", "Short Name opsional. Parent Name dipakai untuk struktur berjenjang dan harus tidak ambigu."),
+		textRow("Institutions", "Name (*), Level (*)", "Short Name opsional. Parent Name dapat diisi dari dropdown path agar nama child yang sama di parent berbeda tetap jelas."),
 		textRow("Regions", "Code (*), Name (*), Level (*)", "Level gunakan COUNTRY, PROVINCE, atau CITY. Parent Code wajib jika region punya parent."),
 		textRow("Periods", "Name (*), Year Start (*), Year End (*)", "Year End harus lebih besar dari Year Start."),
 		textRow("National Priorities", "Period Name (*), Title (*)", "Period Name pilih dari sheet Periods atau period yang sudah ada di database."),
 		textRow("Lenders", "Name (*), Type (*)", "Bilateral dan KSA wajib Country Name; Multilateral harus dikosongkan Country Name."),
 		textRow(""),
-		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data Snapshot hanya referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
 	}
+	rows = append(rows, institutionFallbackGuideRows()...)
+	rows = append(rows, styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data Snapshot hanya referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""))
 	return simpleXLSXSheet{
 		Name:          "Panduan",
 		Rows:          rows,
@@ -647,21 +652,22 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
 		textRow("1. Isi Input Data", "Satu baris mewakili satu proyek. BB Code menjadi kunci penghubung ke semua sheet relasi.", "BB Code yang sudah ada di database akan masuk status skip."),
 		textRow("2. Isi sheet relasi", "Gunakan BB Code yang sama dengan Input Data. Ulangi BB Code di beberapa baris untuk multi EA/IA/lokasi/prioritas/lender.", "BB Code pada sheet relasi punya dropdown dari Input Data."),
-		textRow("3. Gunakan Master Data", "Kolom Program Title, Bappenas Partners, Institution, Location, National Priority, dan Lender memakai dropdown dari master data.", "Jika pilihan tidak ada, tambahkan dulu melalui menu Master Data atau import Master Data."),
+		textRow("3. Gunakan Master Data", "Kolom Program Title, Bappenas Partners, Institution, Location, National Priority, dan Lender memakai dropdown dari master data.", "Dropdown Institution memakai path child; parent; root; untuk membedakan nama yang sama."),
 		textRow("4. Preview", "Upload workbook lalu klik Preview untuk memisahkan create, skip, dan failed.", "Preview tidak menyimpan data."),
 		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Input Data", "Program Title (*), BB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional. Bappenas Partners opsional dan bisa lebih dari satu dengan pemisah koma atau titik koma."),
-		textRow("Relasi - EA", "BB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib untuk proyek baru."),
-		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Institution yang sama boleh dipakai sebagai EA dan IA pada proyek yang sama."),
+		textRow("Relasi - EA", "BB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib. Isi nama jika unik, UUID, atau path child; parent; root; dari dropdown."),
+		textRow("Relasi - IA", "BB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Isi nama jika unik, UUID, atau path child; parent; root; dari dropdown."),
 		textRow("Relasi - Locations", "BB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region dari dropdown."),
 		textRow("Relasi - National Priority", "BB Code (*), National Priority Name (*)", "Pilih national priority dari seluruh master data, tidak dibatasi period Blue Book target."),
 		textRow("Relasi - Project Cost", "BB Code (*), Funding Type (*), Funding Category (*)", "Amount USD angka. Funding Type: Foreign/Counterpart."),
 		textRow("Relasi - Lender Indication", "BB Code (*), Lender Name (*)", "Keterangan opsional dan akan disimpan sebagai remarks lender indication."),
 		textRow(""),
-		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
 	}
+	rows = append(rows, institutionFallbackGuideRows()...)
+	rows = append(rows, styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""))
 	return simpleXLSXSheet{
 		Name:          "Panduan",
 		Rows:          rows,
@@ -678,23 +684,24 @@ func buildGreenBookGuideSheet(greenBook queries.GreenBook) simpleXLSXSheet {
 		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
 		textRow("1. Isi Input Data", "Satu baris mewakili satu GB Project. GB Code menjadi kunci penghubung ke semua sheet relasi.", "GB Code yang sudah ada di database akan masuk status skip."),
 		textRow("2. Isi sheet relasi", "Gunakan GB Code yang sama dengan Input Data. Ulangi GB Code untuk multi BB Project, EA/IA, lokasi, lender, dan rencana tahunan.", "GB Code pada sheet relasi punya dropdown dari Input Data."),
-		textRow("3. Activities dan allocation", "Activity No wajib unik per GB Code dan dipakai oleh sheet Funding Allocation.", "Activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation 0 agar sinkron."),
+		textRow("3. Activities dan allocation", "Activity No wajib unik per GB Code dan dipakai oleh sheet Funding Allocation.", "Dropdown Institution memakai path child; parent; root; untuk membedakan nama yang sama."),
 		textRow("4. Preview", "Upload workbook lalu klik Preview untuk memisahkan create, skip, dan failed.", "Preview tidak menyimpan data."),
 		textRow("5. Eksekusi", "Klik Eksekusi hanya jika tidak ada failed.", "Data dibuat dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Input Data", "Program Title (*), GB Code (*), Project Name (*)", "Duration diisi angka bulan; uraian proyek opsional."),
 		textRow("Relasi - BB Project", "GB Code (*), BB Code (*)", "Minimal satu BB Project active wajib untuk proyek baru."),
-		textRow("Relasi - EA", "GB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib."),
-		textRow("Relasi - IA", "GB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib."),
+		textRow("Relasi - EA", "GB Code (*), Executing Agency Name (*)", "Minimal satu EA wajib. Isi nama jika unik, UUID, atau path child; parent; root; dari dropdown."),
+		textRow("Relasi - IA", "GB Code (*), Implementing Agency Name (*)", "Minimal satu IA wajib. Isi nama jika unik, UUID, atau path child; parent; root; dari dropdown."),
 		textRow("Relasi - Locations", "GB Code (*), Location Name (*)", "Minimal satu lokasi wajib. Pilih nama region atau ketik kode region."),
 		textRow("Relasi - Activities", "GB Code (*), Activity No (*), Activity Name (*)", "Activity No unik per GB Code. Sort Order opsional."),
-		textRow("Relasi - Funding Source", "GB Code (*), Lender Name (*)", "Currency kosong dianggap USD. Jika Currency USD, nilai original dipakai sebagai nilai USD."),
+		textRow("Relasi - Funding Source", "GB Code (*), Lender Name (*)", "Institution Name opsional menerima nama unik, UUID, atau path. Currency kosong dianggap USD."),
 		textRow("Relasi - Disbursement Plan", "GB Code (*), Year (*)", "Year harus unik per GB Code. Amount USD adalah total proyek per tahun."),
 		textRow("Relasi - Funding Allocation", "GB Code (*), Activity No (*)", "Isi breakdown per Activity No. Jika tidak diisi, allocation dibuat 0."),
 		textRow(""),
-		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
 	}
+	rows = append(rows, institutionFallbackGuideRows()...)
+	rows = append(rows, styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""))
 	return simpleXLSXSheet{
 		Name:          "Panduan",
 		Rows:          rows,
@@ -724,8 +731,9 @@ func buildDKGuideSheet() simpleXLSXSheet {
 		textRow("Relasi - Loan Allocation", "DK Key (*), Project Key (*), Institution Name (*)", "Currency kosong dianggap USD. Amount kosong dianggap 0 dan tidak boleh negatif."),
 		textRow("Relasi - Activity Detail", "DK Key (*), Project Key (*), Activity No (*), Activity Name (*)", "Activity No wajib unik per project."),
 		textRow(""),
-		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
 	}
+	rows = append(rows, institutionFallbackGuideRows()...)
+	rows = append(rows, styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""))
 	return simpleXLSXSheet{
 		Name:          "Panduan",
 		Rows:          rows,
@@ -743,6 +751,15 @@ func templateInputSheet(name string, headers []string, widths []float64, validat
 		AutoFilter:    fmt.Sprintf("A1:%s1", xlsxColumnName(len(headers)-1)),
 		FreezeRows:    1,
 		ShowGridLines: false,
+	}
+}
+
+func institutionFallbackGuideRows() [][]simpleXLSXCell {
+	return [][]simpleXLSXCell{
+		styledTextRow(xlsxStyleSection, "Fallback Referensi Institution", "Cara Isi", "Catatan"),
+		textRow("Prioritas 1 - Path dropdown", "Gunakan nilai dropdown dengan format Nama Child; Nama Parent; Nama Root;.", "Direkomendasikan untuk nama yang muncul di beberapa parent, misalnya Sekretariat Utama."),
+		textRow("Prioritas 2 - UUID", "Jika path tidak tersedia atau workbook lama dipakai, isi UUID dari kolom ID/Code pada sheet Master Data.", "UUID selalu menunjuk satu institution spesifik."),
+		textRow("Prioritas 3 - Nama polos", "Nama polos tetap diterima hanya jika nama tersebut unik di master Institution.", "Jika ada lebih dari satu nama sama, Preview berstatus failed agar import tidak memilih parent yang salah."),
 	}
 }
 
@@ -946,8 +963,12 @@ func bappenasPartnerValues(items []queries.BappenasPartner, level string) []stri
 
 func institutionValues(items []queries.Institution) []string {
 	values := make([]string, 0, len(items))
+	institutionsByID := make(map[string]queries.Institution, len(items))
 	for _, item := range items {
-		values = append(values, item.Name)
+		institutionsByID[model.UUIDToString(item.ID)] = item
+	}
+	for _, item := range items {
+		values = append(values, institutionPathLabel(item, institutionsByID))
 	}
 	return values
 }

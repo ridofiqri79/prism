@@ -202,7 +202,7 @@ Response meta:
 }
 ```
 
-Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. Jika sebuah `Parent Name` mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
+Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. `Parent Name` dapat diisi dengan nama jika unik, UUID institution, atau path `Nama Child; Nama Parent; Nama Root;`. Jika `Parent Name` hanya berisi nama polos dan mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Sheet `Panduan` pada template menjelaskan fallback referensi Institution: path dropdown sebagai prioritas utama, UUID dari sheet Master Data sebagai fallback paling spesifik, dan nama polos hanya jika unik. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
 
 ### Country
 
@@ -565,7 +565,7 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 | `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
 | `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
 
-Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma. Kolom institution pada `Relasi - EA` dan `Relasi - IA` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama.
 
 **Preview:**
 `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -767,7 +767,7 @@ Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB C
 | `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
 | `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
 
-Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom institution pada `Relasi - EA`, `Relasi - IA`, dan `Relasi - Funding Source` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama.
 
 **Preview:**
 `POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -955,7 +955,7 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
 

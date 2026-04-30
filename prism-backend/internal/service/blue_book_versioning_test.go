@@ -205,6 +205,79 @@ func TestBlueBookImportReusesPreviousIdentityForRevisionSnapshot(t *testing.T) {
 	}
 }
 
+func TestBlueBookImportRejectsDuplicateBBCodeInWorkbook(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	blueBook := env.createBlueBook(t, 0, nil)
+	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
+		{
+			Name: blueBookImportSheetInput,
+			Rows: [][]simpleXLSXCell{
+				headerRow("Program Title (*)", "BB Code (*)", "Project Name (*)"),
+				textRow(env.programTitle.Title, "BB-DUP", "Duplicate A"),
+				textRow(env.programTitle.Title, "BB-DUP", "Duplicate B"),
+			},
+			Columns:       columns(28, 18, 48),
+			ShowGridLines: false,
+		},
+		emptyImportSheet(blueBookImportSheetEA, "BB Code (*)", "Executing Agency Name (*)"),
+		emptyImportSheet(blueBookImportSheetIA, "BB Code (*)", "Implementing Agency Name (*)"),
+		emptyImportSheet(blueBookImportSheetLocations, "BB Code (*)", "Location Name (*)"),
+		emptyImportSheet(blueBookImportSheetNationalPriority, "BB Code (*)", "National Priority Name (*)"),
+		emptyImportSheet(blueBookImportSheetProjectCost, "BB Code (*)", "Funding Type (*)", "Funding Category (*)", "Amount USD"),
+		emptyImportSheet(blueBookImportSheetLenderIndication, "BB Code (*)", "Lender Name (*)", "Remarks"),
+	}}
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		t.Fatalf("buildSimpleXLSX() error = %v", err)
+	}
+
+	res, err := env.service.PreviewBlueBookProjects(env.ctx, mustParseUUID(t, blueBook.ID), "blue-book-projects.xlsx", bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("PreviewBlueBookProjects() error = %v", err)
+	}
+	inputSheet := findImportSheet(t, res, blueBookImportSheetInput)
+	if inputSheet.Failed == 0 || !importSheetHasMessage(inputSheet, "BB Code duplikat di workbook") {
+		t.Fatalf("input sheet did not report duplicate BB Code: %+v", inputSheet)
+	}
+}
+
+func TestBlueBookImportResolvesScopedInstitutionPath(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	blueBook := env.createBlueBook(t, 0, nil)
+	_, _ = env.createScopedInstitution(t, "Kementerian A", "Sekretariat Utama")
+	targetInstitution, targetPath := env.createScopedInstitution(t, "Kementerian B", "Sekretariat Utama")
+
+	ambiguousWorkbook := buildBlueBookImportWorkbookWithInstitutionRefs(t, env, "BB-AMB", "Ambiguous Institution", "Sekretariat Utama", env.ia.Name)
+	ambiguousRes, err := env.service.PreviewBlueBookProjects(env.ctx, mustParseUUID(t, blueBook.ID), "blue-book-projects.xlsx", bytes.NewReader(ambiguousWorkbook), int64(len(ambiguousWorkbook)))
+	if err != nil {
+		t.Fatalf("PreviewBlueBookProjects(ambiguous) error = %v", err)
+	}
+	eaSheet := findImportSheet(t, ambiguousRes, blueBookImportSheetEA)
+	if eaSheet.Failed == 0 || !importSheetHasMessage(eaSheet, "ambigu") {
+		t.Fatalf("EA sheet did not report ambiguous institution: %+v", eaSheet)
+	}
+
+	workbook := buildBlueBookImportWorkbookWithInstitutionRefs(t, env, "BB-SCOPED", "Scoped Institution", targetPath, env.ia.Name)
+	res, err := env.service.ImportBlueBookProjects(env.ctx, mustParseUUID(t, blueBook.ID), "blue-book-projects.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("ImportBlueBookProjects(scoped) error = %v", err)
+	}
+	if res.TotalFailed != 0 {
+		t.Fatalf("TotalFailed = %d, response = %+v", res.TotalFailed, res)
+	}
+	imported, err := env.queries.GetBBProjectByBlueBookAndCode(env.ctx, queries.GetBBProjectByBlueBookAndCodeParams{BlueBookID: mustParseUUID(t, blueBook.ID), Lower: "BB-SCOPED"})
+	if err != nil {
+		t.Fatalf("GetBBProjectByBlueBookAndCode(scoped) error = %v", err)
+	}
+	institutions, err := env.queries.GetBBProjectInstitutions(env.ctx, imported.ID)
+	if err != nil {
+		t.Fatalf("GetBBProjectInstitutions(scoped) error = %v", err)
+	}
+	if !hasInstitutionRole(institutions, targetInstitution.ID, roleExecutingAgency) {
+		t.Fatalf("imported institutions = %+v, want scoped EA %s", institutions, model.UUIDToString(targetInstitution.ID))
+	}
+}
+
 func setupBlueBookVersioningTest(t *testing.T) *blueBookVersioningTestEnv {
 	t.Helper()
 	if testing.Short() {
@@ -371,6 +444,19 @@ func (env *blueBookVersioningTestEnv) createBBProject(t *testing.T, blueBookID, 
 	return res
 }
 
+func (env *blueBookVersioningTestEnv) createScopedInstitution(t *testing.T, rootName, childName string) (queries.Institution, string) {
+	t.Helper()
+	root, err := env.queries.CreateInstitution(env.ctx, queries.CreateInstitutionParams{ParentID: pgtype.UUID{}, Name: rootName, ShortName: pgtype.Text{}, Level: "Kementerian/Badan/Lembaga"})
+	if err != nil {
+		t.Fatalf("CreateInstitution(%s) error = %v", rootName, err)
+	}
+	child, err := env.queries.CreateInstitution(env.ctx, queries.CreateInstitutionParams{ParentID: root.ID, Name: childName, ShortName: pgtype.Text{}, Level: "Eselon I"})
+	if err != nil {
+		t.Fatalf("CreateInstitution(%s under %s) error = %v", childName, rootName, err)
+	}
+	return child, fmt.Sprintf("%s; %s;", childName, rootName)
+}
+
 func (env *blueBookVersioningTestEnv) bbProjectRequest(code, name string) model.CreateBBProjectRequest {
 	programTitleID := model.UUIDToString(env.programTitle.ID)
 	return model.CreateBBProjectRequest{
@@ -390,6 +476,11 @@ func (env *blueBookVersioningTestEnv) bbProjectRequest(code, name string) model.
 
 func buildBlueBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTestEnv, code, projectName string) []byte {
 	t.Helper()
+	return buildBlueBookImportWorkbookWithInstitutionRefs(t, env, code, projectName, env.ea.Name, env.ia.Name)
+}
+
+func buildBlueBookImportWorkbookWithInstitutionRefs(t *testing.T, env *blueBookVersioningTestEnv, code, projectName, executingAgencyRef, implementingAgencyRef string) []byte {
+	t.Helper()
 	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
 		{
 			Name: blueBookImportSheetInput,
@@ -404,7 +495,7 @@ func buildBlueBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTe
 			Name: blueBookImportSheetEA,
 			Rows: [][]simpleXLSXCell{
 				headerRow("BB Code (*)", "Executing Agency Name (*)"),
-				textRow(code, env.ea.Name),
+				textRow(code, executingAgencyRef),
 			},
 			Columns:       columns(18, 44),
 			ShowGridLines: false,
@@ -413,7 +504,7 @@ func buildBlueBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTe
 			Name: blueBookImportSheetIA,
 			Rows: [][]simpleXLSXCell{
 				headerRow("BB Code (*)", "Implementing Agency Name (*)"),
-				textRow(code, env.ia.Name),
+				textRow(code, implementingAgencyRef),
 			},
 			Columns:       columns(18, 44),
 			ShowGridLines: false,
@@ -436,6 +527,29 @@ func buildBlueBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTe
 		t.Fatalf("buildSimpleXLSX() error = %v", err)
 	}
 	return data
+}
+
+func importSheetHasMessage(sheet model.MasterImportSheetResult, want string) bool {
+	for _, row := range sheet.Rows {
+		if strings.Contains(row.Message, want) {
+			return true
+		}
+	}
+	for _, row := range sheet.Errors {
+		if strings.Contains(row.Message, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasInstitutionRole(rows []queries.GetBBProjectInstitutionsRow, institutionID pgtype.UUID, role string) bool {
+	for _, row := range rows {
+		if row.Role == role && model.UUIDToString(row.ID) == model.UUIDToString(institutionID) {
+			return true
+		}
+	}
+	return false
 }
 
 func emptyImportSheet(name string, headers ...string) simpleXLSXSheet {

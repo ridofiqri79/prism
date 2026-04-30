@@ -16,6 +16,9 @@ func Logger() echo.MiddlewareFunc {
 
 			start := time.Now()
 			err := next(c)
+			if err != nil {
+				c.Error(err)
+			}
 			latency := time.Since(start)
 
 			req := c.Request()
@@ -37,7 +40,7 @@ func Logger() echo.MiddlewareFunc {
 			}
 
 			event.Msg("http_request")
-			return err
+			return nil
 		}
 	}
 }

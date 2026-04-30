@@ -105,7 +105,9 @@ type masterImportLookups struct {
 	countriesByCode           map[string]queries.Country
 	countriesByName           map[string]queries.Country
 	lendersByName             map[string]masterImportLenderRef
+	institutionsByID          map[string]queries.Institution
 	institutionsByName        map[string]queries.Institution
+	institutionsByPath        map[string]queries.Institution
 	ambiguousInstitutionNames map[string]struct{}
 	institutionScopeKeys      map[string]struct{}
 	regionsByCode             map[string]queries.Region
@@ -209,7 +211,9 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		countriesByCode:           map[string]queries.Country{},
 		countriesByName:           map[string]queries.Country{},
 		lendersByName:             map[string]masterImportLenderRef{},
+		institutionsByID:          map[string]queries.Institution{},
 		institutionsByName:        map[string]queries.Institution{},
+		institutionsByPath:        map[string]queries.Institution{},
 		ambiguousInstitutionNames: map[string]struct{}{},
 		institutionScopeKeys:      map[string]struct{}{},
 		regionsByCode:             map[string]queries.Region{},
@@ -247,6 +251,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	for _, institution := range institutions {
 		lookups.addInstitution(institution)
 	}
+	lookups.rebuildInstitutionPathLookups()
 
 	regions, err := qtx.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, ParentCodeFilter: pgtype.Text{}, Search: pgtype.Text{}, SortField: "type", SortOrder: "asc"})
 	if err != nil {
@@ -450,7 +455,7 @@ func (s *MasterService) importInstitutions(ctx context.Context, qtx *queries.Que
 
 			parentID := pgtype.UUID{}
 			if parentName != "" {
-				parent, exists, ambiguous := lookups.lookupInstitutionByName(parentName)
+				parent, exists, ambiguous := lookups.lookupInstitutionReference(parentName)
 				if ambiguous {
 					addImportError(&result, row.number, fmt.Sprintf("Parent Name %q ambigu karena ada lebih dari satu institution dengan nama sama", parentName))
 					continue
@@ -1168,6 +1173,23 @@ func (l *masterImportLookups) addCountry(country queries.Country) {
 }
 
 func (l *masterImportLookups) addInstitution(institution queries.Institution) {
+	if l.institutionsByID == nil {
+		l.institutionsByID = map[string]queries.Institution{}
+	}
+	if l.institutionsByName == nil {
+		l.institutionsByName = map[string]queries.Institution{}
+	}
+	if l.institutionsByPath == nil {
+		l.institutionsByPath = map[string]queries.Institution{}
+	}
+	if l.ambiguousInstitutionNames == nil {
+		l.ambiguousInstitutionNames = map[string]struct{}{}
+	}
+	if l.institutionScopeKeys == nil {
+		l.institutionScopeKeys = map[string]struct{}{}
+	}
+
+	l.institutionsByID[model.UUIDToString(institution.ID)] = institution
 	nameKey := normalizeLookupKey(institution.Name)
 	if existing, exists := l.institutionsByName[nameKey]; exists && model.UUIDToString(existing.ID) != model.UUIDToString(institution.ID) {
 		l.ambiguousInstitutionNames[nameKey] = struct{}{}
@@ -1175,11 +1197,23 @@ func (l *masterImportLookups) addInstitution(institution queries.Institution) {
 		l.institutionsByName[nameKey] = institution
 	}
 	l.institutionScopeKeys[institutionScopeKey(institution.Name, institution.ParentID)] = struct{}{}
+	if path := institutionPathLabel(institution, l.institutionsByID); path != "" {
+		l.institutionsByPath[normalizeInstitutionPathKey(path)] = institution
+	}
 }
 
 func (l *masterImportLookups) hasInstitutionInScope(name string, parentID pgtype.UUID) bool {
 	_, exists := l.institutionScopeKeys[institutionScopeKey(name, parentID)]
 	return exists
+}
+
+func (l *masterImportLookups) rebuildInstitutionPathLookups() {
+	l.institutionsByPath = map[string]queries.Institution{}
+	for _, institution := range l.institutionsByID {
+		if path := institutionPathLabel(institution, l.institutionsByID); path != "" {
+			l.institutionsByPath[normalizeInstitutionPathKey(path)] = institution
+		}
+	}
 }
 
 func (l *masterImportLookups) lookupInstitutionByName(name string) (queries.Institution, bool, bool) {
@@ -1189,6 +1223,57 @@ func (l *masterImportLookups) lookupInstitutionByName(name string) (queries.Inst
 	}
 	institution, exists := l.institutionsByName[nameKey]
 	return institution, exists, false
+}
+
+func (l *masterImportLookups) lookupInstitutionReference(value string) (queries.Institution, bool, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return queries.Institution{}, false, false
+	}
+	if parsed, err := model.ParseUUID(value); err == nil {
+		institution, exists := l.institutionsByID[model.UUIDToString(parsed)]
+		return institution, exists, false
+	}
+	if strings.Contains(value, ";") {
+		institution, exists := l.institutionsByPath[normalizeInstitutionPathKey(value)]
+		return institution, exists, false
+	}
+	return l.lookupInstitutionByName(value)
+}
+
+func institutionPathLabel(institution queries.Institution, institutionsByID map[string]queries.Institution) string {
+	if strings.TrimSpace(institution.Name) == "" {
+		return ""
+	}
+	parts := []string{strings.TrimSpace(institution.Name)}
+	seen := map[string]struct{}{model.UUIDToString(institution.ID): {}}
+	current := institution
+	for current.ParentID.Valid {
+		parentID := model.UUIDToString(current.ParentID)
+		if _, loop := seen[parentID]; loop {
+			break
+		}
+		parent, exists := institutionsByID[parentID]
+		if !exists {
+			break
+		}
+		parts = append(parts, strings.TrimSpace(parent.Name))
+		seen[parentID] = struct{}{}
+		current = parent
+	}
+	return strings.Join(parts, "; ") + ";"
+}
+
+func normalizeInstitutionPathKey(value string) string {
+	parts := strings.Split(value, ";")
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		key := normalizeLookupKey(part)
+		if key != "" {
+			normalized = append(normalized, key)
+		}
+	}
+	return strings.Join(normalized, "|")
 }
 
 func institutionScopeKey(name string, parentID pgtype.UUID) string {

@@ -1,8 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/ridofiqri79/prism-backend/internal/database/queries"
 	"github.com/ridofiqri79/prism-backend/internal/model"
 )
 
@@ -198,6 +202,106 @@ func TestGetGBProjectHistoryReturnsOrderedSnapshotsAndConcreteBBRelations(t *tes
 	}
 }
 
+func TestGreenBookImportReusesPreviousIdentityResolvesLatestBBAndScopedInstitutionPath(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	_, oldBBProject, latestBBProject := env.createBBRevisionPair(t)
+	sourceGreenBook := env.createGreenBook(t, gbService, 0, nil)
+	sourceGBProject := env.createGBProject(t, gbService, sourceGreenBook.ID, oldBBProject.ID, "GB-001", "Flood Control GB")
+	if err := env.queries.SupersedeGreenBooksByPublishYear(env.ctx, 2026); err != nil {
+		t.Fatalf("SupersedeGreenBooksByPublishYear() error = %v", err)
+	}
+	targetGreenBook, err := env.queries.CreateGreenBook(env.ctx, queries.CreateGreenBookParams{
+		PublishYear:         2026,
+		ReplacesGreenBookID: mustParseUUID(t, sourceGreenBook.ID),
+		RevisionNumber:      1,
+	})
+	if err != nil {
+		t.Fatalf("CreateGreenBook(target revision) error = %v", err)
+	}
+	_, _ = env.createScopedInstitution(t, "Kementerian C", "Sekretariat Utama")
+	targetInstitution, targetPath := env.createScopedInstitution(t, "Kementerian D", "Sekretariat Utama")
+	lender := env.createMultilateralLender(t, "World Test Bank")
+
+	ambiguousWorkbook := buildGreenBookRevisionImportWorkbook(t, env, "GB-001", "Flood Control GB Revision", "BB-001", "Sekretariat Utama", env.ia.Name, lender.Name, "")
+	ambiguousRes, err := gbService.PreviewGreenBookProjects(env.ctx, targetGreenBook.ID, "green-book-projects.xlsx", bytes.NewReader(ambiguousWorkbook), int64(len(ambiguousWorkbook)))
+	if err != nil {
+		t.Fatalf("PreviewGreenBookProjects(ambiguous) error = %v", err)
+	}
+	eaSheet := findImportSheet(t, ambiguousRes, greenBookImportSheetEA)
+	if eaSheet.Failed == 0 || !importSheetHasMessage(eaSheet, "ambigu") {
+		t.Fatalf("EA sheet did not report ambiguous institution: %+v", eaSheet)
+	}
+
+	workbook := buildGreenBookRevisionImportWorkbook(t, env, "GB-001", "Flood Control GB Revision", "BB-001", targetPath, env.ia.Name, lender.Name, targetPath)
+	res, err := gbService.ImportGreenBookProjects(env.ctx, targetGreenBook.ID, "green-book-projects.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("ImportGreenBookProjects(scoped) error = %v", err)
+	}
+	if res.TotalFailed != 0 {
+		t.Fatalf("TotalFailed = %d, response = %+v", res.TotalFailed, res)
+	}
+	imported, err := env.queries.GetGBProjectByGreenBookAndCode(env.ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: targetGreenBook.ID, Lower: "GB-001"})
+	if err != nil {
+		t.Fatalf("GetGBProjectByGreenBookAndCode(target) error = %v", err)
+	}
+	if model.UUIDToString(imported.GbProjectIdentityID) != sourceGBProject.GBProjectIdentityID {
+		t.Fatalf("imported GB identity = %s, want %s", model.UUIDToString(imported.GbProjectIdentityID), sourceGBProject.GBProjectIdentityID)
+	}
+	detail, err := gbService.GetGBProject(env.ctx, targetGreenBook.ID, imported.ID)
+	if err != nil {
+		t.Fatalf("GetGBProject(imported) error = %v", err)
+	}
+	if len(detail.BBProjects) != 1 || detail.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("imported BB relation = %+v, want latest BB %s", detail.BBProjects, latestBBProject.ID)
+	}
+	if !gbDetailHasInstitution(detail.ExecutingAgencies, targetInstitution.ID) {
+		t.Fatalf("executing agencies = %+v, want scoped institution %s", detail.ExecutingAgencies, model.UUIDToString(targetInstitution.ID))
+	}
+	if len(detail.FundingSources) != 1 || detail.FundingSources[0].Institution == nil || detail.FundingSources[0].Institution.ID != model.UUIDToString(targetInstitution.ID) {
+		t.Fatalf("funding sources = %+v, want scoped institution %s", detail.FundingSources, model.UUIDToString(targetInstitution.ID))
+	}
+}
+
+func TestGreenBookImportRejectsDuplicateGBCodeInWorkbook(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	greenBook := env.createGreenBook(t, gbService, 0, nil)
+	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
+		{
+			Name: greenBookImportSheetInput,
+			Rows: [][]simpleXLSXCell{
+				headerRow("Program Title (*)", "GB Code (*)", "Project Name (*)"),
+				textRow(env.programTitle.Title, "GB-DUP", "Duplicate A"),
+				textRow(env.programTitle.Title, "GB-DUP", "Duplicate B"),
+			},
+			Columns:       columns(28, 18, 48),
+			ShowGridLines: false,
+		},
+		emptyImportSheet(greenBookImportSheetBBProject, "GB Code (*)", "BB Code (*)"),
+		emptyImportSheet(greenBookImportSheetEA, "GB Code (*)", "Executing Agency Name (*)"),
+		emptyImportSheet(greenBookImportSheetIA, "GB Code (*)", "Implementing Agency Name (*)"),
+		emptyImportSheet(greenBookImportSheetLocations, "GB Code (*)", "Location Name (*)"),
+		emptyImportSheet(greenBookImportSheetActivities, "GB Code (*)", "Activity No (*)", "Activity Name (*)", "Implementation Location", "PIU", "Sort Order"),
+		emptyImportSheet(greenBookImportSheetFundingSource, "GB Code (*)", "Lender Name (*)", "Institution Name", "Currency", "Loan Original", "Grant Original", "Local Original", "Loan USD", "Grant USD", "Local USD"),
+		emptyImportSheet(greenBookImportSheetDisbursementPlan, "GB Code (*)", "Year (*)", "Amount USD"),
+		emptyImportSheet(greenBookImportSheetFundingAllocation, "GB Code (*)", "Activity No (*)", "Services", "Constructions", "Goods", "Trainings", "Other"),
+	}}
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		t.Fatalf("buildSimpleXLSX() error = %v", err)
+	}
+
+	res, err := gbService.PreviewGreenBookProjects(env.ctx, mustParseUUID(t, greenBook.ID), "green-book-projects.xlsx", bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("PreviewGreenBookProjects() error = %v", err)
+	}
+	inputSheet := findImportSheet(t, res, greenBookImportSheetInput)
+	if inputSheet.Failed == 0 || !importSheetHasMessage(inputSheet, "GB Code duplikat di workbook") {
+		t.Fatalf("input sheet did not report duplicate GB Code: %+v", inputSheet)
+	}
+}
+
 func (env *blueBookVersioningTestEnv) createBBRevisionPair(t *testing.T) (*model.BlueBookResponse, *model.BBProjectResponse, *model.BBProjectResponse) {
 	t.Helper()
 	original := env.createBlueBook(t, 0, nil)
@@ -260,4 +364,98 @@ func (env *blueBookVersioningTestEnv) gbProjectRequest(bbProjectID, code, name s
 			{ActivityIndex: 1, Services: 5, Constructions: 20, Goods: 6, Trainings: 7, Other: 8},
 		},
 	}
+}
+
+func (env *blueBookVersioningTestEnv) createMultilateralLender(t *testing.T, name string) queries.Lender {
+	t.Helper()
+	lender, err := env.queries.CreateLender(env.ctx, queries.CreateLenderParams{
+		CountryID: pgtype.UUID{},
+		Name:      name,
+		ShortName: pgtype.Text{},
+		Type:      "Multilateral",
+	})
+	if err != nil {
+		t.Fatalf("CreateLender(%s) error = %v", name, err)
+	}
+	return lender
+}
+
+func buildGreenBookRevisionImportWorkbook(t *testing.T, env *blueBookVersioningTestEnv, code, projectName, bbCode, executingAgencyRef, implementingAgencyRef, lenderName, fundingInstitutionRef string) []byte {
+	t.Helper()
+	fundingRows := [][]simpleXLSXCell{
+		headerRow("GB Code (*)", "Lender Name (*)", "Institution Name", "Currency", "Loan Original", "Grant Original", "Local Original", "Loan USD", "Grant USD", "Local USD"),
+	}
+	if lenderName != "" {
+		fundingRows = append(fundingRows, textRow(code, lenderName, fundingInstitutionRef, "USD", "100", "0", "0", "100", "0", "0"))
+	}
+	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
+		{
+			Name: greenBookImportSheetInput,
+			Rows: [][]simpleXLSXCell{
+				headerRow("Program Title (*)", "GB Code (*)", "Project Name (*)"),
+				textRow(env.programTitle.Title, code, projectName),
+			},
+			Columns:       columns(28, 18, 48),
+			ShowGridLines: false,
+		},
+		{
+			Name: greenBookImportSheetBBProject,
+			Rows: [][]simpleXLSXCell{
+				headerRow("GB Code (*)", "BB Code (*)"),
+				textRow(code, bbCode),
+			},
+			Columns:       columns(18, 18),
+			ShowGridLines: false,
+		},
+		{
+			Name: greenBookImportSheetEA,
+			Rows: [][]simpleXLSXCell{
+				headerRow("GB Code (*)", "Executing Agency Name (*)"),
+				textRow(code, executingAgencyRef),
+			},
+			Columns:       columns(18, 44),
+			ShowGridLines: false,
+		},
+		{
+			Name: greenBookImportSheetIA,
+			Rows: [][]simpleXLSXCell{
+				headerRow("GB Code (*)", "Implementing Agency Name (*)"),
+				textRow(code, implementingAgencyRef),
+			},
+			Columns:       columns(18, 44),
+			ShowGridLines: false,
+		},
+		{
+			Name: greenBookImportSheetLocations,
+			Rows: [][]simpleXLSXCell{
+				headerRow("GB Code (*)", "Location Name (*)"),
+				textRow(code, env.region.Name),
+			},
+			Columns:       columns(18, 36),
+			ShowGridLines: false,
+		},
+		emptyImportSheet(greenBookImportSheetActivities, "GB Code (*)", "Activity No (*)", "Activity Name (*)", "Implementation Location", "PIU", "Sort Order"),
+		{
+			Name:          greenBookImportSheetFundingSource,
+			Rows:          fundingRows,
+			Columns:       columns(18, 36, 44, 14, 18, 18, 18, 18, 18, 18),
+			ShowGridLines: false,
+		},
+		emptyImportSheet(greenBookImportSheetDisbursementPlan, "GB Code (*)", "Year (*)", "Amount USD"),
+		emptyImportSheet(greenBookImportSheetFundingAllocation, "GB Code (*)", "Activity No (*)", "Services", "Constructions", "Goods", "Trainings", "Other"),
+	}}
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		t.Fatalf("buildSimpleXLSX() error = %v", err)
+	}
+	return data
+}
+
+func gbDetailHasInstitution(rows []model.InstitutionResponse, institutionID pgtype.UUID) bool {
+	for _, row := range rows {
+		if row.ID == model.UUIDToString(institutionID) {
+			return true
+		}
+	}
+	return false
 }
