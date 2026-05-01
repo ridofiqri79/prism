@@ -12,6 +12,7 @@ import type {
   GBProjectJourney,
   JourneyFlowLink,
   JourneyFlowNode,
+  JourneyFlowStage,
   JourneyResponse,
   JourneyStageState,
   LAJourney,
@@ -41,6 +42,41 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 2,
 })
+
+const stagePalette: Record<
+  JourneyFlowStage,
+  {
+    filled: string
+    pending: string
+    label: string
+  }
+> = {
+  'blue-book': {
+    filled: '#2563eb',
+    pending: '#bfdbfe',
+    label: '#0f172a',
+  },
+  'green-book': {
+    filled: '#16a34a',
+    pending: '#bbf7d0',
+    label: '#0f172a',
+  },
+  'daftar-kegiatan': {
+    filled: '#f97316',
+    pending: '#fed7aa',
+    label: '#0f172a',
+  },
+  'loan-agreement': {
+    filled: '#64748b',
+    pending: '#cbd5e1',
+    label: '#334155',
+  },
+  monitoring: {
+    filled: '#14b8a6',
+    pending: '#cbd5e1',
+    label: '#334155',
+  },
+}
 
 const flow = computed(() => buildFlow(props.journey))
 const flowNodes = computed(() => flow.value.nodes)
@@ -97,12 +133,12 @@ const chartOption = computed(() => ({
       lineStyle: {
         color: 'gradient',
         curveness: 0.46,
-        opacity: 0.24,
+        opacity: 0.32,
       },
       emphasis: {
         focus: 'adjacency',
         lineStyle: {
-          opacity: 0.46,
+          opacity: 0.5,
         },
       },
     },
@@ -114,11 +150,16 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
   const links: JourneyFlowLink[] = []
   const blueBookNode = `Blue Book\n${journey.bb_project.bb_code}`
 
-  ensureNode(nodes, blueBookNode, journey.bb_project.has_newer_revision ? 'warning' : 'completed')
+  ensureNode(
+    nodes,
+    blueBookNode,
+    journey.bb_project.has_newer_revision ? 'warning' : 'completed',
+    'blue-book',
+  )
 
   if (journey.gb_projects.length === 0) {
     const pendingGreenBookNode = 'Green Book\nBelum ada'
-    ensureNode(nodes, pendingGreenBookNode, 'pending')
+    ensureNode(nodes, pendingGreenBookNode, 'pending', 'green-book')
     links.push(makeLink(blueBookNode, pendingGreenBookNode, 0, 'Blue Book ke Green Book'))
     return { nodes: Array.from(nodes.values()), links }
   }
@@ -126,12 +167,17 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
   for (const greenBookProject of journey.gb_projects) {
     const greenBookNode = `Green Book\n${greenBookProject.gb_code}`
     const greenBookAmount = fundingTotalForGreenBook(greenBookProject)
-    ensureNode(nodes, greenBookNode, greenBookProject.has_newer_revision ? 'warning' : 'completed')
+    ensureNode(
+      nodes,
+      greenBookNode,
+      greenBookProject.has_newer_revision ? 'warning' : 'completed',
+      'green-book',
+    )
     links.push(makeLink(blueBookNode, greenBookNode, greenBookAmount, 'Blue Book ke Green Book'))
 
     if (greenBookProject.dk_projects.length === 0) {
       const pendingDkNode = `Daftar Kegiatan\nBelum ada untuk ${greenBookProject.gb_code}`
-      ensureNode(nodes, pendingDkNode, 'pending')
+      ensureNode(nodes, pendingDkNode, 'pending', 'daftar-kegiatan')
       links.push(makeLink(greenBookNode, pendingDkNode, 0, 'Green Book ke Daftar Kegiatan'))
       continue
     }
@@ -139,7 +185,7 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
     for (const dkProject of greenBookProject.dk_projects) {
       const dkNode = `Daftar Kegiatan\n${shortLabel(dkLabel(dkProject), 42)}`
       const dkAmount = amountForDk(greenBookProject, dkProject)
-      ensureNode(nodes, dkNode, 'completed')
+      ensureNode(nodes, dkNode, 'completed', 'daftar-kegiatan')
       links.push(makeLink(greenBookNode, dkNode, dkAmount, 'Green Book ke Daftar Kegiatan'))
 
       if (!dkProject.loan_agreement) {
@@ -147,7 +193,7 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
           dkLabel(dkProject),
           28,
         )}`
-        ensureNode(nodes, pendingLoanAgreementNode, 'pending')
+        ensureNode(nodes, pendingLoanAgreementNode, 'pending', 'loan-agreement')
         links.push(
           makeLink(dkNode, pendingLoanAgreementNode, 0, 'Daftar Kegiatan ke Loan Agreement'),
         )
@@ -170,14 +216,19 @@ function appendLoanAgreementFlow(
 ) {
   const loanAgreementNode = `Loan Agreement\n${loanAgreement.loan_code}`
   const loanAgreementAmount = loanAgreement.amount_usd ?? fallbackAmount
-  ensureNode(nodes, loanAgreementNode, loanAgreement.is_extended ? 'extended' : 'completed')
+  ensureNode(
+    nodes,
+    loanAgreementNode,
+    loanAgreement.is_extended ? 'extended' : 'completed',
+    'loan-agreement',
+  )
   links.push(
     makeLink(dkNode, loanAgreementNode, loanAgreementAmount, 'Daftar Kegiatan ke Loan Agreement'),
   )
 
   if (loanAgreement.monitoring.length === 0) {
     const pendingMonitoringNode = `Monitoring Disbursement\nBelum ada untuk ${loanAgreement.loan_code}`
-    ensureNode(nodes, pendingMonitoringNode, 'pending')
+    ensureNode(nodes, pendingMonitoringNode, 'pending', 'monitoring')
     links.push(
       makeLink(loanAgreementNode, pendingMonitoringNode, 0, 'Loan Agreement ke Monitoring'),
     )
@@ -188,7 +239,12 @@ function appendLoanAgreementFlow(
     const monitoringNode = `Monitoring\n${monitoring.quarter} ${monitoring.budget_year}`
     const monitoringAmount =
       monitoring.realized_usd > 0 ? monitoring.realized_usd : monitoring.planned_usd
-    ensureNode(nodes, monitoringNode, monitoring.absorption_pct >= 80 ? 'completed' : 'warning')
+    ensureNode(
+      nodes,
+      monitoringNode,
+      monitoring.absorption_pct >= 80 ? 'completed' : 'warning',
+      'monitoring',
+    )
     links.push(
       makeLink(
         loanAgreementNode,
@@ -202,15 +258,22 @@ function appendLoanAgreementFlow(
   }
 }
 
-function ensureNode(nodes: Map<string, JourneyFlowNode>, name: string, state: JourneyStageState) {
+function ensureNode(
+  nodes: Map<string, JourneyFlowNode>,
+  name: string,
+  state: JourneyStageState,
+  stage: JourneyFlowStage,
+) {
   if (nodes.has(name)) return
   nodes.set(name, {
     name,
     itemStyle: {
-      color: nodeColor(state),
+      color: nodeColor(stage, state),
+      borderColor: attentionBorderColor(state),
+      borderWidth: state === 'warning' || state === 'extended' ? 2 : 0,
     },
     label: {
-      color: labelColor(state),
+      color: labelColor(stage, state),
       fontWeight: state === 'pending' ? 400 : 600,
     },
   })
@@ -229,7 +292,7 @@ function makeLink(
     value: normalizeFlowValue(rawValue),
     label,
     lineStyle: {
-      opacity: rawValue > 0 ? 0.28 : 0.14,
+      opacity: rawValue > 0 ? 0.34 : 0.14,
     },
   }
 }
@@ -271,16 +334,20 @@ function shortLabel(value: string, maxLength: number) {
   return `${value.slice(0, Math.max(0, maxLength - 1))}...`
 }
 
-function nodeColor(state: JourneyStageState) {
-  if (state === 'extended') return '#f59e0b'
-  if (state === 'warning') return '#f97316'
-  if (state === 'completed') return '#1fa06f'
-  return '#cbd5e1'
+function nodeColor(stage: JourneyFlowStage, state: JourneyStageState) {
+  if (state === 'pending') return stagePalette[stage].pending
+  return stagePalette[stage].filled
 }
 
-function labelColor(state: JourneyStageState) {
+function labelColor(stage: JourneyFlowStage, state: JourneyStageState) {
   if (state === 'pending') return '#64748b'
-  return '#0f172a'
+  return stagePalette[stage].label
+}
+
+function attentionBorderColor(state: JourneyStageState) {
+  if (state === 'extended') return '#f59e0b'
+  if (state === 'warning') return '#fb923c'
+  return 'transparent'
 }
 
 function isTooltipParam(value: unknown): value is FlowTooltipParam {
@@ -314,27 +381,33 @@ function escapeHtml(value: string) {
       <div>
         <h2 class="text-base font-semibold text-surface-950">Alur Visual</h2>
         <p class="text-sm text-surface-500">
-          Ketebalan garis mengikuti nilai USD bila tersedia, lalu tetap menampilkan gap tahap.
+          Warna node mengikuti tahap, sementara ketebalan garis mengikuti nilai USD bila tersedia.
         </p>
       </div>
       <div class="flex flex-wrap gap-2 text-xs">
         <span
-          class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700"
+          class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-blue-700"
         >
-          <span class="h-2 w-2 rounded-full bg-emerald-500" />
-          Lengkap
+          <span class="h-2 w-2 rounded-full bg-blue-600" />
+          Blue Book
+        </span>
+        <span
+          class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-green-700"
+        >
+          <span class="h-2 w-2 rounded-full bg-green-600" />
+          Green Book
         </span>
         <span
           class="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-orange-700"
         >
           <span class="h-2 w-2 rounded-full bg-orange-500" />
-          Revisi/gap perhatian
+          Daftar Kegiatan
         </span>
         <span
-          class="inline-flex items-center gap-1 rounded-full bg-surface-100 px-2 py-1 text-surface-600"
+          class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700"
         >
-          <span class="h-2 w-2 rounded-full bg-surface-300" />
-          Belum ada
+          <span class="h-2 w-2 rounded-full border-2 border-amber-500 bg-white" />
+          Perlu perhatian
         </span>
       </div>
     </div>

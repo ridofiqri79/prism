@@ -144,6 +144,13 @@ export interface MonitoringSummaryItem {
 
 export type JourneyStageState = 'completed' | 'pending' | 'extended' | 'warning'
 
+export type JourneyFlowStage =
+  | 'blue-book'
+  | 'green-book'
+  | 'daftar-kegiatan'
+  | 'loan-agreement'
+  | 'monitoring'
+
 export interface JourneySummaryMetric {
   label: string
   value: string
@@ -189,6 +196,8 @@ export interface JourneyFlowNode {
   name: string
   itemStyle?: {
     color: string
+    borderColor?: string
+    borderWidth?: number
   }
   label?: {
     color: string
