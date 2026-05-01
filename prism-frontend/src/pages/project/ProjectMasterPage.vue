@@ -741,7 +741,7 @@ onUnmounted(() => {
               <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3">
                 <Skeleton height="1.5rem" />
               </td>
-              <td class="w-28 px-4 py-3">
+              <td class="w-40 px-4 py-3">
                 <Skeleton height="1.5rem" />
               </td>
             </tr>
@@ -783,7 +783,7 @@ onUnmounted(() => {
                   <i :class="sortIcon(column.sortField)" aria-hidden="true" />
                 </button>
               </th>
-              <th class="w-28 px-4 py-3 text-right">Aksi</th>
+              <th class="w-40 px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <TransitionGroup tag="tbody" name="prism-table-row-fade" class="divide-y divide-surface-100">
@@ -873,7 +873,7 @@ onUnmounted(() => {
                   {{ listLabel(project.dk_dates) }}
                 </span>
               </td>
-              <td class="w-28 px-4 py-3">
+              <td class="w-40 px-4 py-3">
                 <div class="flex justify-end gap-1.5">
                   <Button
                     v-tooltip.top="'Detail proyek'"
@@ -885,6 +885,17 @@ onUnmounted(() => {
                     outlined
                     rounded
                     aria-label="Detail proyek"
+                  />
+                  <Button
+                    v-tooltip.top="'Lihat perjalanan proyek'"
+                    as="router-link"
+                    :to="{ name: 'project-journey', params: { bbProjectId: project.id } }"
+                    icon="pi pi-sitemap"
+                    severity="secondary"
+                    size="small"
+                    outlined
+                    rounded
+                    aria-label="Lihat perjalanan proyek"
                   />
                   <Button
                     v-if="can('bb_project', 'update')"

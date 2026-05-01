@@ -41,11 +41,16 @@ export interface BBProjectSummary {
   project_identity_id?: string
   bb_code: string
   project_name: string
+  blue_book_revision_label?: string
+  is_latest?: boolean
   has_newer_revision?: boolean
-  lender_indications?: LenderSummaryItem[]
+  latest_bb_project_id?: string
+  latest_blue_book_revision_label?: string
+  lender_indications: LenderSummaryItem[]
 }
 
 export interface LenderSummaryItem {
+  id?: string
   lender?: Pick<Lender, 'id' | 'name' | 'short_name' | 'type'>
   remarks?: string | null
 }
@@ -72,16 +77,30 @@ export interface GBProjectJourney {
   gb_code: string
   project_name: string
   status?: string
+  green_book_revision_label?: string
+  is_latest?: boolean
   has_newer_revision?: boolean
-  funding_sources?: JourneyFundingSource[]
+  latest_gb_project_id?: string
+  latest_green_book_revision_label?: string
+  funding_sources: JourneyFundingSource[]
   dk_projects: DKProjectJourney[]
 }
 
 export interface JourneyFundingSource {
+  id?: string
   lender?: Pick<Lender, 'id' | 'name' | 'short_name' | 'type'>
+  institution?: {
+    id: string
+    name: string
+    short_name?: string | null
+  } | null
   currency?: string
-  amount_usd?: number
-  amount_original?: number
+  loan_original?: number
+  grant_original?: number
+  local_original?: number
+  loan_usd?: number
+  grant_usd?: number
+  local_usd?: number
 }
 
 export interface DKProjectJourney {
@@ -101,9 +120,16 @@ export interface DKProjectJourney {
 export interface LAJourney {
   id: string
   loan_code: string
+  lender?: Pick<Lender, 'id' | 'name' | 'short_name' | 'type'>
+  agreement_date?: string
   effective_date: string
+  original_closing_date?: string
   closing_date?: string
   is_extended: boolean
+  extension_days?: number
+  currency?: string
+  amount_original?: number
+  amount_usd?: number
   monitoring: MonitoringSummaryItem[]
 }
 

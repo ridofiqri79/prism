@@ -51,6 +51,9 @@ prism-frontend/
 │   │       ├── daftar-kegiatan.routes.ts
 │   │       ├── loan-agreement.routes.ts
 │   │       ├── monitoring.routes.ts
+│   │       ├── dashboard.routes.ts
+│   │       ├── project.routes.ts
+│   │       ├── journey.routes.ts
 │   │       └── user.routes.ts
 │   │
 │   ├── stores/                        # Pinia stores
@@ -60,8 +63,10 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.store.ts
 │   │   ├── loan-agreement.store.ts
 │   │   ├── monitoring.store.ts
+│   │   ├── project.store.ts           # Project master list + filters
+│   │   ├── journey.store.ts           # Perjalanan Proyek, search, loading/error state
 │   │   ├── master.store.ts            # Lender, institution, region, dll (cached)
-│   │   └── notification.store.ts     # SSE events
+│   │   └── user.store.ts              # User + permission state
 │   │
 │   ├── services/                      # Axios API calls — satu file per modul
 │   │   ├── http.ts                    # Axios instance + interceptors
@@ -71,6 +76,8 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.service.ts
 │   │   ├── loan-agreement.service.ts
 │   │   ├── monitoring.service.ts
+│   │   ├── dashboard.service.ts
+│   │   ├── project.service.ts
 │   │   ├── master.service.ts
 │   │   └── user.service.ts
 │   │
@@ -98,7 +105,10 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.types.ts
 │   │   ├── loan-agreement.types.ts
 │   │   ├── monitoring.types.ts
-│   │   └── master.types.ts  # Country, Currency, Lender, Institution, Region, dll
+│   │   ├── dashboard.types.ts           # Dashboard + Perjalanan Proyek response types
+│   │   ├── project.types.ts             # Project master list/search types
+│   │   ├── user.types.ts
+│   │   └── master.types.ts              # Country, Currency, Lender, Institution, Region, dll
 │   │
 │   ├── schemas/                       # Zod validation schemas — satu file per modul
 │   │   ├── blue-book.schema.ts

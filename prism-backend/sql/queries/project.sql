@@ -233,6 +233,7 @@ filtered_projects AS (
       AND (
           sqlc.narg('search')::text IS NULL
           OR LOWER(project_name) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
+          OR LOWER(bb_code) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
           OR EXISTS (
               SELECT 1
               FROM unnest(indication_lenders) AS item(label)
@@ -305,6 +306,7 @@ WITH project_rows AS (
         bp.id,
         bp.project_identity_id,
         bp.program_title_id,
+        bp.bb_code,
         bp.project_name,
         CASE
             WHEN EXISTS (
@@ -485,6 +487,7 @@ WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_type
   AND (
       sqlc.narg('search')::text IS NULL
       OR LOWER(project_name) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
+      OR LOWER(bb_code) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
       OR EXISTS (
           SELECT 1
           FROM unnest(indication_lenders) AS item(label)
@@ -508,6 +511,7 @@ WITH project_rows AS (
         bp.id,
         bp.project_identity_id,
         bp.program_title_id,
+        bp.bb_code,
         bp.project_name,
         CASE
             WHEN EXISTS (
@@ -726,6 +730,7 @@ filtered_projects AS (
       AND (
           sqlc.narg('search')::text IS NULL
           OR LOWER(project_name) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
+          OR LOWER(bb_code) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
           OR EXISTS (
               SELECT 1
               FROM unnest(indication_lenders) AS item(label)

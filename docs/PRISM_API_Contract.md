@@ -1525,7 +1525,7 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `region_ids` | Multi value UUID region/location |
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
 | `dk_date_from`, `dk_date_to` | Range tanggal DK, format `YYYY-MM-DD` |
-| `search` | Search global untuk nama proyek, indikasi lender, fixed lender Green Book, dan executing agency |
+| `search` | Search global untuk kode/nama proyek, indikasi lender, fixed lender Green Book, dan executing agency |
 | `include_history` | `true` untuk menampilkan semua snapshot, default `false` |
 
 Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&loan_types=KSA`), comma-separated value, atau format array query string (`loan_types[]=Bilateral`).
@@ -1576,7 +1576,7 @@ Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filt
 
 ### `GET /projects/:bb_project_id/journey`
 
-**Permission:** Authenticated
+**Permission:** read: `bb_project`
 
 Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dalam satu response.
 
@@ -1586,33 +1586,86 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
   "data": {
     "bb_project": {
       "id": "uuid",
+      "blue_book_id": "uuid",
       "project_identity_id": "uuid-logical-project",
       "bb_code": "BB-2025-001",
       "project_name": "Trans Sumatra Toll Road",
-      "has_newer_revision": false
+      "blue_book_revision_label": "BB 2025-2029",
+      "is_latest": true,
+      "has_newer_revision": false,
+      "latest_bb_project_id": "uuid",
+      "latest_blue_book_revision_label": "BB 2025-2029",
+      "lender_indications": [
+        {
+          "id": "uuid",
+          "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+          "remarks": "Indicative"
+        }
+      ]
     },
     "loi": [
-      { "id": "uuid", "lender": { "name": "JICA" }, "tanggal": "2025-03-10" }
+      {
+        "id": "uuid",
+        "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+        "subject": "Letter of Intent",
+        "date": "2025-03-10",
+        "letter_number": "LoI-001"
+      }
     ],
     "gb_projects": [
       {
         "id": "uuid",
+        "green_book_id": "uuid",
         "gb_project_identity_id": "uuid-logical-gb-project",
         "gb_code": "GB-2025-001",
         "project_name": "Trans Sumatra Section 1",
+        "status": "active",
+        "green_book_revision_label": "GB 2025",
+        "is_latest": true,
         "has_newer_revision": false,
+        "latest_gb_project_id": "uuid",
+        "latest_green_book_revision_label": "GB 2025",
+        "funding_sources": [
+          {
+            "id": "uuid",
+            "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+            "institution": { "id": "uuid", "name": "Kementerian PUPR", "short_name": "PUPR" },
+            "currency": "USD",
+            "loan_original": 300000000,
+            "grant_original": 0,
+            "local_original": 0,
+            "loan_usd": 300000000,
+            "grant_usd": 0,
+            "local_usd": 0
+          }
+        ],
         "dk_projects": [
           {
             "id": "uuid",
             "project_name": "Trans Sumatra Section 1 - DK",
-            "daftar_kegiatan": { "subject": "DK TA 2025", "tanggal": "2025-02-01" },
+            "objectives": "Meningkatkan konektivitas",
+            "daftar_kegiatan": {
+              "id": "uuid",
+              "subject": "DK TA 2025",
+              "date": "2025-02-01",
+              "letter_number": "B-001/2025"
+            },
             "loan_agreement": {
               "id": "uuid",
               "loan_code": "IP-603",
+              "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+              "agreement_date": "2025-05-01",
               "effective_date": "2025-06-01",
+              "original_closing_date": "2030-12-31",
+              "closing_date": "2030-12-31",
               "is_extended": false,
+              "extension_days": 0,
+              "currency": "USD",
+              "amount_original": 300000000,
+              "amount_usd": 300000000,
               "monitoring": [
                 {
+                  "id": "uuid",
                   "budget_year": 2025,
                   "quarter": "TW1",
                   "planned_usd": 3333333,

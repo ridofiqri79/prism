@@ -44,16 +44,26 @@ function nodeClass(state: 'completed' | 'pending' | 'extended') {
 
 function formatDate(value?: string | null) {
   if (!value) return '-'
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(value))
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
 }
 
-function formatFunding(source: JourneyFundingSource) {
-  const lender = source.lender?.short_name || source.lender?.name || 'Lender'
-  const amount = source.amount_usd ?? source.amount_original ?? 0
-  return `${lender} ${new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(amount)}`
+function lenderLabel(lender?: JourneyFundingSource['lender']) {
+  return lender?.short_name || lender?.name || 'Lender'
+}
+
+function institutionLabel(source: JourneyFundingSource) {
+  return source.institution?.short_name || source.institution?.name || ''
+}
+
+function dkLabel(project: DKProjectJourney) {
+  return (
+    project.daftar_kegiatan?.letter_number ||
+    project.daftar_kegiatan?.subject ||
+    project.project_name ||
+    project.id
+  )
 }
 
 function loiDate(loi: JourneyLoI) {
@@ -125,6 +135,12 @@ watch(
               <span v-else class="font-semibold text-prism-green-deep">Blue Book</span>
               <Tag value="Completed" severity="success" rounded />
               <Tag
+                v-if="bbProject.blue_book_revision_label"
+                :value="bbProject.blue_book_revision_label"
+                :severity="bbProject.is_latest === false ? 'secondary' : 'success'"
+                rounded
+              />
+              <Tag
                 v-if="bbProject.has_newer_revision"
                 value="Ada revisi lebih baru"
                 severity="warn"
@@ -133,6 +149,12 @@ watch(
             </div>
             <p class="mt-1 text-sm text-surface-900">
               {{ bbProject.bb_code }} - {{ bbProject.project_name }}
+            </p>
+            <p
+              v-if="bbProject.has_newer_revision && bbProject.latest_blue_book_revision_label"
+              class="mt-1 text-xs font-medium text-prism-gold-deep"
+            >
+              Versi terbaru: {{ bbProject.latest_blue_book_revision_label }}
             </p>
 
             <div v-if="isOpen('blue-book')" class="mt-3 space-y-3 border-l border-surface-100 pl-5">
@@ -144,14 +166,16 @@ watch(
                 >
                   Belum ada
                 </p>
-                <p v-else class="text-surface-600">
-                  {{
-                    bbProject.lender_indications
-                      ?.map((item) => item.lender?.short_name || item.lender?.name)
-                      .filter(Boolean)
-                      .join(', ')
-                  }}
-                </p>
+                <div v-else class="mt-2 space-y-1.5">
+                  <div
+                    v-for="item in bbProject.lender_indications"
+                    :key="item.id || item.lender?.id || item.lender?.name"
+                    class="flex flex-wrap items-center gap-2 text-surface-600"
+                  >
+                    <span class="font-medium text-surface-800">{{ lenderLabel(item.lender) }}</span>
+                    <span v-if="item.remarks" class="text-surface-500">{{ item.remarks }}</span>
+                  </div>
+                </div>
               </div>
 
               <div class="space-y-2">
@@ -172,6 +196,10 @@ watch(
                   <span>{{
                     loi.lender?.short_name || loi.lender?.name || loi.subject || 'LoI'
                   }}</span>
+                  <span v-if="loi.letter_number" class="text-surface-500">{{
+                    loi.letter_number
+                  }}</span>
+                  <span v-if="loi.subject" class="text-surface-500">{{ loi.subject }}</span>
                   <span class="text-surface-500">{{ formatDate(loiDate(loi)) }}</span>
                 </div>
               </div>
@@ -248,6 +276,12 @@ watch(
                       }}</span>
                       <Tag value="Completed" severity="success" rounded />
                       <Tag
+                        v-if="gbProject.green_book_revision_label"
+                        :value="gbProject.green_book_revision_label"
+                        :severity="gbProject.is_latest === false ? 'secondary' : 'success'"
+                        rounded
+                      />
+                      <Tag
                         v-if="gbProject.has_newer_revision"
                         value="Ada revisi lebih baru"
                         severity="warn"
@@ -255,6 +289,12 @@ watch(
                       />
                     </div>
                     <p class="mt-1 text-sm text-surface-900">{{ gbProject.project_name }}</p>
+                    <p
+                      v-if="gbProject.has_newer_revision && gbProject.latest_green_book_revision_label"
+                      class="mt-1 text-xs font-medium text-prism-gold-deep"
+                    >
+                      Versi terbaru: {{ gbProject.latest_green_book_revision_label }}
+                    </p>
 
                     <div
                       v-if="isOpen(`gb-${gbProject.id}`)"
@@ -268,9 +308,39 @@ watch(
                         >
                           Belum ada
                         </p>
-                        <p v-else class="text-surface-600">
-                          {{ gbProject.funding_sources?.map(formatFunding).join(', ') }}
-                        </p>
+                        <div v-else class="mt-2 space-y-2">
+                          <div
+                            v-for="source in gbProject.funding_sources"
+                            :key="source.id || source.lender?.id || source.lender?.name"
+                            class="rounded-lg border border-surface-100 p-3"
+                          >
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p class="font-medium text-surface-900">
+                                  {{ lenderLabel(source.lender) }}
+                                </p>
+                                <p v-if="institutionLabel(source)" class="text-xs text-surface-500">
+                                  {{ institutionLabel(source) }}
+                                </p>
+                              </div>
+                              <Tag :value="source.currency || 'USD'" severity="secondary" rounded />
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-3 text-xs text-surface-500">
+                              <span v-if="(source.loan_usd ?? 0) > 0">
+                                <CurrencyDisplay :amount="source.loan_usd ?? 0" currency="USD" compact />
+                                pinjaman
+                              </span>
+                              <span v-if="(source.grant_usd ?? 0) > 0">
+                                <CurrencyDisplay :amount="source.grant_usd ?? 0" currency="USD" compact />
+                                hibah
+                              </span>
+                              <span v-if="(source.local_usd ?? 0) > 0">
+                                <CurrencyDisplay :amount="source.local_usd ?? 0" currency="USD" compact />
+                                dana pendamping
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div
@@ -293,21 +363,17 @@ watch(
                             class="font-semibold text-prism-green-deep hover:underline"
                           >
                             Daftar Kegiatan:
-                            {{
-                              dkProject.project_name ||
-                              dkProject.daftar_kegiatan?.subject ||
-                              dkProject.objectives ||
-                              dkProject.id
-                            }}
+                            {{ dkLabel(dkProject) }}
                           </RouterLink>
                           <span v-else class="font-semibold text-prism-green-deep">
                             Daftar Kegiatan:
-                            {{
-                              dkProject.project_name ||
-                              dkProject.daftar_kegiatan?.subject ||
-                              dkProject.objectives ||
-                              dkProject.id
-                            }}
+                            {{ dkLabel(dkProject) }}
+                          </span>
+                          <span
+                            v-if="dkProject.project_name && dkProject.project_name !== dkLabel(dkProject)"
+                            class="text-sm text-surface-500"
+                          >
+                            {{ dkProject.project_name }}
                           </span>
                           <span class="text-sm text-surface-500">
                             {{
@@ -351,7 +417,7 @@ watch(
                               </RouterLink>
                               <Tag
                                 :value="
-                                  dkProject.loan_agreement.is_extended ? 'Extended' : 'Completed'
+                                  dkProject.loan_agreement.is_extended ? 'Diperpanjang' : 'Completed'
                                 "
                                 :severity="
                                   dkProject.loan_agreement.is_extended ? 'warn' : 'success'
@@ -360,14 +426,34 @@ watch(
                               />
                             </div>
                             <div class="grid gap-2 text-sm text-surface-600 md:grid-cols-2">
-                              <span
-                                >Effective:
-                                {{ formatDate(dkProject.loan_agreement.effective_date) }}</span
-                              >
-                              <span
-                                >Closing:
-                                {{ formatDate(dkProject.loan_agreement.closing_date) }}</span
-                              >
+                              <span>Lender: {{ lenderLabel(dkProject.loan_agreement.lender) }}</span>
+                              <span>
+                                Nilai:
+                                <CurrencyDisplay
+                                  :amount="dkProject.loan_agreement.amount_usd ?? 0"
+                                  currency="USD"
+                                  compact
+                                />
+                              </span>
+                              <span>
+                                Agreement:
+                                {{ formatDate(dkProject.loan_agreement.agreement_date) }}
+                              </span>
+                              <span>
+                                Efektif:
+                                {{ formatDate(dkProject.loan_agreement.effective_date) }}
+                              </span>
+                              <span>
+                                Original Closing:
+                                {{ formatDate(dkProject.loan_agreement.original_closing_date) }}
+                              </span>
+                              <span>
+                                Closing:
+                                {{ formatDate(dkProject.loan_agreement.closing_date) }}
+                                <span v-if="dkProject.loan_agreement.extension_days">
+                                  (+{{ dkProject.loan_agreement.extension_days }} hari)
+                                </span>
+                              </span>
                             </div>
 
                             <div class="space-y-2 border-l border-surface-100 pl-5">
