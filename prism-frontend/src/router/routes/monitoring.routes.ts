@@ -2,6 +2,16 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const monitoringRoutes: RouteRecordRaw[] = [
   {
+    path: 'monitoring',
+    name: 'monitoring-overview',
+    component: () => import('@/pages/monitoring/MonitoringOverviewPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Monitoring Disbursement',
+      permission: { module: 'monitoring_disbursement', action: 'read' },
+    },
+  },
+  {
     path: 'loan-agreements/:laId/monitoring',
     name: 'monitoring-list',
     component: () => import('@/pages/monitoring/MonitoringListPage.vue'),

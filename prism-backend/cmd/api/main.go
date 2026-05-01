@@ -227,6 +227,12 @@ func main() {
 	loanAgreements.PUT("/:id", laHandler.UpdateLA, middleware.Require("loan_agreement", "update"))
 	loanAgreements.DELETE("/:id", laHandler.DeleteLA, middleware.Require("loan_agreement", "delete"))
 
+	monitoringRoot := api.Group("/monitoring")
+	monitoringRoot.GET("/loan-agreements", monitoringHandler.ListLoanAgreementReferences, middleware.Require("monitoring_disbursement", "read"))
+	monitoringRoot.GET("/import/template", monitoringHandler.DownloadImportTemplate, middleware.RequireAdmin())
+	monitoringRoot.POST("/import/preview", monitoringHandler.PreviewImport, middleware.RequireAdmin())
+	monitoringRoot.POST("/import/execute", monitoringHandler.Import, middleware.RequireAdmin())
+
 	monitoring := api.Group("/loan-agreements/:laId/monitoring")
 	monitoring.GET("", monitoringHandler.List, middleware.Require("monitoring_disbursement", "read"))
 	monitoring.POST("", monitoringHandler.Create, middleware.Require("monitoring_disbursement", "create"))

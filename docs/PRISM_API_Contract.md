@@ -1307,6 +1307,38 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 
 ## Monitoring Disbursement
 
+### Monitoring Workspace & Import
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/monitoring/loan-agreements` | read: `monitoring_disbursement` |
+| `GET` | `/monitoring/import/template` | ADMIN only |
+| `POST` | `/monitoring/import/preview` | ADMIN only |
+| `POST` | `/monitoring/import/execute` | ADMIN only |
+
+`GET /monitoring/loan-agreements` dipakai halaman Monitoring Disbursement sebagai daftar Loan Agreement yang dapat dibuka ke monitoring triwulan. Query params mengikuti pola list umum: `page`, `limit`, `search`, dan `is_effective`. Search mencakup `loan_code`, lender, nomor surat Daftar Kegiatan, dan nama proyek Daftar Kegiatan.
+
+Import Monitoring Disbursement bersifat **create-only**. Endpoint ini hanya membuat monitoring baru untuk kombinasi `Loan Agreement + Budget Year + Quarter` yang belum ada. Kombinasi periode yang sudah ada masuk status `skip`; duplikat periode baru dalam workbook masuk status `failed`.
+
+`GET /monitoring/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Monitoring Disbursement`, `Relasi - Komponen`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot Loan Agreement, lender, currency, status efektif, dan periode monitoring yang sudah ada saat template dibuat.
+
+Workbook:
+- `Monitoring Disbursement`: `Loan Agreement Ref (*)`, `Budget Year (*)`, `Quarter (*)`, `Exchange Rate USD/IDR (*)`, `Exchange Rate Loan Agreement/IDR (*)`, `Planned Loan Agreement`, `Planned USD`, `Planned IDR`, `Realized Loan Agreement`, `Realized USD`, `Realized IDR`.
+- `Relasi - Komponen`: `Loan Agreement Ref (*)`, `Budget Year (*)`, `Quarter (*)`, `Component Name (*)`, `Planned Loan Agreement`, `Planned USD`, `Planned IDR`, `Realized Loan Agreement`, `Realized USD`, `Realized IDR`.
+
+Validasi import:
+- Loan Agreement harus ada di snapshot template dan `effective_date <= CURRENT_DATE`.
+- `Quarter` wajib `TW1`, `TW2`, `TW3`, atau `TW4`.
+- Kurs USD/IDR dan kurs Loan Agreement/IDR wajib lebih dari 0.
+- Nilai rencana/realisasi boleh kosong dan dianggap 0; jika diisi tidak boleh negatif.
+- Baris komponen hanya boleh mengacu ke monitoring yang dibuat dari sheet `Monitoring Disbursement` pada workbook yang sama. Import tidak menambah/mengubah komponen untuk monitoring yang sudah ada.
+
+`POST /monitoring/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+`POST /monitoring/import/execute` menjalankan import hanya jika hasil validasi memiliki `total_failed = 0`. Jika masih ada failed, response error validasi dan data tidak disimpan.
+
+Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
+
 ### Monitoring (Level LA)
 
 | Method | Endpoint | Permission |

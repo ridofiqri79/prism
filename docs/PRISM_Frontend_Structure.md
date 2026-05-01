@@ -158,6 +158,7 @@ prism-frontend/
 │   │   │   └── LAFormPage.vue
 │   │   │
 │   │   ├── monitoring/
+│   │   │   ├── MonitoringOverviewPage.vue
 │   │   │   ├── MonitoringListPage.vue
 │   │   │   └── MonitoringFormPage.vue
 │   │   │

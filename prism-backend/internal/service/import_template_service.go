@@ -97,6 +97,7 @@ type importTemplateReferenceData struct {
 	AllowedGBLenders   []queries.ListAllowedLenderReferencesByGBProjectRow
 	DKProjects         []queries.ListLoanAgreementImportDKProjectReferencesRow
 	AllowedDKLenders   []queries.ListLoanAgreementAllowedLenderReferencesRow
+	MonitoringLAs      []queries.ListMonitoringImportLoanAgreementReferencesRow
 }
 
 func textCell(value string) simpleXLSXCell {
@@ -230,6 +231,24 @@ func (s *LAService) BuildImportTemplate(ctx context.Context) (*importTemplateFil
 
 	return &importTemplateFile{
 		FileName:    "loan_agreement_import_template.xlsx",
+		ContentType: importTemplateContentType,
+		Data:        data,
+	}, nil
+}
+
+func (s *MonitoringService) BuildImportTemplate(ctx context.Context) (*importTemplateFile, error) {
+	workbook, err := s.buildMonitoringImportTemplateWorkbook(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membuat template import Monitoring Disbursement")
+	}
+
+	return &importTemplateFile{
+		FileName:    "monitoring_disbursement_import_template.xlsx",
 		ContentType: importTemplateContentType,
 		Data:        data,
 	}, nil
@@ -482,6 +501,35 @@ func (s *LAService) buildLAImportTemplateWorkbook(ctx context.Context) (simpleXL
 	return simpleXLSXWorkbook{Sheets: sheets, DefinedNames: definedNames}, nil
 }
 
+func (s *MonitoringService) buildMonitoringImportTemplateWorkbook(ctx context.Context) (simpleXLSXWorkbook, error) {
+	masterSvc := &MasterService{db: s.db, queries: s.queries}
+	reference, err := masterSvc.loadImportTemplateReferenceData(ctx, pgtype.UUID{})
+	if err != nil {
+		return simpleXLSXWorkbook{}, err
+	}
+
+	dropdowns, definedNames := buildDropdownSheet(reference)
+	sheets := []simpleXLSXSheet{
+		buildMonitoringGuideSheet(),
+		buildMonitoringMasterDataSnapshotSheet("Master Data", reference),
+		templateInputSheet(monitoringImportSheetInput, []string{"Loan Agreement Ref (*)", "Budget Year (*)", "Quarter (*)", "Exchange Rate USD/IDR (*)", "Exchange Rate Loan Agreement/IDR (*)", "Planned Loan Agreement", "Planned USD", "Planned IDR", "Realized Loan Agreement", "Realized USD", "Realized IDR"}, []float64{82, 18, 14, 24, 34, 24, 18, 18, 26, 18, 18}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddLoanAgreementRefs", "Loan Agreement Ref", "Pilih Loan Agreement yang sudah efektif."),
+			numberValidation("B2:B"+inputLastRow(), "Budget Year", "Isi tahun anggaran empat digit."),
+			listValidation("C2:C"+inputLastRow(), "ddQuarters", "Quarter", "Pilih TW1, TW2, TW3, atau TW4."),
+			decimalValidation("D2:K"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Exchange rate wajib lebih dari 0 saat import."),
+		}),
+		templateInputSheet(monitoringImportSheetComponents, []string{"Loan Agreement Ref (*)", "Budget Year (*)", "Quarter (*)", "Component Name (*)", "Planned Loan Agreement", "Planned USD", "Planned IDR", "Realized Loan Agreement", "Realized USD", "Realized IDR"}, []float64{82, 18, 14, 44, 24, 18, 18, 26, 18, 18}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddLoanAgreementRefs", "Loan Agreement Ref", "Pilih Loan Agreement yang sama dengan sheet Monitoring Disbursement."),
+			numberValidation("B2:B"+inputLastRow(), "Budget Year", "Isi tahun anggaran empat digit."),
+			listValidation("C2:C"+inputLastRow(), "ddQuarters", "Quarter", "Pilih TW1, TW2, TW3, atau TW4."),
+			decimalValidation("E2:J"+inputLastRow(), "Amount", "Isi angka 0 atau lebih."),
+		}),
+		dropdowns,
+	}
+
+	return simpleXLSXWorkbook{Sheets: sheets, DefinedNames: definedNames}, nil
+}
+
 func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, periodID pgtype.UUID) (*importTemplateReferenceData, error) {
 	programTitles, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
@@ -562,6 +610,11 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		return nil, apperrors.Internal("Gagal membaca snapshot allowed lender Loan Agreement")
 	}
 
+	monitoringLAs, err := s.queries.ListMonitoringImportLoanAgreementReferences(ctx)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca snapshot Loan Agreement untuk Monitoring")
+	}
+
 	return &importTemplateReferenceData{
 		ProgramTitles:      programTitles,
 		BappenasPartners:   partners,
@@ -577,6 +630,7 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		AllowedGBLenders:   allowedGBLenders,
 		DKProjects:         dkProjects,
 		AllowedDKLenders:   allowedDKLenders,
+		MonitoringLAs:      monitoringLAs,
 	}, nil
 }
 
@@ -681,6 +735,30 @@ func buildLAMasterDataSnapshotSheet(name string, reference *importTemplateRefere
 		sheet.Rows = append(sheet.Rows, textRow("Allowed Loan Agreement Lender", model.UUIDToString(item.DkProjectID), item.LenderName, item.LenderType, item.Currency, model.UUIDToString(item.LenderID)))
 	}
 	sheet.AutoFilter = fmt.Sprintf("A4:F%d", len(sheet.Rows))
+	return sheet
+}
+
+func buildMonitoringMasterDataSnapshotSheet(name string, reference *importTemplateReferenceData) simpleXLSXSheet {
+	sheet := buildMasterDataSnapshotSheet(name, reference)
+	for _, item := range reference.MonitoringLAs {
+		status := "Eligible"
+		if !item.IsEffective {
+			status = "Belum efektif"
+		}
+		sheet.Rows = append(sheet.Rows, textRow(
+			"Loan Agreement",
+			model.UUIDToString(item.ID),
+			item.LoanCode,
+			item.LenderName,
+			textFromPg(item.LenderShortName),
+			item.Currency,
+			dateString(item.EffectiveDate),
+			status,
+			item.DkProjectName,
+			item.MonitoringPeriods,
+		))
+	}
+	sheet.AutoFilter = fmt.Sprintf("A4:J%d", len(sheet.Rows))
 	return sheet
 }
 
@@ -845,6 +923,34 @@ func buildLAGuideSheet() simpleXLSXSheet {
 	}
 }
 
+func buildMonitoringGuideSheet() simpleXLSXSheet {
+	rows := [][]simpleXLSXCell{
+		styledTextRow(xlsxStyleTitle, "Panduan Import Monitoring Disbursement"),
+		styledTextRow(xlsxStyleSubtitle, "Workbook ini hanya membuat Monitoring Disbursement baru. Periode yang sudah ada untuk Loan Agreement yang sama akan dilewati."),
+		textRow(""),
+		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
+		textRow("1. Isi Monitoring Disbursement", "Satu baris mewakili satu periode monitoring untuk satu Loan Agreement.", "Loan Agreement Ref dari dropdown menyertakan UUID agar tidak ambigu."),
+		textRow("2. Pastikan Loan Agreement efektif", "Monitoring hanya boleh dibuat jika Effective Date sudah lewat atau sama dengan hari ini.", "Loan Agreement belum efektif akan masuk failed saat preview."),
+		textRow("3. Isi periode dan kurs", "Budget Year wajib tahun empat digit. Quarter wajib TW1, TW2, TW3, atau TW4.", "Exchange rate USD/IDR dan Loan Agreement/IDR wajib lebih dari 0."),
+		textRow("4. Isi rencana/realisasi", "Nilai Loan Agreement, USD, dan IDR diinput manual tanpa konversi otomatis.", "Kosong dianggap 0 untuk kolom rencana/realisasi."),
+		textRow("5. Tambah komponen opsional", "Gunakan sheet Relasi - Komponen untuk breakdown per komponen.", "Komponen harus mengacu ke baris Monitoring Disbursement yang akan dibuat di workbook."),
+		textRow("6. Preview dan Eksekusi", "Upload workbook lalu Preview untuk melihat create, skip, dan failed. Eksekusi hanya jika failed = 0.", "Preview tidak menyimpan data; eksekusi menyimpan dalam satu transaksi."),
+		textRow(""),
+		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
+		textRow("Monitoring Disbursement", "Loan Agreement Ref (*), Budget Year (*), Quarter (*)", "Import create-only. Kombinasi Loan Agreement + Budget Year + Quarter harus baru."),
+		textRow("Monitoring Disbursement", "Exchange Rate USD/IDR (*), Exchange Rate Loan Agreement/IDR (*)", "Kurs wajib angka lebih dari 0."),
+		textRow("Relasi - Komponen", "Loan Agreement Ref (*), Budget Year (*), Quarter (*), Component Name (*)", "Opsional; total komponen tidak harus sama dengan nilai level Loan Agreement."),
+		textRow(""),
+		styledTextRow(xlsxStyleNote, "Catatan", "Sheet Master Data adalah snapshot referensi. Sheet _Dropdowns disembunyikan dan dipakai Excel untuk pilihan dropdown.", ""),
+	}
+	return simpleXLSXSheet{
+		Name:          "Panduan",
+		Rows:          rows,
+		Columns:       columns(30, 80, 78),
+		ShowGridLines: false,
+	}
+}
+
 func templateInputSheet(name string, headers []string, widths []float64, validations []simpleXLSXValidation) simpleXLSXSheet {
 	return simpleXLSXSheet{
 		Name:          name,
@@ -896,11 +1002,13 @@ func buildDropdownSheet(reference *importTemplateReferenceData) (simpleXLSXSheet
 		{Name: "ddBBProjectCodes", Header: "BB Project Codes", Values: uniqueSorted(bbProjectCodeValues(reference.BBProjects))},
 		{Name: "ddGBProjectCodes", Header: "GB Project Codes", Values: uniqueSorted(gbProjectCodeValues(reference.GBProjects))},
 		{Name: "ddDKProjectRefs", Header: "DK Project Refs", Values: uniqueSorted(laDKProjectReferenceValues(reference.DKProjects))},
+		{Name: "ddLoanAgreementRefs", Header: "Loan Agreement Refs", Values: uniqueSorted(monitoringLoanAgreementReferenceValues(reference.MonitoringLAs))},
 		{Name: "ddBappenasPartnerLevels", Header: "Bappenas Partner Levels", Values: []string{"Eselon I", "Eselon II"}},
 		{Name: "ddInstitutionLevels", Header: "Institution Levels", Values: institutionLevels},
 		{Name: "ddRegionLevels", Header: "Region Levels", Values: []string{"COUNTRY", "PROVINCE", "CITY"}},
 		{Name: "ddLenderTypes", Header: "Lender Types", Values: []string{"Bilateral", "Multilateral", "KSA"}},
 		{Name: "ddCurrencies", Header: "Currencies", Values: uniqueSorted(currencyValues(reference.Currencies))},
+		{Name: "ddQuarters", Header: "Quarters", Values: []string{"TW1", "TW2", "TW3", "TW4"}},
 		{Name: "ddFundingTypes", Header: "Funding Types", Values: []string{"Foreign", "Counterpart"}},
 		{Name: "ddFundingCategories", Header: "Funding Categories", Values: []string{"Loan", "Grant", "Central Government", "Regional Government", "State-Owned Enterprise", "Others"}},
 	}
@@ -1168,6 +1276,29 @@ func laDKProjectReferenceValues(items []queries.ListLoanAgreementImportDKProject
 		values = append(values, laDKProjectReferenceLabel(item))
 	}
 	return values
+}
+
+func monitoringLoanAgreementReferenceValues(items []queries.ListMonitoringImportLoanAgreementReferencesRow) []string {
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		if !item.IsEffective {
+			continue
+		}
+		values = append(values, monitoringLoanAgreementReferenceLabel(item))
+	}
+	return values
+}
+
+func monitoringLoanAgreementReferenceLabel(item queries.ListMonitoringImportLoanAgreementReferencesRow) string {
+	lender := textFromPg(item.LenderShortName)
+	if lender == "" {
+		lender = item.LenderName
+	}
+	projectName := strings.TrimSpace(item.DkProjectName)
+	if projectName == "" {
+		projectName = "Tanpa nama proyek"
+	}
+	return fmt.Sprintf("%s | %s | %s | %s", item.LoanCode, lender, projectName, model.UUIDToString(item.ID))
 }
 
 func buildSimpleXLSX(workbook simpleXLSXWorkbook) ([]byte, error) {

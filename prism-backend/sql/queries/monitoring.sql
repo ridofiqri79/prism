@@ -1,5 +1,108 @@
 -- ===== MONITORING DISBURSEMENT =====
 
+-- name: ListMonitoringLoanAgreementReferences :many
+SELECT
+    la.id,
+    la.loan_code,
+    la.effective_date,
+    (la.effective_date <= CURRENT_DATE)::boolean AS is_effective,
+    la.currency,
+    la.amount_usd,
+    l.id AS lender_id,
+    l.name AS lender_name,
+    l.type AS lender_type,
+    l.short_name AS lender_short_name,
+    dk.letter_number AS dk_letter_number,
+    dp.project_name AS dk_project_name,
+    COUNT(md.id)::bigint AS monitoring_count,
+    MAX(md.updated_at)::timestamptz AS latest_monitoring_at
+FROM loan_agreement la
+JOIN lender l ON l.id = la.lender_id
+JOIN dk_project dp ON dp.id = la.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    sqlc.narg('is_effective')::boolean IS NULL
+    OR (la.effective_date <= CURRENT_DATE) = sqlc.narg('is_effective')::boolean
+)
+GROUP BY
+    la.id,
+    la.loan_code,
+    la.effective_date,
+    la.currency,
+    la.amount_usd,
+    l.id,
+    l.name,
+    l.type,
+    l.short_name,
+    dk.letter_number,
+    dp.project_name
+ORDER BY la.effective_date DESC, la.loan_code ASC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountMonitoringLoanAgreementReferences :one
+SELECT COUNT(*)
+FROM loan_agreement la
+JOIN lender l ON l.id = la.lender_id
+JOIN dk_project dp ON dp.id = la.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+WHERE (
+    sqlc.narg('search')::text IS NULL
+    OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+)
+AND (
+    sqlc.narg('is_effective')::boolean IS NULL
+    OR (la.effective_date <= CURRENT_DATE) = sqlc.narg('is_effective')::boolean
+);
+
+-- name: ListMonitoringImportLoanAgreementReferences :many
+SELECT
+    la.id,
+    la.loan_code,
+    la.effective_date,
+    (la.effective_date <= CURRENT_DATE)::boolean AS is_effective,
+    la.currency,
+    la.amount_usd,
+    l.name AS lender_name,
+    l.type AS lender_type,
+    l.short_name AS lender_short_name,
+    dk.letter_number AS dk_letter_number,
+    dp.project_name AS dk_project_name,
+    COALESCE(
+        string_agg(md.budget_year::text || ' ' || md.quarter, ', ' ORDER BY md.budget_year, md.quarter)
+            FILTER (WHERE md.id IS NOT NULL),
+        ''
+    )::text AS monitoring_periods
+FROM loan_agreement la
+JOIN lender l ON l.id = la.lender_id
+JOIN dk_project dp ON dp.id = la.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
+GROUP BY
+    la.id,
+    la.loan_code,
+    la.effective_date,
+    la.currency,
+    la.amount_usd,
+    l.name,
+    l.type,
+    l.short_name,
+    dk.letter_number,
+    dp.project_name
+ORDER BY la.effective_date DESC, la.loan_code ASC;
+
 -- name: ListMonitoringByLA :many
 SELECT *
 FROM monitoring_disbursement

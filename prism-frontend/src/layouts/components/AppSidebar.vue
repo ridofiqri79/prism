@@ -87,6 +87,12 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
     },
+    {
+      label: 'Monitoring Disbursement',
+      to: '/monitoring',
+      icon: 'pi pi-chart-line',
+      module: 'monitoring_disbursement',
+    },
   ]),
 )
 

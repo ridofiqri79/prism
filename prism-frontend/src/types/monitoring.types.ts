@@ -1,4 +1,4 @@
-import type { ListParams } from '@/types/master.types'
+import type { Lender, ListParams } from '@/types/master.types'
 
 export type Quarter = 'TW1' | 'TW2' | 'TW3' | 'TW4'
 
@@ -50,6 +50,25 @@ export interface MonitoringListParams extends ListParams {
   search?: string
   budget_year?: number
   quarter?: Quarter
+}
+
+export interface MonitoringLoanAgreementReference {
+  id: string
+  loan_code: string
+  effective_date: string
+  is_effective: boolean
+  currency: string
+  amount_usd: number
+  lender: Lender
+  dk_letter_number?: string | null
+  dk_project_name: string
+  monitoring_count: number
+  latest_monitoring_at?: string
+}
+
+export interface MonitoringLoanAgreementListParams extends ListParams {
+  search?: string
+  is_effective?: boolean
 }
 
 export type MonitoringApiResponse = Omit<MonitoringDisbursement, 'absorption_pct'> & {

@@ -44,6 +44,24 @@ type MonitoringResponse struct {
 	UpdatedAt          string                       `json:"updated_at,omitempty"`
 }
 
+type MonitoringLoanAgreementResponse struct {
+	ID                 string     `json:"id"`
+	LoanCode           string     `json:"loan_code"`
+	EffectiveDate      string     `json:"effective_date"`
+	IsEffective        bool       `json:"is_effective"`
+	Currency           string     `json:"currency"`
+	AmountUSD          float64    `json:"amount_usd"`
+	Lender             LenderInfo `json:"lender"`
+	DKLetterNumber     *string    `json:"dk_letter_number,omitempty"`
+	DKProjectName      string     `json:"dk_project_name"`
+	MonitoringCount    int64      `json:"monitoring_count"`
+	LatestMonitoringAt string     `json:"latest_monitoring_at,omitempty"`
+}
+
+type MonitoringLoanAgreementListFilter struct {
+	IsEffective *string
+}
+
 type MonitoringListFilter struct {
 	BudgetYear *string
 	Quarter    *string
