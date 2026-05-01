@@ -116,3 +116,5 @@ export const greenBookImportFileSchema = masterImportFileSchema.extend({
 })
 
 export const daftarKegiatanImportFileSchema = masterImportFileSchema
+
+export const loanAgreementImportFileSchema = masterImportFileSchema

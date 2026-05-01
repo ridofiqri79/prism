@@ -12,11 +12,13 @@ import {
   blueBookImportFileSchema,
   daftarKegiatanImportFileSchema,
   greenBookImportFileSchema,
+  loanAgreementImportFileSchema,
   masterImportFileSchema,
 } from '@/schemas/master.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
+import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { ApiErrorResponse } from '@/types/api.types'
 import type { BlueBook } from '@/types/blue-book.types'
@@ -29,7 +31,7 @@ import type {
 } from '@/types/master.types'
 
 type ImportStatusFilter = MasterImportRowStatus | 'all'
-type ImportKind = 'master' | 'blue_book' | 'green_book' | 'daftar_kegiatan'
+type ImportKind = 'master' | 'blue_book' | 'green_book' | 'daftar_kegiatan' | 'loan_agreement'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
 type ParsedImportInput = { file: File; blueBookId?: string; greenBookId?: string }
 type ImportKindOption = { value: ImportKind; label: string; description: string }
@@ -43,6 +45,7 @@ const masterStore = useMasterStore()
 const blueBookStore = useBlueBookStore()
 const greenBookStore = useGreenBookStore()
 const daftarKegiatanStore = useDaftarKegiatanStore()
+const loanAgreementStore = useLoanAgreementStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -78,6 +81,11 @@ const importKindOptions: ImportKindOption[] = [
     value: 'daftar_kegiatan',
     label: 'Daftar Kegiatan',
     description: 'Header Daftar Kegiatan baru beserta proyek, Proyek Green Book, pembiayaan, alokasi, dan aktivitas',
+  },
+  {
+    value: 'loan_agreement',
+    label: 'Loan Agreement',
+    description: 'Create-only Loan Agreement dari Proyek Daftar Kegiatan yang eligible',
   },
 ]
 
@@ -123,6 +131,8 @@ const daftarKegiatanWorkbookSheets = [
   'Relasi - Activity Detail',
 ]
 
+const loanAgreementWorkbookSheets = ['Loan Agreement']
+
 const sheetDisplayLabels: Record<string, string> = {
   'Relasi - BB Project': 'Relasi - Proyek Blue Book',
   'Relasi - GB Project': 'Relasi - Proyek Green Book',
@@ -132,6 +142,7 @@ const workbookSheets = computed(() => {
   if (activeImportKind.value === 'master') return masterWorkbookSheets
   if (activeImportKind.value === 'blue_book') return blueBookWorkbookSheets
   if (activeImportKind.value === 'green_book') return greenBookWorkbookSheets
+  if (activeImportKind.value === 'loan_agreement') return loanAgreementWorkbookSheets
 
   return daftarKegiatanWorkbookSheets
 })
@@ -163,7 +174,9 @@ const importBusy = computed(() =>
       ? blueBookStore.importPreviewing || blueBookStore.importExecuting
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importPreviewing || greenBookStore.importExecuting
-        : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importPreviewing || loanAgreementStore.importExecuting
+          : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
 )
 
 const previewLoading = computed(() =>
@@ -173,7 +186,9 @@ const previewLoading = computed(() =>
       ? blueBookStore.importPreviewing
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importPreviewing
-        : daftarKegiatanStore.importPreviewing,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importPreviewing
+          : daftarKegiatanStore.importPreviewing,
 )
 
 const executeLoading = computed(() =>
@@ -183,7 +198,9 @@ const executeLoading = computed(() =>
       ? blueBookStore.importExecuting
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importExecuting
-        : daftarKegiatanStore.importExecuting,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importExecuting
+          : daftarKegiatanStore.importExecuting,
 )
 
 const templateLoading = computed(() =>
@@ -193,7 +210,9 @@ const templateLoading = computed(() =>
       ? blueBookStore.templateDownloading
       : activeImportKind.value === 'green_book'
         ? greenBookStore.templateDownloading
-        : daftarKegiatanStore.templateDownloading,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.templateDownloading
+          : daftarKegiatanStore.templateDownloading,
 )
 
 const targetMissing = computed(
@@ -341,6 +360,8 @@ async function previewFile() {
       summary.value = await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
     } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.previewProjectImport(input.greenBookId ?? '', input.file)
+    } else if (activeImportKind.value === 'loan_agreement') {
+      summary.value = await loanAgreementStore.previewImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.previewImport(input.file)
     }
@@ -373,6 +394,8 @@ async function executeFile() {
       summary.value = await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
     } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.importProjects(input.greenBookId ?? '', input.file)
+    } else if (activeImportKind.value === 'loan_agreement') {
+      summary.value = await loanAgreementStore.executeImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.executeImport(input.file)
     }
@@ -419,6 +442,13 @@ async function downloadTemplate() {
       return
     }
 
+    if (activeImportKind.value === 'loan_agreement') {
+      const laBlob = await loanAgreementStore.downloadImportTemplate()
+      saveBlob(laBlob, 'loan_agreement_import_template.xlsx')
+      toast.success('Template diunduh', 'Template Loan Agreement sudah dibuat dari snapshot master data')
+      return
+    }
+
     const dkBlob = await daftarKegiatanStore.downloadImportTemplate()
     saveBlob(dkBlob, 'daftar_kegiatan_import_template.xlsx')
     toast.success('Template diunduh', 'Template Daftar Kegiatan sudah dibuat dari snapshot master data')
@@ -462,6 +492,16 @@ function getImportInput(): ParsedImportInput | null {
     }
 
     return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
+  }
+
+  if (activeImportKind.value === 'loan_agreement') {
+    const parsed = loanAgreementImportFileSchema.safeParse({ file: selectedFile.value })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file }
   }
 
   const parsed = daftarKegiatanImportFileSchema.safeParse({ file: selectedFile.value })

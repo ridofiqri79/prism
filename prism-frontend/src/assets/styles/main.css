@@ -97,10 +97,12 @@
   }
 
   .prism-sidebar-item.is-active {
-    background: #fdb813;
+    background: rgba(31, 181, 178, 0.14);
     color: #0b6f73;
     font-weight: 700;
-    box-shadow: inset 3px 0 0 #ffd45a;
+    box-shadow:
+      inset 3px 0 0 #1fb5b2,
+      0 0 0 1px rgba(31, 181, 178, 0.16);
   }
 
   .prism-sidebar-item.is-active i {

@@ -8,6 +8,7 @@ import type {
   LoanAgreementListParams,
   LoanAgreementPayload,
 } from '@/types/loan-agreement.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 function toDKProjectLoanOption(dk: DaftarKegiatan, project: DKProject): DKProjectLoanOption {
   const gbProjects = project.gb_projects ?? []
@@ -55,6 +56,33 @@ export const LoanAgreementService = {
 
   async deleteLoanAgreement(id: string) {
     await http.delete(`/loan-agreements/${id}`)
+  },
+
+  async downloadImportTemplate() {
+    const response = await http.get<Blob>('/loan-agreements/import/template', {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  async previewImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/loan-agreements/import/preview',
+      formData,
+    )
+    return response.data.data
+  },
+
+  async executeImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/loan-agreements/import/execute',
+      formData,
+    )
+    return response.data.data
   },
 
   async getDKProjectOptions(search?: string) {

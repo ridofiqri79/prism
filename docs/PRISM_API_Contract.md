@@ -1219,6 +1219,41 @@ Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail
 | `POST` | `/loan-agreements` | create: `loan_agreement` |
 | `PUT` | `/loan-agreements/:id` | update: `loan_agreement` |
 | `DELETE` | `/loan-agreements/:id` | delete: `loan_agreement` |
+| `GET` | `/loan-agreements/import/template` | ADMIN only |
+| `POST` | `/loan-agreements/import/preview` | ADMIN only |
+| `POST` | `/loan-agreements/import/execute` | ADMIN only |
+
+### Import Loan Agreement
+
+**Content-Type:** `multipart/form-data`
+
+**Form field:**
+
+| Field | Keterangan |
+|-------|------------|
+| `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` |
+
+Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru untuk DK Project yang belum memiliki Loan Agreement. DK Project yang sudah memiliki Loan Agreement masuk status `skip`; Loan Code yang sudah dipakai oleh record lain masuk status `failed`.
+
+**Template:**
+`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, dan currency aktif saat template dibuat.
+
+**Kolom workbook:**
+
+| Sheet | Kolom |
+|-------|-------|
+| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date (*)`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Amount USD` |
+
+**Preview:**
+`POST /loan-agreements/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+
+**Execute:**
+`POST /loan-agreements/import/execute` menjalankan import hanya jika hasil validasi memiliki `total_failed = 0`. Jika masih ada failed, response error validasi dan data tidak disimpan.
+
+**Response `200`:**
+Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
+
+`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`; `Amount USD` wajib lebih dari `0` untuk non-USD. Jika `Currency` adalah `USD`, `Amount USD` boleh kosong dan backend menyimpan nilai USD sama dengan `Amount Original`.
 
 **`POST /loan-agreements` Request:**
 ```json

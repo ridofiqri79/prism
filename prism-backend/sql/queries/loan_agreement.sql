@@ -85,6 +85,57 @@ SELECT *
 FROM loan_agreement
 WHERE dk_project_id = $1;
 
+-- name: GetLoanAgreementByLoanCode :one
+SELECT *
+FROM loan_agreement
+WHERE loan_code = $1;
+
+-- name: ListLoanAgreementImportDKProjectReferences :many
+SELECT
+    dp.id,
+    dk.id AS dk_id,
+    COALESCE(dk.letter_number, '') AS letter_number,
+    dk.subject,
+    dp.project_name,
+    COALESCE(string_agg(DISTINCT gp.gb_code, ', ' ORDER BY gp.gb_code), '')::text AS gb_codes,
+    EXISTS (
+        SELECT 1
+        FROM dk_financing_detail dfd
+        WHERE dfd.dk_project_id = dp.id
+          AND dfd.lender_id IS NOT NULL
+    ) AS has_financing_detail,
+    la.id AS existing_loan_agreement_id,
+    la.loan_code AS existing_loan_code
+FROM dk_project dp
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN dk_project_gb_project dkgb ON dkgb.dk_project_id = dp.id
+LEFT JOIN gb_project gp ON gp.id = dkgb.gb_project_id
+LEFT JOIN loan_agreement la ON la.dk_project_id = dp.id
+GROUP BY
+    dp.id,
+    dk.id,
+    dk.letter_number,
+    dk.subject,
+    dp.project_name,
+    la.id,
+    la.loan_code
+ORDER BY dk.date DESC, COALESCE(dk.letter_number, '') ASC, dp.project_name ASC;
+
+-- name: ListLoanAgreementAllowedLenderReferences :many
+SELECT DISTINCT
+    dfd.dk_project_id,
+    dfd.lender_id,
+    l.name AS lender_name,
+    l.short_name AS lender_short_name,
+    l.type AS lender_type,
+    dfd.currency,
+    dfd.amount_original,
+    dfd.amount_usd
+FROM dk_financing_detail dfd
+JOIN lender l ON l.id = dfd.lender_id
+WHERE dfd.lender_id IS NOT NULL
+ORDER BY dfd.dk_project_id, l.name ASC, dfd.currency ASC;
+
 -- name: CreateLoanAgreement :one
 INSERT INTO loan_agreement (
     dk_project_id,

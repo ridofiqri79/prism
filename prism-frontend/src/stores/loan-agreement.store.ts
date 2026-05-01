@@ -7,12 +7,16 @@ import type {
   LoanAgreementListParams,
   LoanAgreementPayload,
 } from '@/types/loan-agreement.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const useLoanAgreementStore = defineStore('loanAgreement', () => {
   const loanAgreements = ref<LoanAgreement[]>([])
   const currentLoanAgreement = ref<LoanAgreement | null>(null)
   const dkProjectOptions = ref<DKProjectLoanOption[]>([])
   const loading = ref(false)
+  const templateDownloading = ref(false)
+  const importPreviewing = ref(false)
+  const importExecuting = ref(false)
   const total = ref(0)
 
   const dkProjectOptionMap = computed(
@@ -58,6 +62,35 @@ export const useLoanAgreementStore = defineStore('loanAgreement', () => {
     await LoanAgreementService.deleteLoanAgreement(id)
   }
 
+  async function downloadImportTemplate(): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await LoanAgreementService.downloadImportTemplate()
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
+  async function previewImport(file: File): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await LoanAgreementService.previewImport(file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
+  async function executeImport(file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await LoanAgreementService.executeImport(file)
+      await fetchLoanAgreements()
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
   async function fetchDKProjectOptions(search?: string) {
     return withLoading(async () => {
       dkProjectOptions.value = await LoanAgreementService.getDKProjectOptions(search)
@@ -85,6 +118,9 @@ export const useLoanAgreementStore = defineStore('loanAgreement', () => {
     currentLoanAgreement.value = null
     dkProjectOptions.value = []
     loading.value = false
+    templateDownloading.value = false
+    importPreviewing.value = false
+    importExecuting.value = false
     total.value = 0
   }
 
@@ -94,12 +130,18 @@ export const useLoanAgreementStore = defineStore('loanAgreement', () => {
     dkProjectOptions,
     dkProjectOptionMap,
     loading,
+    templateDownloading,
+    importPreviewing,
+    importExecuting,
     total,
     fetchLoanAgreements,
     fetchLoanAgreement,
     createLoanAgreement,
     updateLoanAgreement,
     deleteLoanAgreement,
+    downloadImportTemplate,
+    previewImport,
+    executeImport,
     fetchDKProjectOptions,
     fetchDKProjectOption,
     $reset,
