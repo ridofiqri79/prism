@@ -105,6 +105,8 @@ type masterImportLookups struct {
 	countriesByCode           map[string]queries.Country
 	countriesByName           map[string]queries.Country
 	lendersByName             map[string]masterImportLenderRef
+	lendersByShortName        map[string]masterImportLenderRef
+	ambiguousLenderShortNames map[string]struct{}
 	institutionsByID          map[string]queries.Institution
 	institutionsByName        map[string]queries.Institution
 	institutionsByPath        map[string]queries.Institution
@@ -211,6 +213,8 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		countriesByCode:           map[string]queries.Country{},
 		countriesByName:           map[string]queries.Country{},
 		lendersByName:             map[string]masterImportLenderRef{},
+		lendersByShortName:        map[string]masterImportLenderRef{},
+		ambiguousLenderShortNames: map[string]struct{}{},
 		institutionsByID:          map[string]queries.Institution{},
 		institutionsByName:        map[string]queries.Institution{},
 		institutionsByPath:        map[string]queries.Institution{},
@@ -1336,12 +1340,49 @@ func (l *masterImportLookups) countryByNameOrCode(value string) (queries.Country
 }
 
 func (l *masterImportLookups) addLender(id pgtype.UUID, name, lenderType string, shortName pgtype.Text) {
-	l.lendersByName[normalizeLookupKey(name)] = masterImportLenderRef{
+	if l.lendersByName == nil {
+		l.lendersByName = map[string]masterImportLenderRef{}
+	}
+	if l.lendersByShortName == nil {
+		l.lendersByShortName = map[string]masterImportLenderRef{}
+	}
+	if l.ambiguousLenderShortNames == nil {
+		l.ambiguousLenderShortNames = map[string]struct{}{}
+	}
+
+	ref := masterImportLenderRef{
 		ID:        id,
 		Name:      name,
 		Type:      lenderType,
 		ShortName: shortName,
 	}
+	l.lendersByName[normalizeLookupKey(name)] = ref
+
+	if !shortName.Valid || strings.TrimSpace(shortName.String) == "" {
+		return
+	}
+	shortNameKey := normalizeLookupKey(shortName.String)
+	if _, ambiguous := l.ambiguousLenderShortNames[shortNameKey]; ambiguous {
+		return
+	}
+	if existing, exists := l.lendersByShortName[shortNameKey]; exists && model.UUIDToString(existing.ID) != model.UUIDToString(id) {
+		l.ambiguousLenderShortNames[shortNameKey] = struct{}{}
+		delete(l.lendersByShortName, shortNameKey)
+		return
+	}
+	l.lendersByShortName[shortNameKey] = ref
+}
+
+func (l *masterImportLookups) lookupLenderReference(value string) (masterImportLenderRef, bool, bool) {
+	key := normalizeLookupKey(value)
+	if lender, exists := l.lendersByName[key]; exists {
+		return lender, true, false
+	}
+	if _, ambiguous := l.ambiguousLenderShortNames[key]; ambiguous {
+		return masterImportLenderRef{}, false, true
+	}
+	lender, exists := l.lendersByShortName[key]
+	return lender, exists, false
 }
 
 func (l *masterImportLookups) regionByNameOrCode(value string) (queries.Region, bool) {

@@ -607,7 +607,7 @@ Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Co
 | `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
 | `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
 
-Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma. Kolom institution pada `Relasi - EA` dan `Relasi - IA` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma. Kolom institution pada `Relasi - EA` dan `Relasi - IA` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Lender Indication.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
 `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -825,7 +825,7 @@ Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB C
 | `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
 | `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
 
-Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom institution pada `Relasi - EA`, `Relasi - IA`, dan `Relasi - Funding Source` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama.
+Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom institution pada `Relasi - EA`, `Relasi - IA`, dan `Relasi - Funding Source` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Funding Source.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
 `POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.

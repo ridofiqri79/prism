@@ -56,10 +56,47 @@ func TestMasterImportInstitutionLookupTracksScopedDuplicates(t *testing.T) {
 	}
 }
 
+func TestMasterImportLenderLookupFallsBackToUniqueShortName(t *testing.T) {
+	lookups := &masterImportLookups{}
+	lender := masterImportTestLender(testUUID(10), "Asian Development Bank", "ADB")
+	lookups.addLender(lender.ID, lender.Name, lender.Type, lender.ShortName)
+
+	if got, exists, ambiguous := lookups.lookupLenderReference("Asian Development Bank"); !exists || ambiguous || got.ID != lender.ID {
+		t.Fatalf("lookup by name = id %v exists %v ambiguous %v, want lender exists true ambiguous false", got.ID, exists, ambiguous)
+	}
+	if got, exists, ambiguous := lookups.lookupLenderReference("adb"); !exists || ambiguous || got.ID != lender.ID {
+		t.Fatalf("lookup by short_name = id %v exists %v ambiguous %v, want lender exists true ambiguous false", got.ID, exists, ambiguous)
+	}
+}
+
+func TestMasterImportLenderLookupRejectsAmbiguousShortName(t *testing.T) {
+	lookups := &masterImportLookups{}
+	first := masterImportTestLender(testUUID(11), "First Development Bank", "FDB")
+	second := masterImportTestLender(testUUID(12), "Second Development Bank", "FDB")
+	lookups.addLender(first.ID, first.Name, first.Type, first.ShortName)
+	lookups.addLender(second.ID, second.Name, second.Type, second.ShortName)
+
+	if got, exists, ambiguous := lookups.lookupLenderReference("FDB"); exists || !ambiguous || got.ID.Valid {
+		t.Fatalf("lookup ambiguous short_name = id %v exists %v ambiguous %v, want no id exists false ambiguous true", got.ID, exists, ambiguous)
+	}
+	if got, exists, ambiguous := lookups.lookupLenderReference("First Development Bank"); !exists || ambiguous || got.ID != first.ID {
+		t.Fatalf("lookup full name after ambiguous short_name = id %v exists %v ambiguous %v, want first exists true ambiguous false", got.ID, exists, ambiguous)
+	}
+}
+
 func testUUID(seed byte) pgtype.UUID {
 	return pgtype.UUID{
 		Bytes: [16]byte{seed},
 		Valid: true,
+	}
+}
+
+func masterImportTestLender(id pgtype.UUID, name, shortName string) masterImportLenderRef {
+	return masterImportLenderRef{
+		ID:        id,
+		Name:      name,
+		Type:      "Multilateral",
+		ShortName: pgtype.Text{String: shortName, Valid: shortName != ""},
 	}
 }
 

@@ -685,7 +685,14 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
-		lender, exists := lookups.lendersByName[normalizeLookupKey(lenderName)]
+		lender, exists, ambiguous := lookups.lookupLenderReference(lenderName)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Lender %q ambigu karena cocok dengan lebih dari satu short_name di master data", lenderName)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Lender %q belum ada di master data", lenderName)

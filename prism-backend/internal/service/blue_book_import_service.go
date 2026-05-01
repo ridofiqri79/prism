@@ -661,7 +661,14 @@ func (s *BlueBookService) parseBlueBookLenderIndicationRelation(workbook *xlsxWo
 			relations = append(relations, relation)
 			continue
 		}
-		lender, exists := lookups.lendersByName[normalizeLookupKey(name)]
+		lender, exists, ambiguous := lookups.lookupLenderReference(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Lender %q ambigu karena cocok dengan lebih dari satu short_name di master data", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Lender %q belum ada di master data", name)
