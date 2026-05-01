@@ -19,7 +19,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
+import type { DKProject, DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatDate, joinNames } from './daftar-kegiatan-page-utils'
 
@@ -128,6 +128,59 @@ function gbProjectRoute(project: GBProjectSummary) {
   return project.green_book_id
     ? { name: 'gb-project-detail', params: { gbId: project.green_book_id, id: project.id } }
     : { name: 'green-books' }
+}
+
+function loanAgreementRoute(project: DKProject) {
+  if (project.loan_agreement) {
+    return { name: 'loan-agreement-detail', params: { id: project.loan_agreement.id } }
+  }
+
+  return {
+    name: 'loan-agreement-create',
+    query: {
+      dk_id: dkId.value,
+      dk_project_id: project.id,
+    },
+  }
+}
+
+function canUseLoanAgreementAction(project: DKProject) {
+  return project.loan_agreement
+    ? can('loan_agreement', 'read')
+    : can('loan_agreement', 'create')
+}
+
+function hasFinancingLender(project: DKProject) {
+  return project.financing_details.some((detail) => Boolean(detail.lender?.id))
+}
+
+function isLoanAgreementActionDisabled(project: DKProject) {
+  return !project.loan_agreement && !hasFinancingLender(project)
+}
+
+function loanAgreementActionLabel(project: DKProject) {
+  return project.loan_agreement ? 'Buka Loan Agreement' : 'Buat Loan Agreement'
+}
+
+function loanAgreementActionIcon(project: DKProject) {
+  return project.loan_agreement ? 'pi pi-external-link' : 'pi pi-file-plus'
+}
+
+function loanAgreementActionTitle(project: DKProject) {
+  if (project.loan_agreement) {
+    return `Loan Agreement ${project.loan_agreement.loan_code}`
+  }
+
+  if (!hasFinancingLender(project)) {
+    return 'Tambahkan lender pada rincian pembiayaan sebelum membuat Loan Agreement'
+  }
+
+  return 'Buat Loan Agreement dari proyek ini'
+}
+
+function goToLoanAgreement(project: DKProject) {
+  if (isLoanAgreementActionDisabled(project)) return
+  void router.push(loanAgreementRoute(project))
 }
 
 function formatInstitution(institution: Institution) {
@@ -353,10 +406,22 @@ watch(
         >
         <AccordionHeader>
           <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
-            <span>{{ project.project_name }}</span>
-            <span class="text-sm font-normal text-surface-500">{{
-              project.duration ? `${project.duration} bulan` : '-'
-            }}</span>
+            <span class="min-w-0 flex-1">{{ project.project_name }}</span>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+              <Button
+                v-if="canUseLoanAgreementAction(project)"
+                :label="loanAgreementActionLabel(project)"
+                :icon="loanAgreementActionIcon(project)"
+                :disabled="isLoanAgreementActionDisabled(project)"
+                :title="loanAgreementActionTitle(project)"
+                size="small"
+                outlined
+                @click.stop="goToLoanAgreement(project)"
+              />
+              <span class="text-sm font-normal text-surface-500">{{
+                project.duration ? `${project.duration} bulan` : '-'
+              }}</span>
+            </div>
           </div>
         </AccordionHeader>
         <AccordionContent>

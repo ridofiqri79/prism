@@ -65,6 +65,21 @@ export const useLoanAgreementStore = defineStore('loanAgreement', () => {
     })
   }
 
+  async function fetchDKProjectOption(dkId: string, projectId: string) {
+    return withLoading(async () => {
+      const option = await LoanAgreementService.getDKProjectOption(dkId, projectId)
+      const index = dkProjectOptions.value.findIndex((project) => project.id === option.id)
+
+      if (index >= 0) {
+        dkProjectOptions.value[index] = option
+      } else {
+        dkProjectOptions.value = [option, ...dkProjectOptions.value]
+      }
+
+      return option
+    })
+  }
+
   function $reset() {
     loanAgreements.value = []
     currentLoanAgreement.value = null
@@ -86,6 +101,7 @@ export const useLoanAgreementStore = defineStore('loanAgreement', () => {
     updateLoanAgreement,
     deleteLoanAgreement,
     fetchDKProjectOptions,
+    fetchDKProjectOption,
     $reset,
   }
 })

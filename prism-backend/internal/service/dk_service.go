@@ -428,6 +428,10 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil activity detail")
 	}
+	loanAgreement, err := s.queries.GetLoanAgreementByDKProject(ctx, row.ID)
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, apperrors.Internal("Gagal mengambil Loan Agreement DK Project")
+	}
 	res := model.DKProjectResponse{
 		ID:               model.UUIDToString(row.ID),
 		DKID:             model.UUIDToString(row.DkID),
@@ -444,6 +448,12 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		ActivityDetails:  make([]model.DKActivityDetailResponse, 0, len(activityDetails)),
 		CreatedAt:        formatMasterTime(row.CreatedAt),
 		UpdatedAt:        formatMasterTime(row.UpdatedAt),
+	}
+	if err == nil {
+		res.LoanAgreement = &model.LoanAgreementSummary{
+			ID:       model.UUIDToString(loanAgreement.ID),
+			LoanCode: loanAgreement.LoanCode,
+		}
 	}
 	for _, item := range gbProjects {
 		summary := model.GBProjectSummary{

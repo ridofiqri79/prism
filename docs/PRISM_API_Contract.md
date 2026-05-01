@@ -1193,6 +1193,21 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 
 **`GET /daftar-kegiatan/:dk_id/projects/:id` Response `200`** menyertakan `bappenas_partners` sebagai array Mitra Kerja Bappenas Eselon II. Field ini boleh kosong.
 
+Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar-kegiatan/:dk_id/projects/:id` juga menyertakan `loan_agreement` jika proyek tersebut sudah memiliki Loan Agreement. Jika belum ada, field ini tidak dikirim.
+
+```json
+{
+  "id": "uuid-dk-project",
+  "project_name": "Trans Sumatra Section 1 - DK",
+  "loan_agreement": {
+    "id": "uuid-loan-agreement",
+    "loan_code": "IP-603"
+  }
+}
+```
+
+Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect Proyek Daftar Kegiatan. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`; jika `loan_agreement` sudah ada, frontend menampilkan aksi `Buka Loan Agreement`.
+
 ---
 
 ## Loan Agreement

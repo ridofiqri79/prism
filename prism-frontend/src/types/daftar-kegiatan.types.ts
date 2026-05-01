@@ -18,6 +18,11 @@ export interface DaftarKegiatan {
   updated_at?: string
 }
 
+export interface DKProjectLoanAgreementSummary {
+  id: string
+  loan_code: string
+}
+
 export interface DKProject {
   id: string
   dk?: DaftarKegiatan
@@ -35,6 +40,7 @@ export interface DKProject {
   financing_details: DKFinancingDetail[]
   loan_allocations: DKLoanAllocation[]
   activity_details: DKActivityDetail[]
+  loan_agreement?: DKProjectLoanAgreementSummary | null
   created_at?: string
   updated_at?: string
 }

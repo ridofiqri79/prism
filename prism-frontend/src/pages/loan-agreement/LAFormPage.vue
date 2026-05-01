@@ -24,6 +24,13 @@ const toast = useToast()
 const loanAgreementId = computed(() => String(route.params.id ?? ''))
 const isEditMode = computed(() => route.name === 'loan-agreement-edit')
 const pageTitle = computed(() => (isEditMode.value ? 'Edit Loan Agreement' : 'Buat Loan Agreement'))
+const sourceDKId = computed(() => queryString(route.query.dk_id))
+const sourceDKProjectId = computed(() => queryString(route.query.dk_project_id))
+const backRoute = computed(() =>
+  sourceDKId.value && !isEditMode.value
+    ? { name: 'daftar-kegiatan-detail', params: { id: sourceDKId.value } }
+    : { name: 'loan-agreements' },
+)
 const form = useLAForm(null, {
   dkProjects: () => loanAgreementStore.dkProjectOptions,
 })
@@ -63,12 +70,28 @@ async function searchDKProjects(event: AutoCompleteCompleteEvent) {
 }
 
 async function loadData() {
-  await loanAgreementStore.fetchDKProjectOptions()
-
   if (isEditMode.value) {
+    await loanAgreementStore.fetchDKProjectOptions()
     const loanAgreement = await loanAgreementStore.fetchLoanAgreement(loanAgreementId.value)
     form.applyLoanAgreement(loanAgreement)
+    return
   }
+
+  if (sourceDKId.value && sourceDKProjectId.value) {
+    const selectedProject = await loanAgreementStore.fetchDKProjectOption(
+      sourceDKId.value,
+      sourceDKProjectId.value,
+    )
+    form.values.dk_project_id = selectedProject.id
+    return
+  }
+
+  await loanAgreementStore.fetchDKProjectOptions()
+}
+
+function queryString(value: unknown) {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
 }
 
 const onSubmit = form.submit(async (values) => {
@@ -97,7 +120,7 @@ onMounted(() => {
           label="Kembali"
           icon="pi pi-arrow-left"
           outlined
-          @click="router.push({ name: 'loan-agreements' })"
+          @click="router.push(backRoute)"
         />
       </template>
     </PageHeader>
@@ -221,7 +244,7 @@ onMounted(() => {
       </section>
 
       <div class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
-        <Button label="Batal" severity="secondary" outlined @click="router.push({ name: 'loan-agreements' })" />
+        <Button label="Batal" severity="secondary" outlined @click="router.push(backRoute)" />
         <Button type="submit" label="Simpan" icon="pi pi-save" :loading="loanAgreementStore.loading" />
       </div>
     </form>
