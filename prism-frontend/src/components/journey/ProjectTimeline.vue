@@ -294,6 +294,7 @@ watch(
                           >
                             Daftar Kegiatan:
                             {{
+                              dkProject.project_name ||
                               dkProject.daftar_kegiatan?.subject ||
                               dkProject.objectives ||
                               dkProject.id
@@ -302,6 +303,7 @@ watch(
                           <span v-else class="font-semibold text-prism-green-deep">
                             Daftar Kegiatan:
                             {{
+                              dkProject.project_name ||
                               dkProject.daftar_kegiatan?.subject ||
                               dkProject.objectives ||
                               dkProject.id

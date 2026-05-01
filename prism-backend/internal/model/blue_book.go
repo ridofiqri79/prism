@@ -96,17 +96,21 @@ type BBProjectResponse struct {
 }
 
 type BBProjectHistoryItem struct {
-	ID                string `json:"id"`
-	ProjectIdentityID string `json:"project_identity_id"`
-	BlueBookID        string `json:"blue_book_id"`
-	BBCode            string `json:"bb_code"`
-	ProjectName       string `json:"project_name"`
-	BookLabel         string `json:"book_label"`
-	RevisionNumber    int32  `json:"revision_number"`
-	RevisionYear      *int32 `json:"revision_year"`
-	BookStatus        string `json:"book_status"`
-	IsLatest          bool   `json:"is_latest"`
-	UsedByDownstream  bool   `json:"used_by_downstream"`
+	ID                string              `json:"id"`
+	ProjectIdentityID string              `json:"project_identity_id"`
+	BlueBookID        string              `json:"blue_book_id"`
+	BBCode            string              `json:"bb_code"`
+	ProjectName       string              `json:"project_name"`
+	BookLabel         string              `json:"book_label"`
+	RevisionNumber    int32               `json:"revision_number"`
+	RevisionYear      *int32              `json:"revision_year"`
+	BookStatus        string              `json:"book_status"`
+	IsLatest          bool                `json:"is_latest"`
+	UsedByDownstream  bool                `json:"used_by_downstream"`
+	LastChangedBy     *string             `json:"last_changed_by,omitempty"`
+	LastChangedAt     *string             `json:"last_changed_at,omitempty"`
+	LastChangeSummary *string             `json:"last_change_summary,omitempty"`
+	AuditEntries      []ProjectAuditEntry `json:"audit_entries,omitempty"`
 }
 
 type ProjectCostResponse struct {

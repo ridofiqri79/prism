@@ -223,6 +223,7 @@ func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req m
 			DkID:           dkID,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
+			ProjectName:    strings.TrimSpace(req.ProjectName),
 			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
@@ -253,6 +254,7 @@ func (s *DKService) UpdateDKProject(ctx context.Context, dkID, id pgtype.UUID, r
 			ID:             id,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
+			ProjectName:    strings.TrimSpace(req.ProjectName),
 			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
@@ -431,6 +433,7 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		DKID:             model.UUIDToString(row.DkID),
 		ProgramTitleID:   stringPtrFromUUID(row.ProgramTitleID),
 		InstitutionID:    stringPtrFromUUID(row.InstitutionID),
+		ProjectName:      row.ProjectName,
 		Duration:         int32PtrFromInt4(row.Duration),
 		Objectives:       stringPtrFromText(row.Objectives),
 		GBProjects:       make([]model.GBProjectSummary, 0, len(gbProjects)),
@@ -497,6 +500,9 @@ func (s *DKService) withTx(ctx context.Context, fn func(*queries.Queries) error)
 }
 
 func validateDKProjectRequest(req model.CreateDKProjectRequest) error {
+	if strings.TrimSpace(req.ProjectName) == "" {
+		return validation("project_name", "wajib diisi")
+	}
 	if len(req.GBProjectIDs) == 0 {
 		return validation("gb_project_ids", "Minimal 1 GB Project")
 	}

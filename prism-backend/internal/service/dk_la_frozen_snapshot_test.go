@@ -166,6 +166,7 @@ func (env *blueBookVersioningTestEnv) dkProjectRequest(gbProjectID string, lende
 	return model.CreateDKProjectRequest{
 		ProgramTitleID: &programTitleID,
 		InstitutionID:  &institutionID,
+		ProjectName:    "Frozen DK Snapshot Project",
 		Duration:       &duration,
 		Objectives:     &objectives,
 		GBProjectIDs:   []string{gbProjectID},

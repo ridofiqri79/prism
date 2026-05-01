@@ -45,8 +45,9 @@ func (s *JourneyService) GetProjectJourney(ctx context.Context, bbProjectID pgty
 				return nil, err
 			}
 			dkProjects = append(dkProjects, model.JourneyDKProject{
-				ID:         model.UUIDToString(dk.ID),
-				Objectives: stringPtrFromText(dk.Objectives),
+				ID:          model.UUIDToString(dk.ID),
+				ProjectName: dk.ProjectName,
+				Objectives:  stringPtrFromText(dk.Objectives),
 				DaftarKegiatan: &model.JourneyDKHeader{
 					ID:      model.UUIDToString(dk.DkID),
 					Subject: dk.DkSubject,

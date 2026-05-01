@@ -14,6 +14,7 @@ import type {
 export interface DKProjectFormValues {
   program_title_id: string
   institution_id: string
+  project_name: string
   duration: number | null
   objectives: string
   gb_project_ids: string[]
@@ -32,6 +33,7 @@ function defaultValues(): DKProjectFormValues {
   return {
     program_title_id: '',
     institution_id: '',
+    project_name: '',
     duration: null,
     objectives: '',
     gb_project_ids: [],
@@ -74,6 +76,7 @@ function fromProject(project?: DKProject | null): Partial<DKProjectFormValues> {
   return {
     program_title_id: project.program_title_id ?? project.program_title?.id ?? '',
     institution_id: project.institution_id ?? project.institution?.id ?? '',
+    project_name: project.project_name ?? '',
     duration: project.duration ?? null,
     objectives: project.objectives ?? '',
     gb_project_ids: project.gb_projects.map((item) => item.id),
@@ -240,6 +243,7 @@ export function useDKProjectForm(
     if (!primary) return
     values.program_title_id = primary.program_title_id ?? values.program_title_id
     values.institution_id = primary.executing_agencies[0]?.id ?? values.institution_id
+    values.project_name = primary.project_name || values.project_name
     values.duration = primary.duration ?? values.duration
     values.objectives = primary.objective ?? values.objectives
     values.location_ids = uniqueIds(
@@ -323,6 +327,7 @@ export function useDKProjectForm(
     return {
       program_title_id: values.program_title_id || null,
       institution_id: values.institution_id,
+      project_name: values.project_name.trim(),
       duration: values.duration ?? null,
       objectives: values.objectives || null,
       gb_project_ids: values.gb_project_ids,

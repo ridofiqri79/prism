@@ -702,7 +702,7 @@ export const gbProjectSchema = z.object({
 export type GBProjectFormValues = z.infer<typeof gbProjectSchema>
 ```
 
-`LocationMultiSelect` wajib memuat seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`) melalui `fetchAllRegionLevels()`, bukan hanya daftar default/paginated. Durasi proyek di form BB Project, GB Project, dan DK Project adalah angka bulan (`number | null`) dan dikirim sebagai integer. Currency mulai dicatat pada Funding Source Green Book dengan `CurrencySelect` dari Master Currency aktif; jika currency `USD`, form tidak meminta input USD terpisah dan payload menyamakan nilai USD dengan nilai original. Pada DK Project, picker `GB Project` ditempatkan paling atas dan perubahan pilihan memanggil autofill di `useDKProjectForm()` untuk mengisi field turunan dari GB Project terpilih; hasilnya tetap editable sebelum submit.
+`LocationMultiSelect` wajib memuat seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`) melalui `fetchAllRegionLevels()`, bukan hanya daftar default/paginated. Durasi proyek di form BB Project, GB Project, dan DK Project adalah angka bulan (`number | null`) dan dikirim sebagai integer. Currency mulai dicatat pada Funding Source Green Book dengan `CurrencySelect` dari Master Currency aktif; jika currency `USD`, form tidak meminta input USD terpisah dan payload menyamakan nilai USD dengan nilai original. Pada DK Project, picker `GB Project` ditempatkan paling atas dan perubahan pilihan memanggil autofill di `useDKProjectForm()` untuk mengisi field turunan dari GB Project terpilih, termasuk nama proyek Daftar Kegiatan dari nama proyek Green Book; hasilnya tetap editable sebelum submit.
 
 ---
 

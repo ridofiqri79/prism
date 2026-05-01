@@ -352,6 +352,7 @@ CREATE TABLE dk_project (
     dk_id            UUID NOT NULL REFERENCES daftar_kegiatan(id),
     program_title_id UUID REFERENCES program_title(id),
     institution_id   UUID REFERENCES institution(id),  -- Executing Agency
+    project_name     VARCHAR(500) NOT NULL,
     duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objectives       TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),

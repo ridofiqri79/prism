@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -13,6 +13,7 @@ import DisbursementPlanTable from '@/components/green-book/DisbursementPlanTable
 import FundingAllocationTable from '@/components/green-book/FundingAllocationTable.vue'
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useBlueBookStore } from '@/stores/blue-book.store'
@@ -30,6 +31,7 @@ const { can } = usePermission()
 
 const greenBookId = computed(() => String(route.params.gbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
+const isRevisionHistoryOpen = ref(false)
 const project = computed(() => greenBookStore.currentProject)
 const programTitleName = computed(
   () =>
@@ -37,6 +39,15 @@ const programTitleName = computed(
     masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
     '-',
 )
+const auditRailItems = computed(() =>
+  greenBookStore.projectHistory.flatMap((item) =>
+    (item.audit_entries ?? []).map((entry) => ({
+      ...entry,
+      snapshot_label: item.book_label,
+    })),
+  ),
+)
+const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
 function bbProjectBlueBookId(project: BBProjectSummary) {
   return (
@@ -56,6 +67,17 @@ async function loadData() {
 
 function historyRoute(item: GBProjectHistoryItem) {
   return { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } }
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 function bbProjectRoute(bbProject: BBProjectSummary) {
@@ -162,15 +184,28 @@ onMounted(() => {
 
       <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-          <Tag
-            :value="`${greenBookStore.projectHistory.length} snapshot`"
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
+            <Tag
+              :value="`${greenBookStore.projectHistory.length} snapshot`"
+              severity="secondary"
+              rounded
+            />
+          </div>
+          <Button
+            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
+            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
             severity="secondary"
-            rounded
+            size="small"
+            outlined
+            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
           />
         </div>
-        <div class="overflow-auto rounded-lg border border-surface-200">
-          <table class="w-full min-w-[52rem] text-left text-sm">
+        <div
+          v-if="isRevisionHistoryOpen"
+          class="overflow-auto rounded-lg border border-surface-200"
+        >
+          <table class="w-full min-w-[60rem] text-left text-sm">
             <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="px-4 py-3">Green Book</th>
@@ -179,6 +214,7 @@ onMounted(() => {
                 <th class="px-4 py-3">Snapshot</th>
                 <th class="px-4 py-3">Referensi Blue Book</th>
                 <th class="px-4 py-3">Downstream</th>
+                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
                 <th class="px-4 py-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -203,6 +239,15 @@ onMounted(() => {
                     :severity="item.used_by_downstream ? 'info' : 'secondary'"
                     rounded
                   />
+                </td>
+                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
+                  <div v-if="item.last_change_summary">
+                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
+                    <p class="text-xs text-surface-500">
+                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
+                    </p>
+                  </div>
+                  <span v-else>-</span>
                 </td>
                 <td class="px-4 py-3 text-right">
                   <Button
@@ -256,6 +301,8 @@ onMounted(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      <ProjectAuditRail :items="auditRailItems" />
     </div>
   </section>
 </template>

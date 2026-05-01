@@ -363,6 +363,10 @@ func gbProjectDeletionDependencies(rows []queries.ListGBProjectDeletionDependenc
 }
 
 func (s *GreenBookService) GetGBProjectHistory(ctx context.Context, id pgtype.UUID) ([]model.GBProjectHistoryItem, error) {
+	return s.GetGBProjectHistoryWithAudit(ctx, id, false)
+}
+
+func (s *GreenBookService) GetGBProjectHistoryWithAudit(ctx context.Context, id pgtype.UUID, includeAudit bool) ([]model.GBProjectHistoryItem, error) {
 	if _, err := s.queries.GetGBProject(ctx, id); err != nil {
 		return nil, mapNotFound(err, "GB Project tidak ditemukan")
 	}
@@ -384,7 +388,7 @@ func (s *GreenBookService) GetGBProjectHistory(ctx context.Context, id pgtype.UU
 		for _, bb := range bbRows {
 			bbProjects = append(bbProjects, s.bbProjectSummary(ctx, bb))
 		}
-		items = append(items, model.GBProjectHistoryItem{
+		item := model.GBProjectHistoryItem{
 			ID:                  model.UUIDToString(row.ID),
 			GBProjectIdentityID: model.UUIDToString(row.GbProjectIdentityID),
 			GreenBookID:         model.UUIDToString(row.GreenBookID),
@@ -397,7 +401,16 @@ func (s *GreenBookService) GetGBProjectHistory(ctx context.Context, id pgtype.UU
 			IsLatest:            row.IsLatest,
 			UsedByDownstream:    row.UsedByDownstream,
 			BBProjects:          bbProjects,
-		})
+		}
+		if includeAudit {
+			auditRows, err := s.queries.ListGBProjectAuditEntries(ctx, row.ID)
+			if err != nil {
+				return nil, apperrors.Internal("Gagal mengambil audit GB Project")
+			}
+			item.AuditEntries = gbProjectAuditResponses(auditRows)
+			applyLatestAuditSummary(&item.LastChangedBy, &item.LastChangedAt, &item.LastChangeSummary, item.AuditEntries)
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }

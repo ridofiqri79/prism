@@ -24,6 +24,7 @@ type DaftarKegiatanListFilter struct {
 type CreateDKProjectRequest struct {
 	ProgramTitleID     *string                 `json:"program_title_id"`
 	InstitutionID      *string                 `json:"institution_id"`
+	ProjectName        string                  `json:"project_name" validate:"required"`
 	Duration           *int32                  `json:"duration"`
 	Objectives         *string                 `json:"objectives"`
 	GBProjectIDs       []string                `json:"gb_project_ids" validate:"required,min=1"`
@@ -77,6 +78,7 @@ type DKProjectResponse struct {
 	DKID             string                      `json:"dk_id"`
 	ProgramTitleID   *string                     `json:"program_title_id,omitempty"`
 	InstitutionID    *string                     `json:"institution_id,omitempty"`
+	ProjectName      string                      `json:"project_name"`
 	Duration         *int32                      `json:"duration"`
 	Objectives       *string                     `json:"objectives"`
 	GBProjects       []GBProjectSummary          `json:"gb_projects"`

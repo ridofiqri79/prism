@@ -179,7 +179,8 @@ func (h *BlueBookHandler) GetBBProjectHistory(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.GetBBProjectHistory(c.Request().Context(), id)
+	user, _ := c.Get("user").(*model.AuthUser)
+	res, err := h.service.GetBBProjectHistoryWithAudit(c.Request().Context(), id, user != nil && user.Role == "ADMIN")
 	if err != nil {
 		return err
 	}

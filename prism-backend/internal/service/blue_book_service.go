@@ -425,6 +425,10 @@ func (s *BlueBookService) DeleteLoI(ctx context.Context, bbProjectID, id pgtype.
 }
 
 func (s *BlueBookService) GetBBProjectHistory(ctx context.Context, id pgtype.UUID) ([]model.BBProjectHistoryItem, error) {
+	return s.GetBBProjectHistoryWithAudit(ctx, id, false)
+}
+
+func (s *BlueBookService) GetBBProjectHistoryWithAudit(ctx context.Context, id pgtype.UUID, includeAudit bool) ([]model.BBProjectHistoryItem, error) {
 	if _, err := s.queries.GetBBProject(ctx, id); err != nil {
 		return nil, mapNotFound(err, "BB Project tidak ditemukan")
 	}
@@ -438,7 +442,7 @@ func (s *BlueBookService) GetBBProjectHistory(ctx context.Context, id pgtype.UUI
 		if row.RevisionNumber > 0 {
 			label = fmt.Sprintf("%s Revisi ke-%d", label, row.RevisionNumber)
 		}
-		items = append(items, model.BBProjectHistoryItem{
+		item := model.BBProjectHistoryItem{
 			ID:                model.UUIDToString(row.ID),
 			ProjectIdentityID: model.UUIDToString(row.ProjectIdentityID),
 			BlueBookID:        model.UUIDToString(row.BlueBookID),
@@ -450,7 +454,16 @@ func (s *BlueBookService) GetBBProjectHistory(ctx context.Context, id pgtype.UUI
 			BookStatus:        row.BookStatus,
 			IsLatest:          row.IsLatest,
 			UsedByDownstream:  row.UsedByDownstream,
-		})
+		}
+		if includeAudit {
+			auditRows, err := s.queries.ListBBProjectAuditEntries(ctx, row.ID)
+			if err != nil {
+				return nil, apperrors.Internal("Gagal mengambil audit BB Project")
+			}
+			item.AuditEntries = bbProjectAuditResponses(auditRows)
+			applyLatestAuditSummary(&item.LastChangedBy, &item.LastChangedAt, &item.LastChangeSummary, item.AuditEntries)
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }

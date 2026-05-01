@@ -45,7 +45,7 @@ export const LoanAgreementService = {
           const gbProjects = project.gb_projects ?? []
           const labelParts = [
             gbProjects.map((gb) => gb.gb_code).join(', '),
-            project.objectives || project.program_title?.title || dk.subject,
+            project.project_name || project.objectives || project.program_title?.title || dk.subject,
           ].filter(Boolean)
 
           return {
@@ -71,6 +71,7 @@ export const LoanAgreementService = {
     return options.filter((project) =>
       [
         project.label,
+        project.project_name,
         project.objectives,
         project.program_title?.title,
         project.daftar_kegiatan_subject,

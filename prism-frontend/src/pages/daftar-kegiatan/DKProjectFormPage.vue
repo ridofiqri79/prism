@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
 import Textarea from 'primevue/textarea'
 import ActivityDetailsTable from '@/components/daftar-kegiatan/ActivityDetailsTable.vue'
@@ -122,6 +123,13 @@ onMounted(() => {
           }}</small>
         </label>
         <div class="grid gap-4 md:grid-cols-2">
+          <label class="block space-y-2 md:col-span-2">
+            <span class="text-sm font-medium text-surface-700">Nama Proyek Daftar Kegiatan</span>
+            <InputText v-model="form.values.project_name" class="w-full" />
+            <small v-if="form.errors.project_name" class="text-red-600">{{
+              form.errors.project_name
+            }}</small>
+          </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Judul Program</span>
             <ProgramTitleSelect v-model="form.values.program_title_id" />

@@ -9,6 +9,7 @@ import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.
 import LoITable from '@/components/blue-book/LoITable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
 import { usePermission } from '@/composables/usePermission'
@@ -32,6 +33,7 @@ const { can } = usePermission()
 const blueBookId = computed(() => String(route.params.bbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
+const isRevisionHistoryOpen = ref(false)
 const loiForm = reactive<LoIPayload>({
   lender_id: '',
   subject: '',
@@ -59,6 +61,15 @@ const bappenasPartnerNames = computed(
 const allowedLenderIds = computed(
   () => project.value?.lender_indications.map((item) => item.lender.id) ?? [],
 )
+const auditRailItems = computed(() =>
+  blueBookStore.projectHistory.flatMap((item) =>
+    (item.audit_entries ?? []).map((entry) => ({
+      ...entry,
+      snapshot_label: historyLabel(item),
+    })),
+  ),
+)
+const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
@@ -87,6 +98,17 @@ function historyRoute(item: BBProjectHistoryItem) {
 function historyLabel(item: BBProjectHistoryItem) {
   const year = item.revision_year ? ` / ${item.revision_year}` : ''
   return `${item.book_label} - Rev ${item.revision_number}${year}`
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 function openLoIDialog() {
@@ -177,15 +199,28 @@ onMounted(() => {
 
       <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-          <Tag
-            :value="`${blueBookStore.projectHistory.length} snapshot`"
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
+            <Tag
+              :value="`${blueBookStore.projectHistory.length} snapshot`"
+              severity="secondary"
+              rounded
+            />
+          </div>
+          <Button
+            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
+            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
             severity="secondary"
-            rounded
+            size="small"
+            outlined
+            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
           />
         </div>
-        <div class="overflow-auto rounded-lg border border-surface-200">
-          <table class="w-full min-w-[48rem] text-left text-sm">
+        <div
+          v-if="isRevisionHistoryOpen"
+          class="overflow-auto rounded-lg border border-surface-200"
+        >
+          <table class="w-full min-w-[56rem] text-left text-sm">
             <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="px-4 py-3">Blue Book</th>
@@ -193,6 +228,7 @@ onMounted(() => {
                 <th class="px-4 py-3">Status Dokumen</th>
                 <th class="px-4 py-3">Snapshot</th>
                 <th class="px-4 py-3">Downstream</th>
+                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
                 <th class="px-4 py-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -214,6 +250,15 @@ onMounted(() => {
                     :severity="item.used_by_downstream ? 'info' : 'secondary'"
                     rounded
                   />
+                </td>
+                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
+                  <div v-if="item.last_change_summary">
+                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
+                    <p class="text-xs text-surface-500">
+                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
+                    </p>
+                  </div>
+                  <span v-else>-</span>
                 </td>
                 <td class="px-4 py-3 text-right">
                   <Button
@@ -302,6 +347,8 @@ onMounted(() => {
         :can-add="can('bb_project', 'update')"
         @add="openLoIDialog"
       />
+
+      <ProjectAuditRail :items="auditRailItems" />
     </div>
 
     <Dialog

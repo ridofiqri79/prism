@@ -181,7 +181,8 @@ func (h *GreenBookHandler) GetGBProjectHistory(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.GetGBProjectHistory(c.Request().Context(), id)
+	user, _ := c.Get("user").(*model.AuthUser)
+	res, err := h.service.GetGBProjectHistoryWithAudit(c.Request().Context(), id, user != nil && user.Role == "ADMIN")
 	if err != nil {
 		return err
 	}

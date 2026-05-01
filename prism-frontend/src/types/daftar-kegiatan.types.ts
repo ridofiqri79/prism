@@ -24,6 +24,7 @@ export interface DKProject {
   dk_id?: string
   program_title_id?: string | null
   institution_id?: string | null
+  project_name: string
   program_title?: ProgramTitle
   institution?: Institution
   duration?: number | null
@@ -132,6 +133,7 @@ export interface DKActivityDetailPayload {
 export interface DKProjectPayload {
   program_title_id?: string | null
   institution_id: string
+  project_name: string
   duration?: number | null
   objectives?: string | null
   gb_project_ids: string[]

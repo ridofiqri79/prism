@@ -736,6 +736,8 @@ Contoh response ketika masih dipakai downstream:
 |--------|----------|-----------|
 | `GET` | `/bb-projects/:id/history` | read: `bb_project` |
 
+History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response juga menyertakan audit rail ringkas per snapshot (`last_changed_*` dan `audit_entries`) agar terlihat siapa mengubah section/field apa. Untuk STAFF, field audit tidak dikirim karena `audit_log` adalah resource ADMIN only.
+
 **Response `200`:**
 ```json
 {
@@ -751,7 +753,24 @@ Contoh response ketika masih dipakai downstream:
       "revision_year": 2026,
       "book_status": "active",
       "is_latest": true,
-      "used_by_downstream": false
+      "used_by_downstream": false,
+      "last_changed_by": "admin",
+      "last_changed_at": "2026-05-01T08:30:00Z",
+      "last_change_summary": "Mengubah Informasi proyek: Nama proyek, Durasi",
+      "audit_entries": [
+        {
+          "id": "uuid-audit-log",
+          "section": "Informasi proyek",
+          "action": "UPDATE",
+          "action_label": "Mengubah",
+          "changed_fields": ["project_name", "duration"],
+          "changed_field_labels": ["Nama proyek", "Durasi"],
+          "changed_by_id": "uuid-user",
+          "changed_by_username": "admin",
+          "changed_at": "2026-05-01T08:30:00Z",
+          "summary": "Mengubah Informasi proyek: Nama proyek, Durasi"
+        }
+      ]
     }
   ]
 }
@@ -980,6 +999,8 @@ Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book
 |--------|----------|-----------|
 | `GET` | `/gb-projects/:id/history` | read: `gb_project` |
 
+History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response juga menyertakan audit rail ringkas per snapshot (`last_changed_*` dan `audit_entries`) agar terlihat siapa mengubah section/field apa. Untuk STAFF, field audit tidak dikirim karena `audit_log` adalah resource ADMIN only.
+
 **Response `200`:**
 ```json
 {
@@ -996,7 +1017,24 @@ Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book
       "book_status": "active",
       "is_latest": true,
       "used_by_downstream": false,
-      "bb_projects": []
+      "bb_projects": [],
+      "last_changed_by": "admin",
+      "last_changed_at": "2026-05-01T08:35:00Z",
+      "last_change_summary": "Mengubah Funding Source: Lender, Pinjaman USD",
+      "audit_entries": [
+        {
+          "id": "uuid-audit-log",
+          "section": "Funding Source",
+          "action": "UPDATE",
+          "action_label": "Mengubah",
+          "changed_fields": ["lender_id", "loan_usd"],
+          "changed_field_labels": ["Lender", "Pinjaman USD"],
+          "changed_by_id": "uuid-user",
+          "changed_by_username": "admin",
+          "changed_at": "2026-05-01T08:35:00Z",
+          "summary": "Mengubah Funding Source: Lender, Pinjaman USD"
+        }
+      ]
     }
   ]
 }
@@ -1032,7 +1070,7 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 | Sheet | Kolom |
 |-------|-------|
 | `Daftar Kegiatan` | `DK Key (*)`, `Letter Number (*)`, `Subject (*)`, `Date (*)` |
-| `Input Data` | `DK Key (*)`, `Project Key (*)`, `Program Title`, `Executing Agency Name (*)`, `Duration`, `Objectives` |
+| `Input Data` | `DK Key (*)`, `Project Key (*)`, `Project Name (*)`, `Program Title`, `Executing Agency Name (*)`, `Duration`, `Objectives` |
 | `Relasi - GB Project` | `DK Key (*)`, `Project Key (*)`, `GB Code (*)` |
 | `Relasi - Locations` | `DK Key (*)`, `Project Key (*)`, `Location Name (*)` |
 | `Relasi - Financing Detail` | `DK Key (*)`, `Project Key (*)`, `Lender Name (*)`, `Currency`, `Amount Original`, `Grant Original`, `Counterpart Original`, `Amount USD`, `Grant USD`, `Counterpart USD`, `Remarks` |
@@ -1048,13 +1086,13 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Project Name, Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Project Name` adalah nama snapshot di Daftar Kegiatan dan boleh berbeda dari nama Green Book. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
 
 `GB Project` pada DK di-resolve ke latest GB Project snapshot saat DK Project dibuat atau saat pilihan GB diganti eksplisit. Setelah tersimpan, relasi `dk_project_gb_project` tetap menunjuk concrete snapshot yang tersimpan dan tidak auto-pindah ketika ada revisi BB/GB baru.
 
-Pada form create/edit DK Project, picker `GB Project` ditampilkan sebagai field pertama. Saat user memilih GB Project, frontend mengisi otomatis field DK yang memiliki padanan dari GB Project terpilih: program title, executing agency, Mitra Kerja Bappenas, durasi bulan, tujuan/objective, lokasi, rincian pembiayaan dari funding source, alokasi pinjaman dari institution funding source atau institution proyek, dan rincian kegiatan dari activities GB. Hasil autofill tetap dapat diedit user sebelum request `POST` atau `PUT` dikirim.
+Pada form create/edit DK Project, picker `GB Project` ditampilkan sebagai field pertama. Saat user memilih GB Project, frontend mengisi otomatis field DK yang memiliki padanan dari GB Project terpilih: nama proyek Daftar Kegiatan dari nama proyek Green Book, program title, executing agency, Mitra Kerja Bappenas, durasi bulan, tujuan/objective, lokasi, rincian pembiayaan dari funding source, alokasi pinjaman dari institution funding source atau institution proyek, dan rincian kegiatan dari activities GB. Hasil autofill tetap dapat diedit user sebelum request `POST` atau `PUT` dikirim.
 Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah karena backend menyamakan nilai USD dengan nilai original.
 
 ---
@@ -1102,7 +1140,7 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 
 | Param | Format | Keterangan |
 |-------|--------|------------|
-| `search` | string | Cari berdasarkan proyek Green Book terkait, objectives, lokasi, lender, atau activity detail |
+| `search` | string | Cari berdasarkan nama proyek Daftar Kegiatan, proyek Green Book terkait, objectives, lokasi, lender, atau activity detail |
 | `gb_project_ids` | multi-value UUID | Filter relasi proyek Green Book |
 | `executing_agency_ids` | multi-value UUID | Filter institution/executing agency DK Project |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
@@ -1113,6 +1151,7 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 {
   "program_title_id": "uuid",
   "institution_id": "uuid-executing-agency",
+  "project_name": "Trans Sumatra Toll Road Section 1 - DK",
   "duration": 60,
   "objectives": "Meningkatkan konektivitas...",
   "gb_project_ids": ["uuid-gb-project-1"],
@@ -1565,6 +1604,7 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
         "dk_projects": [
           {
             "id": "uuid",
+            "project_name": "Trans Sumatra Section 1 - DK",
             "daftar_kegiatan": { "subject": "DK TA 2025", "tanggal": "2025-02-01" },
             "loan_agreement": {
               "id": "uuid",

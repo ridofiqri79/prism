@@ -63,6 +63,7 @@ FROM dk_project
 WHERE dk_id = sqlc.arg('dk_id')
 AND (
     sqlc.narg('search')::text IS NULL
+    OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
     OR COALESCE(objectives, '') ILIKE '%' || sqlc.narg('search')::text || '%'
     OR EXISTS (
         SELECT 1
@@ -124,6 +125,7 @@ FROM dk_project
 WHERE dk_id = sqlc.arg('dk_id')
 AND (
     sqlc.narg('search')::text IS NULL
+    OR project_name ILIKE '%' || sqlc.narg('search')::text || '%'
     OR COALESCE(objectives, '') ILIKE '%' || sqlc.narg('search')::text || '%'
     OR EXISTS (
         SELECT 1
@@ -189,16 +191,17 @@ WHERE dk_id = $1
   AND id = $2;
 
 -- name: CreateDKProject :one
-INSERT INTO dk_project (dk_id, program_title_id, institution_id, duration, objectives)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO dk_project (dk_id, program_title_id, institution_id, project_name, duration, objectives)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateDKProject :one
 UPDATE dk_project
 SET program_title_id = $2,
     institution_id = $3,
-    duration = $4,
-    objectives = $5,
+    project_name = $4,
+    duration = $5,
+    objectives = $6,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

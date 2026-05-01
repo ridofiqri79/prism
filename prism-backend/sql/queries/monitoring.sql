@@ -219,6 +219,7 @@ ORDER BY gp.gb_code ASC;
 -- name: ListJourneyDKProjectsByGBProject :many
 SELECT DISTINCT
     dp.id,
+    dp.project_name,
     dp.objectives,
     dk.id AS dk_id,
     dk.subject AS dk_subject,

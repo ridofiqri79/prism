@@ -119,18 +119,22 @@ type BBProjectSummary struct {
 }
 
 type GBProjectHistoryItem struct {
-	ID                  string             `json:"id"`
-	GBProjectIdentityID string             `json:"gb_project_identity_id"`
-	GreenBookID         string             `json:"green_book_id"`
-	GBCode              string             `json:"gb_code"`
-	ProjectName         string             `json:"project_name"`
-	BookLabel           string             `json:"book_label"`
-	PublishYear         int32              `json:"publish_year"`
-	RevisionNumber      int32              `json:"revision_number"`
-	BookStatus          string             `json:"book_status"`
-	IsLatest            bool               `json:"is_latest"`
-	UsedByDownstream    bool               `json:"used_by_downstream"`
-	BBProjects          []BBProjectSummary `json:"bb_projects,omitempty"`
+	ID                  string              `json:"id"`
+	GBProjectIdentityID string              `json:"gb_project_identity_id"`
+	GreenBookID         string              `json:"green_book_id"`
+	GBCode              string              `json:"gb_code"`
+	ProjectName         string              `json:"project_name"`
+	BookLabel           string              `json:"book_label"`
+	PublishYear         int32               `json:"publish_year"`
+	RevisionNumber      int32               `json:"revision_number"`
+	BookStatus          string              `json:"book_status"`
+	IsLatest            bool                `json:"is_latest"`
+	UsedByDownstream    bool                `json:"used_by_downstream"`
+	BBProjects          []BBProjectSummary  `json:"bb_projects,omitempty"`
+	LastChangedBy       *string             `json:"last_changed_by,omitempty"`
+	LastChangedAt       *string             `json:"last_changed_at,omitempty"`
+	LastChangeSummary   *string             `json:"last_change_summary,omitempty"`
+	AuditEntries        []ProjectAuditEntry `json:"audit_entries,omitempty"`
 }
 
 type GBActivityResponse struct {

@@ -74,6 +74,7 @@
 - Final setelah diterbitkan — tidak bisa direvisi. Backend cegah UPDATE kecuali ADMIN.
 - Saat DK Project dibuat, relasi ke GB Project harus memakai versi GB Project terbaru untuk logical project terkait.
 - Setelah DK/LA dibuat, downstream tetap menunjuk ke snapshot GB/BB yang dicantumkan saat DK dibuat; tidak auto-pindah ketika ada revisi BB/GB baru.
+- Nama proyek pada DK Project dicatat ulang sebagai snapshot Daftar Kegiatan dan boleh berbeda dari nama proyek Green Book; default frontend diisi dari GB Project terpilih lalu tetap dapat diedit sebelum disimpan.
 - Mitra Kerja Bappenas pada DK Project bersifat opsional, boleh lebih dari satu, dapat diisi otomatis dari GB Project terpilih, dan tetap dapat diedit sebelum disimpan.
 - Activity Details diinput bebas — tidak ada relasi teknis ke Activities GB.
 

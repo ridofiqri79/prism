@@ -19,7 +19,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { DKProject, DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
+import type { DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatDate, joinNames } from './daftar-kegiatan-page-utils'
 
@@ -275,7 +275,7 @@ watch(
 
     <SearchFilterBar
       v-model:search="projectControls.search.value"
-      search-placeholder="Cari proyek Green Book, lender, lokasi, atau komponen"
+      search-placeholder="Cari nama proyek, proyek Green Book, lender, lokasi, atau komponen"
       :active-filters="projectControls.activeFilterPills.value"
       :filter-count="projectControls.activeFilterCount.value"
       @apply="projectControls.applyFilters"
@@ -353,7 +353,7 @@ watch(
         >
         <AccordionHeader>
           <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
-            <span>{{ joinNames((project as DKProject).gb_projects) }}</span>
+            <span>{{ project.project_name }}</span>
             <span class="text-sm font-normal text-surface-500">{{
               project.duration ? `${project.duration} bulan` : '-'
             }}</span>
@@ -362,6 +362,12 @@ watch(
         <AccordionContent>
           <div class="space-y-5 p-2">
             <div class="grid gap-4 md:grid-cols-2">
+              <div class="md:col-span-2">
+                <p class="text-xs uppercase tracking-wide text-surface-500">
+                  Nama Proyek Daftar Kegiatan
+                </p>
+                <p class="font-medium text-surface-900">{{ project.project_name }}</p>
+              </div>
               <div>
                 <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
                 <p class="font-medium text-surface-900">

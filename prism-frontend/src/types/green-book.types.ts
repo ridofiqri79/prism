@@ -1,3 +1,4 @@
+import type { ProjectAuditEntry } from '@/types/audit.types'
 import type { BBProject } from '@/types/blue-book.types'
 import type {
   BappenasPartner,
@@ -192,4 +193,8 @@ export interface GBProjectHistoryItem {
   is_latest: boolean
   used_by_downstream: boolean
   bb_projects?: BBProjectSummary[]
+  last_changed_by?: string
+  last_changed_at?: string
+  last_change_summary?: string
+  audit_entries?: ProjectAuditEntry[]
 }

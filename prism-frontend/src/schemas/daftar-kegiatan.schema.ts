@@ -47,6 +47,7 @@ export const dkActivityDetailSchema = z.object({
 export const dkProjectSchema = z.object({
   program_title_id: optionalUuid,
   institution_id: z.string().uuid('Executing agency wajib dipilih'),
+  project_name: z.string().min(1, 'Nama proyek wajib diisi'),
   duration: optionalDurationMonths,
   objectives: z.string().optional().nullable(),
   gb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 Proyek Green Book'),

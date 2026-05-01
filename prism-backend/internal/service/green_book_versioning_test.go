@@ -397,6 +397,7 @@ func (env *blueBookVersioningTestEnv) createDKProjectLinkedToGB(t *testing.T, gb
 		DkID:           dk.ID,
 		ProgramTitleID: env.programTitle.ID,
 		InstitutionID:  env.ea.ID,
+		ProjectName:    "DK Delete Dependency Project",
 		Duration:       pgtype.Int4{Int32: 12, Valid: true},
 		Objectives:     pgtype.Text{String: "Dependency", Valid: true},
 	})

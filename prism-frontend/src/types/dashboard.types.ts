@@ -86,6 +86,7 @@ export interface JourneyFundingSource {
 
 export interface DKProjectJourney {
   id: string
+  project_name: string
   objectives?: string | null
   daftar_kegiatan?: {
     id?: string
