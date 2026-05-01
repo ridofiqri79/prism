@@ -31,9 +31,9 @@ const isCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
 )
 const expandedGroups = ref<Record<string, boolean>>({
-  'Tahapan Perencanaan': true,
-  'Master Data': true,
-  Administrasi: true,
+  'Dokumen Perencanaan': true,
+  Referensi: true,
+  'Akses Admin': true,
 })
 
 const accountLabel = computed(() => auth.user?.email || auth.user?.username || 'PRISM')
@@ -66,7 +66,7 @@ function filterNavigation(items: NavigationItem[]) {
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-home' },
-    { label: 'Project', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
+    { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
   ]),
 )
@@ -82,7 +82,7 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
       module: 'daftar_kegiatan',
     },
     {
-      label: 'Loan Agreement',
+      label: 'Perjanjian Pinjaman',
       to: '/loan-agreements',
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
@@ -99,8 +99,13 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
 const referenceItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Negara', to: '/master/countries', icon: 'pi pi-globe', module: 'country' },
-    { label: 'Lender', to: '/master/lenders', icon: 'pi pi-building-columns', module: 'lender' },
-    { label: 'Currency', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
+    {
+      label: 'Pemberi Pinjaman',
+      to: '/master/lenders',
+      icon: 'pi pi-building-columns',
+      module: 'lender',
+    },
+    { label: 'Mata Uang', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
     { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
     { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {
@@ -110,7 +115,7 @@ const referenceItems = computed<NavigationItem[]>(() =>
       module: 'program_title',
     },
     {
-      label: 'Mitra Bappenas',
+      label: 'Mitra Kerja Bappenas',
       to: '/master/bappenas-partners',
       icon: 'pi pi-users',
       module: 'bappenas_partner',
@@ -141,14 +146,14 @@ const navigationGroups = computed<NavigationGroup[]>(() =>
   [
     {
       section: 'Perencanaan',
-      label: 'Tahapan Perencanaan',
+      label: 'Dokumen Perencanaan',
       icon: 'pi pi-compass',
       items: planningDocumentItems.value,
     },
-    { section: 'Data', label: 'Master Data', icon: 'pi pi-database', items: referenceItems.value },
+    { section: 'Data', label: 'Referensi', icon: 'pi pi-database', items: referenceItems.value },
     {
       section: 'Sistem',
-      label: 'Administrasi',
+      label: 'Akses Admin',
       icon: 'pi pi-shield',
       items: adminAccessItems.value,
     },
@@ -216,7 +221,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
 <template>
   <aside
     class="prism-sidebar hidden shrink-0 border-r transition-[width] duration-200 lg:flex lg:flex-col"
-    :class="isCollapsed ? 'w-[68px]' : 'w-[260px]'"
+    :class="isCollapsed ? 'w-[68px]' : 'w-[288px]'"
   >
     <div
       class="prism-sidebar-header flex items-center border-b"
@@ -253,7 +258,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
           v-model="searchQuery"
           type="search"
           class="prism-sidebar-search-input h-9 w-full rounded-lg border px-9 pr-16 text-sm outline-none transition"
-          placeholder="Quick search..."
+          placeholder="Cari menu..."
         />
         <span
           class="prism-sidebar-kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]"
@@ -263,7 +268,10 @@ function handleSearchShortcut(event: KeyboardEvent) {
       </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto pb-4" :class="isCollapsed ? 'px-2 py-3' : 'px-3'">
+    <nav
+      class="prism-sidebar-nav flex-1 overflow-y-auto pb-4"
+      :class="isCollapsed ? 'px-2 py-3' : 'px-3'"
+    >
       <div class="space-y-1">
         <RouterLink
           v-for="item in visiblePrimaryItems"
@@ -278,7 +286,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
           :title="isCollapsed ? item.label : undefined"
         >
           <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-          <span v-if="!isCollapsed" class="truncate">{{ item.label }}</span>
+          <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+            {{ item.label }}
+          </span>
         </RouterLink>
       </div>
 
@@ -302,7 +312,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
             @click="toggleGroup(group)"
           >
             <i :class="[group.icon, 'shrink-0 text-[13px]']" />
-            <span v-if="!isCollapsed" class="min-w-0 flex-1 truncate">{{ group.label }}</span>
+            <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+              {{ group.label }}
+            </span>
             <i
               v-if="!isCollapsed"
               :class="[
@@ -327,7 +339,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
               :aria-label="item.label"
             >
               <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-              <span class="truncate">{{ item.label }}</span>
+              <span class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+                {{ item.label }}
+              </span>
             </RouterLink>
           </div>
         </div>

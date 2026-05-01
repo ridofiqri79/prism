@@ -133,6 +133,31 @@
     box-shadow: 0 0 0 3px rgba(253, 184, 19, 0.22);
   }
 
+  .prism-sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(31, 181, 178, 0.34) transparent;
+  }
+
+  .prism-sidebar-nav::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .prism-sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .prism-sidebar-nav::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(31, 181, 178, 0.26);
+    background-clip: content-box;
+  }
+
+  .prism-sidebar-nav:hover::-webkit-scrollbar-thumb {
+    background: rgba(31, 181, 178, 0.42);
+    background-clip: content-box;
+  }
+
   .prism-sidebar-child-list {
     border-color: rgba(31, 181, 178, 0.18);
   }
