@@ -142,6 +142,72 @@ export interface MonitoringSummaryItem {
   absorption_pct: number
 }
 
+export type JourneyStageState = 'completed' | 'pending' | 'extended' | 'warning'
+
+export interface JourneySummaryMetric {
+  label: string
+  value: string
+  hint: string
+  icon: string
+  state: JourneyStageState
+}
+
+export interface JourneySnapshotStep {
+  key: string
+  label: string
+  value: string
+  state: JourneyStageState
+  hint?: string
+}
+
+export interface JourneyFundingGroup {
+  key: string
+  label: string
+  currency: string
+  loan_usd: number
+  grant_usd: number
+  local_usd: number
+  total_usd: number
+}
+
+export interface JourneyMatrixStage {
+  key: string
+  label: string
+  value: string
+  state: JourneyStageState
+}
+
+export interface JourneyMatrixRow {
+  key: string
+  project_label: string
+  project_name: string
+  funding_usd: number
+  stages: JourneyMatrixStage[]
+}
+
+export interface JourneyFlowNode {
+  name: string
+  itemStyle?: {
+    color: string
+  }
+  label?: {
+    color: string
+    fontWeight?: number
+  }
+}
+
+export interface JourneyFlowLink {
+  source: string
+  target: string
+  value: number
+  rawValue: number
+  label: string
+  lineStyle?: {
+    color?: string
+    opacity?: number
+  }
+}
+
 export interface DashboardFilterParams {
   budget_year?: number
   quarter?: DashboardQuarter
@@ -156,9 +222,7 @@ export type DashboardSummaryApiResponse = Omit<
   total_realisasi_usd?: number
 }
 
-export type MonitoringSummaryApiResponse = Partial<
-  Omit<MonitoringSummary, 'by_lender'>
-> & {
+export type MonitoringSummaryApiResponse = Partial<Omit<MonitoringSummary, 'by_lender'>> & {
   by_lender?: Array<
     Partial<Omit<LenderSummary, 'lender'>> & {
       lender: Lender

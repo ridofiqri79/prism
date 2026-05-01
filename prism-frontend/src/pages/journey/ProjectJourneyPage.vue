@@ -5,7 +5,10 @@ import { useRoute, useRouter } from 'vue-router'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import SelectButton from 'primevue/selectbutton'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ProjectJourneyFlow from '@/components/journey/ProjectJourneyFlow.vue'
+import ProjectJourneySummary from '@/components/journey/ProjectJourneySummary.vue'
 import ProjectTimeline from '@/components/journey/ProjectTimeline.vue'
 import { useJourneyStore } from '@/stores/journey.store'
 import type { JourneyResponse } from '@/types/dashboard.types'
@@ -25,6 +28,8 @@ type ProjectJourneyOption = Pick<
   label: string
 }
 
+type JourneyView = 'summary' | 'flow' | 'detail'
+
 const route = useRoute()
 const router = useRouter()
 const journeyStore = useJourneyStore()
@@ -37,8 +42,16 @@ const {
 } = storeToRefs(journeyStore)
 
 const selectedProject = ref<ProjectJourneyOption | null>(null)
+const activeView = ref<JourneyView>('summary')
 const bbProjectId = computed(() => String(route.params.bbProjectId ?? ''))
-const projectSuggestions = computed<ProjectJourneyOption[]>(() => projectOptions.value.map(toOption))
+const projectSuggestions = computed<ProjectJourneyOption[]>(() =>
+  projectOptions.value.map(toOption),
+)
+const viewOptions: Array<{ label: string; value: JourneyView; icon: string }> = [
+  { label: 'Ringkasan', value: 'summary', icon: 'pi pi-chart-bar' },
+  { label: 'Alur Visual', value: 'flow', icon: 'pi pi-share-alt' },
+  { label: 'Detail Hierarki', value: 'detail', icon: 'pi pi-sitemap' },
+]
 
 function toOption(project: ProjectMasterRow): ProjectJourneyOption {
   return {
@@ -109,10 +122,7 @@ onMounted(async () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader
-      title="Perjalanan Proyek"
-      subtitle="Alur proyek dari Blue Book sampai Monitoring"
-    />
+    <PageHeader title="Perjalanan Proyek" subtitle="Alur proyek dari Blue Book sampai Monitoring" />
 
     <section class="rounded-lg border border-surface-200 bg-white p-4">
       <div class="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -181,6 +191,34 @@ onMounted(async () => {
       Pilih Proyek Blue Book untuk melihat timeline perjalanan proyek.
     </Message>
 
-    <ProjectTimeline v-if="journeyData" :journey="journeyData" />
+    <section v-if="journeyData" class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-semibold text-surface-950">Visualisasi Perjalanan</h2>
+          <p class="text-sm text-surface-500">
+            Pilih ringkasan, flow, atau detail hierarki sesuai kebutuhan baca.
+          </p>
+        </div>
+        <SelectButton
+          v-model="activeView"
+          :options="viewOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          data-key="value"
+        >
+          <template #option="{ option }">
+            <span class="inline-flex items-center gap-2">
+              <i :class="option.icon" />
+              <span>{{ option.label }}</span>
+            </span>
+          </template>
+        </SelectButton>
+      </div>
+
+      <ProjectJourneySummary v-if="activeView === 'summary'" :journey="journeyData" />
+      <ProjectJourneyFlow v-else-if="activeView === 'flow'" :journey="journeyData" />
+      <ProjectTimeline v-else :journey="journeyData" />
+    </section>
   </section>
 </template>
