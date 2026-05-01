@@ -17,8 +17,9 @@ import { useBlueBookStore } from '@/stores/blue-book.store'
 import { greenBookSchema } from '@/schemas/green-book.schema'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { GBProject, GBProjectListParams, GBProjectStatus, GreenBookPayload } from '@/types/green-book.types'
+import type { GBProject, GBProjectListParams, GreenBookPayload } from '@/types/green-book.types'
 import type { Institution, Region } from '@/types/master.types'
+import { formatApiError } from '@/utils/api-error'
 import { formatGBRevision, joinNames, toFormErrors, type FormErrors } from './green-book-page-utils'
 
 type GreenBookField = keyof GreenBookPayload
@@ -35,7 +36,6 @@ interface GBProjectFilterState {
   bb_project_ids: string[]
   executing_agency_ids: string[]
   location_ids: string[]
-  status: GBProjectStatus[]
 }
 
 const greenBookId = computed(() => String(route.params.id ?? ''))
@@ -44,13 +44,11 @@ const projectControls = useListControls<GBProjectFilterState>({
     bb_project_ids: [],
     executing_agency_ids: [],
     location_ids: [],
-    status: [],
   },
   filterLabels: {
     bb_project_ids: 'Proyek Blue Book',
     executing_agency_ids: 'Executing Agency',
     location_ids: 'Location',
-    status: 'Status',
   },
   formatFilterValue: (key, value) => {
     if (key === 'bb_project_ids' && Array.isArray(value)) return selectedBBProjectSummary(value)
@@ -72,7 +70,6 @@ const columns: ColumnDef[] = [
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
-const projectStatusOptions: GBProjectStatus[] = ['active', 'deleted']
 const selectedCountryCodes = computed(() => {
   const selected = new Set(projectControls.draftFilters.location_ids)
 
@@ -155,12 +152,20 @@ async function save() {
 
 function deleteProject(project: GBProject) {
   confirm.confirmDelete(`Proyek Green Book ${project.gb_code}`, async () => {
-    await greenBookStore.deleteProject(greenBookId.value, project.id)
-    toast.success('Berhasil', 'Proyek Green Book berhasil dihapus')
-    if (greenBookStore.projects.length === 1 && projectControls.page.value > 1) {
-      projectControls.page.value -= 1
-    } else {
-      await loadProjects()
+    try {
+      await greenBookStore.deleteProject(greenBookId.value, project.id)
+      toast.success('Berhasil', 'Proyek Green Book berhasil dihapus permanen')
+      if (greenBookStore.projects.length === 1 && projectControls.page.value > 1) {
+        projectControls.page.value -= 1
+      } else {
+        await loadProjects()
+      }
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Proyek Green Book masih memiliki relasi turunan'),
+        12000,
+      )
     }
   })
 }
@@ -338,16 +343,6 @@ watch(
             option-disabled="disabled"
             placeholder="Semua lokasi"
             filter
-            display="chip"
-            class="w-full"
-          />
-        </label>
-        <label class="block space-y-2 xl:col-span-1">
-          <span class="text-sm font-medium text-surface-700">Status</span>
-          <MultiSelect
-            v-model="projectControls.draftFilters.status"
-            :options="projectStatusOptions"
-            placeholder="Semua status"
             display="chip"
             class="w-full"
           />

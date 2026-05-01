@@ -135,5 +135,6 @@ gb.DELETE("/:gbId/projects/:id", gbHandler.DeleteGBProject, permission.Require("
 - [x] `internal/service/green_book_service.go` — validasi + transaksi dengan activity_index mapping
 - [x] `internal/handler/green_book_handler.go`
 - [x] Routes terdaftar
+- [x] Catatan terkini: delete GB Project memakai hard delete dan ditolak jika masih dipakai DK/LA/Monitoring
 - [x] `POST /gb-projects` dengan duplikat tahun disbursement → 422
 - [x] `POST /gb-projects` sukses → Activities + FundingAllocation tersimpan berurutan

@@ -380,7 +380,7 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 | `region` | Hierarki wilayah via `type` (COUNTRY/PROVINCE/CITY) + `parent_code` (bukan `parent_id`) |
 | `blue_book` | Header BB, relasi ke `period` |
 | `project_identity` | Identitas logical BB Project lintas revisi |
-| `bb_project` | Snapshot proyek BB, `status: active/deleted`, `bb_code` unik per `blue_book_id` |
+| `bb_project` | Snapshot proyek BB, status hanya `active`; penghapusan proyek memakai hard delete |
 | `lender_indication` | Indikasi lender per BB project, field `remarks` (bukan `keterangan`) |
 | `loi` | LoI per BB project, field `subject/date/letter_number` (bukan `perihal/tanggal/nomor_surat`) |
 | `green_book` | Header GB, tidak pakai `period` |

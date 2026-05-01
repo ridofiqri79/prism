@@ -144,7 +144,7 @@ CREATE TABLE bb_project (
     scope_of_work        TEXT,
     outputs              TEXT,
     outcomes             TEXT,
-    status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active')),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (blue_book_id, bb_code)
@@ -245,7 +245,7 @@ CREATE TABLE gb_project (
     duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objective        TEXT,
     scope_of_project TEXT,
-    status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (green_book_id, gb_code)
@@ -641,6 +641,36 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION audit_trigger_by_column_fn()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_old_data JSONB;
+    v_new_data JSONB;
+    v_record_data JSONB;
+    v_record_id UUID;
+BEGIN
+    BEGIN
+        v_user_id := current_setting('app.current_user_id', true)::UUID;
+    EXCEPTION WHEN OTHERS THEN
+        v_user_id := NULL;
+    END;
+
+    v_old_data := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE to_jsonb(OLD) END;
+    v_new_data := CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE to_jsonb(NEW) END;
+    v_record_data := COALESCE(v_new_data, v_old_data);
+    v_record_id := (v_record_data ->> TG_ARGV[0])::UUID;
+
+    INSERT INTO audit_log (table_name, record_id, action, old_data, new_data, changed_by)
+    VALUES (TG_TABLE_NAME, v_record_id, TG_OP, v_old_data, v_new_data, v_user_id);
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
 
 -- ============================================================
 -- PASANG TRIGGER KE SEMUA TABEL
@@ -692,6 +722,22 @@ CREATE TRIGGER trg_audit_bb_project
     AFTER INSERT OR UPDATE OR DELETE ON bb_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
+CREATE TRIGGER trg_audit_bb_project_institution
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_institution
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_national_priority
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_national_priority
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
 CREATE TRIGGER trg_audit_bb_project_cost
     AFTER INSERT OR UPDATE OR DELETE ON bb_project_cost
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
@@ -712,6 +758,22 @@ CREATE TRIGGER trg_audit_green_book
 CREATE TRIGGER trg_audit_gb_project
     AFTER INSERT OR UPDATE OR DELETE ON gb_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_gb_project_bb_project
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_bb_project
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_institution
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_institution
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
 
 CREATE TRIGGER trg_audit_gb_activity
     AFTER INSERT OR UPDATE OR DELETE ON gb_activity
@@ -737,6 +799,18 @@ CREATE TRIGGER trg_audit_daftar_kegiatan
 CREATE TRIGGER trg_audit_dk_project
     AFTER INSERT OR UPDATE OR DELETE ON dk_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_dk_project_gb_project
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_gb_project
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
+
+CREATE TRIGGER trg_audit_dk_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
+
+CREATE TRIGGER trg_audit_dk_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
 
 CREATE TRIGGER trg_audit_dk_financing_detail
     AFTER INSERT OR UPDATE OR DELETE ON dk_financing_detail

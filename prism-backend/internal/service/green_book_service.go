@@ -209,7 +209,7 @@ func buildGBProjectListParams(gbID pgtype.UUID, filter model.GBProjectListFilter
 	if err != nil {
 		return queries.ListGBProjectsByGreenBookParams{}, err
 	}
-	statuses, err := allowedValues(filter.Statuses, map[string]struct{}{"active": {}, "deleted": {}}, "status")
+	statuses, err := allowedValues(filter.Statuses, map[string]struct{}{"active": {}}, "status")
 	if err != nil {
 		return queries.ListGBProjectsByGreenBookParams{}, err
 	}
@@ -312,17 +312,33 @@ func (s *GreenBookService) UpdateGBProject(ctx context.Context, gbID, id pgtype.
 	return s.buildGBProjectResponse(ctx, updated)
 }
 
-func (s *GreenBookService) DeleteGBProject(ctx context.Context, gbID, id pgtype.UUID) error {
+func (s *GreenBookService) DeleteGBProject(ctx context.Context, gbID, id pgtype.UUID, user *model.AuthUser) error {
 	var deleted queries.GbProject
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
 		if _, err := qtx.GetActiveGBProjectByGreenBook(ctx, queries.GetActiveGBProjectByGreenBookParams{GreenBookID: gbID, ID: id}); err != nil {
 			return mapNotFound(err, "GB Project tidak ditemukan")
 		}
-		row, err := qtx.SoftDeleteGBProject(ctx, id)
+		dependencies, err := qtx.ListGBProjectDeletionDependencies(ctx, id)
 		if err != nil {
+			return err
+		}
+		if len(dependencies) > 0 {
+			return deletionBlockedError(user, "GB Project", gbProjectDeletionDependencies(dependencies))
+		}
+		row, err := qtx.HardDeleteGBProject(ctx, queries.HardDeleteGBProjectParams{GreenBookID: gbID, ID: id})
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				dependencies, depErr := qtx.ListGBProjectDeletionDependencies(ctx, id)
+				if depErr == nil && len(dependencies) > 0 {
+					return deletionBlockedError(user, "GB Project", gbProjectDeletionDependencies(dependencies))
+				}
+			}
 			return mapNotFound(err, "GB Project tidak ditemukan")
 		}
 		deleted = row
+		if err := qtx.DeleteOrphanGBProjectIdentity(ctx, deleted.GbProjectIdentityID); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -331,6 +347,19 @@ func (s *GreenBookService) DeleteGBProject(ctx context.Context, gbID, id pgtype.
 		s.broker.Publish("gb_project.deleted", map[string]string{"id": model.UUIDToString(deleted.ID)})
 	}
 	return nil
+}
+
+func gbProjectDeletionDependencies(rows []queries.ListGBProjectDeletionDependenciesRow) []deletionDependency {
+	dependencies := make([]deletionDependency, 0, len(rows))
+	for _, row := range rows {
+		dependencies = append(dependencies, deletionDependency{
+			relationType:  row.RelationType,
+			relationID:    model.UUIDToString(row.RelationID),
+			relationLabel: row.RelationLabel,
+			relationPath:  row.RelationPath,
+		})
+	}
+	return dependencies
 }
 
 func (s *GreenBookService) GetGBProjectHistory(ctx context.Context, id pgtype.UUID) ([]model.GBProjectHistoryItem, error) {

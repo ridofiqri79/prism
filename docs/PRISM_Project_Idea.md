@@ -261,13 +261,13 @@ Periode perencanaan **5 tahunan** yang menjadi acuan bersama untuk **Blue Book**
 - Period
 - Publish Date
 - Versi revisi — format: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`, contoh: *"BB 2025–2029 Revisi ke-1 Tahun 2026"*
-- *(Riwayat semua versi disimpan; proyek yang dihapus tetap ada dengan status `deleted`)*
+- *(Riwayat versi tetap disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream)*
 
 ### 5.3 Green Book
 - List of Green Book Projects
 - Publish Date (tahun terbit)
 - Versi revisi — format: `GB [YYYY] Revisi ke-[N]`
-- *(Riwayat semua versi disimpan; proyek yang dihapus tetap ada dengan status `deleted`)*
+- *(Riwayat versi tetap disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream)*
 
 ### 5.4 Daftar Kegiatan
 Berupa **surat** yang diterbitkan Bappenas dengan struktur dua level:
@@ -407,7 +407,7 @@ Bappenas Publish Blue Book (per 5 tahun)
 ## 7. Catatan Pengembangan Awal
 
 - Sistem bersifat **input-centric**: data diinput oleh Staff, ditampilkan sebagai tabel dan visualisasi.
-- **Manajemen versi/revisi** untuk BB dan GB: riwayat semua versi disimpan, proyek yang dihapus tetap ada dengan status `deleted`. Format versi: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`.
+- **Manajemen versi/revisi** untuk BB dan GB: riwayat semua versi disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream. Format versi: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`.
 - **Multi-currency** pada Daftar Kegiatan: konversi ke USD dilakukan manual oleh Staff, sistem menyimpan nilai original (mata uang lender) dan nilai USD secara bersamaan.
 - Relasi **BB ↔ GB bersifat many-to-many** dan **DK ↔ GB bersifat many-to-many** — keduanya perlu tabel penghubung di skema database.
 - **LoI** memiliki perihal dan tanggal (wajib) serta nomor surat (opsional); satu BB project bisa menerima banyak LoI dari lender yang berbeda.

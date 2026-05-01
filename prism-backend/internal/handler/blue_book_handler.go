@@ -164,7 +164,11 @@ func (h *BlueBookHandler) DeleteBBProject(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := h.service.DeleteBBProject(c.Request().Context(), bbID, id); err != nil {
+	user, ok := c.Get("user").(*model.AuthUser)
+	if !ok || user == nil {
+		return apperrors.Unauthorized("User tidak ditemukan")
+	}
+	if err := h.service.DeleteBBProject(c.Request().Context(), bbID, id, user); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

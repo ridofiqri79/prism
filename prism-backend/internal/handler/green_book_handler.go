@@ -166,7 +166,11 @@ func (h *GreenBookHandler) DeleteGBProject(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := h.service.DeleteGBProject(c.Request().Context(), gbID, id); err != nil {
+	user, ok := c.Get("user").(*model.AuthUser)
+	if !ok || user == nil {
+		return apperrors.Unauthorized("User tidak ditemukan")
+	}
+	if err := h.service.DeleteGBProject(c.Request().Context(), gbID, id, user); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

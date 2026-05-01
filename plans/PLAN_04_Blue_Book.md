@@ -12,7 +12,7 @@
 **`src/types/blue-book.types.ts`:**
 ```typescript
 export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded' }
-export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' | 'deleted' }
+export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' }
 export interface LenderIndication { id: string; lender: Lender; remarks?: string }
 export interface LoI { id: string; lender: Lender; subject: string; date: string; letter_number?: string }
 export interface BBProjectCost { id: string; funding_type: 'Foreign' | 'Counterpart'; funding_category: string; amount_usd: number }

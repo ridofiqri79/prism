@@ -48,8 +48,8 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 UPDATE bb_project SET program_title_id=$2, project_name=$3, duration=$4, objective=$5, scope_of_work=$6, outputs=$7, outcomes=$8, updated_at=NOW()
 WHERE id=$1 RETURNING *;
 
--- name: SoftDeleteBBProject :one
-UPDATE bb_project SET status='deleted', updated_at=NOW() WHERE id=$1 RETURNING *;
+-- name: HardDeleteBBProject :one
+DELETE FROM bb_project WHERE id=$1 RETURNING *;
 
 -- ===== BB INSTITUTIONS =====
 -- name: GetBBProjectInstitutions :many
@@ -240,7 +240,8 @@ loi.DELETE("/:id", bbHandler.DeleteLoI, permission.Require("bb_project", "update
 - [x] `internal/service/blue_book_service.go` — CRUD + validasi bisnis + transaksi + SSE
 - [x] `internal/handler/blue_book_handler.go`
 - [x] Routes terdaftar
+- [x] Catatan terkini: delete BB Project memakai hard delete dan ditolak jika masih dipakai GB/DK/LA/Monitoring
 - [x] `POST /bb-projects` dengan bb_code duplikat → 409
 - [x] `POST /bb-projects` dengan EA = IA → diterima bila payload lain valid
 - [x] `POST /bb-projects` sukses → SSE event terkirim
-- [x] `DELETE /blue-books/:bbId/projects/:id` → status `deleted`, record tetap ada di DB
+- [x] `DELETE /blue-books/:bbId/projects/:id` → hard delete; ditolak jika masih ada relasi GB/DK/LA/Monitoring

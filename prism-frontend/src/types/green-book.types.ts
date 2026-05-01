@@ -9,7 +9,7 @@ import type {
 } from '@/types/master.types'
 
 export type GreenBookStatus = 'active' | 'superseded'
-export type GBProjectStatus = 'active' | 'deleted'
+export type GBProjectStatus = 'active'
 
 export interface GreenBook {
   id: string

@@ -176,7 +176,7 @@ prism-frontend/
 │       │   ├── SearchFilterBar.vue    # Search + filter drawer standar untuk halaman paginated
 │       │   ├── TableReloadShell.vue   # Shell animasi reload tabel yang mempertahankan data lama
 │       │   ├── PageHeader.vue         # Title + breadcrumb + action button
-│       │   ├── StatusBadge.vue        # Badge status active/deleted/extended
+│       │   ├── StatusBadge.vue        # Badge status reusable per modul
 │       │   ├── CurrencyDisplay.vue    # Format angka USD / IDR / mata uang lender
 │       │   ├── EmptyState.vue         # Empty state reusable
 │       │   └── ConfirmDialog.vue      # Dialog konfirmasi delete

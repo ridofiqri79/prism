@@ -12,7 +12,7 @@
 **`src/types/green-book.types.ts`:**
 ```typescript
 export interface GreenBook { id: string; publish_year: number; revision_number: number; status: 'active' | 'superseded' }
-export interface GBProject { id: string; gb_code: string; project_name: string; duration?: number | null; program_title?: ProgramTitle; bb_projects: BBProjectSummary[]; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; activities: GBActivity[]; funding_sources: GBFundingSource[]; disbursement_plan: GBDisbursementPlan[]; funding_allocations: GBFundingAllocation[]; status: 'active' | 'deleted' }
+export interface GBProject { id: string; gb_code: string; project_name: string; duration?: number | null; program_title?: ProgramTitle; bb_projects: BBProjectSummary[]; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; activities: GBActivity[]; funding_sources: GBFundingSource[]; disbursement_plan: GBDisbursementPlan[]; funding_allocations: GBFundingAllocation[]; status: 'active' }
 export interface GBActivity { id: string; activity_name: string; implementation_location?: string; piu?: string; sort_order: number }
 export interface GBFundingSource { id: string; lender: Lender; institution?: Institution; loan_usd: number; grant_usd: number; local_usd: number }
 export interface GBDisbursementPlan { id: string; year: number; amount_usd: number }

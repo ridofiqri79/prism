@@ -10,7 +10,7 @@ import type {
 } from '@/types/master.types'
 
 export type BlueBookStatus = 'active' | 'superseded'
-export type BBProjectStatus = 'active' | 'deleted'
+export type BBProjectStatus = 'active'
 export type FundingType = 'Foreign' | 'Counterpart'
 
 export interface BlueBook {

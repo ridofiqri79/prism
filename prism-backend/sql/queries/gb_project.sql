@@ -434,13 +434,79 @@ WHERE id = $1
   AND status = 'active'
 RETURNING *;
 
--- name: SoftDeleteGBProject :one
-UPDATE gb_project
-SET status = 'deleted',
-    updated_at = NOW()
-WHERE id = $1
-  AND status = 'active'
+-- name: ListGBProjectDeletionDependencies :many
+WITH related_dk AS (
+    SELECT DISTINCT
+        dp.id,
+        dk.subject,
+        dk.letter_number,
+        dk.date
+    FROM dk_project_gb_project dpg
+    JOIN dk_project dp ON dp.id = dpg.dk_project_id
+    JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+    WHERE dpg.gb_project_id = $1
+),
+related_la AS (
+    SELECT DISTINCT
+        la.id,
+        la.loan_code,
+        rd.subject,
+        rd.letter_number
+    FROM related_dk rd
+    JOIN loan_agreement la ON la.dk_project_id = rd.id
+),
+related_monitoring AS (
+    SELECT DISTINCT
+        md.id,
+        md.budget_year,
+        md.quarter,
+        rla.loan_code,
+        rla.subject,
+        rla.letter_number
+    FROM related_la rla
+    JOIN monitoring_disbursement md ON md.loan_agreement_id = rla.id
+)
+SELECT
+    'daftar_kegiatan_project'::text AS relation_type,
+    id AS relation_id,
+    COALESCE(letter_number, subject)::text AS relation_label,
+    format('Daftar Kegiatan %s', COALESCE(letter_number, subject))::text AS relation_path
+FROM related_dk
+UNION ALL
+SELECT
+    'loan_agreement'::text AS relation_type,
+    id AS relation_id,
+    loan_code::text AS relation_label,
+    format('Daftar Kegiatan %s -> Loan Agreement %s', COALESCE(letter_number, subject), loan_code)::text AS relation_path
+FROM related_la
+UNION ALL
+SELECT
+    'monitoring_disbursement'::text AS relation_type,
+    id AS relation_id,
+    format('%s %s', budget_year, quarter)::text AS relation_label,
+    format('Daftar Kegiatan %s -> Loan Agreement %s -> Monitoring %s %s', COALESCE(letter_number, subject), loan_code, budget_year, quarter)::text AS relation_path
+FROM related_monitoring
+ORDER BY relation_type, relation_label;
+
+-- name: HardDeleteGBProject :one
+DELETE FROM gb_project gp
+WHERE gp.green_book_id = $1
+  AND gp.id = $2
+  AND NOT EXISTS (
+      SELECT 1
+      FROM dk_project_gb_project dpg
+      WHERE dpg.gb_project_id = gp.id
+  )
 RETURNING *;
+
+-- name: DeleteOrphanGBProjectIdentity :exec
+DELETE FROM gb_project_identity gpi
+WHERE gpi.id = $1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM gb_project gp
+      WHERE gp.gb_project_identity_id = gpi.id
+  );
 
 -- ===== GB PROJECT BB PROJECT =====
 

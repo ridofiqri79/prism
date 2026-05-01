@@ -3,7 +3,9 @@ package service
 import (
 	"bytes"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ridofiqri79/prism-backend/internal/database/queries"
@@ -129,6 +131,47 @@ func TestGreenBookRevisionClonePreservesIdentityAndUsesLatestBB(t *testing.T) {
 	if sourceAfterRevision.IsLatest || !sourceAfterRevision.HasNewerRevision {
 		t.Fatalf("source latest flags = is_latest:%v has_newer:%v, want historical with newer revision", sourceAfterRevision.IsLatest, sourceAfterRevision.HasNewerRevision)
 	}
+}
+
+func TestDeleteGBProjectHardDeletesWhenNoDownstreamAndAuditsChildren(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-DEL-GB-001", "BB For Delete")
+	greenBook := env.createGreenBook(t, gbService, 0, nil)
+	gbProject := env.createGBProject(t, gbService, greenBook.ID, bbProject.ID, "GB-DEL-001", "Wrong GB")
+	gbProjectID := mustParseUUID(t, gbProject.ID)
+
+	if err := gbService.DeleteGBProject(env.ctx, mustParseUUID(t, greenBook.ID), gbProjectID, staffDeleteUser()); err != nil {
+		t.Fatalf("DeleteGBProject(no downstream) error = %v", err)
+	}
+	if _, err := env.queries.GetGBProject(env.ctx, gbProjectID); err != pgx.ErrNoRows {
+		t.Fatalf("GetGBProject after hard delete error = %v, want pgx.ErrNoRows", err)
+	}
+	assertAuditDeleteExists(t, env, "gb_project", gbProject.ID)
+	assertAuditDeleteExists(t, env, "gb_project_bb_project", gbProject.ID)
+	assertAuditDeleteExists(t, env, "gb_project_institution", gbProject.ID)
+	assertAuditDeleteExists(t, env, "gb_activity", gbProject.Activities[0].ID)
+}
+
+func TestDeleteGBProjectRejectsDKDownstreamAndShowsRelations(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-USED-GB-001", "BB Used By GB")
+	greenBook := env.createGreenBook(t, gbService, 0, nil)
+	gbProject := env.createGBProject(t, gbService, greenBook.ID, bbProject.ID, "GB-USED-001", "Used GB")
+	env.createDKProjectLinkedToGB(t, gbProject.ID)
+
+	err := gbService.DeleteGBProject(env.ctx, mustParseUUID(t, greenBook.ID), mustParseUUID(t, gbProject.ID), staffDeleteUser())
+	assertAppErrorCode(t, err, "FORBIDDEN")
+	assertAppErrorHasDetailField(t, err, "daftar_kegiatan_project")
+
+	err = gbService.DeleteGBProject(env.ctx, mustParseUUID(t, greenBook.ID), mustParseUUID(t, gbProject.ID), adminDeleteUser())
+	assertAppErrorCode(t, err, "CONFLICT")
+	assertAppErrorHasDetailField(t, err, "daftar_kegiatan_project")
 }
 
 func TestGreenBookRevisionCloneMapsFundingAllocationToClonedActivity(t *testing.T) {
@@ -337,6 +380,36 @@ func (env *blueBookVersioningTestEnv) createGBProject(t *testing.T, service *Gre
 		t.Fatalf("CreateGBProject(%s) error = %v", code, err)
 	}
 	return res
+}
+
+func (env *blueBookVersioningTestEnv) createDKProjectLinkedToGB(t *testing.T, gbProjectID string) queries.DkProject {
+	t.Helper()
+	date := pgtype.Date{Time: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC), Valid: true}
+	dk, err := env.queries.CreateDaftarKegiatan(env.ctx, queries.CreateDaftarKegiatanParams{
+		LetterNumber: pgtype.Text{String: "DK-DEL-001", Valid: true},
+		Subject:      "DK Delete Dependency",
+		Date:         date,
+	})
+	if err != nil {
+		t.Fatalf("CreateDaftarKegiatan error = %v", err)
+	}
+	project, err := env.queries.CreateDKProject(env.ctx, queries.CreateDKProjectParams{
+		DkID:           dk.ID,
+		ProgramTitleID: env.programTitle.ID,
+		InstitutionID:  env.ea.ID,
+		Duration:       pgtype.Int4{Int32: 12, Valid: true},
+		Objectives:     pgtype.Text{String: "Dependency", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateDKProject error = %v", err)
+	}
+	if err := env.queries.AddDKProjectGBProject(env.ctx, queries.AddDKProjectGBProjectParams{
+		DkProjectID: project.ID,
+		GbProjectID: mustParseUUID(t, gbProjectID),
+	}); err != nil {
+		t.Fatalf("AddDKProjectGBProject error = %v", err)
+	}
+	return project
 }
 
 func (env *blueBookVersioningTestEnv) gbProjectRequest(bbProjectID, code, name string) model.CreateGBProjectRequest {

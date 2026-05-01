@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -131,6 +132,43 @@ func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
 	if sourceAfterRevision.IsLatest || !sourceAfterRevision.HasNewerRevision {
 		t.Fatalf("source latest flags = is_latest:%v has_newer:%v, want historical with newer revision", sourceAfterRevision.IsLatest, sourceAfterRevision.HasNewerRevision)
 	}
+}
+
+func TestDeleteBBProjectHardDeletesWhenNoDownstreamAndAuditsChildren(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	project := env.createBBProject(t, blueBook.ID, "BB-DEL-001", "Wrong Input")
+	projectID := mustParseUUID(t, project.ID)
+
+	if err := env.service.DeleteBBProject(env.ctx, mustParseUUID(t, blueBook.ID), projectID, staffDeleteUser()); err != nil {
+		t.Fatalf("DeleteBBProject(no downstream) error = %v", err)
+	}
+	if _, err := env.queries.GetBBProject(env.ctx, projectID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("GetBBProject after hard delete error = %v, want pgx.ErrNoRows", err)
+	}
+	assertAuditDeleteExists(t, env, "bb_project", project.ID)
+	assertAuditDeleteExists(t, env, "bb_project_institution", project.ID)
+	assertAuditDeleteExists(t, env, "bb_project_location", project.ID)
+	assertAuditDeleteExists(t, env, "bb_project_cost", project.ProjectCosts[0].ID)
+}
+
+func TestDeleteBBProjectRejectsDownstreamAndShowsRelations(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-USED-001", "Used Input")
+	greenBook := env.createGreenBook(t, gbService, 0, nil)
+	env.createGBProject(t, gbService, greenBook.ID, bbProject.ID, "GB-USED-001", "Used GB")
+
+	err := env.service.DeleteBBProject(env.ctx, mustParseUUID(t, blueBook.ID), mustParseUUID(t, bbProject.ID), staffDeleteUser())
+	assertAppErrorCode(t, err, "FORBIDDEN")
+	assertAppErrorHasDetailField(t, err, "green_book_project")
+
+	err = env.service.DeleteBBProject(env.ctx, mustParseUUID(t, blueBook.ID), mustParseUUID(t, bbProject.ID), adminDeleteUser())
+	assertAppErrorCode(t, err, "CONFLICT")
+	assertAppErrorHasDetailField(t, err, "green_book_project")
 }
 
 func TestListBBProjectsSupportsSearchAndFilters(t *testing.T) {
@@ -625,6 +663,39 @@ func assertAppErrorCode(t *testing.T, err error, code string) {
 	if appErr.Code != code {
 		t.Fatalf("AppError code = %s, want %s; message=%q", appErr.Code, code, appErr.Message)
 	}
+}
+
+func assertAppErrorHasDetailField(t *testing.T, err error, field string) {
+	t.Helper()
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected AppError with detail field %s, got %T: %v", field, err, err)
+	}
+	for _, detail := range appErr.Details {
+		if detail.Field == field {
+			return
+		}
+	}
+	t.Fatalf("AppError details did not include field %s: %+v", field, appErr.Details)
+}
+
+func assertAuditDeleteExists(t *testing.T, env *blueBookVersioningTestEnv, tableName, recordID string) {
+	t.Helper()
+	var count int64
+	if err := env.pool.QueryRow(env.ctx, `SELECT COUNT(*) FROM audit_log WHERE table_name = $1 AND record_id = $2 AND action = 'DELETE'`, tableName, recordID).Scan(&count); err != nil {
+		t.Fatalf("count audit log for %s/%s: %v", tableName, recordID, err)
+	}
+	if count == 0 {
+		t.Fatalf("audit log missing DELETE for %s/%s", tableName, recordID)
+	}
+}
+
+func staffDeleteUser() *model.AuthUser {
+	return &model.AuthUser{Role: "STAFF"}
+}
+
+func adminDeleteUser() *model.AuthUser {
+	return &model.AuthUser{Role: "ADMIN"}
 }
 
 func assertProjectListIDs(t *testing.T, projects []model.BBProjectResponse, ids ...string) {

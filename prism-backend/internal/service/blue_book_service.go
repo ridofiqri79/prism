@@ -329,17 +329,33 @@ func (s *BlueBookService) UpdateBBProject(ctx context.Context, bbID, id pgtype.U
 	return s.buildBBProjectResponse(ctx, updated)
 }
 
-func (s *BlueBookService) DeleteBBProject(ctx context.Context, bbID, id pgtype.UUID) error {
+func (s *BlueBookService) DeleteBBProject(ctx context.Context, bbID, id pgtype.UUID, user *model.AuthUser) error {
 	var deleted queries.BbProject
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
 		if _, err := qtx.GetActiveBBProjectByBlueBook(ctx, queries.GetActiveBBProjectByBlueBookParams{BlueBookID: bbID, ID: id}); err != nil {
 			return mapNotFound(err, "BB Project tidak ditemukan")
 		}
-		row, err := qtx.SoftDeleteBBProject(ctx, id)
+		dependencies, err := qtx.ListBBProjectDeletionDependencies(ctx, id)
 		if err != nil {
+			return err
+		}
+		if len(dependencies) > 0 {
+			return deletionBlockedError(user, "BB Project", bbProjectDeletionDependencies(dependencies))
+		}
+		row, err := qtx.HardDeleteBBProject(ctx, queries.HardDeleteBBProjectParams{BlueBookID: bbID, ID: id})
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				dependencies, depErr := qtx.ListBBProjectDeletionDependencies(ctx, id)
+				if depErr == nil && len(dependencies) > 0 {
+					return deletionBlockedError(user, "BB Project", bbProjectDeletionDependencies(dependencies))
+				}
+			}
 			return mapNotFound(err, "BB Project tidak ditemukan")
 		}
 		deleted = row
+		if err := qtx.DeleteOrphanProjectIdentity(ctx, deleted.ProjectIdentityID); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -348,6 +364,19 @@ func (s *BlueBookService) DeleteBBProject(ctx context.Context, bbID, id pgtype.U
 		s.broker.Publish("bb_project.deleted", map[string]string{"id": model.UUIDToString(deleted.ID)})
 	}
 	return nil
+}
+
+func bbProjectDeletionDependencies(rows []queries.ListBBProjectDeletionDependenciesRow) []deletionDependency {
+	dependencies := make([]deletionDependency, 0, len(rows))
+	for _, row := range rows {
+		dependencies = append(dependencies, deletionDependency{
+			relationType:  row.RelationType,
+			relationID:    model.UUIDToString(row.RelationID),
+			relationLabel: row.RelationLabel,
+			relationPath:  row.RelationPath,
+		})
+	}
+	return dependencies
 }
 
 func (s *BlueBookService) ListLoI(ctx context.Context, bbProjectID pgtype.UUID) ([]model.LoIResponse, error) {

@@ -632,6 +632,29 @@ Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB C
 | `PUT` | `/blue-books/:bb_id/projects/:id` | update: `bb_project` |
 | `DELETE` | `/blue-books/:bb_id/projects/:id` | delete: `bb_project` |
 
+`DELETE /blue-books/:bb_id/projects/:id` melakukan hard delete. Backend menolak penghapusan jika BB Project masih menjadi referensi Green Book Project, Daftar Kegiatan, Loan Agreement, atau Monitoring. Untuk record yang sudah memiliki relasi turunan, STAFF menerima `403 FORBIDDEN` dan ADMIN menerima `409 CONFLICT`; keduanya berisi `error.details[]` dengan daftar relasi yang harus dibersihkan terlebih dahulu.
+
+Contoh response ketika masih dipakai downstream:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "BB Project tidak bisa dihapus permanen karena masih memiliki relasi turunan. Hapus relasi turunan terlebih dahulu.",
+    "details": [
+      {
+        "field": "green_book_project",
+        "message": "GB-2025-001 - Trans Sumatra Section 1 | Green Book 2025 Revisi 0 | id=uuid-gb-project"
+      },
+      {
+        "field": "monitoring_disbursement",
+        "message": "2026 TW1 | Green Book Project GB-2025-001 -> Daftar Kegiatan DK-001 -> Loan Agreement IP-603 -> Monitoring 2026 TW1 | id=uuid-monitoring"
+      }
+    ]
+  }
+}
+```
+
 **`GET /blue-books/:bb_id/projects` Query Params tambahan:**
 
 | Param | Format | Keterangan |
@@ -850,6 +873,8 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 | `PUT` | `/green-books/:gb_id/projects/:id` | update: `gb_project` |
 | `DELETE` | `/green-books/:gb_id/projects/:id` | delete: `gb_project` |
 
+`DELETE /green-books/:gb_id/projects/:id` melakukan hard delete. Backend menolak penghapusan jika GB Project masih menjadi referensi Daftar Kegiatan, Loan Agreement, atau Monitoring. Untuk record yang sudah memiliki relasi turunan, STAFF menerima `403 FORBIDDEN` dan ADMIN menerima `409 CONFLICT`; keduanya berisi `error.details[]` dengan daftar relasi yang harus dibersihkan terlebih dahulu.
+
 **`GET /green-books/:gb_id/projects` Query Params tambahan:**
 
 | Param | Format | Keterangan |
@@ -858,7 +883,7 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 | `bb_project_ids` | multi-value UUID | Filter relasi proyek Blue Book |
 | `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
-| `status` | multi-value enum | `active`, `deleted` |
+| `status` | multi-value enum | `active` saja; Project Green Book yang dihapus tidak tersedia karena hard delete |
 
 **`POST /green-books/:gb_id/projects` Request:**
 ```json

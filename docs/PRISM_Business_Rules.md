@@ -8,7 +8,7 @@
 
 - Semua `id` menggunakan UUID v4.
 - `created_at` dan `updated_at` di-set oleh database, bukan aplikasi.
-- `bb_project.status` dan `gb_project.status`: `active` atau `deleted`. Record `deleted` tetap ada di DB, tidak bisa jadi referensi baru, tidak muncul di list default.
+- Penghapusan BB Project dan GB Project memakai hard delete. Backend wajib menolak penghapusan jika record masih dipakai downstream, dan response harus menampilkan relasi turunan yang perlu dibersihkan terlebih dahulu.
 
 ---
 
@@ -155,7 +155,7 @@
 
 - Setiap request ubah data: `SET LOCAL app.current_user_id = '<uuid>'` di awal transaksi.
 - `audit_log` hanya bisa diakses ADMIN — tidak boleh diekspos ke STAFF.
-- Tabel junction tanpa kolom `id` tidak diaudit (bb_project_institution, dll.).
+- Tabel junction proyek tanpa kolom `id` tetap diaudit memakai owner id (`bb_project_id`, `gb_project_id`, atau `dk_project_id`) supaya relasi turunan yang ikut terhapus tetap tercatat.
 
 ---
 

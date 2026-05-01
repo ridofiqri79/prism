@@ -41,7 +41,7 @@ http.interceptors.response.use(
       }
     }
 
-    if (status === 403) {
+    if (status === 403 && !error.response?.data?.error?.details?.length) {
       emitToast({
         severity: 'error',
         summary: 'Akses Ditolak',

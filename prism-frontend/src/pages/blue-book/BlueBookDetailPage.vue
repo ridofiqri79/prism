@@ -22,6 +22,7 @@ import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { BBProject, BBProjectListParams, BlueBookPayload } from '@/types/blue-book.types'
 import type { Institution, Region } from '@/types/master.types'
+import { formatApiError } from '@/utils/api-error'
 import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type BlueBookField = keyof BlueBookPayload
@@ -274,12 +275,20 @@ async function save() {
 
 function deleteProject(project: BBProject) {
   confirm.confirmDelete(`Proyek Blue Book ${project.bb_code}`, async () => {
-    await blueBookStore.deleteProject(blueBookId.value, project.id)
-    toast.success('Berhasil', 'Proyek Blue Book berhasil dihapus')
-    if (blueBookStore.projects.length === 1 && projectControls.page.value > 1) {
-      projectControls.page.value -= 1
-    } else {
-      await loadProjects()
+    try {
+      await blueBookStore.deleteProject(blueBookId.value, project.id)
+      toast.success('Berhasil', 'Proyek Blue Book berhasil dihapus permanen')
+      if (blueBookStore.projects.length === 1 && projectControls.page.value > 1) {
+        projectControls.page.value -= 1
+      } else {
+        await loadProjects()
+      }
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Proyek Blue Book masih memiliki relasi turunan'),
+        12000,
+      )
     }
   })
 }
