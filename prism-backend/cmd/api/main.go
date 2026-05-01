@@ -236,6 +236,7 @@ func main() {
 	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
 
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
+	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
 
 	e.GET("/events", handler.SSEHandler(broker))

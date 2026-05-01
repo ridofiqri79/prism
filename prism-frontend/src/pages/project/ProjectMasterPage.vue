@@ -12,9 +12,11 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
+import SummaryCard from '@/components/common/SummaryCard.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
+import { useToast } from '@/composables/useToast'
 import { useMasterStore } from '@/stores/master.store'
 import { useProjectStore } from '@/stores/project.store'
 import type { Institution, Lender, LenderType, ProgramTitle, Region } from '@/types/master.types'
@@ -33,6 +35,7 @@ import type {
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
 const { can } = usePermission()
+const toast = useToast()
 
 const listControls = useListControls<ProjectMasterFilterState>({
   initialFilters: createDefaultFilters(),
@@ -147,6 +150,20 @@ const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
   LA: 'Loan Agreement',
   Monitoring: 'Monitoring',
 }
+const fundingSummaryCards = computed(() => [
+  {
+    label: 'Total Pinjaman',
+    value: projectStore.fundingSummary.total_loan_usd,
+  },
+  {
+    label: 'Total Hibah',
+    value: projectStore.fundingSummary.total_grant_usd,
+  },
+  {
+    label: 'Total Dana Pendamping',
+    value: projectStore.fundingSummary.total_counterpart_usd,
+  },
+])
 
 function createDefaultFilters(): ProjectMasterFilterState {
   return {
@@ -220,6 +237,24 @@ async function loadProjectMaster() {
   await projectStore.fetchProjectMaster(buildParams())
 }
 
+function buildExportParams(): ProjectMasterListParams {
+  const params = { ...buildParams() }
+  delete params.page
+  delete params.limit
+
+  return params
+}
+
+async function exportFilteredProjects() {
+  try {
+    const blob = await projectStore.downloadProjectMasterExport(buildExportParams())
+    saveBlob(blob, projectExportFileName())
+    toast.success('Export selesai', 'File Excel dibuat dari filter aktif')
+  } catch {
+    toast.error('Export gagal', 'Data project tidak dapat diexport saat ini')
+  }
+}
+
 async function refreshFromFirstPage() {
   if (page.value !== 1) {
     page.value = 1
@@ -254,6 +289,21 @@ function sortIcon(field: ProjectMasterSortField) {
   }
 
   return sortOrder.value === 'asc' ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function projectExportFileName() {
+  return `projects_filtered_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
 }
 
 function headerAlignClass(column?: ProjectMasterColumnConfig) {
@@ -638,6 +688,18 @@ onUnmounted(() => {
       </template>
     </SearchFilterBar>
 
+    <section class="grid gap-4 md:grid-cols-3">
+      <SummaryCard
+        v-for="card in fundingSummaryCards"
+        :key="card.label"
+        :label="card.label"
+        :value="card.value"
+        unit="USD"
+        format="currency"
+        :compact="false"
+      />
+    </section>
+
     <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200 p-4">
         <div>
@@ -645,6 +707,16 @@ onUnmounted(() => {
           <p class="text-sm text-surface-500">{{ projectStore.total }} project ditemukan.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <Button
+            v-tooltip.top="'Export semua project sesuai filter aktif'"
+            label="Export Excel"
+            icon="pi pi-download"
+            severity="secondary"
+            outlined
+            :loading="projectStore.exporting"
+            :disabled="projectStore.total === 0 || projectStore.exporting"
+            @click="exportFilteredProjects"
+          />
           <Tag :value="columnSelectionLabel" severity="secondary" rounded />
           <MultiSelect
             v-model="visibleColumnKeys"

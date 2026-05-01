@@ -37,3 +37,15 @@ type ProjectMasterResponse struct {
 	HasNewerRevision      bool     `json:"has_newer_revision"`
 	BlueBookRevisionLabel string   `json:"blue_book_revision_label"`
 }
+
+type ProjectMasterFundingSummary struct {
+	TotalLoanUSD        float64 `json:"total_loan_usd"`
+	TotalGrantUSD       float64 `json:"total_grant_usd"`
+	TotalCounterpartUSD float64 `json:"total_counterpart_usd"`
+}
+
+type ProjectMasterListResponse struct {
+	Data    []ProjectMasterResponse     `json:"data"`
+	Meta    PaginationMeta              `json:"meta"`
+	Summary ProjectMasterFundingSummary `json:"summary"`
+}

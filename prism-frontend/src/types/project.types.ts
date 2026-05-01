@@ -1,4 +1,5 @@
 import type { LenderType } from '@/types/master.types'
+import type { PaginatedResponse } from '@/types/api.types'
 
 export type ProjectStatus = 'Pipeline' | 'Ongoing'
 export type ProjectPipelineStatus = 'BB' | 'GB' | 'DK' | 'LA' | 'Monitoring'
@@ -53,6 +54,16 @@ export interface ProjectMasterRow {
   is_latest: boolean
   has_newer_revision: boolean
   blue_book_revision_label: string
+}
+
+export interface ProjectMasterFundingSummary {
+  total_loan_usd: number
+  total_grant_usd: number
+  total_counterpart_usd: number
+}
+
+export interface ProjectMasterListResponse extends PaginatedResponse<ProjectMasterRow> {
+  summary: ProjectMasterFundingSummary
 }
 
 export interface ProjectMasterListParams {

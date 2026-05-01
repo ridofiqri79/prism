@@ -1443,6 +1443,8 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 Menampilkan master table seluruh BB Project aktif. Tanpa query filter, endpoint default hanya mengembalikan latest snapshot per `project_identity_id` supaya revisi lama tidak double-count. Gunakan `include_history=true` untuk melihat semua snapshot historis.
 
+Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya page pagination saat ini. Untuk project yang masih di tahap Blue Book, total memakai `bb_project_cost`: pinjaman = `Foreign/Loan`, hibah = `Foreign/Grant`, dana pendamping = seluruh `Counterpart`. Untuk project yang sudah memiliki relasi Green Book, total memakai `gb_funding_source`: `loan_usd`, `grant_usd`, dan `local_usd`.
+
 **Query Params:**
 
 | Param | Keterangan |
@@ -1489,9 +1491,22 @@ Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&lo
       "blue_book_revision_label": "BB 2025-2029"
     }
   ],
-  "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
+  "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 },
+  "summary": {
+    "total_loan_usd": 250000000,
+    "total_grant_usd": 0,
+    "total_counterpart_usd": 50000000
+  }
 }
 ```
+
+### `GET /projects/export`
+
+**Permission:** read: `bb_project`
+
+Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filter aktif. Endpoint memakai query param yang sama dengan `GET /projects`; `page` dan `limit` diabaikan karena export selalu mengambil semua hasil filter. Sorting tetap mengikuti `sort` dan `order`. Sheet `Ringkasan` berisi total pendanaan serta daftar filter aktif yang dipakai saat export.
+
+**Response `200`:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dengan `Content-Disposition: attachment`.
 
 ---
 

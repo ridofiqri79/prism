@@ -26,6 +26,16 @@ func (h *ProjectHandler) ListMaster(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func (h *ProjectHandler) ExportMaster(c echo.Context) error {
+	file, err := h.service.ExportProjectMaster(c.Request().Context(), projectMasterFilter(c), paginationParams(c))
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+file.FileName+`"`)
+	return c.Blob(http.StatusOK, file.ContentType, file.Data)
+}
+
 func projectMasterFilter(c echo.Context) model.ProjectMasterFilter {
 	return model.ProjectMasterFilter{
 		LoanTypes:           queryValues(c, "loan_types", "loan_types[]"),
