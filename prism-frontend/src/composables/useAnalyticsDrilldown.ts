@@ -75,6 +75,11 @@ function mappedQuery(target: DrilldownTarget, sourceQuery: Record<string, string
       return
     }
 
+    if (target === 'projects' && key === 'lender_types') {
+      addQueryValue(query, 'loan_types', values)
+      return
+    }
+
     if (target === 'loan_agreements' && (key === 'lender_ids' || key === 'fixed_lender_ids')) {
       addQueryValue(query, 'lender_id', values.slice(0, 1))
       return

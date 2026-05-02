@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -36,6 +37,8 @@ const projectStore = useProjectStore()
 const masterStore = useMasterStore()
 const { can } = usePermission()
 const toast = useToast()
+const route = useRoute()
+const hydratingRouteQuery = ref(false)
 
 const listControls = useListControls<ProjectMasterFilterState>({
   initialFilters: createDefaultFilters(),
@@ -182,6 +185,105 @@ function createDefaultFilters(): ProjectMasterFilterState {
     search: '',
     include_history: false,
   }
+}
+
+function assignFilterState(target: ProjectMasterFilterState, source: ProjectMasterFilterState) {
+  target.loan_types = [...source.loan_types]
+  target.indication_lender_ids = [...source.indication_lender_ids]
+  target.executing_agency_ids = [...source.executing_agency_ids]
+  target.fixed_lender_ids = [...source.fixed_lender_ids]
+  target.project_statuses = [...source.project_statuses]
+  target.pipeline_statuses = [...source.pipeline_statuses]
+  target.program_title_ids = [...source.program_title_ids]
+  target.region_ids = [...source.region_ids]
+  target.foreign_loan_min = source.foreign_loan_min
+  target.foreign_loan_max = source.foreign_loan_max
+  target.dk_date_from = source.dk_date_from
+  target.dk_date_to = source.dk_date_to
+  target.search = source.search
+  target.include_history = source.include_history
+}
+
+function routeQueryValues(key: string) {
+  const value = route.query[key]
+  const rawValues = Array.isArray(value) ? value : [value]
+
+  return rawValues
+    .flatMap((item) => (typeof item === 'string' ? item.split(',') : []))
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function routeQueryString(key: string) {
+  return routeQueryValues(key)[0] ?? ''
+}
+
+function routeQueryNumber(key: string) {
+  const raw = routeQueryString(key)
+  const parsed = Number(raw)
+
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function routeQueryBoolean(key: string) {
+  const raw = routeQueryString(key).toLowerCase()
+
+  if (raw === 'true' || raw === '1') return true
+  if (raw === 'false' || raw === '0') return false
+
+  return false
+}
+
+function routeLenderTypes(key: string): LenderType[] {
+  return routeQueryValues(key).filter(
+    (value): value is LenderType =>
+      value === 'Bilateral' || value === 'Multilateral' || value === 'KSA',
+  )
+}
+
+function routeProjectStatuses(key: string): ProjectStatus[] {
+  return routeQueryValues(key).filter(
+    (value): value is ProjectStatus => value === 'Pipeline' || value === 'Ongoing',
+  )
+}
+
+function routePipelineStatuses(key: string): ProjectPipelineStatus[] {
+  return routeQueryValues(key).filter(
+    (value): value is ProjectPipelineStatus =>
+      value === 'BB' ||
+      value === 'GB' ||
+      value === 'DK' ||
+      value === 'LA' ||
+      value === 'Monitoring',
+  )
+}
+
+function hydrateFiltersFromRouteQuery() {
+  const next = createDefaultFilters()
+
+  next.loan_types = routeLenderTypes('loan_types')
+  next.indication_lender_ids = routeQueryValues('indication_lender_ids')
+  next.executing_agency_ids = routeQueryValues('executing_agency_ids')
+  next.fixed_lender_ids = routeQueryValues('fixed_lender_ids')
+  next.project_statuses = routeProjectStatuses('project_statuses')
+  next.pipeline_statuses = routePipelineStatuses('pipeline_statuses')
+  next.program_title_ids = routeQueryValues('program_title_ids')
+  next.region_ids = routeQueryValues('region_ids')
+  next.foreign_loan_min = routeQueryNumber('foreign_loan_min')
+  next.foreign_loan_max = routeQueryNumber('foreign_loan_max')
+  next.dk_date_from = routeQueryString('dk_date_from')
+  next.dk_date_to = routeQueryString('dk_date_to')
+  next.search = routeQueryString('search')
+  next.include_history = routeQueryBoolean('include_history')
+
+  hydratingRouteQuery.value = true
+  assignFilterState(filters, next)
+  assignFilterState(appliedFilters, next)
+  listControls.search.value = next.search
+  listControls.debouncedSearch.value = next.search
+  window.queueMicrotask(() => {
+    hydratingRouteQuery.value = false
+  })
 }
 
 function textParam(value: string) {
@@ -470,11 +572,21 @@ watch([page, limit], () => {
 watch(
   [listControls.debouncedSearch, () => JSON.stringify(appliedFilters), sortField, sortOrder],
   () => {
+    if (hydratingRouteQuery.value) return
+    void refreshFromFirstPage()
+  },
+)
+
+watch(
+  () => route.query,
+  () => {
+    hydrateFiltersFromRouteQuery()
     void refreshFromFirstPage()
   },
 )
 
 onMounted(() => {
+  hydrateFiltersFromRouteQuery()
   void Promise.all([
     masterStore.fetchLenders(true, { limit: 1000, sort: 'name', order: 'asc' }),
     masterStore.fetchInstitutions(true, { limit: 1000, sort: 'name', order: 'asc' }),

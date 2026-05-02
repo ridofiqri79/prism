@@ -248,15 +248,15 @@ Browser smoke:
 
 ## Checklist
 
-- [ ] Portfolio section selesai
-- [ ] Funnel pipeline selesai
-- [ ] Kementerian/Lembaga section selesai
-- [ ] Lender section selesai
-- [ ] Lender per Kementerian/Lembaga matrix selesai
-- [ ] Penyerapan section selesai
-- [ ] Performa tahunan section selesai
-- [ ] Proporsi lender section selesai
-- [ ] Drilldown utama bekerja
-- [ ] Responsive behavior dicek
-- [ ] `npm.cmd run type-check` berhasil
-- [ ] `npm.cmd run build` berhasil
+- [x] Portfolio section selesai
+- [x] Funnel pipeline selesai
+- [x] Kementerian/Lembaga section selesai
+- [x] Lender section selesai
+- [x] Lender per Kementerian/Lembaga matrix selesai
+- [x] Penyerapan section selesai
+- [x] Performa tahunan section selesai
+- [x] Proporsi lender section selesai
+- [x] Drilldown utama bekerja
+- [x] Responsive behavior dicek
+- [x] `npm.cmd run type-check` berhasil
+- [x] `npm.cmd run build` berhasil

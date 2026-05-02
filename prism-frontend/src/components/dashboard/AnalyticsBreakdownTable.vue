@@ -42,6 +42,20 @@ function formatPercent(value: string | number | null | undefined) {
   return value || '-'
 }
 
+function normalizedPercent(value: string | number | null | undefined) {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0
+
+  return Math.min(100, Math.max(0, numeric))
+}
+
+function absorptionClass(value: string | number | null | undefined) {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0
+
+  if (numeric < 50) return 'bg-red-500'
+  if (numeric >= 90) return 'bg-emerald-500'
+  return 'bg-sky-500'
+}
+
 function cellClass(column: AnalyticsBreakdownTableColumn) {
   if (
     column.align === 'right' ||
@@ -74,7 +88,7 @@ function cellClass(column: AnalyticsBreakdownTableColumn) {
     </div>
 
     <div v-else class="overflow-x-auto">
-      <table class="w-full min-w-[44rem] text-left text-sm">
+      <table class="w-full min-w-max text-left text-sm">
         <thead class="bg-surface-50 text-xs uppercase text-surface-500">
           <tr>
             <th
@@ -111,6 +125,18 @@ function cellClass(column: AnalyticsBreakdownTableColumn) {
                 :value="String(row.cells[column.key] || '-')"
                 :severity="row.severity"
               />
+              <div v-else-if="column.kind === 'absorption'" class="min-w-36 space-y-1">
+                <div class="h-2 overflow-hidden rounded-full bg-surface-100">
+                  <div
+                    class="h-full rounded-full"
+                    :class="absorptionClass(row.cells[column.key])"
+                    :style="{ width: `${normalizedPercent(row.cells[column.key])}%` }"
+                  />
+                </div>
+                <span class="block text-xs font-semibold text-surface-700">
+                  {{ formatPercent(row.cells[column.key]) }}
+                </span>
+              </div>
               <AnalyticsDrilldownButton
                 v-else-if="column.kind === 'drilldown'"
                 :drilldown="row.drilldown"

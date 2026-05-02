@@ -328,7 +328,7 @@ export interface AnalyticsStageBreakdown {
 export interface AnalyticsBreakdownTableColumn {
   key: string
   label: string
-  kind?: 'text' | 'number' | 'currency' | 'percent' | 'badge' | 'drilldown'
+  kind?: 'text' | 'number' | 'currency' | 'percent' | 'badge' | 'drilldown' | 'absorption'
   align?: 'left' | 'right' | 'center'
 }
 
