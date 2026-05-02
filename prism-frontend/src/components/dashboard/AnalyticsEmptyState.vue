@@ -16,5 +16,7 @@ withDefaults(
 </script>
 
 <template>
-  <EmptyState :title="title" :description="description" :compact="compact" />
+  <EmptyState :title="title" :description="description" :compact="compact">
+    <slot />
+  </EmptyState>
 </template>

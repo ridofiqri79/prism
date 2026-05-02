@@ -23,5 +23,8 @@ withDefaults(
     <i :class="['pi pi-inbox text-surface-400', compact ? 'text-3xl' : 'text-4xl']" />
     <h2 :class="['text-base font-semibold text-surface-800', compact ? 'mt-3' : 'mt-4']">{{ title }}</h2>
     <p v-if="description" class="mt-1 max-w-md text-sm text-surface-500">{{ description }}</p>
+    <div v-if="$slots.default" class="mt-4 flex flex-wrap justify-center gap-2">
+      <slot />
+    </div>
   </div>
 </template>

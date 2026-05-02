@@ -114,6 +114,10 @@
     color: rgba(21, 126, 92, 0.68);
   }
 
+  .prism-sidebar-section {
+    letter-spacing: 0;
+  }
+
   .prism-sidebar-search-icon {
     color: rgba(11, 111, 115, 0.52);
   }

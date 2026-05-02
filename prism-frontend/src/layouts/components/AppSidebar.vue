@@ -298,7 +298,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
         :key="group.label"
         :class="[isCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
       >
-        <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
+        <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-[0.65rem] font-semibold uppercase">
           {{ group.section }}
         </p>
 

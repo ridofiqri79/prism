@@ -55,7 +55,7 @@ const funnelRows = computed(() => {
     return {
       ...row,
       color: colors[index % colors.length],
-      label: stageLabel(row.stage),
+      label: `${index + 1}. ${stageLabel(row.stage)}`,
       projectText: `${formatNumber(row.project_count)} project`,
       amountText: formatUSD(row.total_loan_usd),
       shareText: `${Math.round(ratio * 100)}%`,
@@ -113,7 +113,7 @@ function formatUSD(value: number) {
     <div class="border-b border-surface-200 p-4">
       <h2 class="text-base font-semibold text-surface-950">Funnel Pipeline</h2>
       <p class="mt-1 text-sm text-surface-500">
-        Total project aktual per stage; project yang sudah lanjut tetap dihitung di stage asal.
+        Tahap tidak eksklusif; proyek yang sudah berlanjut tetap terlihat pada tahap sebelumnya.
       </p>
     </div>
 
@@ -124,8 +124,8 @@ function formatUSD(value: number) {
 
     <div v-else-if="empty" class="p-4">
       <AnalyticsEmptyState
-        title="Tidak ada data"
-        description="Data funnel kosong untuk filter aktif."
+        title="Tidak ada proyek pada funnel"
+        description="Tidak ada proyek yang cocok dengan filter aktif. Longgarkan filter tahun, lender, atau Kementerian/Lembaga."
       />
     </div>
 

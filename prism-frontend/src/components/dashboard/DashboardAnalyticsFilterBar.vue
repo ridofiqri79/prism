@@ -17,6 +17,8 @@ import type { Institution, Lender, LenderType, ProgramTitle, Region } from '@/ty
 const props = withDefaults(
   defineProps<{
     modelValue: DashboardAnalyticsFilterState
+    appliedFilters?: DashboardAnalyticsFilterState
+    resultCount?: number
     lenders: Lender[]
     institutions: Institution[]
     regions: Region[]
@@ -25,6 +27,8 @@ const props = withDefaults(
     loadingOptions?: boolean
   }>(),
   {
+    appliedFilters: undefined,
+    resultCount: undefined,
     loading: false,
     loadingOptions: false,
   },
@@ -67,6 +71,11 @@ const projectStatusOptions: Array<{ label: string; value: DashboardAnalyticsProj
 ]
 
 const localFilters = reactive<DashboardAnalyticsFilterState>(cloneFilters(props.modelValue))
+const activeFilterChips = computed(() => buildFilterChips(props.appliedFilters ?? props.modelValue))
+const hasActiveFilterChips = computed(() => activeFilterChips.value.length > 0)
+const shouldShowNoResultHint = computed(
+  () => props.resultCount === 0 && hasActiveFilterChips.value && !props.loading,
+)
 
 const lenderOptions = computed(() =>
   props.lenders.map((lender) => ({
@@ -199,6 +208,58 @@ function isCoveredBySelectedCountry(region: Region) {
   return parent?.parent_code ? selectedCountryCodes.value.includes(parent.parent_code) : false
 }
 
+function labelsForIds<T extends { id: string }>(
+  ids: string[],
+  options: T[],
+  labeler: (item: T) => string,
+) {
+  if (ids.length === 0) return []
+
+  return ids.map((id) => {
+    const item = options.find((option) => option.id === id)
+
+    return item ? labeler(item) : id
+  })
+}
+
+function buildFilterChips(filters: DashboardAnalyticsFilterState) {
+  const chips: string[] = []
+
+  if (filters.budget_year !== null) chips.push(`Tahun ${filters.budget_year}`)
+  if (filters.quarter !== null) chips.push(filters.quarter)
+  labelsForIds(filters.lender_ids, props.lenders, (lender) =>
+    lender.short_name ? `${lender.name} (${lender.short_name})` : lender.name,
+  ).forEach((label) => chips.push(`Lender: ${label}`))
+  filters.lender_types.forEach((type) => chips.push(`Tipe lender: ${type}`))
+  labelsForIds(filters.institution_ids, props.institutions, (institution) =>
+    institution.short_name
+      ? `${institution.name} (${institution.short_name})`
+      : institution.name,
+  ).forEach((label) => chips.push(`Kementerian/Lembaga: ${label}`))
+  filters.pipeline_statuses.forEach((status) =>
+    chips.push(`Stage: ${pipelineStatusOptions.find((item) => item.value === status)?.label ?? status}`),
+  )
+  filters.project_statuses.forEach((status) => chips.push(`Status project: ${status}`))
+  labelsForIds(filters.region_ids, props.regions, formatRegion).forEach((label) =>
+    chips.push(`Wilayah: ${label}`),
+  )
+  labelsForIds(filters.program_title_ids, props.programTitles, formatProgramTitle).forEach((label) =>
+    chips.push(`Program: ${label}`),
+  )
+  if (filters.foreign_loan_min !== null) chips.push(`Min USD ${formatCompactUSD(filters.foreign_loan_min)}`)
+  if (filters.foreign_loan_max !== null) chips.push(`Max USD ${formatCompactUSD(filters.foreign_loan_max)}`)
+  if (filters.include_history) chips.push('Mode audit: histori revisi')
+
+  return chips
+}
+
+function formatCompactUSD(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
 watch(
   () => props.modelValue,
   (value) => {
@@ -224,7 +285,21 @@ watch(
 
 <template>
   <section class="rounded-lg border border-surface-200 bg-white">
-    <div class="grid gap-4 p-4 lg:grid-cols-[12rem_14rem_1fr_auto]">
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-surface-200 p-4">
+      <div>
+        <h2 class="text-base font-semibold text-surface-950">Filter Dashboard</h2>
+        <p class="mt-1 text-sm text-surface-500">
+          Gunakan filter utama untuk pekerjaan harian; kriteria lain tersedia di filter lanjutan.
+        </p>
+      </div>
+
+      <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2">
+        <ToggleSwitch v-model="localFilters.include_history" />
+        <span class="text-sm font-medium text-surface-700">Mode audit histori revisi</span>
+      </label>
+    </div>
+
+    <div class="grid gap-4 p-4 lg:grid-cols-[12rem_minmax(16rem,1fr)_minmax(16rem,1fr)_auto]">
       <label class="block space-y-2">
         <span class="text-sm font-medium text-surface-700">Tahun Anggaran</span>
         <Select
@@ -238,12 +313,17 @@ watch(
       </label>
 
       <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Triwulan</span>
-        <Select
-          v-model="localFilters.quarter"
-          :options="quarterOptions"
+        <span class="text-sm font-medium text-surface-700">Kementerian/Lembaga</span>
+        <MultiSelect
+          v-model="localFilters.institution_ids"
+          :options="institutionOptions"
           option-label="label"
           option-value="value"
+          placeholder="Semua Kementerian/Lembaga"
+          display="chip"
+          filter
+          filter-placeholder="Cari Kementerian/Lembaga"
+          :loading="loadingOptions"
           class="w-full"
         />
       </label>
@@ -295,6 +375,17 @@ watch(
       class="grid gap-4 border-t border-surface-200 p-4 md:grid-cols-2 xl:grid-cols-6"
     >
       <label class="block space-y-2 xl:col-span-2">
+        <span class="text-sm font-medium text-surface-700">Triwulan</span>
+        <Select
+          v-model="localFilters.quarter"
+          :options="quarterOptions"
+          option-label="label"
+          option-value="value"
+          class="w-full"
+        />
+      </label>
+
+      <label class="block space-y-2 xl:col-span-2">
         <span class="text-sm font-medium text-surface-700">Tipe Lender</span>
         <MultiSelect
           v-model="localFilters.lender_types"
@@ -303,22 +394,6 @@ watch(
           option-value="value"
           placeholder="Semua tipe"
           display="chip"
-          class="w-full"
-        />
-      </label>
-
-      <label class="block space-y-2 xl:col-span-2">
-        <span class="text-sm font-medium text-surface-700">Kementerian/Lembaga</span>
-        <MultiSelect
-          v-model="localFilters.institution_ids"
-          :options="institutionOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Semua Kementerian/Lembaga"
-          display="chip"
-          filter
-          filter-placeholder="Cari Kementerian/Lembaga"
-          :loading="loadingOptions"
           class="w-full"
         />
       </label>
@@ -407,15 +482,42 @@ watch(
           />
         </label>
       </div>
+    </div>
 
-      <label
-        class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-3"
+    <div
+      v-if="hasActiveFilterChips"
+      class="flex flex-wrap items-center gap-2 border-t border-surface-200 px-4 py-3"
+    >
+      <span class="text-sm font-medium text-surface-700">
+        Menampilkan
+        <template v-if="resultCount !== undefined">{{ resultCount }} proyek</template>
+        <template v-else>hasil</template>
+        untuk:
+      </span>
+      <span
+        v-for="chip in activeFilterChips"
+        :key="chip"
+        class="inline-flex max-w-full items-center rounded-full border border-surface-200 bg-surface-50 px-2.5 py-1 text-xs font-medium text-surface-700"
       >
-        <ToggleSwitch v-model="localFilters.include_history" />
-        <span class="text-sm font-medium text-surface-700"
-          >Tampilkan histori revisi untuk mode audit/history</span
-        >
-      </label>
+        <span class="truncate">{{ chip }}</span>
+      </span>
+    </div>
+
+    <div
+      v-if="shouldShowNoResultHint"
+      class="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+    >
+      <span>
+        Tidak ada proyek untuk kombinasi filter aktif. Coba hapus Lender, Kementerian/Lembaga, atau gunakan reset.
+      </span>
+      <Button
+        label="Reset filter"
+        icon="pi pi-refresh"
+        severity="warn"
+        size="small"
+        outlined
+        @click="emit('reset')"
+      />
     </div>
   </section>
 </template>

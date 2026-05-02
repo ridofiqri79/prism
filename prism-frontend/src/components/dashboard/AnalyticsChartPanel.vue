@@ -79,7 +79,9 @@ watch([() => props.loading, () => props.empty], scheduleChartMount)
     </div>
 
     <div v-else-if="empty" class="p-4">
-      <AnalyticsEmptyState :title="emptyTitle" :description="emptyDescription" />
+      <AnalyticsEmptyState :title="emptyTitle" :description="emptyDescription">
+        <slot name="empty-actions" />
+      </AnalyticsEmptyState>
     </div>
 
     <div v-else class="p-4">

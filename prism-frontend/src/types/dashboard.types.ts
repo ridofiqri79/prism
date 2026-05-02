@@ -300,6 +300,9 @@ export interface AnalyticsMoneyMetric {
   value: number
   format?: 'number' | 'currency' | 'percent'
   unit?: string
+  hint?: string
+  emphasis?: 'normal' | 'high'
+  actionLabel?: string
   severity?: DashboardAnalyticsSeverity
   drilldown?: DashboardDrilldownQuery
 }

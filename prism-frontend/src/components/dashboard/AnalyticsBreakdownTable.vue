@@ -53,6 +53,8 @@ function isBlankCell(value: string | number | null | undefined) {
 }
 
 function absorptionClass(value: string | number | null | undefined) {
+  if (isBlankCell(value)) return 'bg-surface-300'
+
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0
 
   if (numeric < 50) return 'bg-red-500'
@@ -88,7 +90,9 @@ function cellClass(column: AnalyticsBreakdownTableColumn) {
     </div>
 
     <div v-else-if="rows.length === 0" class="p-4">
-      <AnalyticsEmptyState :title="emptyTitle" :description="emptyDescription" />
+      <AnalyticsEmptyState :title="emptyTitle" :description="emptyDescription">
+        <slot name="empty-actions" />
+      </AnalyticsEmptyState>
     </div>
 
     <div v-else class="overflow-x-auto">
@@ -139,13 +143,17 @@ function cellClass(column: AnalyticsBreakdownTableColumn) {
                   />
                 </div>
                 <span class="block text-xs font-semibold text-surface-700">
-                  {{ formatPercent(row.cells[column.key]) }}
+                  {{
+                    isBlankCell(row.cells[column.key])
+                      ? 'Belum ada data'
+                      : formatPercent(row.cells[column.key])
+                  }}
                 </span>
               </div>
               <AnalyticsDrilldownButton
                 v-else-if="column.kind === 'drilldown'"
                 :drilldown="row.drilldown"
-                label="Buka"
+                label="Lihat detail"
                 @open="emit('drilldown', $event)"
               />
               <span v-else class="block max-w-[28rem] whitespace-normal leading-relaxed">

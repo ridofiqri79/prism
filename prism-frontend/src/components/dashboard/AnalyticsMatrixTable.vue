@@ -115,7 +115,7 @@ function formatPercent(value: number) {
           Matrix Lender per Kementerian/Lembaga
         </h2>
         <p class="mt-1 text-sm text-surface-500">
-          Basis performa memakai Loan Agreement dan Monitoring, bukan lender indication.
+          Menunjukkan lender yang sudah masuk Loan Agreement atau monitoring pada tiap Kementerian/Lembaga.
         </p>
       </div>
       <Select
@@ -135,7 +135,7 @@ function formatPercent(value: number) {
     <div v-else-if="items.length === 0" class="p-4">
       <AnalyticsEmptyState
         title="Matrix kosong"
-        description="Belum ada kombinasi lender dan Kementerian/Lembaga untuk filter aktif."
+        description="Tidak ada kombinasi lender dan Kementerian/Lembaga untuk filter aktif. Coba hapus filter lender atau tahun."
       />
     </div>
 
@@ -190,7 +190,7 @@ function formatPercent(value: number) {
                 </div>
                 <AnalyticsDrilldownButton
                   :drilldown="cellFor(row.id, lender.id)?.drilldown"
-                  label="Buka"
+                  label="Lihat detail"
                   @open="emit('drilldown', $event)"
                 />
               </div>

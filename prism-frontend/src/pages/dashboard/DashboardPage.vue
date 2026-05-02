@@ -52,16 +52,32 @@ const matrixTopN = ref(10)
 
 const tabs: Array<{
   key: DashboardAnalyticsTab
+  group: string
   label: string
   sections: DashboardAnalyticsSectionKey[]
 }> = [
-  { key: 'portfolio', label: 'Portfolio', sections: ['overview'] },
-  { key: 'institutions', label: 'Kementerian/Lembaga', sections: ['institutions'] },
-  { key: 'lenders', label: 'Lender', sections: ['lenders', 'lenderProportion'] },
-  { key: 'absorption', label: 'Penyerapan', sections: ['absorption'] },
-  { key: 'yearly', label: 'Tahunan', sections: ['yearly'] },
-  { key: 'risks', label: 'Risiko & Data Quality', sections: ['risks'] },
+  { key: 'portfolio', group: 'Ringkasan', label: 'Portfolio', sections: ['overview'] },
+  { key: 'institutions', group: 'Entitas', label: 'Kementerian/Lembaga', sections: ['institutions'] },
+  { key: 'lenders', group: 'Entitas', label: 'Lender', sections: ['lenders', 'lenderProportion'] },
+  { key: 'absorption', group: 'Metrik', label: 'Penyerapan', sections: ['absorption'] },
+  { key: 'yearly', group: 'Waktu', label: 'Tahunan', sections: ['yearly'] },
+  { key: 'risks', group: 'Risiko & Kualitas', label: 'Watchlist', sections: ['risks'] },
 ]
+const tabGroups = computed(() => {
+  const groups: Array<{ label: string; tabs: typeof tabs }> = []
+
+  tabs.forEach((tab) => {
+    const group = groups.find((item) => item.label === tab.group)
+
+    if (group) {
+      group.tabs.push(tab)
+    } else {
+      groups.push({ label: tab.group, tabs: [tab] })
+    }
+  })
+
+  return groups
+})
 const absorptionLevelOptions: Array<{ label: string; value: AbsorptionLevel }> = [
   { label: 'Kementerian/Lembaga', value: 'institution' },
   { label: 'Project', value: 'project' },
@@ -164,23 +180,64 @@ const portfolioMetrics = computed<AnalyticsMoneyMetric[]>(() => {
   const portfolio = overview?.portfolio
 
   return [
-    metric('project_count', 'Project logical', portfolio?.project_count ?? 0, 'number', overview?.drilldown),
-    metric('assignment_count', 'Assignment Kementerian/Lembaga', portfolio?.assignment_count ?? 0),
     metric(
       'pipeline_loan',
-      'Pipeline loan USD',
+      'Nilai pinjaman pipeline',
       portfolio?.total_pipeline_loan_usd ?? 0,
       'currency',
+      undefined,
+      'Total nilai pinjaman dari proyek yang masih berada di pipeline perencanaan.',
+      'high',
     ),
     metric(
       'agreement_amount',
       'Loan Agreement USD',
       portfolio?.total_agreement_amount_usd ?? 0,
       'currency',
+      undefined,
+      'Nilai pinjaman yang sudah memiliki Loan Agreement.',
+      'high',
     ),
-    metric('planned', 'Rencana USD', portfolio?.total_planned_usd ?? 0, 'currency'),
-    metric('realized', 'Realisasi USD', portfolio?.total_realized_usd ?? 0, 'currency'),
-    metric('absorption', 'Penyerapan', portfolio?.absorption_pct ?? 0, 'percent'),
+    metric(
+      'project_count',
+      'Total proyek',
+      portfolio?.project_count ?? 0,
+      'number',
+      overview?.drilldown,
+      'Proyek dihitung unik lintas revisi.',
+    ),
+    metric(
+      'assignment_count',
+      'Assignment Kementerian/Lembaga',
+      portfolio?.assignment_count ?? 0,
+      'number',
+      undefined,
+      'Assignment dapat lebih besar dari total proyek jika satu proyek punya lebih dari satu Kementerian/Lembaga.',
+    ),
+    metric(
+      'planned',
+      'Rencana monitoring USD',
+      portfolio?.total_planned_usd ?? 0,
+      'currency',
+      undefined,
+      'Total rencana monitoring disbursement untuk filter aktif.',
+    ),
+    metric(
+      'realized',
+      'Realisasi monitoring USD',
+      portfolio?.total_realized_usd ?? 0,
+      'currency',
+      undefined,
+      'Total realisasi monitoring disbursement untuk filter aktif.',
+    ),
+    metric(
+      'absorption',
+      'Penyerapan',
+      portfolio?.absorption_pct ?? 0,
+      'percent',
+      undefined,
+      'Realisasi dibagi rencana. Jika rencana 0, backend mengembalikan 0%.',
+    ),
   ]
 })
 const institutionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
@@ -188,18 +245,41 @@ const institutionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
   const drilldown = analytics.institutions.value?.drilldown
 
   return [
-    metric('institution_count', 'Kementerian/Lembaga', summary?.institution_count ?? 0, 'number', drilldown),
-    metric('project_count', 'Project logical', summary?.project_count ?? 0, 'number', drilldown),
-    metric('assignment_count', 'Assignment', summary?.assignment_count ?? 0),
+    metric(
+      'institution_count',
+      'Kementerian/Lembaga',
+      summary?.institution_count ?? 0,
+      'number',
+      drilldown,
+      'Jumlah Kementerian/Lembaga yang memiliki proyek pada filter aktif.',
+    ),
+    metric(
+      'project_count',
+      'Total proyek',
+      summary?.project_count ?? 0,
+      'number',
+      drilldown,
+      'Proyek dihitung unik lintas revisi.',
+    ),
+    metric(
+      'assignment_count',
+      'Assignment',
+      summary?.assignment_count ?? 0,
+      'number',
+      undefined,
+      'Assignment menghitung relasi proyek ke Kementerian/Lembaga dan dapat overlap.',
+    ),
     metric(
       'agreement_amount',
       'Loan Agreement USD',
       summary?.total_agreement_amount_usd ?? 0,
       'currency',
+      undefined,
+      'Nilai Loan Agreement untuk Kementerian/Lembaga pada filter aktif.',
     ),
-    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency'),
-    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency'),
-    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency', undefined, 'Total rencana monitoring.'),
+    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency', undefined, 'Total realisasi monitoring.'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', undefined, 'Realisasi dibagi rencana.'),
   ]
 })
 const lenderMetrics = computed<AnalyticsMoneyMetric[]>(() => {
@@ -207,17 +287,33 @@ const lenderMetrics = computed<AnalyticsMoneyMetric[]>(() => {
   const drilldown = analytics.lenders.value?.drilldown
 
   return [
-    metric('lender_count', 'Lender legal binding', summary?.lender_count ?? 0, 'number', drilldown),
-    metric('loan_agreement_count', 'Loan Agreement', summary?.loan_agreement_count ?? 0, 'number', drilldown),
+    metric(
+      'lender_count',
+      'Lender dengan Loan Agreement',
+      summary?.lender_count ?? 0,
+      'number',
+      drilldown,
+      'Jumlah lender yang sudah memiliki Loan Agreement pada filter aktif.',
+    ),
+    metric(
+      'loan_agreement_count',
+      'Loan Agreement',
+      summary?.loan_agreement_count ?? 0,
+      'number',
+      drilldown,
+      'Jumlah Loan Agreement yang cocok dengan filter aktif.',
+    ),
     metric(
       'agreement_amount',
       'Loan Agreement USD',
       summary?.total_agreement_amount_usd ?? 0,
       'currency',
+      undefined,
+      'Nilai pinjaman dari Loan Agreement.',
     ),
-    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency'),
-    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency'),
-    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency', undefined, 'Total rencana monitoring.'),
+    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency', undefined, 'Total realisasi monitoring.'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', undefined, 'Realisasi dibagi rencana.'),
   ]
 })
 const absorptionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
@@ -225,9 +321,9 @@ const absorptionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
   const drilldown = analytics.absorption.value?.drilldown
 
   return [
-    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency', drilldown),
-    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency', drilldown),
-    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', drilldown),
+    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency', drilldown, 'Total rencana monitoring.'),
+    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency', drilldown, 'Total realisasi monitoring.'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', drilldown, 'Realisasi dibagi rencana.'),
   ]
 })
 const yearlyMetrics = computed<AnalyticsMoneyMetric[]>(() => {
@@ -235,11 +331,11 @@ const yearlyMetrics = computed<AnalyticsMoneyMetric[]>(() => {
   const drilldown = analytics.yearly.value?.drilldown
 
   return [
-    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency', drilldown),
-    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency', drilldown),
-    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', drilldown),
-    metric('loan_agreement_count', 'Loan Agreement', summary?.loan_agreement_count ?? 0),
-    metric('project_count', 'Project aktif', summary?.project_count ?? 0),
+    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency', drilldown, 'Total rencana monitoring pada periode yang tampil.'),
+    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency', drilldown, 'Total realisasi monitoring pada periode yang tampil.'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent', drilldown, 'Realisasi dibagi rencana.'),
+    metric('loan_agreement_count', 'Loan Agreement', summary?.loan_agreement_count ?? 0, 'number', undefined, 'Jumlah Loan Agreement pada periode yang tampil.'),
+    metric('project_count', 'Project aktif', summary?.project_count ?? 0, 'number', undefined, 'Jumlah proyek aktif pada periode yang tampil.'),
   ]
 })
 const riskMetrics = computed<AnalyticsMoneyMetric[]>(() =>
@@ -345,6 +441,9 @@ const activeAbsorptionItems = computed<DashboardAbsorptionRankedItem[]>(() => {
 
   return data.by_institution
 })
+const activeAbsorptionChartItems = computed(() =>
+  activeAbsorptionItems.value.filter((item) => item.planned_usd > 0),
+)
 const activeAbsorptionLabel = computed(() => {
   if (absorptionLevel.value === 'project') return 'Project'
   if (absorptionLevel.value === 'lender') return 'Lender'
@@ -452,7 +551,7 @@ const lenderPerformanceChartOption = computed(() =>
   ),
 )
 const absorptionChartOption = computed(() => {
-  const rows = [...activeAbsorptionItems.value]
+  const rows = [...activeAbsorptionChartItems.value]
     .sort((left, right) => left.absorption_pct - right.absorption_pct)
     .slice(0, 10)
 
@@ -651,6 +750,18 @@ const lenderProportionAmountNotes = computed(() =>
 const currentTabSections = computed(
   () => tabs.find((tab) => tab.key === activeTab.value)?.sections ?? [],
 )
+const activeResultCount = computed(() => analytics.overview.value?.portfolio.project_count)
+const activeFilterSummary = computed(() => {
+  const filters = analytics.appliedFilters
+  const parts: string[] = []
+
+  if (filters.budget_year) parts.push(`TA ${filters.budget_year}`)
+  if (filters.quarter) parts.push(filters.quarter)
+  if (filters.lender_ids.length > 0) parts.push(`${filters.lender_ids.length} lender`)
+  if (filters.institution_ids.length > 0) parts.push(`${filters.institution_ids.length} Kementerian/Lembaga`)
+
+  return parts.length > 0 ? parts.join(', ') : 'filter aktif'
+})
 
 function metric(
   key: string,
@@ -658,6 +769,9 @@ function metric(
   value: number,
   format: AnalyticsMoneyMetric['format'] = 'number',
   drilldown?: DashboardDrilldownQuery,
+  hint?: string,
+  emphasis: AnalyticsMoneyMetric['emphasis'] = 'normal',
+  actionLabel?: string,
 ): AnalyticsMoneyMetric {
   return {
     key,
@@ -665,6 +779,9 @@ function metric(
     value,
     format,
     unit: format === 'currency' ? 'USD' : undefined,
+    hint,
+    emphasis,
+    actionLabel,
     drilldown,
   }
 }
@@ -844,8 +961,8 @@ function formatUSD(value: number) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(value)
 }
 
@@ -918,11 +1035,13 @@ onMounted(() => {
   <section class="space-y-5">
     <PageHeader
       title="Dashboard Analytics"
-      subtitle="Ringkasan portfolio pinjaman luar negeri, Kementerian/Lembaga, lender, dan penyerapan."
+      subtitle="Ringkasan portfolio, entitas, penyerapan, dan risiko berdasarkan filter aktif."
     />
 
     <DashboardAnalyticsFilterBar
       :model-value="analytics.draftFilters"
+      :applied-filters="analytics.appliedFilters"
+      :result-count="activeResultCount"
       :lenders="masterStore.lenders"
       :institutions="masterStore.institutions"
       :regions="masterStore.regions"
@@ -935,19 +1054,29 @@ onMounted(() => {
     />
 
     <nav
-      class="flex gap-2 overflow-x-auto rounded-lg border border-surface-200 bg-white p-2"
+      class="flex gap-3 overflow-x-auto rounded-lg border border-surface-200 bg-white p-2"
       aria-label="Analytics tabs"
     >
-      <Button
-        v-for="tab in tabs"
-        :key="tab.key"
-        :label="tab.label"
-        :severity="activeTab === tab.key ? undefined : 'secondary'"
-        :outlined="activeTab !== tab.key"
-        size="small"
-        @click="activeTab = tab.key"
-      />
+      <div v-for="group in tabGroups" :key="group.label" class="flex shrink-0 items-center gap-2">
+        <span class="px-1 text-[0.65rem] font-semibold uppercase text-surface-400">
+          {{ group.label }}
+        </span>
+        <Button
+          v-for="tab in group.tabs"
+          :key="tab.key"
+          :label="tab.label"
+          :severity="activeTab === tab.key ? undefined : 'secondary'"
+          :outlined="activeTab !== tab.key"
+          size="small"
+          @click="activeTab = tab.key"
+        />
+      </div>
     </nav>
+
+    <p class="rounded-lg border border-surface-200 bg-white p-3 text-sm text-surface-600">
+      Angka 0 berarti nilai tercatat nol. Panel kosong berarti tidak ada baris untuk
+      {{ activeFilterSummary }}.
+    </p>
 
     <section
       v-if="sectionError(currentTabSections)"
@@ -978,12 +1107,18 @@ onMounted(() => {
         />
         <AnalyticsBreakdownTable
           title="Pipeline Portfolio"
-          description="Blue Book, Green Book, Daftar Kegiatan, Loan Agreement, dan Monitoring ditampilkan sebagai stage eksplisit."
+          description="Setiap tahap ditampilkan terpisah agar proyek yang sudah lanjut tetap bisa ditelusuri dari tahap asal."
           :columns="portfolioColumns"
           :rows="portfolioRows"
           :loading="sectionLoading(['overview'])"
+          empty-title="Tidak ada proyek pada portfolio"
+          :empty-description="`Tidak ada proyek untuk ${activeFilterSummary}. Longgarkan filter atau reset untuk melihat seluruh portfolio.`"
           @drilldown="handleDrilldown"
-        />
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsBreakdownTable>
       </div>
     </section>
 
@@ -995,28 +1130,48 @@ onMounted(() => {
       />
       <div class="grid gap-4 xl:grid-cols-2">
         <AnalyticsChartPanel
-          title="Top 10 Kementerian/Lembaga by Project"
-          description="Project count deduplicated; assignment count tetap overlap-aware di tabel."
+          title="Kementerian/Lembaga by Project"
+          description="Jumlah proyek unik; detail assignment tersedia di tabel."
           :option="institutionProjectChartOption"
           :loading="sectionLoading(['institutions'])"
           :empty="topInstitutionsByProject.length === 0"
-        />
+          :height="topInstitutionsByProject.length < 3 ? '12rem' : '20rem'"
+          empty-title="Tidak ada Kementerian/Lembaga"
+          :empty-description="`Tidak ada Kementerian/Lembaga untuk ${activeFilterSummary}. Coba kosongkan filter Lender atau tahun.`"
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsChartPanel>
         <AnalyticsChartPanel
           title="Top Penyerapan Kementerian/Lembaga"
-          description="Hanya menghitung baris dengan rencana USD lebih dari 0."
+          description="Hanya menampilkan entitas yang sudah memiliki rencana monitoring."
           :option="institutionAbsorptionChartOption"
           :loading="sectionLoading(['institutions'])"
           :empty="topInstitutionsByAbsorption.length === 0"
-        />
+          :height="topInstitutionsByAbsorption.length < 3 ? '12rem' : '20rem'"
+          empty-title="Belum ada data penyerapan"
+          empty-description="Tidak ada rencana monitoring pada Kementerian/Lembaga untuk filter aktif."
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsChartPanel>
       </div>
       <AnalyticsBreakdownTable
         title="Performa Kementerian/Lembaga"
-        description="Nama panjang dipertahankan di tabel, tanpa menampilkan UUID."
+        description="Membandingkan cakupan proyek, nilai Loan Agreement, dan realisasi monitoring per Kementerian/Lembaga."
         :columns="institutionColumns"
         :rows="institutionRows"
         :loading="sectionLoading(['institutions'])"
+        empty-title="Tidak ada Kementerian/Lembaga"
+        :empty-description="`Tidak ada baris Kementerian/Lembaga untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
     </section>
 
     <section v-else-if="activeTab === 'lenders'" class="space-y-4">
@@ -1027,19 +1182,32 @@ onMounted(() => {
       />
       <AnalyticsChartPanel
         title="Top Lender by Loan Agreement USD"
-        description="Basis lender pada performa legal adalah Loan Agreement; KSA dipisahkan sebagai tipe sendiri."
+        description="Menampilkan lender yang sudah tercatat pada Loan Agreement."
         :option="lenderPerformanceChartOption"
         :loading="sectionLoading(['lenders'])"
         :empty="topLendersByAmount.length === 0"
-      />
+        :height="topLendersByAmount.length < 3 ? '12rem' : '20rem'"
+        empty-title="Tidak ada Loan Agreement untuk lender"
+        :empty-description="`Tidak ada lender dengan Loan Agreement untuk ${activeFilterSummary}. Proyek mungkin masih berada di tahap Daftar Kegiatan atau sebelumnya.`"
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsChartPanel>
       <AnalyticsBreakdownTable
         title="Performa Lender Legal"
-        description="Tidak memakai lender indication sebagai performa legal binding."
+        description="Cakupan lender dihitung dari Loan Agreement dan monitoring yang sudah tercatat."
         :columns="lenderColumns"
         :rows="lenderRows"
         :loading="sectionLoading(['lenders'])"
+        empty-title="Tidak ada lender legal"
+        :empty-description="`Tidak ada Loan Agreement untuk lender pada ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
       <AnalyticsMatrixTable
         v-model:top-n="matrixTopN"
         :items="analytics.lenders.value?.lender_institution_matrix ?? []"
@@ -1049,26 +1217,44 @@ onMounted(() => {
       <div class="grid gap-4 xl:grid-cols-2">
         <AnalyticsChartPanel
           title="Pie Proporsi Lender Loan Agreement"
-          description="Pie chart ini hanya memakai stage Loan Agreement, tidak mencampur lender indication atau funding source."
+          description="Proporsi lender pada stage Loan Agreement."
           :option="loanAgreementLenderPieChartOption"
           :loading="sectionLoading(['lenderProportion'])"
           :empty="loanAgreementLenderProportionItems.length === 0"
-        />
+          empty-title="Tidak ada proporsi Loan Agreement"
+          empty-description="Belum ada lender pada stage Loan Agreement untuk filter aktif."
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsChartPanel>
         <AnalyticsChartPanel
           title="Proporsi Lender per Stage"
-          description="Lender Indication, Green Book Funding Source, Loan Agreement, dan Monitoring Realization tidak digabung tanpa label."
           :option="lenderProportionChartOption"
           :loading="sectionLoading(['lenderProportion'])"
           :empty="lenderProportionRows.length === 0"
-        />
+          empty-title="Tidak ada proporsi lender"
+          description="Membedakan lender indikatif, funding source, agreement, dan monitoring."
+          :empty-description="`Tidak ada data proporsi lender untuk ${activeFilterSummary}.`"
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsChartPanel>
       </div>
       <AnalyticsBreakdownTable
         title="Detail Proporsi Lender"
         :columns="lenderProportionColumns"
         :rows="lenderProportionRows"
         :loading="sectionLoading(['lenderProportion'])"
+        empty-title="Tidak ada detail proporsi lender"
+        :empty-description="`Tidak ada proporsi lender untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
       <p
         v-if="lenderProportionAmountNotes.length > 0"
         class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
@@ -1086,7 +1272,7 @@ onMounted(() => {
       <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-200 bg-white p-3">
         <div>
           <h2 class="text-base font-semibold text-surface-950">Level Penyerapan</h2>
-          <p class="text-sm text-surface-500">Rencana 0 tetap ditampilkan sebagai 0% dari backend.</p>
+          <p class="text-sm text-surface-500">Jika belum ada rencana monitoring, penyerapan ditampilkan 0% sesuai aturan backend.</p>
         </div>
         <SelectButton
           v-model="absorptionLevel"
@@ -1098,29 +1284,46 @@ onMounted(() => {
       </div>
       <div class="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <AnalyticsChartPanel
-          :title="`Top Low Absorption ${activeAbsorptionLabel}`"
+          :title="`Penyerapan Terendah ${activeAbsorptionLabel}`"
           description="Urutan dari penyerapan terendah agar anomali mudah dipindai."
           :option="absorptionChartOption"
           :loading="sectionLoading(['absorption'])"
-          :empty="activeAbsorptionItems.length === 0"
-        />
+          :empty="activeAbsorptionChartItems.length === 0"
+          :height="activeAbsorptionChartItems.length < 3 ? '12rem' : '20rem'"
+          empty-title="Belum ada rencana monitoring"
+          :empty-description="`Tidak ada baris dengan rencana USD lebih dari 0 untuk ${activeFilterSummary}. Angka penyerapan 0% di KPI dapat berarti belum ada rencana, bukan performa rendah.`"
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsChartPanel>
         <AnalyticsBreakdownTable
           title="Daftar Penyerapan Rendah"
           :columns="absorptionColumns"
           :rows="lowAbsorptionRows"
           :loading="sectionLoading(['absorption'])"
           empty-title="Tidak ada penyerapan rendah"
-          empty-description="Tidak ada baris berstatus rendah untuk level dan filter aktif."
+          :empty-description="`Tidak ada baris berstatus rendah untuk ${activeAbsorptionLabel} pada ${activeFilterSummary}.`"
           @drilldown="handleDrilldown"
-        />
+        >
+          <template #empty-actions>
+            <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+          </template>
+        </AnalyticsBreakdownTable>
       </div>
       <AnalyticsBreakdownTable
         :title="`Ranking Penyerapan ${activeAbsorptionLabel}`"
         :columns="absorptionColumns"
         :rows="absorptionRows"
         :loading="sectionLoading(['absorption'])"
+        empty-title="Tidak ada ranking penyerapan"
+        :empty-description="`Belum ada data penyerapan untuk ${activeAbsorptionLabel} pada ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
     </section>
 
     <section v-else-if="activeTab === 'yearly'" class="space-y-4">
@@ -1133,19 +1336,31 @@ onMounted(() => {
         {{ yearlyContext }}
       </p>
       <AnalyticsChartPanel
-        title="Trend Planned vs Realized"
-        description="Grouped bar untuk rencana/realisasi dan line untuk penyerapan."
+        title="Tren Rencana vs Realisasi"
+        description="Rencana dan realisasi ditampilkan per tahun anggaran dan triwulan."
         :option="yearlyTrendChartOption"
         :loading="sectionLoading(['yearly'])"
         :empty="yearlyRows.length === 0"
-      />
+        empty-title="Tidak ada tren tahunan"
+        :empty-description="`Tidak ada monitoring tahunan untuk ${activeFilterSummary}.`"
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsChartPanel>
       <AnalyticsBreakdownTable
         title="Detail Performa Tahunan"
         :columns="yearlyColumns"
         :rows="yearlyRows"
         :loading="sectionLoading(['yearly'])"
+        empty-title="Tidak ada data tahunan"
+        :empty-description="`Tidak ada baris monitoring tahunan untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
     </section>
 
     <section v-else-if="activeTab === 'risks'" class="space-y-4">
@@ -1158,28 +1373,38 @@ onMounted(() => {
       <AnalyticsEmptyState
         v-else
         title="Tidak ada risk card"
-        description="Endpoint risks mengembalikan daftar kosong untuk filter aktif."
-      />
+        :description="`Tidak ada kartu risiko untuk ${activeFilterSummary}.`"
+      >
+        <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+      </AnalyticsEmptyState>
       <AnalyticsBreakdownTable
         title="Risk Watchlist"
-        description="Loan Agreement, monitoring, dan risiko closing ditampilkan dengan stage legal yang eksplisit."
+        description="Memantau Loan Agreement, monitoring, dan risiko closing yang perlu ditindaklanjuti."
         :columns="riskWatchlistColumns"
         :rows="riskWatchlistRows"
         :loading="sectionLoading(['risks'])"
         empty-title="Tidak ada risiko aktif"
-        empty-description="Tidak ada watchlist Loan Agreement atau monitoring untuk filter aktif."
+        :empty-description="`Tidak ada watchlist Loan Agreement atau monitoring untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
       <AnalyticsBreakdownTable
         title="Belum berlanjut ke tahap berikutnya"
-        description="Project pipeline memakai latest snapshot default dan tidak menghitung revisi historis ganda."
+        description="Menunjukkan proyek yang belum masuk ke tahap lanjutan pada filter aktif."
         :columns="pipelineBottleneckColumns"
         :rows="pipelineBottleneckRows"
         :loading="sectionLoading(['risks'])"
         empty-title="Tidak ada bottleneck pipeline"
-        empty-description="Tidak ada project yang tertahan pada filter aktif."
+        :empty-description="`Tidak ada proyek yang tertahan untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
       <AnalyticsMetricGrid
         v-if="dataQualityMetrics.length > 0 || sectionLoading(['risks'])"
         :metrics="dataQualityMetrics"
@@ -1193,9 +1418,13 @@ onMounted(() => {
         :rows="dataQualityRows"
         :loading="sectionLoading(['risks'])"
         empty-title="Tidak ada isu kelengkapan data"
-        empty-description="Data quality tidak menemukan isu untuk filter aktif."
+        :empty-description="`Tidak ada isu kelengkapan data untuk ${activeFilterSummary}.`"
         @drilldown="handleDrilldown"
-      />
+      >
+        <template #empty-actions>
+          <Button label="Reset filter" icon="pi pi-refresh" size="small" outlined @click="analytics.resetFilters" />
+        </template>
+      </AnalyticsBreakdownTable>
     </section>
   </section>
 </template>

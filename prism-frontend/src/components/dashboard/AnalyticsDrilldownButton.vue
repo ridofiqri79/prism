@@ -10,7 +10,7 @@ withDefaults(
   }>(),
   {
     drilldown: undefined,
-    label: 'Buka',
+    label: 'Lihat detail',
     disabled: false,
   },
 )
