@@ -4,7 +4,7 @@ import { SankeyChart } from 'echarts/charts'
 import { TooltipComponent } from 'echarts/components'
 import { use } from 'echarts/core'
 import { LabelLayout } from 'echarts/features'
-import { CanvasRenderer } from 'echarts/renderers'
+import { SVGRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import type {
@@ -18,11 +18,13 @@ import type {
   LAJourney,
 } from '@/types/dashboard.types'
 
-use([SankeyChart, TooltipComponent, LabelLayout, CanvasRenderer])
+use([SankeyChart, TooltipComponent, LabelLayout, SVGRenderer])
 
 const props = defineProps<{
   journey: JourneyResponse
 }>()
+
+const chartInitOptions = { renderer: 'svg' as const }
 
 type FlowBuildResult = {
   nodes: JourneyFlowNode[]
@@ -432,6 +434,7 @@ function escapeHtml(value: string) {
     <div class="overflow-x-auto rounded-lg border border-surface-100 bg-surface-50">
       <VChart
         :option="chartOption"
+        :init-options="chartInitOptions"
         autoresize
         class="min-w-[58rem] w-full"
         :style="{ height: chartHeight }"

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { BarChart, LineChart } from 'echarts/charts'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { use } from 'echarts/core'
-import { CanvasRenderer } from 'echarts/renderers'
+import { SVGRenderer } from 'echarts/renderers'
 import type { EChartsOption } from 'echarts'
 import Skeleton from 'primevue/skeleton'
 import VChart from 'vue-echarts'
 import AnalyticsEmptyState from '@/components/dashboard/AnalyticsEmptyState.vue'
 
-use([BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
+use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer])
 
 const props = withDefaults(
   defineProps<{
@@ -20,7 +20,7 @@ const props = withDefaults(
     empty?: boolean
     emptyTitle?: string
     emptyDescription?: string
-    heightClass?: string
+    height?: string
   }>(),
   {
     description: undefined,
@@ -28,11 +28,42 @@ const props = withDefaults(
     empty: false,
     emptyTitle: 'Tidak ada data',
     emptyDescription: 'Data chart kosong untuk filter aktif.',
-    heightClass: 'h-80',
+    height: '20rem',
   },
 )
 
 const chartOption = computed(() => props.option as EChartsOption)
+const chartStyle = computed(() => ({ height: props.height }))
+const chartInitOptions = { renderer: 'svg' as const }
+const chartReady = ref(false)
+let frameId: number | null = null
+
+function cancelScheduledFrame() {
+  if (frameId !== null) {
+    window.cancelAnimationFrame(frameId)
+    frameId = null
+  }
+}
+
+function scheduleChartMount() {
+  cancelScheduledFrame()
+  chartReady.value = false
+
+  if (props.loading || props.empty) return
+
+  void nextTick(() => {
+    frameId = window.requestAnimationFrame(() => {
+      frameId = window.requestAnimationFrame(() => {
+        chartReady.value = true
+        frameId = null
+      })
+    })
+  })
+}
+
+onMounted(scheduleChartMount)
+onBeforeUnmount(cancelScheduledFrame)
+watch([() => props.loading, () => props.empty], scheduleChartMount)
 </script>
 
 <template>
@@ -52,7 +83,21 @@ const chartOption = computed(() => props.option as EChartsOption)
     </div>
 
     <div v-else class="p-4">
-      <VChart :option="chartOption" autoresize class="w-full" :class="heightClass" />
+      <Skeleton v-if="!chartReady" class="analytics-chart w-full" :style="chartStyle" />
+      <VChart
+        v-else
+        :option="chartOption"
+        :init-options="chartInitOptions"
+        autoresize
+        class="analytics-chart w-full"
+        :style="chartStyle"
+      />
     </div>
   </section>
 </template>
+
+<style scoped>
+.analytics-chart {
+  min-height: 16rem;
+}
+</style>

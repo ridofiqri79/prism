@@ -1641,6 +1641,7 @@ Catatan contract:
 
 - `absorption_pct` dihitung server-side: `realized_usd / planned_usd * 100`; jika `planned_usd = 0`, hasilnya `0`.
 - Stage lender tidak boleh dicampur tanpa label. Stage yang dipakai analytics adalah `indication`, `funding_source`, `agreement`, dan `monitoring`.
+- `overview.pipeline_funnel` menghitung total project aktual per stage, bukan status terakhir yang saling eksklusif. Contoh: project Green Book yang sudah lanjut ke Daftar Kegiatan tetap dihitung pada stage `GB`.
 - Drilldown memakai object `{ "target": "...", "query": { "...": ["..."] } }` agar frontend bisa menerjemahkan filter ke Project Master, Monitoring, atau workspace lain.
 - Closing risk memakai threshold penyerapan service tetap `80`; item masuk jika Loan Agreement efektif, closing date berada dalam `closing_months_threshold`, dan absorption `< 80`.
 - Target drilldown DA-03 yang valid: `projects`, `monitoring`, `loan_agreements`, dan `spatial_distribution`. Backend mengirim query object terstruktur, bukan URL string.

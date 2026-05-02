@@ -9,6 +9,7 @@ import AnalyticsEmptyState from '@/components/dashboard/AnalyticsEmptyState.vue'
 import AnalyticsMatrixTable from '@/components/dashboard/AnalyticsMatrixTable.vue'
 import AnalyticsMetricGrid from '@/components/dashboard/AnalyticsMetricGrid.vue'
 import DashboardAnalyticsFilterBar from '@/components/dashboard/DashboardAnalyticsFilterBar.vue'
+import DashboardPipelineFunnel from '@/components/dashboard/DashboardPipelineFunnel.vue'
 import {
   useDashboardAnalytics,
   type DashboardAnalyticsSectionKey,
@@ -420,39 +421,6 @@ const dataQualityRows = computed<AnalyticsBreakdownTableRow[]>(() =>
   })),
 )
 
-const pipelineFunnelChartOption = computed(() => {
-  const rows = analytics.overview.value?.pipeline_funnel ?? []
-  const labels = rows.map((item) => stageLabel(item.stage))
-
-  return {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      formatter: (params: unknown) => {
-        const item = tooltipItems(params)[0]
-        const row = rows[item?.dataIndex ?? 0]
-
-        return [
-          `<strong>${row ? stageLabel(row.stage) : ''}</strong>`,
-          `Project: ${formatNumber(row?.project_count ?? 0)}`,
-          `Nilai pinjaman: ${formatUSD(row?.total_loan_usd ?? 0)}`,
-        ].join('<br/>')
-      },
-    },
-    grid: { left: 128, right: 24, top: 16, bottom: 24, containLabel: true },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: labels },
-    series: [
-      {
-        name: 'Project',
-        type: 'bar',
-        data: rows.map((item) => item.project_count),
-        barMaxWidth: 22,
-        itemStyle: { color: '#2563eb', borderRadius: [0, 5, 5, 0] },
-      },
-    ],
-  }
-})
 const institutionProjectChartOption = computed(() =>
   horizontalBarOption(
     topInstitutionsByProject.value.map((item) => shortLabel(institutionLabel(item.institution))),
@@ -589,6 +557,63 @@ const lenderProportionChartOption = computed(() => {
       barMaxWidth: 24,
       itemStyle: { color: colors[type] },
     })),
+  }
+})
+const loanAgreementLenderProportionStage = computed(
+  () =>
+    (analytics.lenderProportion.value?.by_stage ?? []).find(
+      (stage) => stage.stage === 'Loan Agreement',
+    ) ?? null,
+)
+const loanAgreementLenderProportionItems = computed(
+  () =>
+    loanAgreementLenderProportionStage.value?.items.filter(
+      (item) => item.share_pct > 0 || item.amount_usd > 0 || item.project_count > 0,
+    ) ?? [],
+)
+const loanAgreementLenderPieUsesProjectCount = computed(
+  () =>
+    loanAgreementLenderProportionItems.value.length > 0 &&
+    loanAgreementLenderProportionItems.value.every((item) => item.share_pct <= 0) &&
+    loanAgreementLenderProportionItems.value.some((item) => item.project_count > 0),
+)
+const loanAgreementLenderPieChartOption = computed(() => {
+  const items = loanAgreementLenderProportionItems.value
+  const useProjectCount = loanAgreementLenderPieUsesProjectCount.value
+
+  return {
+    color: ['#2563eb', '#64748b', '#d97706'],
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const raw = recordFrom(params)
+        const data = recordFrom(raw.data)
+        const type = stringFrom(data.name)
+        const item = items.find((candidate) => candidate.type === type)
+
+        return [
+          `<strong>${type}</strong>`,
+          `${useProjectCount ? 'Proporsi jumlah project' : 'Proporsi nilai USD'}: ${numberFrom(raw.percent).toFixed(1)}%`,
+          `Project: ${formatNumber(item?.project_count ?? 0)}`,
+          `Nilai: ${formatUSD(item?.amount_usd ?? 0)}`,
+        ].join('<br/>')
+      },
+    },
+    legend: { orient: 'vertical', left: 0, top: 'middle' },
+    series: [
+      {
+        name: 'Loan Agreement',
+        type: 'pie',
+        radius: ['44%', '72%'],
+        center: ['60%', '50%'],
+        avoidLabelOverlap: true,
+        label: { formatter: '{b}: {d}%' },
+        data: items.map((item) => ({
+          name: item.type,
+          value: useProjectCount ? item.project_count : item.share_pct,
+        })),
+      },
+    ],
   }
 })
 
@@ -946,10 +971,8 @@ onMounted(() => {
         @drilldown="handleDrilldown"
       />
       <div class="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <AnalyticsChartPanel
-          title="Funnel Pipeline"
-          description="Jumlah project per stage memakai latest snapshot default."
-          :option="pipelineFunnelChartOption"
+        <DashboardPipelineFunnel
+          :rows="analytics.overview.value?.pipeline_funnel ?? []"
           :loading="sectionLoading(['overview'])"
           :empty="portfolioRows.length === 0"
         />
@@ -1023,7 +1046,14 @@ onMounted(() => {
         :loading="sectionLoading(['lenders'])"
         @drilldown="handleDrilldown"
       />
-      <div class="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div class="grid gap-4 xl:grid-cols-2">
+        <AnalyticsChartPanel
+          title="Pie Proporsi Lender Loan Agreement"
+          description="Pie chart ini hanya memakai stage Loan Agreement, tidak mencampur lender indication atau funding source."
+          :option="loanAgreementLenderPieChartOption"
+          :loading="sectionLoading(['lenderProportion'])"
+          :empty="loanAgreementLenderProportionItems.length === 0"
+        />
         <AnalyticsChartPanel
           title="Proporsi Lender per Stage"
           description="Lender Indication, Green Book Funding Source, Loan Agreement, dan Monitoring Realization tidak digabung tanpa label."
@@ -1031,14 +1061,14 @@ onMounted(() => {
           :loading="sectionLoading(['lenderProportion'])"
           :empty="lenderProportionRows.length === 0"
         />
-        <AnalyticsBreakdownTable
-          title="Detail Proporsi Lender"
-          :columns="lenderProportionColumns"
-          :rows="lenderProportionRows"
-          :loading="sectionLoading(['lenderProportion'])"
-          @drilldown="handleDrilldown"
-        />
       </div>
+      <AnalyticsBreakdownTable
+        title="Detail Proporsi Lender"
+        :columns="lenderProportionColumns"
+        :rows="lenderProportionRows"
+        :loading="sectionLoading(['lenderProportion'])"
+        @drilldown="handleDrilldown"
+      />
       <p
         v-if="lenderProportionAmountNotes.length > 0"
         class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"

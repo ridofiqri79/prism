@@ -606,69 +606,19 @@ latest_bb_project_rows AS (
     ) ranked
     WHERE sqlc.arg('include_history')::boolean OR latest_rank = 1
 ),
-project_portfolio_rows AS (
+bb_stage_rows AS (
     SELECT
-        bp.id,
-        bp.project_identity_id,
+        'BB'::text AS pipeline_stage,
+        bp.project_identity_id AS entity_id,
         bp.program_title_id,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN 'Monitoring'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN 'LA'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN 'DK'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN 'GB'
-            ELSE 'BB'
-        END::text AS pipeline_status,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN 'Ongoing'
-            ELSE 'Pipeline'
-        END::text AS project_status,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                WHERE gbp.bb_project_id = bp.id
-            ) THEN COALESCE((
-                SELECT SUM(gfs.loan_usd)
-                FROM gb_project_bb_project gbp
-                JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
-                WHERE gbp.bb_project_id = bp.id
-            ), 0)
-            ELSE COALESCE((
-                SELECT SUM(pc.amount_usd)
-                FROM bb_project_cost pc
-                WHERE pc.bb_project_id = bp.id
-                  AND pc.funding_type = 'Foreign'
-                  AND pc.funding_category = 'Loan'
-            ), 0)
-        END::numeric AS foreign_loan_usd,
+        'Pipeline'::text AS project_status,
+        COALESCE((
+            SELECT SUM(pc.amount_usd)
+            FROM bb_project_cost pc
+            WHERE pc.bb_project_id = bp.id
+              AND pc.funding_type = 'Foreign'
+              AND pc.funding_category = 'Loan'
+        ), 0)::numeric AS foreign_loan_usd,
         ARRAY(
             SELECT DISTINCT type_label
             FROM (
@@ -738,9 +688,169 @@ project_portfolio_rows AS (
         )::uuid[] AS region_ids
     FROM latest_bb_project_rows bp
 ),
-filtered_projects AS (
+latest_gb_project_rows AS (
     SELECT *
-    FROM project_portfolio_rows
+    FROM (
+        SELECT
+            gp.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY gp.gb_project_identity_id
+                ORDER BY gb.revision_number DESC, gb.created_at DESC, gp.created_at DESC
+            ) AS latest_rank
+        FROM gb_project gp
+        JOIN green_book gb ON gb.id = gp.green_book_id
+        WHERE gp.status = 'active'
+    ) ranked
+    WHERE sqlc.arg('include_history')::boolean OR latest_rank = 1
+),
+gb_stage_rows AS (
+    SELECT
+        'GB'::text AS pipeline_stage,
+        gp.gb_project_identity_id AS entity_id,
+        gp.program_title_id,
+        'Pipeline'::text AS project_status,
+        COALESCE((
+            SELECT SUM(gfs.loan_usd)
+            FROM gb_funding_source gfs
+            WHERE gfs.gb_project_id = gp.id
+        ), 0)::numeric AS foreign_loan_usd,
+        ARRAY(
+            SELECT DISTINCT l.type
+            FROM gb_funding_source gfs
+            JOIN lender l ON l.id = gfs.lender_id
+            WHERE gfs.gb_project_id = gp.id
+            ORDER BY l.type
+        )::text[] AS loan_types,
+        ARRAY[]::uuid[] AS indication_lender_ids,
+        ARRAY(
+            SELECT DISTINCT gfs.lender_id
+            FROM gb_funding_source gfs
+            WHERE gfs.gb_project_id = gp.id
+            ORDER BY gfs.lender_id
+        )::uuid[] AS fixed_lender_ids,
+        ARRAY[]::uuid[] AS agreement_lender_ids,
+        ARRAY(
+            SELECT DISTINCT gpi.institution_id
+            FROM gb_project_institution gpi
+            WHERE gpi.gb_project_id = gp.id
+              AND gpi.role = 'Executing Agency'
+            ORDER BY gpi.institution_id
+        )::uuid[] AS executing_agency_ids,
+        ARRAY(
+            SELECT DISTINCT ir.root_institution_id
+            FROM gb_project_institution gpi
+            LEFT JOIN institution_rollup ir ON ir.source_institution_id = gpi.institution_id
+            WHERE gpi.gb_project_id = gp.id
+              AND gpi.role = 'Executing Agency'
+              AND ir.root_institution_id IS NOT NULL
+            ORDER BY ir.root_institution_id
+        )::uuid[] AS executing_agency_root_ids,
+        ARRAY(
+            SELECT DISTINCT gpl.region_id
+            FROM gb_project_location gpl
+            WHERE gpl.gb_project_id = gp.id
+            ORDER BY gpl.region_id
+        )::uuid[] AS region_ids
+    FROM latest_gb_project_rows gp
+),
+dk_stage_rows AS (
+    SELECT
+        'DK'::text AS pipeline_stage,
+        dp.id AS entity_id,
+        dp.program_title_id,
+        'Pipeline'::text AS project_status,
+        COALESCE((
+            SELECT SUM(dfd.amount_usd)
+            FROM dk_financing_detail dfd
+            WHERE dfd.dk_project_id = dp.id
+        ), 0)::numeric AS foreign_loan_usd,
+        ARRAY(
+            SELECT DISTINCT l.type
+            FROM dk_financing_detail dfd
+            JOIN lender l ON l.id = dfd.lender_id
+            WHERE dfd.dk_project_id = dp.id
+            ORDER BY l.type
+        )::text[] AS loan_types,
+        ARRAY[]::uuid[] AS indication_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dfd.lender_id
+            FROM dk_financing_detail dfd
+            WHERE dfd.dk_project_id = dp.id
+              AND dfd.lender_id IS NOT NULL
+            ORDER BY dfd.lender_id
+        )::uuid[] AS fixed_lender_ids,
+        ARRAY[]::uuid[] AS agreement_lender_ids,
+        CASE WHEN dp.institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[dp.institution_id]::uuid[] END AS executing_agency_ids,
+        CASE WHEN ir.root_institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[ir.root_institution_id]::uuid[] END AS executing_agency_root_ids,
+        ARRAY(
+            SELECT DISTINCT dpl.region_id
+            FROM dk_project_location dpl
+            WHERE dpl.dk_project_id = dp.id
+            ORDER BY dpl.region_id
+        )::uuid[] AS region_ids
+    FROM dk_project dp
+    LEFT JOIN institution_rollup ir ON ir.source_institution_id = dp.institution_id
+),
+la_stage_rows AS (
+    SELECT
+        'LA'::text AS pipeline_stage,
+        la.dk_project_id AS entity_id,
+        dp.program_title_id,
+        'Ongoing'::text AS project_status,
+        la.amount_usd::numeric AS foreign_loan_usd,
+        ARRAY[l.type]::text[] AS loan_types,
+        ARRAY[]::uuid[] AS indication_lender_ids,
+        ARRAY[]::uuid[] AS fixed_lender_ids,
+        ARRAY[la.lender_id]::uuid[] AS agreement_lender_ids,
+        CASE WHEN dp.institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[dp.institution_id]::uuid[] END AS executing_agency_ids,
+        CASE WHEN ir.root_institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[ir.root_institution_id]::uuid[] END AS executing_agency_root_ids,
+        ARRAY(
+            SELECT DISTINCT dpl.region_id
+            FROM dk_project_location dpl
+            WHERE dpl.dk_project_id = dp.id
+            ORDER BY dpl.region_id
+        )::uuid[] AS region_ids
+    FROM loan_agreement la
+    JOIN lender l ON l.id = la.lender_id
+    JOIN dk_project dp ON dp.id = la.dk_project_id
+    LEFT JOIN institution_rollup ir ON ir.source_institution_id = dp.institution_id
+),
+monitoring_stage_rows AS (
+    SELECT DISTINCT ON (la.dk_project_id)
+        'Monitoring'::text AS pipeline_stage,
+        la.dk_project_id AS entity_id,
+        dp.program_title_id,
+        'Ongoing'::text AS project_status,
+        la.amount_usd::numeric AS foreign_loan_usd,
+        ARRAY[l.type]::text[] AS loan_types,
+        ARRAY[]::uuid[] AS indication_lender_ids,
+        ARRAY[]::uuid[] AS fixed_lender_ids,
+        ARRAY[la.lender_id]::uuid[] AS agreement_lender_ids,
+        CASE WHEN dp.institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[dp.institution_id]::uuid[] END AS executing_agency_ids,
+        CASE WHEN ir.root_institution_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[ir.root_institution_id]::uuid[] END AS executing_agency_root_ids,
+        ARRAY(
+            SELECT DISTINCT dpl.region_id
+            FROM dk_project_location dpl
+            WHERE dpl.dk_project_id = dp.id
+            ORDER BY dpl.region_id
+        )::uuid[] AS region_ids
+    FROM monitoring_disbursement md
+    JOIN loan_agreement la ON la.id = md.loan_agreement_id
+    JOIN lender l ON l.id = la.lender_id
+    JOIN dk_project dp ON dp.id = la.dk_project_id
+    LEFT JOIN institution_rollup ir ON ir.source_institution_id = dp.institution_id
+    ORDER BY la.dk_project_id, md.created_at DESC
+),
+stage_rows AS (
+    SELECT * FROM bb_stage_rows
+    UNION ALL SELECT * FROM gb_stage_rows
+    UNION ALL SELECT * FROM dk_stage_rows
+    UNION ALL SELECT * FROM la_stage_rows
+    UNION ALL SELECT * FROM monitoring_stage_rows
+),
+filtered_stage_rows AS (
+    SELECT *
+    FROM stage_rows
     WHERE (COALESCE(cardinality(sqlc.arg('lender_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('lender_types')::text[])
       AND (
           COALESCE(cardinality(sqlc.arg('lender_ids')::uuid[]), 0) = 0
@@ -753,7 +863,7 @@ filtered_projects AS (
           OR executing_agency_ids && sqlc.arg('institution_ids')::uuid[]
           OR executing_agency_root_ids && sqlc.arg('institution_ids')::uuid[]
       )
-      AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+      AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_stage = ANY(sqlc.arg('pipeline_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0 OR region_ids && sqlc.arg('region_ids')::uuid[])
       AND (COALESCE(cardinality(sqlc.arg('program_title_ids')::uuid[]), 0) = 0 OR program_title_id = ANY(sqlc.arg('program_title_ids')::uuid[]))
@@ -762,10 +872,10 @@ filtered_projects AS (
 )
 SELECT
     s.pipeline_stage AS stage,
-    COUNT(DISTINCT fp.project_identity_id)::bigint AS project_count,
-    COALESCE(SUM(fp.foreign_loan_usd), 0)::numeric AS total_loan_usd
+    COUNT(DISTINCT fs.entity_id)::bigint AS project_count,
+    COALESCE(SUM(fs.foreign_loan_usd), 0)::numeric AS total_loan_usd
 FROM stages s
-LEFT JOIN filtered_projects fp ON fp.pipeline_status = s.pipeline_stage
+LEFT JOIN filtered_stage_rows fs ON fs.pipeline_stage = s.pipeline_stage
 GROUP BY s.pipeline_stage, s.sort_order
 ORDER BY s.sort_order ASC;
 
