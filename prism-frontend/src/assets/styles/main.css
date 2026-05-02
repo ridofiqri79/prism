@@ -158,6 +158,15 @@
     background-clip: content-box;
   }
 
+  .prism-sidebar-group {
+    border-top: 1px solid rgba(31, 181, 178, 0.18);
+    padding-top: 1rem;
+  }
+
+  .prism-sidebar-group + .prism-sidebar-group {
+    margin-top: 1.25rem;
+  }
+
   .prism-sidebar-child-list {
     border-color: rgba(31, 181, 178, 0.18);
   }

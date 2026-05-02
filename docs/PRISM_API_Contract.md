@@ -1583,6 +1583,107 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ---
 
+## Spatial Distribution
+
+Endpoint ini dipakai menu frontend `/spatial-distribution` dengan label sidebar **Sebaran Wilayah**. Route frontend tetap berbahasa Inggris, sedangkan label UI/menu memakai Bahasa Indonesia.
+
+### `GET /spatial-distribution/choropleth`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan data peta choropleth provinsi atau kabupaten/kota. Cakupan lokasi mengikuti aturan wilayah PRISM:
+- lokasi `COUNTRY`/Nasional dihitung mencakup seluruh provinsi pada peta level provinsi,
+- lokasi `PROVINCE` dihitung pada provinsi terkait,
+- lokasi `CITY` dihitung pada kabupaten/kota terkait dan provinsi induknya.
+- saat `level=city`, peta hanya menghitung lokasi `CITY` eksplisit di dalam `province_code`; lokasi `COUNTRY`/`PROVINCE` tidak digandakan ke semua kabupaten/kota karena tidak ada basis alokasi ke child wilayah.
+
+**Query Params:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `level` | `province` atau `city`; default `province` |
+| `province_code` | Wajib jika `level=city`; kode provinsi parent |
+| `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
+| `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
+| `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `search` | Cari berdasarkan kode atau nama proyek |
+| `include_history` | `true` untuk menghitung snapshot historis, default latest snapshot saja |
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "level": "province",
+    "regions": [
+      {
+        "region_id": "uuid",
+        "region_code": "32",
+        "region_name": "Jawa Barat",
+        "region_type": "PROVINCE",
+        "project_count": 12,
+        "total_loan_usd": 2400000000
+      }
+    ],
+    "summary": {
+      "total_regions": 38,
+      "active_regions": 12,
+      "total_project_count": 52,
+      "total_loan_usd": 9000000000,
+      "max_project_count": 12,
+      "max_loan_usd": 2400000000
+    }
+  }
+}
+```
+
+---
+
+### `GET /spatial-distribution/projects`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan daftar proyek untuk wilayah yang menjadi fokus pada peta. Query filter sama dengan endpoint choropleth, ditambah pagination standar.
+Untuk fokus nasional/Indonesia, frontend mengirim `level=province&region_code=ID`; daftar proyek hanya berisi proyek yang lokasi tersimpannya `COUNTRY`/Nasional, bukan seluruh proyek provinsi turunannya.
+Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi `CITY` eksplisit pada `region_code` yang dipilih.
+
+**Query Params:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `level` | `province` atau `city`; `province` menerima `COUNTRY` nasional atau `PROVINCE`, `city` menerima `CITY` |
+| `region_code` | Kode nasional (`ID`), provinsi, atau kabupaten/kota yang dipilih |
+| `province_code` | Konteks parent saat `level=city` |
+| `page`, `limit`, `sort`, `order` | Pagination dan sorting standar project master |
+| `loan_types`, `project_statuses`, `pipeline_statuses`, `search`, `include_history` | Sama dengan choropleth |
+
+**Response `200`:**
+```json
+{
+  "level": "province",
+  "region_id": "uuid",
+  "region_code": "32",
+  "region_name": "Jawa Barat",
+  "region_type": "PROVINCE",
+  "data": [
+    {
+      "id": "uuid",
+      "bb_code": "BB-2025-001",
+      "project_name": "Pembangunan Infrastruktur",
+      "pipeline_status": "GB",
+      "foreign_loan_usd": 250000000
+    }
+  ],
+  "meta": { "page": 1, "limit": 10, "total": 12, "total_pages": 2 },
+  "summary": {
+    "total_loan_usd": 2500000000,
+    "total_grant_usd": 0,
+    "total_counterpart_usd": 300000000
+  }
+}
+```
+
+---
+
 ### `GET /projects`
 
 **Permission:** read: `bb_project`

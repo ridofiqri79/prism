@@ -54,6 +54,7 @@ func main() {
 	dashboardService := service.NewDashboardService(q)
 	journeyService := service.NewJourneyService(q)
 	projectService := service.NewProjectService(q)
+	spatialDistributionService := service.NewSpatialDistributionService(q, projectService)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -65,6 +66,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	journeyHandler := handler.NewJourneyHandler(journeyService)
 	projectHandler := handler.NewProjectHandler(projectService)
+	spatialDistributionHandler := handler.NewSpatialDistributionHandler(spatialDistributionService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -247,6 +249,10 @@ func main() {
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
+
+	spatialDistribution := api.Group("/spatial-distribution", middleware.Require("bb_project", "read"))
+	spatialDistribution.GET("/choropleth", spatialDistributionHandler.Choropleth)
+	spatialDistribution.GET("/projects", spatialDistributionHandler.RegionProjects)
 
 	e.GET("/events", handler.SSEHandler(broker))
 

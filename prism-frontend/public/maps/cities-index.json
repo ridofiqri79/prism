@@ -1,0 +1,236 @@
+{
+  "generatedFrom": "BIG RBI50K_ADMINISTRASI_KABKOTA_20230907.gdb / ADMINISTRASI_AR_KABKOTA",
+  "provinceCount": 38,
+  "totalFeatures": 514,
+  "provinces": {
+    "11": {
+      "provinceCode": "11",
+      "provinceName": "Aceh",
+      "featureCount": 23,
+      "path": "/maps/cities/11.json"
+    },
+    "12": {
+      "provinceCode": "12",
+      "provinceName": "Sumatera Utara",
+      "featureCount": 33,
+      "path": "/maps/cities/12.json"
+    },
+    "13": {
+      "provinceCode": "13",
+      "provinceName": "Sumatera Barat",
+      "featureCount": 19,
+      "path": "/maps/cities/13.json"
+    },
+    "14": {
+      "provinceCode": "14",
+      "provinceName": "Riau",
+      "featureCount": 12,
+      "path": "/maps/cities/14.json"
+    },
+    "15": {
+      "provinceCode": "15",
+      "provinceName": "Jambi",
+      "featureCount": 11,
+      "path": "/maps/cities/15.json"
+    },
+    "16": {
+      "provinceCode": "16",
+      "provinceName": "Sumatera Selatan",
+      "featureCount": 17,
+      "path": "/maps/cities/16.json"
+    },
+    "17": {
+      "provinceCode": "17",
+      "provinceName": "Bengkulu",
+      "featureCount": 10,
+      "path": "/maps/cities/17.json"
+    },
+    "18": {
+      "provinceCode": "18",
+      "provinceName": "Lampung",
+      "featureCount": 15,
+      "path": "/maps/cities/18.json"
+    },
+    "19": {
+      "provinceCode": "19",
+      "provinceName": "Kepulauan Bangka Belitung",
+      "featureCount": 7,
+      "path": "/maps/cities/19.json"
+    },
+    "21": {
+      "provinceCode": "21",
+      "provinceName": "Kepulauan Riau",
+      "featureCount": 7,
+      "path": "/maps/cities/21.json"
+    },
+    "31": {
+      "provinceCode": "31",
+      "provinceName": "DKI Jakarta",
+      "featureCount": 6,
+      "path": "/maps/cities/31.json"
+    },
+    "32": {
+      "provinceCode": "32",
+      "provinceName": "Jawa Barat",
+      "featureCount": 27,
+      "path": "/maps/cities/32.json"
+    },
+    "33": {
+      "provinceCode": "33",
+      "provinceName": "Jawa Tengah",
+      "featureCount": 35,
+      "path": "/maps/cities/33.json"
+    },
+    "34": {
+      "provinceCode": "34",
+      "provinceName": "DI Yogyakarta",
+      "featureCount": 5,
+      "path": "/maps/cities/34.json"
+    },
+    "35": {
+      "provinceCode": "35",
+      "provinceName": "Jawa Timur",
+      "featureCount": 38,
+      "path": "/maps/cities/35.json"
+    },
+    "36": {
+      "provinceCode": "36",
+      "provinceName": "Banten",
+      "featureCount": 8,
+      "path": "/maps/cities/36.json"
+    },
+    "51": {
+      "provinceCode": "51",
+      "provinceName": "Bali",
+      "featureCount": 9,
+      "path": "/maps/cities/51.json"
+    },
+    "52": {
+      "provinceCode": "52",
+      "provinceName": "Nusa Tenggara Barat",
+      "featureCount": 10,
+      "path": "/maps/cities/52.json"
+    },
+    "53": {
+      "provinceCode": "53",
+      "provinceName": "Nusa Tenggara Timur",
+      "featureCount": 22,
+      "path": "/maps/cities/53.json"
+    },
+    "61": {
+      "provinceCode": "61",
+      "provinceName": "Kalimantan Barat",
+      "featureCount": 14,
+      "path": "/maps/cities/61.json"
+    },
+    "62": {
+      "provinceCode": "62",
+      "provinceName": "Kalimantan Tengah",
+      "featureCount": 14,
+      "path": "/maps/cities/62.json"
+    },
+    "63": {
+      "provinceCode": "63",
+      "provinceName": "Kalimantan Selatan",
+      "featureCount": 13,
+      "path": "/maps/cities/63.json"
+    },
+    "64": {
+      "provinceCode": "64",
+      "provinceName": "Kalimantan Timur",
+      "featureCount": 10,
+      "path": "/maps/cities/64.json"
+    },
+    "65": {
+      "provinceCode": "65",
+      "provinceName": "Kalimantan Utara",
+      "featureCount": 5,
+      "path": "/maps/cities/65.json"
+    },
+    "71": {
+      "provinceCode": "71",
+      "provinceName": "Sulawesi Utara",
+      "featureCount": 15,
+      "path": "/maps/cities/71.json"
+    },
+    "72": {
+      "provinceCode": "72",
+      "provinceName": "Sulawesi Tengah",
+      "featureCount": 13,
+      "path": "/maps/cities/72.json"
+    },
+    "73": {
+      "provinceCode": "73",
+      "provinceName": "Sulawesi Selatan",
+      "featureCount": 24,
+      "path": "/maps/cities/73.json"
+    },
+    "74": {
+      "provinceCode": "74",
+      "provinceName": "Sulawesi Tenggara",
+      "featureCount": 17,
+      "path": "/maps/cities/74.json"
+    },
+    "75": {
+      "provinceCode": "75",
+      "provinceName": "Gorontalo",
+      "featureCount": 6,
+      "path": "/maps/cities/75.json"
+    },
+    "76": {
+      "provinceCode": "76",
+      "provinceName": "Sulawesi Barat",
+      "featureCount": 6,
+      "path": "/maps/cities/76.json"
+    },
+    "81": {
+      "provinceCode": "81",
+      "provinceName": "Maluku",
+      "featureCount": 11,
+      "path": "/maps/cities/81.json"
+    },
+    "82": {
+      "provinceCode": "82",
+      "provinceName": "Maluku Utara",
+      "featureCount": 10,
+      "path": "/maps/cities/82.json"
+    },
+    "91": {
+      "provinceCode": "91",
+      "provinceName": "Papua Barat",
+      "featureCount": 7,
+      "path": "/maps/cities/91.json"
+    },
+    "92": {
+      "provinceCode": "92",
+      "provinceName": "Papua Barat Daya",
+      "featureCount": 6,
+      "path": "/maps/cities/92.json"
+    },
+    "94": {
+      "provinceCode": "94",
+      "provinceName": "Papua",
+      "featureCount": 9,
+      "path": "/maps/cities/94.json"
+    },
+    "95": {
+      "provinceCode": "95",
+      "provinceName": "Papua Selatan",
+      "featureCount": 4,
+      "path": "/maps/cities/95.json"
+    },
+    "96": {
+      "provinceCode": "96",
+      "provinceName": "Papua Tengah",
+      "featureCount": 8,
+      "path": "/maps/cities/96.json"
+    },
+    "97": {
+      "provinceCode": "97",
+      "provinceName": "Papua Pegunungan",
+      "featureCount": 8,
+      "path": "/maps/cities/97.json"
+    }
+  },
+  "missing": []
+}

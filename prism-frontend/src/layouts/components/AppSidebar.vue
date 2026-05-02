@@ -66,6 +66,7 @@ function filterNavigation(items: NavigationItem[]) {
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-home' },
+    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
     { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
   ]),
@@ -295,7 +296,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
       <section
         v-for="group in visibleNavigationGroups"
         :key="group.label"
-        :class="isCollapsed ? 'mt-3' : 'mt-5'"
+        :class="[isCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
       >
         <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
           {{ group.section }}

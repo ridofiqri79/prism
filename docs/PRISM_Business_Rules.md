@@ -107,6 +107,7 @@
 - COUNTRY/Nasional juga mencakup seluruh CITY di bawah provinsi turunannya.
 - Frontend nonaktifkan pilihan PROVINCE/CITY jika COUNTRY/Nasional sudah dipilih.
 - Location BB, GB, DK: multi-select dan boleh memilih seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`).
+- Untuk analitik choropleth kabupaten/kota, data yang disimpan di level `COUNTRY`/`PROVINCE` tidak boleh digandakan ke setiap `CITY`. Drilldown kab/kota hanya menghitung lokasi `CITY` eksplisit agar angka peta tidak membuat alokasi palsu.
 
 ---
 
