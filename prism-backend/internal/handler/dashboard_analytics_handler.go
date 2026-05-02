@@ -145,6 +145,29 @@ func dashboardAnalyticsFilter(c echo.Context) (model.DashboardAnalyticsFilter, e
 		}
 		filter.ForeignLoanMax = &parsed
 	}
+	if value := strings.TrimSpace(c.QueryParam("low_absorption_threshold")); value != "" {
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) || parsed < 0 || parsed > 100 {
+			return filter, dashboardAnalyticsValidation("low_absorption_threshold", "harus angka 0 sampai 100")
+		}
+		filter.LowAbsorptionThreshold = &parsed
+	}
+	if value := strings.TrimSpace(c.QueryParam("closing_months_threshold")); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed <= 0 {
+			return filter, dashboardAnalyticsValidation("closing_months_threshold", "harus angka lebih dari 0")
+		}
+		threshold := int32(parsed)
+		filter.ClosingMonthsThreshold = &threshold
+	}
+	if value := strings.TrimSpace(c.QueryParam("stale_monitoring_quarters")); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed <= 0 {
+			return filter, dashboardAnalyticsValidation("stale_monitoring_quarters", "harus angka lebih dari 0")
+		}
+		threshold := int32(parsed)
+		filter.StaleMonitoringQuarters = &threshold
+	}
 	if filter.ForeignLoanMin != nil && filter.ForeignLoanMax != nil && *filter.ForeignLoanMin > *filter.ForeignLoanMax {
 		return filter, dashboardAnalyticsValidation("foreign_loan_max", "harus lebih besar dari nilai minimum")
 	}

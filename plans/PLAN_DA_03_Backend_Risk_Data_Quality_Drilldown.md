@@ -293,14 +293,14 @@ go test ./...
 
 ## Checklist
 
-- [ ] API contract `/dashboard/analytics/risks` update
-- [ ] Low absorption watchlist query/service
-- [ ] Effective without monitoring query/service
-- [ ] Closing risk query/service
-- [ ] Extended loan insight query/service
-- [ ] Pipeline bottleneck query/service
-- [ ] Data quality cards query/service
-- [ ] Drilldown query builder
-- [ ] Backend tests
-- [ ] `make generate` berhasil
-- [ ] `go test ./...` berhasil atau blocker dicatat
+- [x] API contract `/dashboard/analytics/risks` update
+- [x] Low absorption watchlist query/service
+- [x] Effective without monitoring query/service
+- [x] Closing risk query/service
+- [x] Extended loan insight query/service
+- [x] Pipeline bottleneck query/service
+- [x] Data quality cards query/service
+- [x] Drilldown query builder
+- [x] Backend tests
+- [x] `make generate` berhasil
+- [x] `go test ./...` berhasil atau blocker dicatat

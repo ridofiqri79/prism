@@ -1617,11 +1617,21 @@ Endpoint analytics memakai filter umum yang konsisten. Multi value dapat dikirim
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai foreign loan dalam USD |
 | `include_history` | `true` untuk audit/history; default `false` sehingga hitungan portfolio memakai latest snapshot dan tidak double-count revisi |
 
+**Filter tambahan `GET /dashboard/analytics/risks`:**
+
+| Param | Default | Keterangan |
+|-------|---------|------------|
+| `low_absorption_threshold` | `50` | Ambang watchlist penyerapan rendah. Item masuk jika `planned_usd > 0` dan `absorption_pct < threshold`. |
+| `closing_months_threshold` | `12` | Ambang closing risk dari `CURRENT_DATE`. |
+| `stale_monitoring_quarters` | `1` | Toleransi triwulan untuk monitoring stale pada Loan Agreement efektif. |
+
 Catatan contract:
 
 - `absorption_pct` dihitung server-side: `realized_usd / planned_usd * 100`; jika `planned_usd = 0`, hasilnya `0`.
 - Stage lender tidak boleh dicampur tanpa label. Stage yang dipakai analytics adalah `indication`, `funding_source`, `agreement`, dan `monitoring`.
 - Drilldown memakai object `{ "target": "...", "query": { "...": ["..."] } }` agar frontend bisa menerjemahkan filter ke Project Master, Monitoring, atau workspace lain.
+- Closing risk memakai threshold penyerapan service tetap `80`; item masuk jika Loan Agreement efektif, closing date berada dalam `closing_months_threshold`, dan absorption `< 80`.
+- Target drilldown DA-03 yang valid: `projects`, `monitoring`, `loan_agreements`, dan `spatial_distribution`. Backend mengirim query object terstruktur, bukan URL string.
 
 **Response `GET /dashboard/analytics/overview` `200`:**
 
@@ -1839,6 +1849,79 @@ Stage proporsi lender:
 | `Green Book Funding Source` | `gb_funding_source` Green Book |
 | `Loan Agreement` | `loan_agreement.lender_id` |
 | `Monitoring Realization` | `monitoring_disbursement` lewat `loan_agreement` |
+
+**Response `GET /dashboard/analytics/risks` `200`:**
+
+```json
+{
+  "data": {
+    "summary": {
+      "low_absorption_count": 2,
+      "effective_without_monitoring_count": 1,
+      "closing_risk_count": 1,
+      "extended_loan_count": 1,
+      "data_quality_issue_count": 3,
+      "bottleneck_project_count": 4
+    },
+    "thresholds": {
+      "low_absorption_threshold": 50,
+      "closing_months_threshold": 12,
+      "closing_absorption_threshold": 80,
+      "stale_monitoring_quarters": 1
+    },
+    "risk_cards": [
+      { "code": "LOW_ABSORPTION", "label": "Penyerapan rendah", "count": 2, "severity": "warning", "drilldown": { "target": "monitoring", "query": { "risk_codes": ["LOW_ABSORPTION"] } } }
+    ],
+    "watchlists": {
+      "low_absorption_projects": [
+        {
+          "risk_code": "LOW_ABSORPTION",
+          "project_id": "uuid-dk-project",
+          "project_name": "Flood Control",
+          "loan_agreement_id": "uuid-la",
+          "loan_code": "IP-001",
+          "lender": { "id": "uuid", "name": "Japan International Cooperation Agency", "short_name": "JICA", "type": "Bilateral" },
+          "institution": { "id": "uuid", "name": "Kementerian Pekerjaan Umum", "short_name": "PU", "level": "Kementerian/Badan/Lembaga" },
+          "budget_year": 2025,
+          "quarter": "TW1",
+          "planned_usd": 1000000,
+          "realized_usd": 250000,
+          "absorption_pct": 25,
+          "drilldown": { "target": "monitoring", "query": { "risk_codes": ["LOW_ABSORPTION"], "loan_agreement_id": ["uuid-la"] } }
+        }
+      ],
+      "effective_without_monitoring": [],
+      "closing_risks": [],
+      "extended_loans": [],
+      "pipeline_bottlenecks": [
+        { "stage": "BB", "label": "Blue Book belum berlanjut ke Green Book", "project_count": 2, "total_loan_usd": 1000000, "oldest_date": "2026-01-01", "severity": "warning", "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["BB"] } } }
+      ]
+    },
+    "extended_loan_insight": {
+      "count": 1,
+      "amount_usd": 500000,
+      "average_extension_days": 30,
+      "by_lender": [],
+      "by_institution": []
+    },
+    "data_quality": [
+      { "code": "NO_LENDER", "label": "Project tanpa lender sesuai stage", "stage": "Green Book Funding Source", "count": 1, "severity": "warning", "drilldown": { "target": "projects", "query": { "data_quality_codes": ["NO_LENDER"], "data_quality_stages": ["Green Book Funding Source"] } } }
+    ],
+    "drilldown": { "target": "projects", "query": { "include_history": ["false"] } }
+  }
+}
+```
+
+Data quality codes minimal:
+
+| Code | Basis hitung | Target |
+|------|--------------|--------|
+| `NO_EXECUTING_AGENCY` | BB/GB/DK project tanpa Executing Agency sesuai stage | `projects` |
+| `NO_LENDER` | BB tanpa lender indication, GB tanpa funding source, atau DK tanpa financing lender | `projects` |
+| `NO_REGION` | BB/GB/DK project tanpa location | `projects` |
+| `NO_FUNDING_AMOUNT` | Funding amount USD kosong atau 0 sesuai stage | `projects` |
+| `EFFECTIVE_NO_MONITORING` | Loan Agreement efektif tanpa monitoring sesuai filter periode | `monitoring` |
+| `PLANNED_ZERO_REALIZED_POSITIVE` | Monitoring dengan `planned_usd = 0` dan `realized_usd > 0` | `monitoring` |
 
 ---
 

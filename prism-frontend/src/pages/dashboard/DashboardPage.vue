@@ -1,232 +1,514 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import Select from 'primevue/select'
-import Tag from 'primevue/tag'
-import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
-import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import SummaryCard from '@/components/common/SummaryCard.vue'
-import LenderSelect from '@/components/forms/LenderSelect.vue'
-import { DashboardService } from '@/services/dashboard.service'
+import AnalyticsBreakdownTable from '@/components/dashboard/AnalyticsBreakdownTable.vue'
+import AnalyticsEmptyState from '@/components/dashboard/AnalyticsEmptyState.vue'
+import AnalyticsMetricGrid from '@/components/dashboard/AnalyticsMetricGrid.vue'
+import DashboardAnalyticsFilterBar from '@/components/dashboard/DashboardAnalyticsFilterBar.vue'
+import {
+  useDashboardAnalytics,
+  type DashboardAnalyticsSectionKey,
+} from '@/composables/useDashboardAnalytics'
+import { useMasterStore } from '@/stores/master.store'
 import type {
-  DashboardFilterParams,
-  DashboardQuarter,
-  DashboardSummary,
-  MonitoringSummary,
+  AnalyticsBreakdownTableColumn,
+  AnalyticsBreakdownTableRow,
+  AnalyticsMoneyMetric,
+  DashboardAnalyticsPipelineStage,
+  DashboardDrilldownQuery,
 } from '@/types/dashboard.types'
-import type { MonitoringDisbursement } from '@/types/monitoring.types'
 
-const MonitoringChart = defineAsyncComponent(() => import('@/components/monitoring/MonitoringChart.vue'))
-const currentYear = new Date().getFullYear()
-const summary = ref<DashboardSummary | null>(null)
-const monitoringSummary = ref<MonitoringSummary | null>(null)
-const loading = ref(false)
-const filters = reactive<{
-  budget_year: number | null
-  quarter: DashboardQuarter | null
-  lender_id: string | null
-}>({
-  budget_year: currentYear,
-  quarter: null,
-  lender_id: null,
-})
-const yearOptions = Array.from({ length: 9 }, (_, index) => {
-  const year = currentYear - 4 + index
-  return { label: String(year), value: year }
-})
-const quarterOptions: Array<{ label: string; value: DashboardQuarter | null }> = [
-  { label: 'Semua Triwulan', value: null },
-  { label: 'TW1 (Apr-Jun)', value: 'TW1' },
-  { label: 'TW2 (Jul-Sep)', value: 'TW2' },
-  { label: 'TW3 (Okt-Des)', value: 'TW3' },
-  { label: 'TW4 (Jan-Mar)', value: 'TW4' },
+type DashboardAnalyticsTab =
+  | 'portfolio'
+  | 'institutions'
+  | 'lenders'
+  | 'absorption'
+  | 'yearly'
+  | 'risks'
+
+const masterStore = useMasterStore()
+const analytics = useDashboardAnalytics()
+const activeTab = ref<DashboardAnalyticsTab>('portfolio')
+const tabs: Array<{
+  key: DashboardAnalyticsTab
+  label: string
+  sections: DashboardAnalyticsSectionKey[]
+}> = [
+  { key: 'portfolio', label: 'Portfolio', sections: ['overview'] },
+  { key: 'institutions', label: 'Kementerian/Lembaga', sections: ['institutions'] },
+  { key: 'lenders', label: 'Lender', sections: ['lenders', 'lenderProportion'] },
+  { key: 'absorption', label: 'Penyerapan', sections: ['absorption'] },
+  { key: 'yearly', label: 'Tahunan', sections: ['yearly'] },
+  { key: 'risks', label: 'Risiko & Data Quality', sections: ['risks'] },
 ]
 
-const cards = computed(() => {
-  const data = summary.value
+const portfolioColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'stage', label: 'Stage' },
+  { key: 'project_count', label: 'Project', kind: 'number', align: 'right' },
+  { key: 'total_loan_usd', label: 'Nilai Pinjaman USD', kind: 'currency', align: 'right' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const institutionColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'institution', label: 'Kementerian/Lembaga' },
+  { key: 'project_count', label: 'Project', kind: 'number', align: 'right' },
+  { key: 'assignment_count', label: 'Assignment', kind: 'number', align: 'right' },
+  { key: 'agreement_amount_usd', label: 'Agreement USD', kind: 'currency', align: 'right' },
+  { key: 'absorption_pct', label: 'Penyerapan', kind: 'percent', align: 'right' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const lenderColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'lender', label: 'Lender' },
+  { key: 'type', label: 'Tipe', kind: 'badge', align: 'center' },
+  { key: 'project_count', label: 'Project', kind: 'number', align: 'right' },
+  { key: 'agreement_amount_usd', label: 'Agreement USD', kind: 'currency', align: 'right' },
+  { key: 'absorption_pct', label: 'Penyerapan', kind: 'percent', align: 'right' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const lenderProportionColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'stage', label: 'Stage' },
+  { key: 'type', label: 'Tipe', kind: 'badge', align: 'center' },
+  { key: 'project_count', label: 'Project', kind: 'number', align: 'right' },
+  { key: 'lender_count', label: 'Lender', kind: 'number', align: 'right' },
+  { key: 'amount_usd', label: 'Nilai USD', kind: 'currency', align: 'right' },
+  { key: 'share_pct', label: 'Proporsi', kind: 'percent', align: 'right' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const absorptionColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'name', label: 'Nama' },
+  { key: 'dimension', label: 'Dimensi', kind: 'badge', align: 'center' },
+  { key: 'planned_usd', label: 'Rencana USD', kind: 'currency', align: 'right' },
+  { key: 'realized_usd', label: 'Realisasi USD', kind: 'currency', align: 'right' },
+  { key: 'absorption_pct', label: 'Penyerapan', kind: 'percent', align: 'right' },
+  { key: 'status', label: 'Status', kind: 'badge', align: 'center' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const yearlyColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'period', label: 'Periode' },
+  { key: 'planned_usd', label: 'Rencana USD', kind: 'currency', align: 'right' },
+  { key: 'realized_usd', label: 'Realisasi USD', kind: 'currency', align: 'right' },
+  { key: 'absorption_pct', label: 'Penyerapan', kind: 'percent', align: 'right' },
+  { key: 'loan_agreement_count', label: 'Loan Agreement', kind: 'number', align: 'right' },
+  { key: 'project_count', label: 'Project', kind: 'number', align: 'right' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+const riskColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'label', label: 'Risk/Data Quality' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'count', label: 'Jumlah', kind: 'number', align: 'right' },
+  { key: 'severity', label: 'Severity', kind: 'badge', align: 'center' },
+  { key: 'drilldown', label: 'Drilldown', kind: 'drilldown', align: 'center' },
+]
+
+const portfolioMetrics = computed<AnalyticsMoneyMetric[]>(() => {
+  const portfolio = analytics.overview.value?.portfolio
 
   return [
-  { label: 'Total Proyek Blue Book', value: data?.total_bb_projects ?? 0, format: 'number' as const },
-  { label: 'Total Proyek Green Book', value: data?.total_gb_projects ?? 0, format: 'number' as const },
-    { label: 'Total Loan Agreements', value: data?.total_loan_agreements ?? 0, format: 'number' as const },
-    { label: 'Total Nilai Pinjaman', value: data?.total_amount_usd ?? 0, unit: 'USD', format: 'currency' as const },
-    { label: 'Total Realisasi', value: data?.total_realized_usd ?? 0, unit: 'USD', format: 'currency' as const },
-    { label: 'Penyerapan Keseluruhan', value: data?.overall_absorption_pct ?? 0, format: 'percent' as const },
-    { label: 'Monitoring Aktif', value: data?.active_monitoring ?? 0, format: 'number' as const },
+    metric('project_count', 'Project logical', portfolio?.project_count ?? 0),
+    metric('assignment_count', 'Assignment Kementerian/Lembaga', portfolio?.assignment_count ?? 0),
+    metric(
+      'pipeline_loan',
+      'Pipeline loan USD',
+      portfolio?.total_pipeline_loan_usd ?? 0,
+      'currency',
+    ),
+    metric(
+      'agreement_amount',
+      'Loan Agreement USD',
+      portfolio?.total_agreement_amount_usd ?? 0,
+      'currency',
+    ),
+    metric('planned', 'Rencana USD', portfolio?.total_planned_usd ?? 0, 'currency'),
+    metric('realized', 'Realisasi USD', portfolio?.total_realized_usd ?? 0, 'currency'),
+    metric('absorption', 'Penyerapan', portfolio?.absorption_pct ?? 0, 'percent'),
   ]
 })
-
-const chartData = computed<MonitoringDisbursement[]>(() => {
-  const data = monitoringSummary.value
-  if (!data) return []
+const institutionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
+  const summary = analytics.institutions.value?.summary
 
   return [
-    {
-      id: 'dashboard-summary',
-      loan_agreement_id: 'dashboard',
-      budget_year: data.budget_year ?? data.tahun_anggaran ?? filters.budget_year ?? currentYear,
-      quarter: data.quarter ?? data.triwulan ?? filters.quarter ?? 'TW1',
-      exchange_rate_usd_idr: 0,
-      exchange_rate_la_idr: 0,
-      planned_la: 0,
-      planned_usd: data.total_planned_usd,
-      planned_idr: 0,
-      realized_la: 0,
-      realized_usd: data.total_realized_usd,
-      realized_idr: 0,
-      absorption_pct: data.absorption_pct,
-      komponen: [],
+    metric('institution_count', 'Kementerian/Lembaga', summary?.institution_count ?? 0),
+    metric('project_count', 'Project logical', summary?.project_count ?? 0),
+    metric('assignment_count', 'Assignment', summary?.assignment_count ?? 0),
+    metric(
+      'agreement_amount',
+      'Agreement USD',
+      summary?.total_agreement_amount_usd ?? 0,
+      'currency',
+    ),
+    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency'),
+    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+  ]
+})
+const lenderMetrics = computed<AnalyticsMoneyMetric[]>(() => {
+  const summary = analytics.lenders.value?.summary
+
+  return [
+    metric('lender_count', 'Lender legal', summary?.lender_count ?? 0),
+    metric('loan_agreement_count', 'Loan Agreement', summary?.loan_agreement_count ?? 0),
+    metric(
+      'agreement_amount',
+      'Agreement USD',
+      summary?.total_agreement_amount_usd ?? 0,
+      'currency',
+    ),
+    metric('planned', 'Rencana USD', summary?.total_planned_usd ?? 0, 'currency'),
+    metric('realized', 'Realisasi USD', summary?.total_realized_usd ?? 0, 'currency'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+  ]
+})
+const absorptionMetrics = computed<AnalyticsMoneyMetric[]>(() => {
+  const summary = analytics.absorption.value?.summary
+
+  return [
+    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency'),
+    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+  ]
+})
+const yearlyMetrics = computed<AnalyticsMoneyMetric[]>(() => {
+  const summary = analytics.yearly.value?.summary
+
+  return [
+    metric('planned', 'Rencana USD', summary?.planned_usd ?? 0, 'currency'),
+    metric('realized', 'Realisasi USD', summary?.realized_usd ?? 0, 'currency'),
+    metric('absorption', 'Penyerapan', summary?.absorption_pct ?? 0, 'percent'),
+    metric('loan_agreement_count', 'Loan Agreement', summary?.loan_agreement_count ?? 0),
+    metric('project_count', 'Project', summary?.project_count ?? 0),
+  ]
+})
+const riskMetrics = computed<AnalyticsMoneyMetric[]>(() =>
+  (analytics.risks.value?.risk_cards ?? []).map((card) => ({
+    key: card.code,
+    label: card.label,
+    value: card.amount_usd ?? card.count,
+    format: card.amount_usd !== undefined ? 'currency' : 'number',
+    unit: card.amount_usd !== undefined ? 'USD' : undefined,
+    severity:
+      card.severity === 'warning' ? 'warning' : card.severity === 'danger' ? 'danger' : 'info',
+    drilldown: card.drilldown,
+  })),
+)
+
+const portfolioRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.overview.value?.pipeline_funnel ?? []).map((item) => ({
+    id: item.stage,
+    cells: {
+      stage: stageLabel(item.stage),
+      project_count: item.project_count,
+      total_loan_usd: item.total_loan_usd,
     },
-  ]
-})
+    drilldown: item.drilldown,
+  })),
+)
+const institutionRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.institutions.value?.items ?? []).map((item) => ({
+    id: item.institution.id,
+    cells: {
+      institution: item.institution.short_name
+        ? `${item.institution.name} (${item.institution.short_name})`
+        : item.institution.name,
+      project_count: item.project_count,
+      assignment_count: item.assignment_count,
+      agreement_amount_usd: item.agreement_amount_usd,
+      absorption_pct: item.absorption_pct,
+    },
+    drilldown: item.drilldown,
+  })),
+)
+const lenderRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.lenders.value?.items ?? []).map((item) => ({
+    id: item.lender.id,
+    severity: lenderSeverity(item.lender.type),
+    cells: {
+      lender: item.lender.short_name
+        ? `${item.lender.name} (${item.lender.short_name})`
+        : item.lender.name,
+      type: item.lender.type,
+      project_count: item.project_count,
+      agreement_amount_usd: item.agreement_amount_usd,
+      absorption_pct: item.absorption_pct,
+    },
+    drilldown: item.drilldown,
+  })),
+)
+const lenderProportionRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.lenderProportion.value?.by_stage ?? []).flatMap((stage) =>
+    stage.items.map((item) => ({
+      id: `${stage.stage}-${item.type}`,
+      severity: lenderSeverity(item.type),
+      cells: {
+        stage: stage.stage,
+        type: item.type,
+        project_count: item.project_count,
+        lender_count: item.lender_count,
+        amount_usd: item.amount_usd,
+        share_pct: item.share_pct,
+      },
+      drilldown: item.drilldown,
+    })),
+  ),
+)
+const absorptionRows = computed<AnalyticsBreakdownTableRow[]>(() => [
+  ...absorptionRankRows(analytics.absorption.value?.by_institution ?? [], 'Kementerian/Lembaga'),
+  ...absorptionRankRows(analytics.absorption.value?.by_project ?? [], 'Project'),
+  ...absorptionRankRows(analytics.absorption.value?.by_lender ?? [], 'Lender'),
+])
+const yearlyRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.yearly.value?.items ?? []).map((item) => ({
+    id: `${item.budget_year}-${item.quarter}`,
+    cells: {
+      period: `${item.budget_year} ${item.quarter}`,
+      planned_usd: item.planned_usd,
+      realized_usd: item.realized_usd,
+      absorption_pct: item.absorption_pct,
+      loan_agreement_count: item.loan_agreement_count,
+      project_count: item.project_count,
+    },
+    drilldown: item.drilldown,
+  })),
+)
+const riskRows = computed<AnalyticsBreakdownTableRow[]>(() => [
+  ...(analytics.risks.value?.watchlists.pipeline_bottlenecks ?? []).map((item) => ({
+    id: `bottleneck-${item.stage}`,
+    severity: item.severity,
+    cells: {
+      label: item.label,
+      stage: stageLabel(item.stage),
+      count: item.project_count,
+      severity: item.severity,
+    },
+    drilldown: item.drilldown,
+  })),
+  ...(analytics.risks.value?.data_quality ?? []).map((item) => ({
+    id: `data-quality-${item.code}-${item.stage}`,
+    severity: item.severity,
+    cells: {
+      label: item.label,
+      stage: item.stage,
+      count: item.count,
+      severity: item.severity,
+    },
+    drilldown: item.drilldown,
+  })),
+])
 
-function buildParams(): DashboardFilterParams {
+function metric(
+  key: string,
+  label: string,
+  value: number,
+  format: AnalyticsMoneyMetric['format'] = 'number',
+): AnalyticsMoneyMetric {
   return {
-    budget_year: filters.budget_year ?? undefined,
-    quarter: filters.quarter ?? undefined,
-    lender_id: filters.lender_id ?? undefined,
+    key,
+    label,
+    value,
+    format,
+    unit: format === 'currency' ? 'USD' : undefined,
   }
 }
 
-async function loadSummary() {
-  summary.value = await DashboardService.getSummary()
-}
-
-async function loadMonitoringSummary() {
-  monitoringSummary.value = await DashboardService.getMonitoringSummary(buildParams())
-}
-
-async function loadData() {
-  loading.value = true
-  try {
-    await Promise.all([loadSummary(), loadMonitoringSummary()])
-  } finally {
-    loading.value = false
+function stageLabel(stage: DashboardAnalyticsPipelineStage) {
+  const labels: Record<DashboardAnalyticsPipelineStage, string> = {
+    BB: 'Blue Book',
+    GB: 'Green Book',
+    DK: 'Daftar Kegiatan',
+    LA: 'Loan Agreement',
+    Monitoring: 'Monitoring',
   }
+
+  return labels[stage]
 }
 
-async function applyFilters() {
-  loading.value = true
-  try {
-    await loadMonitoringSummary()
-  } finally {
-    loading.value = false
-  }
+function lenderSeverity(type: string) {
+  if (type === 'KSA') return 'warning'
+  if (type === 'Multilateral') return 'secondary'
+  return 'info'
+}
+
+function absorptionRankRows(
+  rows: NonNullable<typeof analytics.absorption.value>['by_institution'],
+  dimension: string,
+) {
+  return rows.map((item) => ({
+    id: `${dimension}-${item.id}`,
+    severity: item.status === 'low' ? 'danger' : item.status === 'high' ? 'success' : 'info',
+    cells: {
+      name: item.name,
+      dimension,
+      planned_usd: item.planned_usd,
+      realized_usd: item.realized_usd,
+      absorption_pct: item.absorption_pct,
+      status: item.status,
+    },
+    drilldown: item.drilldown,
+  }))
+}
+
+function sectionLoading(sections: DashboardAnalyticsSectionKey[]) {
+  return sections.some((section) => analytics.loading[section])
+}
+
+function sectionError(sections: DashboardAnalyticsSectionKey[]) {
+  return sections.map((section) => analytics.errors[section]).find(Boolean)
+}
+
+function handleDrilldown(drilldown: DashboardDrilldownQuery) {
+  void analytics.openDrilldown(drilldown)
 }
 
 onMounted(() => {
-  void loadData()
+  void analytics.initialize()
 })
 </script>
 
 <template>
-  <section class="space-y-6">
-    <PageHeader title="Dashboard" subtitle="Ringkasan monitoring pinjaman luar negeri" />
+  <section class="space-y-5">
+    <PageHeader
+      title="Dashboard Analytics"
+      subtitle="Ringkasan portfolio pinjaman luar negeri, monitoring, risiko, dan data quality."
+    />
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard
-        v-for="card in cards"
-        :key="card.label"
-        :label="card.label"
-        :value="card.value"
-        :unit="card.unit"
-        :format="card.format"
+    <DashboardAnalyticsFilterBar
+      :model-value="analytics.draftFilters"
+      :lenders="masterStore.lenders"
+      :institutions="masterStore.institutions"
+      :regions="masterStore.regions"
+      :program-titles="masterStore.programTitles"
+      :loading="analytics.anyLoading.value"
+      :loading-options="analytics.loadingMasterData.value"
+      @update:model-value="analytics.updateDraftFilters"
+      @apply="analytics.applyFilters"
+      @reset="analytics.resetFilters"
+    />
+
+    <nav
+      class="flex gap-2 overflow-x-auto rounded-lg border border-surface-200 bg-white p-2"
+      aria-label="Analytics tabs"
+    >
+      <Button
+        v-for="tab in tabs"
+        :key="tab.key"
+        :label="tab.label"
+        :severity="activeTab === tab.key ? undefined : 'secondary'"
+        :outlined="activeTab !== tab.key"
+        size="small"
+        @click="activeTab = tab.key"
+      />
+    </nav>
+
+    <section
+      v-if="sectionError(tabs.find((tab) => tab.key === activeTab)?.sections ?? [])"
+      class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+    >
+      {{ sectionError(tabs.find((tab) => tab.key === activeTab)?.sections ?? []) }}
+    </section>
+
+    <section v-if="activeTab === 'portfolio'" class="space-y-4">
+      <AnalyticsMetricGrid
+        :metrics="portfolioMetrics"
+        :loading="sectionLoading(['overview'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Pipeline Portfolio"
+        description="Default memakai latest snapshot agar revisi tidak double-count."
+        :columns="portfolioColumns"
+        :rows="portfolioRows"
+        :loading="sectionLoading(['overview'])"
+        @drilldown="handleDrilldown"
       />
     </section>
 
-    <section class="rounded-lg border border-surface-200 bg-white p-4">
-      <div class="grid gap-4 md:grid-cols-[12rem_14rem_1fr_auto]">
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Tahun Anggaran</span>
-          <Select
-            v-model="filters.budget_year"
-            :options="yearOptions"
-            option-label="label"
-            option-value="value"
-            show-clear
-            class="w-full"
-          />
-        </label>
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Triwulan</span>
-          <Select
-            v-model="filters.quarter"
-            :options="quarterOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-          />
-        </label>
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Lender</span>
-          <LenderSelect v-model="filters.lender_id" placeholder="Semua lender" />
-        </label>
-        <div class="flex items-end">
-          <Button label="Terapkan Filter" icon="pi pi-filter" :loading="loading" @click="applyFilters" />
-        </div>
-      </div>
+    <section v-else-if="activeTab === 'institutions'" class="space-y-4">
+      <AnalyticsMetricGrid
+        :metrics="institutionMetrics"
+        :loading="sectionLoading(['institutions'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Distribusi Kementerian/Lembaga"
+        :columns="institutionColumns"
+        :rows="institutionRows"
+        :loading="sectionLoading(['institutions'])"
+        @drilldown="handleDrilldown"
+      />
     </section>
 
-    <section class="grid gap-4 xl:grid-cols-[24rem_1fr]">
-      <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <p class="text-sm text-surface-500">Ringkasan Monitoring</p>
-        <p class="mt-2 text-4xl font-semibold text-surface-950">
-          {{ (monitoringSummary?.absorption_pct ?? 0).toFixed(1) }}%
-        </p>
-        <div class="mt-4">
-          <AbsorptionBar :pct="monitoringSummary?.absorption_pct ?? 0" />
-        </div>
-        <dl class="mt-6 grid gap-4 text-sm">
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-surface-500">Rencana USD</dt>
-            <dd class="font-semibold text-surface-900">
-              <CurrencyDisplay :amount="monitoringSummary?.total_planned_usd ?? 0" currency="USD" compact />
-            </dd>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-surface-500">Realisasi USD</dt>
-            <dd class="font-semibold text-surface-900">
-              <CurrencyDisplay :amount="monitoringSummary?.total_realized_usd ?? 0" currency="USD" compact />
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      <MonitoringChart :data="chartData" />
+    <section v-else-if="activeTab === 'lenders'" class="space-y-4">
+      <AnalyticsMetricGrid
+        :metrics="lenderMetrics"
+        :loading="sectionLoading(['lenders'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Performa Lender Legal"
+        description="Basis lender pada tab ini adalah Loan Agreement dan Monitoring."
+        :columns="lenderColumns"
+        :rows="lenderRows"
+        :loading="sectionLoading(['lenders'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Proporsi Lender per Stage"
+        description="Stage lender ditampilkan eksplisit agar indikasi, funding source, dan legal agreement tidak tercampur."
+        :columns="lenderProportionColumns"
+        :rows="lenderProportionRows"
+        :loading="sectionLoading(['lenderProportion'])"
+        @drilldown="handleDrilldown"
+      />
     </section>
 
-    <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-      <div class="border-b border-surface-200 p-4">
-        <h2 class="text-lg font-semibold text-surface-950">Rincian per Lender</h2>
-      </div>
-      <div class="overflow-auto">
-        <table class="w-full min-w-[52rem] text-left text-sm">
-          <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-            <tr>
-              <th class="px-4 py-3">Lender</th>
-              <th class="px-4 py-3">Tipe</th>
-              <th class="px-4 py-3">Rencana USD</th>
-              <th class="px-4 py-3">Realisasi USD</th>
-              <th class="px-4 py-3">Penyerapan</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-100">
-            <tr v-if="(monitoringSummary?.by_lender.length ?? 0) === 0">
-              <td colspan="5" class="px-4 py-6 text-center text-surface-500">
-                Tidak ada data monitoring untuk filter ini.
-              </td>
-            </tr>
-            <tr v-for="item in monitoringSummary?.by_lender ?? []" :key="item.lender.id">
-              <td class="px-4 py-3 font-medium text-surface-900">{{ item.lender.name }}</td>
-              <td class="px-4 py-3"><Tag :value="item.lender.type" severity="info" rounded /></td>
-              <td class="px-4 py-3"><CurrencyDisplay :amount="item.planned_usd" currency="USD" /></td>
-              <td class="px-4 py-3"><CurrencyDisplay :amount="item.realized_usd" currency="USD" /></td>
-              <td class="px-4 py-3"><AbsorptionBar :pct="item.absorption_pct" /></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <section v-else-if="activeTab === 'absorption'" class="space-y-4">
+      <AnalyticsMetricGrid
+        :metrics="absorptionMetrics"
+        :loading="sectionLoading(['absorption'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Penyerapan"
+        :columns="absorptionColumns"
+        :rows="absorptionRows"
+        :loading="sectionLoading(['absorption'])"
+        @drilldown="handleDrilldown"
+      />
+    </section>
+
+    <section v-else-if="activeTab === 'yearly'" class="space-y-4">
+      <AnalyticsMetricGrid
+        :metrics="yearlyMetrics"
+        :loading="sectionLoading(['yearly'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Performa Tahunan"
+        :columns="yearlyColumns"
+        :rows="yearlyRows"
+        :loading="sectionLoading(['yearly'])"
+        @drilldown="handleDrilldown"
+      />
+    </section>
+
+    <section v-else-if="activeTab === 'risks'" class="space-y-4">
+      <AnalyticsMetricGrid
+        v-if="riskMetrics.length > 0 || sectionLoading(['risks'])"
+        :metrics="riskMetrics"
+        :loading="sectionLoading(['risks'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsEmptyState
+        v-else
+        title="Tidak ada risk card"
+        description="Endpoint risks mengembalikan daftar kosong untuk filter aktif."
+      />
+      <AnalyticsBreakdownTable
+        title="Risiko & Data Quality"
+        :columns="riskColumns"
+        :rows="riskRows"
+        :loading="sectionLoading(['risks'])"
+        @drilldown="handleDrilldown"
+      />
     </section>
   </section>
 </template>

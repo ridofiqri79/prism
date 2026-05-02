@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,6 +15,13 @@ import (
 type DashboardAnalyticsService struct {
 	queries *queries.Queries
 }
+
+const (
+	defaultLowAbsorptionThreshold  = 50.0
+	defaultClosingMonthsThreshold  = int32(12)
+	defaultStaleMonitoringQuarters = int32(1)
+	closingRiskAbsorptionThreshold = 80.0
+)
 
 type dashboardAnalyticsQueryValues struct {
 	BudgetYear       pgtype.Int4
@@ -334,13 +342,65 @@ func (s *DashboardAnalyticsService) LenderProportion(ctx context.Context, filter
 }
 
 func (s *DashboardAnalyticsService) Risks(ctx context.Context, filter model.DashboardAnalyticsFilter) (*model.DashboardAnalyticsRisksResponse, error) {
-	if _, err := newDashboardAnalyticsQueryValues(filter); err != nil {
+	values, err := newDashboardAnalyticsQueryValues(filter)
+	if err != nil {
 		return nil, err
 	}
+	thresholds := dashboardAnalyticsRiskThresholds(filter)
+	riskRows, err := s.queries.ListDashboardAnalyticsRiskWatchlist(ctx, values.riskWatchlistParams(thresholds))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil risk watchlist analytics")
+	}
+	bottleneckRows, err := s.queries.ListDashboardAnalyticsPipelineBottlenecks(ctx, values.pipelineBottleneckParams())
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil pipeline bottleneck analytics")
+	}
+	dataQualityRows, err := s.queries.ListDashboardAnalyticsDataQualityIssues(ctx, values.dataQualityParams())
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil data quality analytics")
+	}
+
+	watchlists := model.DashboardAnalyticsRiskWatchlists{
+		LowAbsorptionProjects:      []model.DashboardAnalyticsLoanAgreementRiskItem{},
+		EffectiveWithoutMonitoring: []model.DashboardAnalyticsLoanAgreementRiskItem{},
+		ClosingRisks:               []model.DashboardAnalyticsLoanAgreementRiskItem{},
+		ExtendedLoans:              []model.DashboardAnalyticsLoanAgreementRiskItem{},
+		PipelineBottlenecks:        dashboardAnalyticsPipelineBottlenecks(filter, bottleneckRows),
+	}
+
+	for _, row := range riskRows {
+		item := dashboardAnalyticsLoanAgreementRiskItem(filter, row)
+		switch row.RiskCode {
+		case "LOW_ABSORPTION":
+			watchlists.LowAbsorptionProjects = append(watchlists.LowAbsorptionProjects, item)
+		case "EFFECTIVE_WITHOUT_MONITORING":
+			watchlists.EffectiveWithoutMonitoring = append(watchlists.EffectiveWithoutMonitoring, item)
+		case "CLOSING_RISK":
+			watchlists.ClosingRisks = append(watchlists.ClosingRisks, item)
+		case "EXTENDED_LOAN":
+			watchlists.ExtendedLoans = append(watchlists.ExtendedLoans, item)
+		}
+	}
+
+	dataQuality := dashboardAnalyticsDataQualityItems(filter, dataQualityRows)
+	extendedInsight := dashboardAnalyticsExtendedLoanInsight(filter, watchlists.ExtendedLoans)
+	summary := model.DashboardAnalyticsRiskSummary{
+		LowAbsorptionCount:              len(watchlists.LowAbsorptionProjects),
+		EffectiveWithoutMonitoringCount: len(watchlists.EffectiveWithoutMonitoring),
+		ClosingRiskCount:                len(watchlists.ClosingRisks),
+		ExtendedLoanCount:               len(watchlists.ExtendedLoans),
+		DataQualityIssueCount:           dashboardAnalyticsDataQualityAffectedCount(dataQuality),
+		BottleneckProjectCount:          dashboardAnalyticsBottleneckProjectCount(watchlists.PipelineBottlenecks),
+	}
+
 	return &model.DashboardAnalyticsRisksResponse{
-		Watchlists:  []model.DashboardAnalyticsRiskItem{},
-		DataQuality: []model.DashboardAnalyticsDataQualityItem{},
-		Drilldown:   dashboardAnalyticsDrilldown(filter, "projects", nil),
+		Summary:             summary,
+		Thresholds:          thresholds,
+		RiskCards:           dashboardAnalyticsRiskCards(filter, summary, extendedInsight),
+		Watchlists:          watchlists,
+		ExtendedLoanInsight: extendedInsight,
+		DataQuality:         dataQuality,
+		Drilldown:           dashboardAnalyticsDrilldown(filter, "projects", nil),
 	}, nil
 }
 
@@ -476,6 +536,55 @@ func (v dashboardAnalyticsQueryValues) lenderProportionParams() queries.ListDash
 	}
 }
 
+func (v dashboardAnalyticsQueryValues) riskWatchlistParams(thresholds model.DashboardAnalyticsRiskThresholds) queries.ListDashboardAnalyticsRiskWatchlistParams {
+	return queries.ListDashboardAnalyticsRiskWatchlistParams{
+		BudgetYear:              v.BudgetYear,
+		Quarter:                 v.Quarter,
+		LenderIds:               v.LenderIDs,
+		LenderTypes:             v.LenderTypes,
+		InstitutionIds:          v.InstitutionIDs,
+		PipelineStatuses:        v.PipelineStatuses,
+		ProjectStatuses:         v.ProjectStatuses,
+		ForeignLoanMin:          v.ForeignLoanMin,
+		ForeignLoanMax:          v.ForeignLoanMax,
+		ProgramTitleIds:         v.ProgramTitleIDs,
+		RegionIds:               v.RegionIDs,
+		LowAbsorptionThreshold:  thresholds.LowAbsorptionThreshold,
+		StaleMonitoringQuarters: thresholds.StaleMonitoringQuarters,
+		ClosingMonthsThreshold:  thresholds.ClosingMonthsThreshold,
+	}
+}
+
+func (v dashboardAnalyticsQueryValues) pipelineBottleneckParams() queries.ListDashboardAnalyticsPipelineBottlenecksParams {
+	return queries.ListDashboardAnalyticsPipelineBottlenecksParams{
+		PipelineStatuses: v.PipelineStatuses,
+		ProjectStatuses:  v.ProjectStatuses,
+		LenderIds:        v.LenderIDs,
+		LenderTypes:      v.LenderTypes,
+		InstitutionIds:   v.InstitutionIDs,
+		ProgramTitleIds:  v.ProgramTitleIDs,
+		RegionIds:        v.RegionIDs,
+		ForeignLoanMin:   v.ForeignLoanMin,
+		ForeignLoanMax:   v.ForeignLoanMax,
+		IncludeHistory:   v.IncludeHistory,
+	}
+}
+
+func (v dashboardAnalyticsQueryValues) dataQualityParams() queries.ListDashboardAnalyticsDataQualityIssuesParams {
+	return queries.ListDashboardAnalyticsDataQualityIssuesParams{
+		IncludeHistory:  v.IncludeHistory,
+		LenderIds:       v.LenderIDs,
+		LenderTypes:     v.LenderTypes,
+		InstitutionIds:  v.InstitutionIDs,
+		ProgramTitleIds: v.ProgramTitleIDs,
+		RegionIds:       v.RegionIDs,
+		ForeignLoanMin:  v.ForeignLoanMin,
+		ForeignLoanMax:  v.ForeignLoanMax,
+		BudgetYear:      v.BudgetYear,
+		Quarter:         v.Quarter,
+	}
+}
+
 func dashboardAnalyticsPipelineFunnel(filter model.DashboardAnalyticsFilter, rows []queries.ListDashboardAnalyticsPipelineFunnelRow) []model.DashboardAnalyticsPipelineFunnelItem {
 	items := make([]model.DashboardAnalyticsPipelineFunnelItem, 0, len(rows))
 	for _, row := range rows {
@@ -577,6 +686,277 @@ func lenderProportionByStage(filter model.DashboardAnalyticsFilter, rows []queri
 		})
 	}
 	return result
+}
+
+func dashboardAnalyticsRiskThresholds(filter model.DashboardAnalyticsFilter) model.DashboardAnalyticsRiskThresholds {
+	thresholds := model.DashboardAnalyticsRiskThresholds{
+		LowAbsorptionThreshold:     defaultLowAbsorptionThreshold,
+		ClosingMonthsThreshold:     defaultClosingMonthsThreshold,
+		ClosingAbsorptionThreshold: closingRiskAbsorptionThreshold,
+		StaleMonitoringQuarters:    defaultStaleMonitoringQuarters,
+	}
+	if filter.LowAbsorptionThreshold != nil {
+		thresholds.LowAbsorptionThreshold = *filter.LowAbsorptionThreshold
+	}
+	if filter.ClosingMonthsThreshold != nil {
+		thresholds.ClosingMonthsThreshold = *filter.ClosingMonthsThreshold
+	}
+	if filter.StaleMonitoringQuarters != nil {
+		thresholds.StaleMonitoringQuarters = *filter.StaleMonitoringQuarters
+	}
+	return thresholds
+}
+
+func dashboardAnalyticsLoanAgreementRiskItem(filter model.DashboardAnalyticsFilter, row queries.ListDashboardAnalyticsRiskWatchlistRow) model.DashboardAnalyticsLoanAgreementRiskItem {
+	extra := map[string][]string{
+		"risk_codes":        {row.RiskCode},
+		"loan_agreement_id": {model.UUIDToString(row.LoanAgreementID)},
+	}
+	if row.BudgetYear.Valid {
+		extra["budget_year"] = []string{strconv.FormatInt(int64(row.BudgetYear.Int32), 10)}
+	}
+	if row.Quarter.Valid {
+		extra["quarter"] = []string{row.Quarter.String}
+	}
+
+	target := "monitoring"
+	if row.RiskCode == "CLOSING_RISK" || row.RiskCode == "EXTENDED_LOAN" {
+		target = "loan_agreements"
+	}
+
+	item := model.DashboardAnalyticsLoanAgreementRiskItem{
+		RiskCode:            row.RiskCode,
+		RiskLabel:           row.RiskLabel,
+		Severity:            row.Severity,
+		ProjectID:           model.UUIDToString(row.DkProjectID),
+		ProjectName:         row.ProjectName,
+		LoanAgreementID:     model.UUIDToString(row.LoanAgreementID),
+		LoanCode:            row.LoanCode,
+		Lender:              dashboardAnalyticsLenderRef(row.LenderID, row.LenderName, row.LenderShortName, row.LenderType),
+		EffectiveDate:       dateString(row.EffectiveDate),
+		OriginalClosingDate: dateString(row.OriginalClosingDate),
+		ClosingDate:         dateString(row.ClosingDate),
+		BudgetYear:          int32PtrFromInt4(row.BudgetYear),
+		Quarter:             stringPtrFromText(row.Quarter),
+		PlannedUSD:          floatFromNumeric(row.PlannedUsd),
+		RealizedUSD:         floatFromNumeric(row.RealizedUsd),
+		AbsorptionPct:       row.AbsorptionPct,
+		AgreementAmountUSD:  floatFromNumeric(row.AgreementAmountUsd),
+		DaysSinceEffective:  int(row.DaysSinceEffective),
+		DaysToClosing:       int(row.DaysToClosing),
+		MonthsToClosing:     int(row.MonthsToClosing),
+		ExtensionDays:       int(row.ExtensionDays),
+		StaleQuarters:       int(row.StaleQuarters),
+		MonitoringStatus:    row.MonitoringStatus,
+		Drilldown:           dashboardAnalyticsDrilldown(filter, target, extra),
+	}
+	if row.InstitutionID.Valid {
+		item.Institution = &model.DashboardAnalyticsEntityRef{
+			ID:        model.UUIDToString(row.InstitutionID),
+			Name:      textValue(row.InstitutionName),
+			ShortName: stringPtrFromText(row.InstitutionShortName),
+			Level:     textValue(row.InstitutionLevel),
+		}
+	}
+	return item
+}
+
+func dashboardAnalyticsLenderRef(id pgtype.UUID, name string, shortName pgtype.Text, lenderType string) model.DashboardAnalyticsEntityRef {
+	return model.DashboardAnalyticsEntityRef{
+		ID:        model.UUIDToString(id),
+		Name:      name,
+		ShortName: stringPtrFromText(shortName),
+		Type:      lenderType,
+	}
+}
+
+func dashboardAnalyticsPipelineBottlenecks(filter model.DashboardAnalyticsFilter, rows []queries.ListDashboardAnalyticsPipelineBottlenecksRow) []model.DashboardAnalyticsPipelineBottleneckItem {
+	items := make([]model.DashboardAnalyticsPipelineBottleneckItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.DashboardAnalyticsPipelineBottleneckItem{
+			Stage:        row.Stage,
+			Label:        row.Label,
+			ProjectCount: int(row.ProjectCount),
+			TotalLoanUSD: floatFromNumeric(row.TotalLoanUsd),
+			OldestDate:   dateString(row.OldestDate),
+			Severity:     row.Severity,
+			Drilldown: dashboardAnalyticsDrilldown(filter, "projects", map[string][]string{
+				"pipeline_statuses": {row.Stage},
+			}),
+		})
+	}
+	return items
+}
+
+func dashboardAnalyticsDataQualityItems(filter model.DashboardAnalyticsFilter, rows []queries.ListDashboardAnalyticsDataQualityIssuesRow) []model.DashboardAnalyticsDataQualityItem {
+	items := make([]model.DashboardAnalyticsDataQualityItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.DashboardAnalyticsDataQualityItem{
+			Code:     row.Code,
+			Label:    row.Label,
+			Stage:    row.Stage,
+			Severity: row.Severity,
+			Count:    int(row.AffectedCount),
+			Drilldown: dashboardAnalyticsDrilldown(filter, row.Target, map[string][]string{
+				"data_quality_codes":  {row.Code},
+				"data_quality_stages": {row.Stage},
+			}),
+		})
+	}
+	return items
+}
+
+func dashboardAnalyticsRiskCards(filter model.DashboardAnalyticsFilter, summary model.DashboardAnalyticsRiskSummary, extended model.DashboardAnalyticsExtendedLoanInsight) []model.DashboardAnalyticsRiskCard {
+	return []model.DashboardAnalyticsRiskCard{
+		{
+			Code:      "LOW_ABSORPTION",
+			Label:     "Penyerapan rendah",
+			Count:     summary.LowAbsorptionCount,
+			Severity:  "warning",
+			Drilldown: dashboardAnalyticsDrilldown(filter, "monitoring", map[string][]string{"risk_codes": {"LOW_ABSORPTION"}}),
+		},
+		{
+			Code:      "EFFECTIVE_WITHOUT_MONITORING",
+			Label:     "Loan Agreement efektif tanpa monitoring terkini",
+			Count:     summary.EffectiveWithoutMonitoringCount,
+			Severity:  "danger",
+			Drilldown: dashboardAnalyticsDrilldown(filter, "monitoring", map[string][]string{"risk_codes": {"EFFECTIVE_WITHOUT_MONITORING"}}),
+		},
+		{
+			Code:      "CLOSING_RISK",
+			Label:     "Closing risk",
+			Count:     summary.ClosingRiskCount,
+			Severity:  "danger",
+			Drilldown: dashboardAnalyticsDrilldown(filter, "loan_agreements", map[string][]string{"risk_codes": {"CLOSING_RISK"}}),
+		},
+		{
+			Code:      "EXTENDED_LOAN",
+			Label:     "Loan Agreement diperpanjang",
+			Count:     summary.ExtendedLoanCount,
+			Severity:  "info",
+			AmountUSD: extended.AmountUSD,
+			Drilldown: dashboardAnalyticsDrilldown(filter, "loan_agreements", map[string][]string{
+				"risk_codes":  {"EXTENDED_LOAN"},
+				"is_extended": {"true"},
+			}),
+		},
+		{
+			Code:      "PIPELINE_BOTTLENECK",
+			Label:     "Project belum berlanjut",
+			Count:     summary.BottleneckProjectCount,
+			Severity:  "warning",
+			Drilldown: dashboardAnalyticsDrilldown(filter, "projects", map[string][]string{"project_statuses": {"Pipeline"}}),
+		},
+		{
+			Code:      "DATA_QUALITY",
+			Label:     "Data quality issues",
+			Count:     summary.DataQualityIssueCount,
+			Severity:  "warning",
+			Drilldown: dashboardAnalyticsDrilldown(filter, "projects", map[string][]string{"data_quality": {"true"}}),
+		},
+	}
+}
+
+func dashboardAnalyticsDataQualityAffectedCount(items []model.DashboardAnalyticsDataQualityItem) int {
+	total := 0
+	for _, item := range items {
+		total += item.Count
+	}
+	return total
+}
+
+func dashboardAnalyticsBottleneckProjectCount(items []model.DashboardAnalyticsPipelineBottleneckItem) int {
+	total := 0
+	for _, item := range items {
+		total += item.ProjectCount
+	}
+	return total
+}
+
+type dashboardAnalyticsExtendedAccumulator struct {
+	entity    model.DashboardAnalyticsEntityRef
+	count     int
+	amount    float64
+	totalDays int
+	extra     map[string][]string
+}
+
+func dashboardAnalyticsExtendedLoanInsight(filter model.DashboardAnalyticsFilter, loans []model.DashboardAnalyticsLoanAgreementRiskItem) model.DashboardAnalyticsExtendedLoanInsight {
+	insight := model.DashboardAnalyticsExtendedLoanInsight{
+		ByLender:      []model.DashboardAnalyticsExtendedLoanBreakdown{},
+		ByInstitution: []model.DashboardAnalyticsExtendedLoanBreakdown{},
+	}
+	lenderBreakdown := map[string]*dashboardAnalyticsExtendedAccumulator{}
+	institutionBreakdown := map[string]*dashboardAnalyticsExtendedAccumulator{}
+
+	totalExtensionDays := 0
+	for _, loan := range loans {
+		insight.Count++
+		insight.AmountUSD += loan.AgreementAmountUSD
+		totalExtensionDays += loan.ExtensionDays
+
+		lenderID := loan.Lender.ID
+		if lenderID != "" {
+			acc := lenderBreakdown[lenderID]
+			if acc == nil {
+				acc = &dashboardAnalyticsExtendedAccumulator{
+					entity: loan.Lender,
+					extra:  map[string][]string{"fixed_lender_ids": {lenderID}, "is_extended": {"true"}},
+				}
+				lenderBreakdown[lenderID] = acc
+			}
+			acc.count++
+			acc.amount += loan.AgreementAmountUSD
+			acc.totalDays += loan.ExtensionDays
+		}
+
+		if loan.Institution != nil && loan.Institution.ID != "" {
+			institutionID := loan.Institution.ID
+			acc := institutionBreakdown[institutionID]
+			if acc == nil {
+				acc = &dashboardAnalyticsExtendedAccumulator{
+					entity: *loan.Institution,
+					extra:  map[string][]string{"executing_agency_ids": {institutionID}, "is_extended": {"true"}},
+				}
+				institutionBreakdown[institutionID] = acc
+			}
+			acc.count++
+			acc.amount += loan.AgreementAmountUSD
+			acc.totalDays += loan.ExtensionDays
+		}
+	}
+
+	if insight.Count > 0 {
+		insight.AverageExtensionDays = float64(totalExtensionDays) / float64(insight.Count)
+	}
+	insight.ByLender = dashboardAnalyticsExtendedBreakdownItems(filter, "lender", lenderBreakdown)
+	insight.ByInstitution = dashboardAnalyticsExtendedBreakdownItems(filter, "institution", institutionBreakdown)
+	return insight
+}
+
+func dashboardAnalyticsExtendedBreakdownItems(filter model.DashboardAnalyticsFilter, dimension string, values map[string]*dashboardAnalyticsExtendedAccumulator) []model.DashboardAnalyticsExtendedLoanBreakdown {
+	items := make([]model.DashboardAnalyticsExtendedLoanBreakdown, 0, len(values))
+	for _, value := range values {
+		avg := 0.0
+		if value.count > 0 {
+			avg = float64(value.totalDays) / float64(value.count)
+		}
+		items = append(items, model.DashboardAnalyticsExtendedLoanBreakdown{
+			Dimension:            dimension,
+			Entity:               value.entity,
+			LoanAgreementCount:   value.count,
+			AmountUSD:            value.amount,
+			AverageExtensionDays: avg,
+			Drilldown:            dashboardAnalyticsDrilldown(filter, "loan_agreements", value.extra),
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].AmountUSD == items[j].AmountUSD {
+			return items[i].Entity.Name < items[j].Entity.Name
+		}
+		return items[i].AmountUSD > items[j].AmountUSD
+	})
+	return items
 }
 
 func optionalFloatNumeric(value *float64) pgtype.Numeric {

@@ -241,13 +241,13 @@ Jika backend live tersedia, smoke halaman `/dashboard` di browser.
 
 ## Checklist
 
-- [ ] `dashboard.types.ts` update analytics types
-- [ ] `dashboard.service.ts` update analytics methods
-- [ ] Store/composable dashboard analytics dibuat
-- [ ] Filter bar dibuat
-- [ ] Shared analytics components dibuat/reuse
-- [ ] Dashboard layout tab/section dibuat
-- [ ] Drilldown helper dibuat
-- [ ] Loading/empty/error states tersedia
-- [ ] `npm.cmd run type-check` berhasil
-- [ ] `npm.cmd run build` berhasil
+- [x] `dashboard.types.ts` update analytics types
+- [x] `dashboard.service.ts` update analytics methods
+- [x] Store/composable dashboard analytics dibuat
+- [x] Filter bar dibuat
+- [x] Shared analytics components dibuat/reuse
+- [x] Dashboard layout tab/section dibuat
+- [x] Drilldown helper dibuat
+- [x] Loading/empty/error states tersedia
+- [x] `npm.cmd run type-check` berhasil
+- [x] `npm.cmd run build` berhasil
