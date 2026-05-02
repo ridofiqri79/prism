@@ -1622,33 +1622,32 @@ Catatan contract:
 - `absorption_pct` dihitung server-side: `realized_usd / planned_usd * 100`; jika `planned_usd = 0`, hasilnya `0`.
 - Stage lender tidak boleh dicampur tanpa label. Stage yang dipakai analytics adalah `indication`, `funding_source`, `agreement`, dan `monitoring`.
 - Drilldown memakai object `{ "target": "...", "query": { "...": ["..."] } }` agar frontend bisa menerjemahkan filter ke Project Master, Monitoring, atau workspace lain.
-- Phase foundation boleh mengembalikan array kosong contract-safe untuk section agregasi yang belum dikerjakan; tidak boleh memakai placeholder atau sample data hardcoded.
 
-**Response foundation `GET /dashboard/analytics/overview` `200`:**
+**Response `GET /dashboard/analytics/overview` `200`:**
 
 ```json
 {
   "data": {
     "portfolio": {
       "project_count": 120,
-      "pipeline_project_count": 78,
-      "ongoing_project_count": 42,
-      "total_foreign_loan_usd": 15000000000,
-      "total_grant_usd": 250000000,
-      "total_counterpart_usd": 500000000
-    },
-    "monitoring": {
-      "loan_agreement_count": 42,
-      "monitoring_count": 38,
-      "planned_usd": 500000000,
-      "realized_usd": 380000000,
-      "agreement_amount_usd": 15000000000,
+      "assignment_count": 135,
+      "total_pipeline_loan_usd": 15000000000,
+      "total_agreement_amount_usd": 12000000000,
+      "total_planned_usd": 500000000,
+      "total_realized_usd": 380000000,
       "absorption_pct": 76.0
     },
+    "pipeline_funnel": [
+      { "stage": "BB", "project_count": 40, "total_loan_usd": 3000000000, "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["BB"] } } },
+      { "stage": "GB", "project_count": 30, "total_loan_usd": 4000000000, "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["GB"] } } },
+      { "stage": "DK", "project_count": 20, "total_loan_usd": 3000000000, "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["DK"] } } },
+      { "stage": "LA", "project_count": 15, "total_loan_usd": 2500000000, "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["LA"] } } },
+      { "stage": "Monitoring", "project_count": 15, "total_loan_usd": 2500000000, "drilldown": { "target": "projects", "query": { "pipeline_statuses": ["Monitoring"] } } }
+    ],
+    "top_insights": [],
     "drilldown": {
       "target": "projects",
       "query": {
-        "pipeline_statuses": ["Monitoring"],
         "include_history": ["false"]
       }
     }
@@ -1656,17 +1655,190 @@ Catatan contract:
 }
 ```
 
-Response section endpoint lainnya mengikuti bentuk:
+**Response `GET /dashboard/analytics/institutions` `200`:**
 
 ```json
 {
   "data": {
-    "summary": { ... },
-    "items": [],
+    "summary": {
+      "institution_count": 20,
+      "project_count": 120,
+      "assignment_count": 135,
+      "total_agreement_amount_usd": 12000000000,
+      "total_planned_usd": 500000000,
+      "total_realized_usd": 380000000,
+      "absorption_pct": 76.0
+    },
+    "items": [
+      {
+        "institution": {
+          "id": "uuid",
+          "name": "Kementerian Pekerjaan Umum",
+          "short_name": "PU",
+          "level": "Kementerian/Badan/Lembaga"
+        },
+        "project_count": 10,
+        "assignment_count": 12,
+        "loan_agreement_count": 6,
+        "monitoring_count": 8,
+        "agreement_amount_usd": 1200000000,
+        "planned_usd": 100000000,
+        "realized_usd": 76000000,
+        "absorption_pct": 76.0,
+        "pipeline_breakdown": { "BB": 2, "GB": 2, "DK": 1, "LA": 1, "Monitoring": 4 },
+        "drilldown": { "target": "projects", "query": { "executing_agency_ids": ["uuid"] } }
+      }
+    ],
     "drilldown": { "target": "projects", "query": {} }
   }
 }
 ```
+
+**Response `GET /dashboard/analytics/lenders` `200`:**
+
+```json
+{
+  "data": {
+    "summary": {
+      "lender_count": 8,
+      "loan_agreement_count": 42,
+      "total_agreement_amount_usd": 12000000000,
+      "total_planned_usd": 500000000,
+      "total_realized_usd": 380000000,
+      "absorption_pct": 76.0
+    },
+    "items": [
+      {
+        "lender": { "id": "uuid", "name": "Japan International Cooperation Agency", "short_name": "JICA", "type": "Bilateral" },
+        "loan_agreement_count": 10,
+        "project_count": 10,
+        "institution_count": 5,
+        "monitoring_count": 12,
+        "agreement_amount_usd": 3000000000,
+        "planned_usd": 150000000,
+        "realized_usd": 110000000,
+        "absorption_pct": 73.3,
+        "drilldown": { "target": "projects", "query": { "fixed_lender_ids": ["uuid"] } }
+      }
+    ],
+    "lender_institution_matrix": [
+      {
+        "institution": { "id": "uuid", "name": "Kementerian Pekerjaan Umum", "short_name": "PU", "level": "Kementerian/Badan/Lembaga" },
+        "lender": { "id": "uuid", "name": "Japan International Cooperation Agency", "short_name": "JICA", "type": "Bilateral" },
+        "project_count": 4,
+        "loan_agreement_count": 4,
+        "monitoring_count": 5,
+        "agreement_amount_usd": 1000000000,
+        "planned_usd": 50000000,
+        "realized_usd": 40000000,
+        "absorption_pct": 80.0,
+        "drilldown": { "target": "projects", "query": { "executing_agency_ids": ["uuid"], "fixed_lender_ids": ["uuid"] } }
+      }
+    ],
+    "drilldown": { "target": "projects", "query": {} }
+  }
+}
+```
+
+**Response `GET /dashboard/analytics/absorption` `200`:**
+
+```json
+{
+  "data": {
+    "summary": { "planned_usd": 500000000, "realized_usd": 380000000, "absorption_pct": 76.0 },
+    "by_institution": [
+      {
+        "rank": 1,
+        "id": "uuid",
+        "name": "Kementerian Pekerjaan Umum",
+        "dimension": "institution",
+        "planned_usd": 100000000,
+        "realized_usd": 76000000,
+        "absorption_pct": 76.0,
+        "variance_usd": 24000000,
+        "status": "normal",
+        "drilldown": { "target": "monitoring", "query": { "executing_agency_ids": ["uuid"] } }
+      }
+    ],
+    "by_project": [],
+    "by_lender": [],
+    "drilldown": { "target": "monitoring", "query": {} }
+  }
+}
+```
+
+Status penyerapan:
+
+| Status | Rule |
+|--------|------|
+| `low` | `< 50` |
+| `normal` | `50 - 89.99` |
+| `high` | `>= 90` |
+
+**Response `GET /dashboard/analytics/yearly` `200`:**
+
+```json
+{
+  "data": {
+    "summary": {
+      "planned_usd": 500000000,
+      "realized_usd": 380000000,
+      "absorption_pct": 76.0,
+      "loan_agreement_count": 42,
+      "project_count": 40
+    },
+    "items": [
+      {
+        "budget_year": 2025,
+        "quarter": "TW1",
+        "planned_usd": 100000000,
+        "realized_usd": 80000000,
+        "absorption_pct": 80.0,
+        "loan_agreement_count": 10,
+        "project_count": 10,
+        "drilldown": { "target": "monitoring", "query": { "budget_year": ["2025"], "quarter": ["TW1"] } }
+      }
+    ],
+    "drilldown": { "target": "monitoring", "query": {} }
+  }
+}
+```
+
+Jika `quarter` kosong, endpoint mengembalikan semua triwulan dalam tahun terkait. Jika `budget_year` kosong, endpoint mengembalikan semua tahun yang ada di monitoring. Urutan: `budget_year ASC`, lalu `TW1`, `TW2`, `TW3`, `TW4`.
+
+**Response `GET /dashboard/analytics/lender-proportion` `200`:**
+
+```json
+{
+  "data": {
+    "by_stage": [
+      {
+        "stage": "Loan Agreement",
+        "items": [
+          {
+            "type": "KSA",
+            "project_count": 4,
+            "lender_count": 1,
+            "amount_usd": 500000000,
+            "share_pct": 25.0,
+            "drilldown": { "target": "projects", "query": { "lender_types": ["KSA"] } }
+          }
+        ]
+      }
+    ],
+    "drilldown": { "target": "projects", "query": {} }
+  }
+}
+```
+
+Stage proporsi lender:
+
+| Stage | Sumber |
+|-------|--------|
+| `Lender Indication` | `lender_indication` Blue Book |
+| `Green Book Funding Source` | `gb_funding_source` Green Book |
+| `Loan Agreement` | `loan_agreement.lender_id` |
+| `Monitoring Realization` | `monitoring_disbursement` lewat `loan_agreement` |
 
 ---
 
