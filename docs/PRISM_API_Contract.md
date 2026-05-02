@@ -1583,6 +1583,93 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ---
 
+### Dashboard Analytics
+
+Endpoint analytics memakai filter umum yang konsisten. Multi value dapat dikirim sebagai repeated query param, comma-separated value, atau format array query string.
+
+**Permission:** Authenticated
+
+**Endpoint target:**
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| `GET` | `/dashboard/analytics/overview` | Ringkasan portfolio, pipeline, dan monitoring foundation |
+| `GET` | `/dashboard/analytics/institutions` | Distribusi dan performa Kementerian/Lembaga |
+| `GET` | `/dashboard/analytics/lenders` | Performa lender dan stage lender |
+| `GET` | `/dashboard/analytics/absorption` | Penyerapan by Kementerian/Lembaga, project, dan lender |
+| `GET` | `/dashboard/analytics/yearly` | Performa tahunan/triwulan |
+| `GET` | `/dashboard/analytics/lender-proportion` | Proporsi lender Bilateral, Multilateral, dan KSA by stage |
+| `GET` | `/dashboard/analytics/risks` | Risk watchlist, monitoring compliance, dan data quality |
+
+**Filter umum:**
+
+| Param | Keterangan |
+|-------|------------|
+| `budget_year` | Tahun monitoring |
+| `quarter` | `TW1`, `TW2`, `TW3`, `TW4` |
+| `lender_ids` | Multi-value UUID lender; response analytics tetap memberi label stage lender |
+| `lender_types` | Multi-value: `Bilateral`, `Multilateral`, `KSA` |
+| `institution_ids` | Multi-value UUID institution; backend dapat roll-up ke root Kementerian/Lembaga |
+| `pipeline_statuses` | Multi-value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `project_statuses` | Multi-value: `Pipeline`, `Ongoing` |
+| `region_ids` | Multi-value UUID region |
+| `program_title_ids` | Multi-value UUID program title |
+| `foreign_loan_min`, `foreign_loan_max` | Range nilai foreign loan dalam USD |
+| `include_history` | `true` untuk audit/history; default `false` sehingga hitungan portfolio memakai latest snapshot dan tidak double-count revisi |
+
+Catatan contract:
+
+- `absorption_pct` dihitung server-side: `realized_usd / planned_usd * 100`; jika `planned_usd = 0`, hasilnya `0`.
+- Stage lender tidak boleh dicampur tanpa label. Stage yang dipakai analytics adalah `indication`, `funding_source`, `agreement`, dan `monitoring`.
+- Drilldown memakai object `{ "target": "...", "query": { "...": ["..."] } }` agar frontend bisa menerjemahkan filter ke Project Master, Monitoring, atau workspace lain.
+- Phase foundation boleh mengembalikan array kosong contract-safe untuk section agregasi yang belum dikerjakan; tidak boleh memakai placeholder atau sample data hardcoded.
+
+**Response foundation `GET /dashboard/analytics/overview` `200`:**
+
+```json
+{
+  "data": {
+    "portfolio": {
+      "project_count": 120,
+      "pipeline_project_count": 78,
+      "ongoing_project_count": 42,
+      "total_foreign_loan_usd": 15000000000,
+      "total_grant_usd": 250000000,
+      "total_counterpart_usd": 500000000
+    },
+    "monitoring": {
+      "loan_agreement_count": 42,
+      "monitoring_count": 38,
+      "planned_usd": 500000000,
+      "realized_usd": 380000000,
+      "agreement_amount_usd": 15000000000,
+      "absorption_pct": 76.0
+    },
+    "drilldown": {
+      "target": "projects",
+      "query": {
+        "pipeline_statuses": ["Monitoring"],
+        "include_history": ["false"]
+      }
+    }
+  }
+}
+```
+
+Response section endpoint lainnya mengikuti bentuk:
+
+```json
+{
+  "data": {
+    "summary": { ... },
+    "items": [],
+    "drilldown": { "target": "projects", "query": {} }
+  }
+}
+```
+
+---
+
 ## Spatial Distribution
 
 Endpoint ini dipakai menu frontend `/spatial-distribution` dengan label sidebar **Sebaran Wilayah**. Route frontend tetap berbahasa Inggris, sedangkan label UI/menu memakai Bahasa Indonesia.

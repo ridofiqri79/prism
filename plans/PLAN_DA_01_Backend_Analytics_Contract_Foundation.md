@@ -247,14 +247,14 @@ Jika `make` tidak tersedia di Windows, gunakan perintah repo yang setara dan cat
 
 ## Checklist
 
-- [ ] `docs/PRISM_API_Contract.md` update bagian Dashboard Analytics
-- [ ] `sql/queries/dashboard_analytics.sql` dibuat
-- [ ] Query foundation latest snapshot dibuat
-- [ ] Query foundation monitoring fact dibuat
-- [ ] Query foundation institution rollup dibuat
-- [ ] `make generate` berhasil
-- [ ] `internal/model/dashboard_analytics.go` dibuat
-- [ ] `internal/service/dashboard_analytics_service.go` dibuat
-- [ ] `internal/handler/dashboard_analytics_handler.go` dibuat
-- [ ] Routes `/dashboard/analytics/*` terdaftar
-- [ ] `go test ./...` berhasil atau blocker dicatat
+- [x] `docs/PRISM_API_Contract.md` update bagian Dashboard Analytics
+- [x] `sql/queries/dashboard_analytics.sql` dibuat
+- [x] Query foundation latest snapshot dibuat
+- [x] Query foundation monitoring fact dibuat
+- [x] Query foundation institution rollup dibuat
+- [x] `make generate` berhasil
+- [x] `internal/model/dashboard_analytics.go` dibuat
+- [x] `internal/service/dashboard_analytics_service.go` dibuat
+- [x] `internal/handler/dashboard_analytics_handler.go` dibuat
+- [x] Routes `/dashboard/analytics/*` terdaftar
+- [x] `go test ./...` berhasil atau blocker dicatat
