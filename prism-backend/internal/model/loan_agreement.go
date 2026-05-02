@@ -40,4 +40,5 @@ type LoanAgreementListFilter struct {
 	LenderID          *string
 	IsExtended        *string
 	ClosingDateBefore *string
+	RiskCodes         []string
 }

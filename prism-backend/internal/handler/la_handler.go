@@ -31,6 +31,7 @@ func loanAgreementListFilter(c echo.Context) model.LoanAgreementListFilter {
 		LenderID:          queryStringPtr(c, "lender_id"),
 		IsExtended:        queryStringPtr(c, "is_extended"),
 		ClosingDateBefore: queryStringPtr(c, "closing_date_before"),
+		RiskCodes:         queryValues(c, "risk_codes", "risk_codes[]"),
 	}
 }
 

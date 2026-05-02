@@ -24,6 +24,8 @@ import type { Institution, Lender, LenderType, ProgramTitle, Region } from '@/ty
 import type {
   ProjectMasterColumnConfig,
   ProjectMasterColumnKey,
+  ProjectDataQualityCode,
+  ProjectDataQualityStage,
   ProjectMasterFilterState,
   ProjectMasterListParams,
   ProjectMasterRow,
@@ -58,6 +60,8 @@ const listControls = useListControls<ProjectMasterFilterState>({
     foreign_loan_max: 'Foreign Loan Max',
     dk_date_from: 'Tanggal DK dari',
     dk_date_to: 'Tanggal DK sampai',
+    data_quality_codes: 'Kelengkapan Data',
+    data_quality_stages: 'Tahap Kelengkapan Data',
     include_history: 'Snapshot historis',
   },
   formatFilterValue: (key, value) => formatProjectFilterValue(key, value),
@@ -68,6 +72,12 @@ const sortField = listControls.sort as Ref<ProjectMasterSortField>
 const sortOrder = listControls.order as Ref<ProjectMasterSortOrder>
 const filters = listControls.draftFilters
 const appliedFilters = listControls.appliedFilters
+const activeFilterPills = computed(() =>
+  listControls.activeFilterPills.value.filter(
+    (pill) => pill.key !== 'include_history' || appliedFilters.include_history,
+  ),
+)
+const activeFilterCount = computed(() => activeFilterPills.value.length)
 const columnConfigs: ProjectMasterColumnConfig[] = [
   { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: true },
   { key: 'indication_lenders', label: 'Indikasi Lender', sortField: 'indication_lenders', defaultVisible: false },
@@ -145,6 +155,17 @@ const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus
   { label: 'Loan Agreement', value: 'LA' },
   { label: 'Monitoring', value: 'Monitoring' },
 ]
+const dataQualityCodeOptions: Array<{ label: string; value: ProjectDataQualityCode }> = [
+  { label: 'Tanpa Kementerian/Lembaga', value: 'NO_EXECUTING_AGENCY' },
+  { label: 'Tanpa lender', value: 'NO_LENDER' },
+  { label: 'Tanpa lokasi', value: 'NO_REGION' },
+  { label: 'Tanpa nilai pendanaan', value: 'NO_FUNDING_AMOUNT' },
+]
+const dataQualityStageOptions: Array<{ label: string; value: ProjectDataQualityStage }> = [
+  { label: 'Blue Book', value: 'Blue Book' },
+  { label: 'Green Book Funding Source', value: 'Green Book Funding Source' },
+  { label: 'Daftar Kegiatan Financing', value: 'Daftar Kegiatan Financing' },
+]
 
 const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
   BB: 'Blue Book',
@@ -182,6 +203,8 @@ function createDefaultFilters(): ProjectMasterFilterState {
     foreign_loan_max: null,
     dk_date_from: '',
     dk_date_to: '',
+    data_quality_codes: [],
+    data_quality_stages: [],
     search: '',
     include_history: false,
   }
@@ -200,6 +223,8 @@ function assignFilterState(target: ProjectMasterFilterState, source: ProjectMast
   target.foreign_loan_max = source.foreign_loan_max
   target.dk_date_from = source.dk_date_from
   target.dk_date_to = source.dk_date_to
+  target.data_quality_codes = [...source.data_quality_codes]
+  target.data_quality_stages = [...source.data_quality_stages]
   target.search = source.search
   target.include_history = source.include_history
 }
@@ -220,6 +245,8 @@ function routeQueryString(key: string) {
 
 function routeQueryNumber(key: string) {
   const raw = routeQueryString(key)
+  if (!raw) return null
+
   const parsed = Number(raw)
 
   return Number.isFinite(parsed) ? parsed : null
@@ -258,6 +285,25 @@ function routePipelineStatuses(key: string): ProjectPipelineStatus[] {
   )
 }
 
+function routeDataQualityCodes(key: string): ProjectDataQualityCode[] {
+  return routeQueryValues(key).filter(
+    (value): value is ProjectDataQualityCode =>
+      value === 'NO_EXECUTING_AGENCY' ||
+      value === 'NO_LENDER' ||
+      value === 'NO_REGION' ||
+      value === 'NO_FUNDING_AMOUNT',
+  )
+}
+
+function routeDataQualityStages(key: string): ProjectDataQualityStage[] {
+  return routeQueryValues(key).filter(
+    (value): value is ProjectDataQualityStage =>
+      value === 'Blue Book' ||
+      value === 'Green Book Funding Source' ||
+      value === 'Daftar Kegiatan Financing',
+  )
+}
+
 function hydrateFiltersFromRouteQuery() {
   const next = createDefaultFilters()
 
@@ -273,6 +319,8 @@ function hydrateFiltersFromRouteQuery() {
   next.foreign_loan_max = routeQueryNumber('foreign_loan_max')
   next.dk_date_from = routeQueryString('dk_date_from')
   next.dk_date_to = routeQueryString('dk_date_to')
+  next.data_quality_codes = routeDataQualityCodes('data_quality_codes')
+  next.data_quality_stages = routeDataQualityStages('data_quality_stages')
   next.search = routeQueryString('search')
   next.include_history = routeQueryBoolean('include_history')
 
@@ -328,6 +376,12 @@ function buildParams(): ProjectMasterListParams {
   }
   if (appliedFilters.dk_date_from) params.dk_date_from = appliedFilters.dk_date_from
   if (appliedFilters.dk_date_to) params.dk_date_to = appliedFilters.dk_date_to
+  if (appliedFilters.data_quality_codes.length > 0) {
+    params.data_quality_codes = [...appliedFilters.data_quality_codes]
+  }
+  if (appliedFilters.data_quality_stages.length > 0) {
+    params.data_quality_stages = [...appliedFilters.data_quality_stages]
+  }
   if (appliedFilters.include_history) params.include_history = true
 
   params.search = textParam(listControls.debouncedSearch.value)
@@ -524,6 +578,24 @@ function formatProjectFilterValue(key: string, value: unknown) {
       return selectedLabelSummary(value.map((item) => pipelineStatusLabels[item as ProjectPipelineStatus] ?? item))
     }
 
+    if (key === 'data_quality_codes') {
+      return selectedLabelSummary(
+        value.map(
+          (item) =>
+            dataQualityCodeOptions.find((option) => option.value === item)?.label ?? String(item),
+        ),
+      )
+    }
+
+    if (key === 'data_quality_stages') {
+      return selectedLabelSummary(
+        value.map(
+          (item) =>
+            dataQualityStageOptions.find((option) => option.value === item)?.label ?? String(item),
+        ),
+      )
+    }
+
     return selectedLabelSummary(value.map(String))
   }
 
@@ -611,8 +683,8 @@ onUnmounted(() => {
     <SearchFilterBar
       v-model:search="listControls.search.value"
       search-placeholder="Cari nama proyek, indikasi lender, fixed lender, atau executing agency"
-      :active-filters="listControls.activeFilterPills.value"
-      :filter-count="listControls.activeFilterCount.value"
+      :active-filters="activeFilterPills"
+      :filter-count="activeFilterCount"
       @apply="listControls.applyFilters"
       @reset="listControls.resetFilters"
       @remove="listControls.removeFilter"
@@ -723,6 +795,36 @@ onUnmounted(() => {
               placeholder="Semua step"
               filter
               filter-placeholder="Cari status pipeline"
+              display="chip"
+              class="w-full"
+            />
+          </label>
+
+          <label class="block space-y-2 xl:col-span-2">
+            <span class="text-sm font-medium text-surface-700">Kelengkapan Data</span>
+            <MultiSelect
+              v-model="filters.data_quality_codes"
+              :options="dataQualityCodeOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="Semua isu"
+              filter
+              filter-placeholder="Cari isu data"
+              display="chip"
+              class="w-full"
+            />
+          </label>
+
+          <label class="block space-y-2 xl:col-span-2">
+            <span class="text-sm font-medium text-surface-700">Tahap Kelengkapan Data</span>
+            <MultiSelect
+              v-model="filters.data_quality_stages"
+              :options="dataQualityStageOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="Semua tahap"
+              filter
+              filter-placeholder="Cari tahap"
               display="chip"
               class="w-full"
             />

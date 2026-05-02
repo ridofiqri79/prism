@@ -33,6 +33,51 @@ AND (
     sqlc.narg('is_effective')::boolean IS NULL
     OR (la.effective_date <= CURRENT_DATE) = sqlc.narg('is_effective')::boolean
 )
+AND (
+    (
+        COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+        AND COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+    )
+    OR (
+        (
+            'EFFECTIVE_WITHOUT_MONITORING' = ANY(sqlc.arg('risk_codes')::text[])
+            OR 'EFFECTIVE_NO_MONITORING' = ANY(sqlc.arg('data_quality_codes')::text[])
+        )
+        AND la.effective_date <= CURRENT_DATE
+        AND NOT EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_missing
+            WHERE md_missing.loan_agreement_id = la.id
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_missing.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_missing.quarter = sqlc.narg('quarter')::varchar)
+        )
+    )
+    OR (
+        'LOW_ABSORPTION' = ANY(sqlc.arg('risk_codes')::text[])
+        AND EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_low
+            WHERE md_low.loan_agreement_id = la.id
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_low.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_low.quarter = sqlc.narg('quarter')::varchar)
+            GROUP BY md_low.loan_agreement_id
+            HAVING SUM(md_low.planned_usd) > 0
+               AND (SUM(md_low.realized_usd) / SUM(md_low.planned_usd) * 100) < 50
+        )
+    )
+    OR (
+        'PLANNED_ZERO_REALIZED_POSITIVE' = ANY(sqlc.arg('data_quality_codes')::text[])
+        AND EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_quality
+            WHERE md_quality.loan_agreement_id = la.id
+              AND md_quality.planned_usd = 0
+              AND md_quality.realized_usd > 0
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_quality.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_quality.quarter = sqlc.narg('quarter')::varchar)
+        )
+    )
+)
 GROUP BY
     la.id,
     la.loan_code,
@@ -65,6 +110,51 @@ WHERE (
 AND (
     sqlc.narg('is_effective')::boolean IS NULL
     OR (la.effective_date <= CURRENT_DATE) = sqlc.narg('is_effective')::boolean
+)
+AND (
+    (
+        COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+        AND COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+    )
+    OR (
+        (
+            'EFFECTIVE_WITHOUT_MONITORING' = ANY(sqlc.arg('risk_codes')::text[])
+            OR 'EFFECTIVE_NO_MONITORING' = ANY(sqlc.arg('data_quality_codes')::text[])
+        )
+        AND la.effective_date <= CURRENT_DATE
+        AND NOT EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_missing
+            WHERE md_missing.loan_agreement_id = la.id
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_missing.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_missing.quarter = sqlc.narg('quarter')::varchar)
+        )
+    )
+    OR (
+        'LOW_ABSORPTION' = ANY(sqlc.arg('risk_codes')::text[])
+        AND EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_low
+            WHERE md_low.loan_agreement_id = la.id
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_low.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_low.quarter = sqlc.narg('quarter')::varchar)
+            GROUP BY md_low.loan_agreement_id
+            HAVING SUM(md_low.planned_usd) > 0
+               AND (SUM(md_low.realized_usd) / SUM(md_low.planned_usd) * 100) < 50
+        )
+    )
+    OR (
+        'PLANNED_ZERO_REALIZED_POSITIVE' = ANY(sqlc.arg('data_quality_codes')::text[])
+        AND EXISTS (
+            SELECT 1
+            FROM monitoring_disbursement md_quality
+            WHERE md_quality.loan_agreement_id = la.id
+              AND md_quality.planned_usd = 0
+              AND md_quality.realized_usd > 0
+              AND (sqlc.narg('budget_year')::int IS NULL OR md_quality.budget_year = sqlc.narg('budget_year')::int)
+              AND (sqlc.narg('quarter')::varchar IS NULL OR md_quality.quarter = sqlc.narg('quarter')::varchar)
+        )
+    )
 );
 
 -- name: ListMonitoringImportLoanAgreementReferences :many
@@ -120,6 +210,22 @@ AND (
 )
 AND (sqlc.narg('budget_year')::int IS NULL OR budget_year = sqlc.narg('budget_year')::int)
 AND (sqlc.narg('quarter')::varchar IS NULL OR quarter = sqlc.narg('quarter')::varchar)
+AND (
+    (
+        COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+        AND COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+    )
+    OR (
+        'LOW_ABSORPTION' = ANY(sqlc.arg('risk_codes')::text[])
+        AND planned_usd > 0
+        AND (realized_usd / planned_usd * 100) < 50
+    )
+    OR (
+        'PLANNED_ZERO_REALIZED_POSITIVE' = ANY(sqlc.arg('data_quality_codes')::text[])
+        AND planned_usd = 0
+        AND realized_usd > 0
+    )
+)
 ORDER BY budget_year ASC, quarter ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -139,7 +245,23 @@ AND (
     )
 )
 AND (sqlc.narg('budget_year')::int IS NULL OR budget_year = sqlc.narg('budget_year')::int)
-AND (sqlc.narg('quarter')::varchar IS NULL OR quarter = sqlc.narg('quarter')::varchar);
+AND (sqlc.narg('quarter')::varchar IS NULL OR quarter = sqlc.narg('quarter')::varchar)
+AND (
+    (
+        COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+        AND COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+    )
+    OR (
+        'LOW_ABSORPTION' = ANY(sqlc.arg('risk_codes')::text[])
+        AND planned_usd > 0
+        AND (realized_usd / planned_usd * 100) < 50
+    )
+    OR (
+        'PLANNED_ZERO_REALIZED_POSITIVE' = ANY(sqlc.arg('data_quality_codes')::text[])
+        AND planned_usd = 0
+        AND realized_usd > 0
+    )
+);
 
 -- name: GetMonitoring :one
 SELECT *

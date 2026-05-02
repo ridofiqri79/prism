@@ -48,6 +48,10 @@ function normalizedPercent(value: string | number | null | undefined) {
   return Math.min(100, Math.max(0, numeric))
 }
 
+function isBlankCell(value: string | number | null | undefined) {
+  return value === null || value === undefined || value === ''
+}
+
 function absorptionClass(value: string | number | null | undefined) {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0
 
@@ -110,10 +114,11 @@ function cellClass(column: AnalyticsBreakdownTableColumn) {
               :class="cellClass(column)"
             >
               <CurrencyDisplay
-                v-if="column.kind === 'currency'"
+                v-if="column.kind === 'currency' && !isBlankCell(row.cells[column.key])"
                 :amount="Number(row.cells[column.key] ?? 0)"
                 currency="USD"
               />
+              <span v-else-if="column.kind === 'currency'">-</span>
               <span v-else-if="column.kind === 'percent'">{{
                 formatPercent(row.cells[column.key])
               }}</span>

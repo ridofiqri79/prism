@@ -21,6 +21,11 @@ type LAService struct {
 	broker  *sse.Broker
 }
 
+var loanAgreementRiskCodeSet = map[string]struct{}{
+	"EXTENDED_LOAN": {},
+	"CLOSING_RISK":  {},
+}
+
 func NewLAService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.Broker) *LAService {
 	return &LAService{db: db, queries: queries, broker: broker}
 }
@@ -40,6 +45,7 @@ func (s *LAService) ListLoanAgreements(ctx context.Context, filter model.LoanAgr
 		LenderID:          queryParams.LenderID,
 		IsExtended:        queryParams.IsExtended,
 		ClosingDateBefore: queryParams.ClosingDateBefore,
+		RiskCodes:         queryParams.RiskCodes,
 	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung Loan Agreement")
@@ -71,11 +77,16 @@ func buildLoanAgreementListParams(filter model.LoanAgreementListFilter, params m
 	if err != nil {
 		return queries.ListLoanAgreementsParams{}, err
 	}
+	riskCodes, err := allowedValues(filter.RiskCodes, loanAgreementRiskCodeSet, "risk_codes")
+	if err != nil {
+		return queries.ListLoanAgreementsParams{}, err
+	}
 	return queries.ListLoanAgreementsParams{
 		Search:            nullableText(params.Search),
 		LenderID:          lenderID,
 		IsExtended:        isExtended,
 		ClosingDateBefore: closingDateBefore,
+		RiskCodes:         riskCodes,
 		Limit:             int32(limit),
 		Offset:            int32(offset),
 	}, nil

@@ -20,7 +20,11 @@ func NewMonitoringHandler(service *service.MonitoringService) *MonitoringHandler
 
 func (h *MonitoringHandler) ListLoanAgreementReferences(c echo.Context) error {
 	res, err := h.service.ListLoanAgreementReferences(c.Request().Context(), model.MonitoringLoanAgreementListFilter{
-		IsEffective: queryStringPtr(c, "is_effective"),
+		IsEffective:      queryStringPtr(c, "is_effective"),
+		BudgetYear:       queryStringPtr(c, "budget_year"),
+		Quarter:          queryStringPtr(c, "quarter"),
+		RiskCodes:        queryValues(c, "risk_codes", "risk_codes[]"),
+		DataQualityCodes: queryValues(c, "data_quality_codes", "data_quality_codes[]"),
 	}, paginationParams(c))
 	if err != nil {
 		return err
@@ -42,8 +46,10 @@ func (h *MonitoringHandler) List(c echo.Context) error {
 
 func monitoringListFilter(c echo.Context) model.MonitoringListFilter {
 	return model.MonitoringListFilter{
-		BudgetYear: queryStringPtr(c, "budget_year"),
-		Quarter:    queryStringPtr(c, "quarter"),
+		BudgetYear:       queryStringPtr(c, "budget_year"),
+		Quarter:          queryStringPtr(c, "quarter"),
+		RiskCodes:        queryValues(c, "risk_codes", "risk_codes[]"),
+		DataQualityCodes: queryValues(c, "data_quality_codes", "data_quality_codes[]"),
 	}
 }
 

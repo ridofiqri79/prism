@@ -23,11 +23,26 @@ const supportedQueryKeys: Record<DrilldownTarget, Set<string>> = {
     'region_ids',
     'foreign_loan_min',
     'foreign_loan_max',
+    'data_quality_codes',
+    'data_quality_stages',
     'include_history',
     'search',
   ]),
-  monitoring: new Set(['search', 'is_effective']),
-  loan_agreements: new Set(['search', 'lender_id', 'is_extended', 'closing_date_before']),
+  monitoring: new Set([
+    'search',
+    'is_effective',
+    'budget_year',
+    'quarter',
+    'risk_codes',
+    'data_quality_codes',
+  ]),
+  loan_agreements: new Set([
+    'search',
+    'lender_id',
+    'is_extended',
+    'closing_date_before',
+    'risk_codes',
+  ]),
   spatial_distribution: new Set(['region_ids', 'provinceCode', 'sectorId', 'mode']),
 }
 
@@ -60,6 +75,10 @@ function mappedQuery(target: DrilldownTarget, sourceQuery: Record<string, string
   const ignored: string[] = []
 
   Object.entries(sourceQuery).forEach(([key, values]) => {
+    if (target === 'projects' && key === 'include_history' && !values.includes('true')) {
+      return
+    }
+
     if (supported.has(key)) {
       addQueryValue(query, key, values)
       return
@@ -77,6 +96,16 @@ function mappedQuery(target: DrilldownTarget, sourceQuery: Record<string, string
 
     if (target === 'projects' && key === 'lender_types') {
       addQueryValue(query, 'loan_types', values)
+      return
+    }
+
+    if (target === 'projects' && key === 'data_quality' && values.includes('true')) {
+      addQueryValue(query, 'data_quality_codes', [
+        'NO_EXECUTING_AGENCY',
+        'NO_LENDER',
+        'NO_REGION',
+        'NO_FUNDING_AMOUNT',
+      ])
       return
     }
 

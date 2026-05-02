@@ -13,6 +13,8 @@ type ProjectMasterFilter struct {
 	ForeignLoanMax      *string
 	DKDateFrom          *string
 	DKDateTo            *string
+	DataQualityCodes    []string
+	DataQualityStages   []string
 	Search              *string
 	IncludeHistory      bool
 }

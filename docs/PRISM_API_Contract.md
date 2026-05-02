@@ -1302,6 +1302,7 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `lender_id` | Filter by lender |
 | `is_extended` | Filter: `true` / `false` |
 | `closing_date_before` | Filter LA yang akan berakhir sebelum tanggal ini |
+| `risk_codes` | Multi value: `CLOSING_RISK`, `EXTENDED_LOAN`. Dipakai drilldown Dashboard Analytics; `CLOSING_RISK` memakai LA efektif, closing <= 12 bulan, dan penyerapan < 80%. |
 
 ---
 
@@ -1316,7 +1317,16 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `POST` | `/monitoring/import/preview` | ADMIN only |
 | `POST` | `/monitoring/import/execute` | ADMIN only |
 
-`GET /monitoring/loan-agreements` dipakai halaman Monitoring Disbursement sebagai daftar Loan Agreement yang dapat dibuka ke monitoring triwulan. Query params mengikuti pola list umum: `page`, `limit`, `search`, dan `is_effective`. Search mencakup `loan_code`, lender, nomor surat Daftar Kegiatan, dan nama proyek Daftar Kegiatan.
+`GET /monitoring/loan-agreements` dipakai halaman Monitoring Disbursement sebagai daftar Loan Agreement yang dapat dibuka ke monitoring triwulan. Query params mengikuti pola list umum: `page`, `limit`, `search`, `is_effective`, `budget_year`, `quarter`, `risk_codes`, dan `data_quality_codes`. Search mencakup `loan_code`, lender, nomor surat Daftar Kegiatan, dan nama proyek Daftar Kegiatan.
+
+Filter drilldown analytics yang didukung:
+
+| Param | Format | Keterangan |
+|-------|--------|------------|
+| `budget_year` | number | Filter periode monitoring atau periode yang belum memiliki monitoring |
+| `quarter` | enum | `TW1`, `TW2`, `TW3`, `TW4` |
+| `risk_codes` | Multi value | `EFFECTIVE_WITHOUT_MONITORING`, `LOW_ABSORPTION` |
+| `data_quality_codes` | Multi value | `EFFECTIVE_NO_MONITORING`, `PLANNED_ZERO_REALIZED_POSITIVE` |
 
 Import Monitoring Disbursement bersifat **create-only**. Endpoint ini hanya membuat monitoring baru untuk kombinasi `Loan Agreement + Budget Year + Quarter` yang belum ada. Kombinasi periode yang sudah ada masuk status `skip`; duplikat periode baru dalam workbook masuk status `failed`.
 
@@ -1356,6 +1366,8 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `search` | string | Cari berdasarkan tahun anggaran, triwulan, atau nama komponen |
 | `budget_year` | number | Filter tahun anggaran |
 | `quarter` | enum | `TW1`, `TW2`, `TW3`, `TW4` |
+| `risk_codes` | Multi value | `LOW_ABSORPTION` untuk baris monitoring dengan `planned_usd > 0` dan penyerapan < 50; `EFFECTIVE_WITHOUT_MONITORING` diterima dari drilldown LA spesifik dan menghasilkan daftar kosong bila belum ada baris monitoring |
+| `data_quality_codes` | Multi value | `PLANNED_ZERO_REALIZED_POSITIVE`; `EFFECTIVE_NO_MONITORING` diterima dari drilldown LA spesifik dan menghasilkan daftar kosong bila belum ada baris monitoring |
 
 **`POST /loan-agreements/:la_id/monitoring` Request:**
 ```json
@@ -2050,6 +2062,8 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `region_ids` | Multi value UUID region/location |
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
 | `dk_date_from`, `dk_date_to` | Range tanggal DK, format `YYYY-MM-DD` |
+| `data_quality_codes` | Multi value: `NO_EXECUTING_AGENCY`, `NO_LENDER`, `NO_REGION`, `NO_FUNDING_AMOUNT`. Filter project yang memiliki isu kelengkapan data pada stage terkait. |
+| `data_quality_stages` | Multi value: `Blue Book`, `Green Book Funding Source`, `Daftar Kegiatan Financing`. Digunakan bersama `data_quality_codes` untuk drilldown dashboard analytics. |
 | `search` | Search global untuk kode/nama proyek, indikasi lender, fixed lender Green Book, dan executing agency |
 | `include_history` | `true` untuk menampilkan semua snapshot, default `false` |
 

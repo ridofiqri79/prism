@@ -46,7 +46,10 @@ export interface LoanAgreementListParams extends ListParams {
   lender_id?: string
   is_extended?: boolean
   closing_date_before?: string
+  risk_codes?: LoanAgreementRiskCode[]
 }
+
+export type LoanAgreementRiskCode = 'EXTENDED_LOAN' | 'CLOSING_RISK'
 
 export interface DKProjectLoanOption extends DKProject {
   label: string

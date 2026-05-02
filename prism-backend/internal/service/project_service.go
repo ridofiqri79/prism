@@ -22,6 +22,20 @@ const (
 	projectMasterExportFilterLabelLimit = 20
 )
 
+var (
+	projectMasterDataQualityCodeSet = map[string]struct{}{
+		"NO_EXECUTING_AGENCY": {},
+		"NO_LENDER":           {},
+		"NO_REGION":           {},
+		"NO_FUNDING_AMOUNT":   {},
+	}
+	projectMasterDataQualityStageSet = map[string]struct{}{
+		"Blue Book":                 {},
+		"Green Book Funding Source": {},
+		"Daftar Kegiatan Financing": {},
+	}
+)
+
 func NewProjectService(queries *queries.Queries) *ProjectService {
 	return &ProjectService{queries: queries}
 }
@@ -177,6 +191,14 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
 	}
+	dataQualityCodes, err := allowedValues(filter.DataQualityCodes, projectMasterDataQualityCodeSet, "data_quality_codes")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	dataQualityStages, err := allowedValues(filter.DataQualityStages, projectMasterDataQualityStageSet, "data_quality_stages")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
 	if foreignLoanMin.Valid && foreignLoanMax.Valid && floatFromNumeric(foreignLoanMin) > floatFromNumeric(foreignLoanMax) {
 		return queries.ListProjectMasterParams{}, validation("foreign_loan_max", "harus lebih besar dari nilai minimum")
 	}
@@ -194,6 +216,8 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 		Offset:              int32(offset),
 		Limit:               int32(limit),
 		IncludeHistory:      filter.IncludeHistory,
+		DataQualityCodes:    dataQualityCodes,
+		DataQualityStages:   dataQualityStages,
 		LoanTypes:           loanTypes,
 		IndicationLenderIds: indicationLenderIDs,
 		ExecutingAgencyIds:  executingAgencyIDs,
@@ -224,6 +248,8 @@ func countProjectMasterParams(params queries.ListProjectMasterParams) queries.Co
 		ForeignLoanMax:      params.ForeignLoanMax,
 		DkDateFrom:          params.DkDateFrom,
 		DkDateTo:            params.DkDateTo,
+		DataQualityCodes:    params.DataQualityCodes,
+		DataQualityStages:   params.DataQualityStages,
 		Search:              params.Search,
 		IncludeHistory:      params.IncludeHistory,
 	}
@@ -231,6 +257,9 @@ func countProjectMasterParams(params queries.ListProjectMasterParams) queries.Co
 
 func summaryProjectMasterParams(params queries.ListProjectMasterParams) queries.GetProjectMasterFundingSummaryParams {
 	return queries.GetProjectMasterFundingSummaryParams{
+		IncludeHistory:      params.IncludeHistory,
+		DataQualityCodes:    params.DataQualityCodes,
+		DataQualityStages:   params.DataQualityStages,
 		LoanTypes:           params.LoanTypes,
 		IndicationLenderIds: params.IndicationLenderIds,
 		ExecutingAgencyIds:  params.ExecutingAgencyIds,
@@ -244,7 +273,6 @@ func summaryProjectMasterParams(params queries.ListProjectMasterParams) queries.
 		DkDateFrom:          params.DkDateFrom,
 		DkDateTo:            params.DkDateTo,
 		Search:              params.Search,
-		IncludeHistory:      params.IncludeHistory,
 	}
 }
 
@@ -423,6 +451,8 @@ func (s *ProjectService) projectMasterExportFilters(ctx context.Context, params 
 	addFilter("Status Pipeline", joinExportFilterValues(projectPipelineLabels(params.PipelineStatuses)))
 	addFilter("Program Title", joinExportValues(s.projectProgramTitleLabels(ctx, params.ProgramTitleIds)))
 	addFilter("Region/Location", joinExportValues(s.projectRegionLabels(ctx, params.RegionIds)))
+	addFilter("Kode Kelengkapan Data", joinExportFilterValues(projectDataQualityLabels(params.DataQualityCodes)))
+	addFilter("Tahap Kelengkapan Data", joinExportFilterValues(params.DataQualityStages))
 
 	if params.ForeignLoanMin.Valid && params.ForeignLoanMax.Valid {
 		addFilter("Nilai Pinjaman USD", exportNumericLabel(params.ForeignLoanMin)+" - "+exportNumericLabel(params.ForeignLoanMax))
@@ -600,6 +630,25 @@ func projectPipelineLabels(statuses []string) []string {
 	labels := make([]string, 0, len(statuses))
 	for _, status := range statuses {
 		labels = append(labels, projectPipelineLabel(status))
+	}
+	return labels
+}
+
+func projectDataQualityLabels(codes []string) []string {
+	labels := make([]string, 0, len(codes))
+	for _, code := range codes {
+		switch code {
+		case "NO_EXECUTING_AGENCY":
+			labels = append(labels, "Tanpa Kementerian/Lembaga")
+		case "NO_LENDER":
+			labels = append(labels, "Tanpa Lender")
+		case "NO_REGION":
+			labels = append(labels, "Tanpa Lokasi")
+		case "NO_FUNDING_AMOUNT":
+			labels = append(labels, "Tanpa Nilai Pendanaan")
+		default:
+			labels = append(labels, code)
+		}
 	}
 	return labels
 }

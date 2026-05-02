@@ -59,12 +59,18 @@ type MonitoringLoanAgreementResponse struct {
 }
 
 type MonitoringLoanAgreementListFilter struct {
-	IsEffective *string
+	IsEffective      *string
+	BudgetYear       *string
+	Quarter          *string
+	RiskCodes        []string
+	DataQualityCodes []string
 }
 
 type MonitoringListFilter struct {
-	BudgetYear *string
-	Quarter    *string
+	BudgetYear       *string
+	Quarter          *string
+	RiskCodes        []string
+	DataQualityCodes []string
 }
 
 type MonitoringKomponenResponse struct {

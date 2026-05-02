@@ -1,6 +1,10 @@
 import type { Lender, ListParams } from '@/types/master.types'
 
 export type Quarter = 'TW1' | 'TW2' | 'TW3' | 'TW4'
+export type MonitoringRiskCode = 'EFFECTIVE_WITHOUT_MONITORING' | 'LOW_ABSORPTION'
+export type MonitoringDataQualityCode =
+  | 'EFFECTIVE_NO_MONITORING'
+  | 'PLANNED_ZERO_REALIZED_POSITIVE'
 
 export interface MonitoringKomponen {
   id?: string
@@ -50,6 +54,8 @@ export interface MonitoringListParams extends ListParams {
   search?: string
   budget_year?: number
   quarter?: Quarter
+  risk_codes?: MonitoringRiskCode[]
+  data_quality_codes?: MonitoringDataQualityCode[]
 }
 
 export interface MonitoringLoanAgreementReference {
@@ -69,6 +75,10 @@ export interface MonitoringLoanAgreementReference {
 export interface MonitoringLoanAgreementListParams extends ListParams {
   search?: string
   is_effective?: boolean
+  budget_year?: number
+  quarter?: Quarter
+  risk_codes?: MonitoringRiskCode[]
+  data_quality_codes?: MonitoringDataQualityCode[]
 }
 
 export type MonitoringApiResponse = Omit<MonitoringDisbursement, 'absorption_pct'> & {

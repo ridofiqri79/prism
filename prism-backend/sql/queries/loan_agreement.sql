@@ -35,6 +35,26 @@ AND (
     sqlc.narg('closing_date_before')::date IS NULL
     OR la.closing_date <= sqlc.narg('closing_date_before')::date
 )
+AND (
+    COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+    OR (
+        'EXTENDED_LOAN' = ANY(sqlc.arg('risk_codes')::text[])
+        AND la.closing_date <> la.original_closing_date
+    )
+    OR (
+        'CLOSING_RISK' = ANY(sqlc.arg('risk_codes')::text[])
+        AND la.effective_date <= CURRENT_DATE
+        AND la.closing_date <= CURRENT_DATE + INTERVAL '12 months'
+        AND COALESCE((
+            SELECT CASE
+                WHEN SUM(md.planned_usd) > 0 THEN SUM(md.realized_usd) / SUM(md.planned_usd) * 100
+                ELSE 0
+            END
+            FROM monitoring_disbursement md
+            WHERE md.loan_agreement_id = la.id
+        ), 0) < 80
+    )
+)
 ORDER BY la.created_at DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -56,6 +76,26 @@ AND (
 AND (
     sqlc.narg('closing_date_before')::date IS NULL
     OR la.closing_date <= sqlc.narg('closing_date_before')::date
+)
+AND (
+    COALESCE(cardinality(sqlc.arg('risk_codes')::text[]), 0) = 0
+    OR (
+        'EXTENDED_LOAN' = ANY(sqlc.arg('risk_codes')::text[])
+        AND la.closing_date <> la.original_closing_date
+    )
+    OR (
+        'CLOSING_RISK' = ANY(sqlc.arg('risk_codes')::text[])
+        AND la.effective_date <= CURRENT_DATE
+        AND la.closing_date <= CURRENT_DATE + INTERVAL '12 months'
+        AND COALESCE((
+            SELECT CASE
+                WHEN SUM(md.planned_usd) > 0 THEN SUM(md.realized_usd) / SUM(md.planned_usd) * 100
+                ELSE 0
+            END
+            FROM monitoring_disbursement md
+            WHERE md.loan_agreement_id = la.id
+        ), 0) < 80
+    )
 );
 
 -- name: GetLoanAgreement :one

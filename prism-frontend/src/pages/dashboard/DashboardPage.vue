@@ -21,6 +21,7 @@ import type {
   DashboardAbsorptionRankedItem,
   DashboardAnalyticsPipelineStage,
   DashboardDrilldownQuery,
+  DashboardLoanAgreementRiskItem,
   DashboardLenderProportionStage,
   DashboardYearlyItem,
 } from '@/types/dashboard.types'
@@ -130,8 +131,27 @@ const yearlyColumns: AnalyticsBreakdownTableColumn[] = [
   { key: 'project_count', label: 'Project Aktif', kind: 'number', align: 'right' },
   { key: 'drilldown', label: 'Aksi', kind: 'drilldown', align: 'center' },
 ]
-const riskColumns: AnalyticsBreakdownTableColumn[] = [
-  { key: 'label', label: 'Risk/Data Quality' },
+const riskWatchlistColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'category', label: 'Kategori' },
+  { key: 'project', label: 'Project' },
+  { key: 'institution', label: 'Kementerian/Lembaga' },
+  { key: 'lender', label: 'Lender' },
+  { key: 'amount_usd', label: 'Nilai USD', kind: 'currency', align: 'right' },
+  { key: 'absorption_pct', label: 'Penyerapan', kind: 'absorption', align: 'left' },
+  { key: 'severity', label: 'Status', kind: 'badge', align: 'center' },
+  { key: 'drilldown', label: 'Aksi', kind: 'drilldown', align: 'center' },
+]
+const pipelineBottleneckColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'label', label: 'Kategori' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'count', label: 'Jumlah', kind: 'number', align: 'right' },
+  { key: 'amount_usd', label: 'Nilai USD', kind: 'currency', align: 'right' },
+  { key: 'oldest_date', label: 'Tanggal Terlama' },
+  { key: 'severity', label: 'Severity', kind: 'badge', align: 'center' },
+  { key: 'drilldown', label: 'Aksi', kind: 'drilldown', align: 'center' },
+]
+const dataQualityColumns: AnalyticsBreakdownTableColumn[] = [
+  { key: 'label', label: 'Kelengkapan data' },
   { key: 'stage', label: 'Stage' },
   { key: 'count', label: 'Jumlah', kind: 'number', align: 'right' },
   { key: 'severity', label: 'Severity', kind: 'badge', align: 'center' },
@@ -224,13 +244,24 @@ const yearlyMetrics = computed<AnalyticsMoneyMetric[]>(() => {
 const riskMetrics = computed<AnalyticsMoneyMetric[]>(() =>
   (analytics.risks.value?.risk_cards ?? []).map((card) => ({
     key: card.code,
-    label: card.label,
+    label: riskCardLabel(card.code, card.label),
     value: card.amount_usd ?? card.count,
     format: card.amount_usd !== undefined ? 'currency' : 'number',
     unit: card.amount_usd !== undefined ? 'USD' : undefined,
     severity:
       card.severity === 'warning' ? 'warning' : card.severity === 'danger' ? 'danger' : 'info',
     drilldown: card.drilldown,
+  })),
+)
+const dataQualityMetrics = computed<AnalyticsMoneyMetric[]>(() =>
+  (analytics.risks.value?.data_quality ?? []).map((item) => ({
+    key: `${item.code}-${item.stage}`,
+    label: `${item.label} - ${item.stage}`,
+    value: item.count,
+    format: 'number',
+    severity:
+      item.severity === 'warning' ? 'warning' : item.severity === 'danger' ? 'danger' : 'info',
+    drilldown: item.drilldown,
   })),
 )
 
@@ -348,19 +379,35 @@ const yearlyRows = computed<AnalyticsBreakdownTableRow[]>(() =>
     drilldown: item.drilldown,
   })),
 )
-const riskRows = computed<AnalyticsBreakdownTableRow[]>(() => [
-  ...(analytics.risks.value?.watchlists.pipeline_bottlenecks ?? []).map((item) => ({
+const riskWatchlistRows = computed<AnalyticsBreakdownTableRow[]>(() => [
+  ...riskRowsFor(
+    'Penyerapan rendah',
+    analytics.risks.value?.watchlists.low_absorption_projects ?? [],
+  ),
+  ...riskRowsFor(
+    'Loan Agreement efektif tanpa monitoring',
+    analytics.risks.value?.watchlists.effective_without_monitoring ?? [],
+  ),
+  ...riskRowsFor('Mendekati closing date', analytics.risks.value?.watchlists.closing_risks ?? []),
+  ...riskRowsFor('Loan Agreement diperpanjang', analytics.risks.value?.watchlists.extended_loans ?? []),
+])
+const pipelineBottleneckRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.risks.value?.watchlists.pipeline_bottlenecks ?? []).map((item) => ({
     id: `bottleneck-${item.stage}`,
     severity: item.severity,
     cells: {
       label: item.label,
       stage: stageLabel(item.stage),
       count: item.project_count,
+      amount_usd: item.total_loan_usd,
+      oldest_date: item.oldest_date || '-',
       severity: item.severity,
     },
     drilldown: item.drilldown,
   })),
-  ...(analytics.risks.value?.data_quality ?? []).map((item) => ({
+)
+const dataQualityRows = computed<AnalyticsBreakdownTableRow[]>(() =>
+  (analytics.risks.value?.data_quality ?? []).map((item) => ({
     id: `data-quality-${item.code}-${item.stage}`,
     severity: item.severity,
     cells: {
@@ -371,7 +418,7 @@ const riskRows = computed<AnalyticsBreakdownTableRow[]>(() => [
     },
     drilldown: item.drilldown,
   })),
-])
+)
 
 const pipelineFunnelChartOption = computed(() => {
   const rows = analytics.overview.value?.pipeline_funnel ?? []
@@ -576,6 +623,9 @@ const lenderProportionAmountNotes = computed(() =>
     .filter((stage) => stageTotalAmount(stage) === 0 && stageTotalProjects(stage) > 0)
     .map((stage) => stage.stage),
 )
+const currentTabSections = computed(
+  () => tabs.find((tab) => tab.key === activeTab.value)?.sections ?? [],
+)
 
 function metric(
   key: string,
@@ -641,6 +691,57 @@ function absorptionRankRows(rows: DashboardAbsorptionRankedItem[]): AnalyticsBre
   }))
 }
 
+function riskRowsFor(
+  category: string,
+  items: DashboardLoanAgreementRiskItem[],
+): AnalyticsBreakdownTableRow[] {
+  return items.map((item) => ({
+    id: `${category}-${item.loan_agreement_id}-${item.risk_code}-${item.budget_year ?? ''}-${item.quarter ?? ''}`,
+    severity: item.severity,
+    cells: {
+      category,
+      project: item.project_name || '-',
+      institution: item.institution ? institutionLabel(item.institution) : '-',
+      lender: lenderLabel(item.lender),
+      amount_usd: riskAmountUSD(item),
+      absorption_pct: riskHasAbsorption(item) ? item.absorption_pct : null,
+      severity: severityLabel(item.severity),
+    },
+    drilldown: item.drilldown,
+  }))
+}
+
+function riskAmountUSD(item: DashboardLoanAgreementRiskItem) {
+  if (item.risk_code === 'LOW_ABSORPTION') return item.planned_usd
+  if (item.agreement_amount_usd !== undefined) return item.agreement_amount_usd
+  return null
+}
+
+function riskHasAbsorption(item: DashboardLoanAgreementRiskItem) {
+  return item.risk_code === 'LOW_ABSORPTION' || item.risk_code === 'CLOSING_RISK'
+}
+
+function severityLabel(value: string) {
+  if (value === 'danger') return 'Tinggi'
+  if (value === 'warning') return 'Perlu perhatian'
+  if (value === 'success') return 'Selesai'
+  if (value === 'info') return 'Info'
+  return value || '-'
+}
+
+function riskCardLabel(code: string, fallback: string) {
+  const labels: Record<string, string> = {
+    LOW_ABSORPTION: 'Penyerapan rendah',
+    EFFECTIVE_WITHOUT_MONITORING: 'Loan Agreement efektif tanpa monitoring',
+    CLOSING_RISK: 'Mendekati closing date',
+    EXTENDED_LOAN: 'Loan Agreement diperpanjang',
+    PIPELINE_BOTTLENECK: 'Belum berlanjut ke tahap berikutnya',
+    DATA_QUALITY: 'Kelengkapan data',
+  }
+
+  return labels[code] ?? fallback
+}
+
 function institutionLabel(institution: { name: string; short_name?: string | null }) {
   return institution.short_name ? `${institution.name} (${institution.short_name})` : institution.name
 }
@@ -659,6 +760,12 @@ function sectionError(sections: DashboardAnalyticsSectionKey[]) {
 
 function handleDrilldown(drilldown: DashboardDrilldownQuery) {
   void analytics.openDrilldown(drilldown)
+}
+
+function retryActiveSections() {
+  currentTabSections.value.forEach((section) => {
+    void analytics.fetchSection(section)
+  })
 }
 
 function quarterIndex(quarter: string) {
@@ -818,10 +925,18 @@ onMounted(() => {
     </nav>
 
     <section
-      v-if="sectionError(tabs.find((tab) => tab.key === activeTab)?.sections ?? [])"
-      class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      v-if="sectionError(currentTabSections)"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
     >
-      {{ sectionError(tabs.find((tab) => tab.key === activeTab)?.sections ?? []) }}
+      <span>{{ sectionError(currentTabSections) }}</span>
+      <Button
+        label="Coba lagi"
+        icon="pi pi-refresh"
+        severity="danger"
+        size="small"
+        outlined
+        @click="retryActiveSections"
+      />
     </section>
 
     <section v-if="activeTab === 'portfolio'" class="space-y-4">
@@ -1016,10 +1131,39 @@ onMounted(() => {
         description="Endpoint risks mengembalikan daftar kosong untuk filter aktif."
       />
       <AnalyticsBreakdownTable
-        title="Risiko & Data Quality"
-        :columns="riskColumns"
-        :rows="riskRows"
+        title="Risk Watchlist"
+        description="Loan Agreement, monitoring, dan risiko closing ditampilkan dengan stage legal yang eksplisit."
+        :columns="riskWatchlistColumns"
+        :rows="riskWatchlistRows"
         :loading="sectionLoading(['risks'])"
+        empty-title="Tidak ada risiko aktif"
+        empty-description="Tidak ada watchlist Loan Agreement atau monitoring untuk filter aktif."
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Belum berlanjut ke tahap berikutnya"
+        description="Project pipeline memakai latest snapshot default dan tidak menghitung revisi historis ganda."
+        :columns="pipelineBottleneckColumns"
+        :rows="pipelineBottleneckRows"
+        :loading="sectionLoading(['risks'])"
+        empty-title="Tidak ada bottleneck pipeline"
+        empty-description="Tidak ada project yang tertahan pada filter aktif."
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsMetricGrid
+        v-if="dataQualityMetrics.length > 0 || sectionLoading(['risks'])"
+        :metrics="dataQualityMetrics"
+        :loading="sectionLoading(['risks'])"
+        @drilldown="handleDrilldown"
+      />
+      <AnalyticsBreakdownTable
+        title="Kelengkapan data"
+        description="Klik tiap isu untuk membuka workspace target dengan filter yang masih bisa diubah."
+        :columns="dataQualityColumns"
+        :rows="dataQualityRows"
+        :loading="sectionLoading(['risks'])"
+        empty-title="Tidak ada isu kelengkapan data"
+        empty-description="Data quality tidak menemukan isu untuk filter aktif."
         @drilldown="handleDrilldown"
       />
     </section>

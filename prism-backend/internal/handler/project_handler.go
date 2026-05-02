@@ -50,6 +50,8 @@ func projectMasterFilter(c echo.Context) model.ProjectMasterFilter {
 		ForeignLoanMax:      queryStringPtr(c, "foreign_loan_max"),
 		DKDateFrom:          queryStringPtr(c, "dk_date_from"),
 		DKDateTo:            queryStringPtr(c, "dk_date_to"),
+		DataQualityCodes:    queryValues(c, "data_quality_codes", "data_quality_codes[]"),
+		DataQualityStages:   queryValues(c, "data_quality_stages", "data_quality_stages[]"),
 		Search:              queryStringPtr(c, "search"),
 		IncludeHistory:      strings.EqualFold(c.QueryParam("include_history"), "true"),
 	}

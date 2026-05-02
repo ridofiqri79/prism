@@ -24,6 +24,17 @@ type MonitoringService struct {
 	broker  *sse.Broker
 }
 
+var (
+	monitoringRiskCodeSet = map[string]struct{}{
+		"EFFECTIVE_WITHOUT_MONITORING": {},
+		"LOW_ABSORPTION":               {},
+	}
+	monitoringDataQualityCodeSet = map[string]struct{}{
+		"EFFECTIVE_NO_MONITORING":        {},
+		"PLANNED_ZERO_REALIZED_POSITIVE": {},
+	}
+)
+
 func NewMonitoringService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.Broker) *MonitoringService {
 	return &MonitoringService{db: db, queries: queries, broker: broker}
 }
@@ -34,19 +45,43 @@ func (s *MonitoringService) ListLoanAgreementReferences(ctx context.Context, fil
 	if err != nil {
 		return nil, err
 	}
+	budgetYear, err := optionalInt4(filter.BudgetYear, "budget_year")
+	if err != nil {
+		return nil, err
+	}
+	quarter, err := optionalQuarter(filter.Quarter, "quarter")
+	if err != nil {
+		return nil, err
+	}
+	riskCodes, err := allowedValues(filter.RiskCodes, monitoringRiskCodeSet, "risk_codes")
+	if err != nil {
+		return nil, err
+	}
+	dataQualityCodes, err := allowedValues(filter.DataQualityCodes, monitoringDataQualityCodeSet, "data_quality_codes")
+	if err != nil {
+		return nil, err
+	}
 	queryParams := queries.ListMonitoringLoanAgreementReferencesParams{
-		Search:      nullableText(params.Search),
-		IsEffective: isEffective,
-		Limit:       int32(limit),
-		Offset:      int32(offset),
+		Search:           nullableText(params.Search),
+		IsEffective:      isEffective,
+		RiskCodes:        riskCodes,
+		DataQualityCodes: dataQualityCodes,
+		BudgetYear:       budgetYear,
+		Quarter:          quarter,
+		Limit:            int32(limit),
+		Offset:           int32(offset),
 	}
 	rows, err := s.queries.ListMonitoringLoanAgreementReferences(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar Loan Agreement untuk monitoring")
 	}
 	total, err := s.queries.CountMonitoringLoanAgreementReferences(ctx, queries.CountMonitoringLoanAgreementReferencesParams{
-		Search:      queryParams.Search,
-		IsEffective: queryParams.IsEffective,
+		Search:           queryParams.Search,
+		IsEffective:      queryParams.IsEffective,
+		RiskCodes:        queryParams.RiskCodes,
+		DataQualityCodes: queryParams.DataQualityCodes,
+		BudgetYear:       queryParams.BudgetYear,
+		Quarter:          queryParams.Quarter,
 	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung daftar Loan Agreement untuk monitoring")
@@ -72,10 +107,12 @@ func (s *MonitoringService) ListMonitoring(ctx context.Context, laID pgtype.UUID
 		return nil, apperrors.Internal("Gagal mengambil monitoring")
 	}
 	total, err := s.queries.CountMonitoringByLA(ctx, queries.CountMonitoringByLAParams{
-		LoanAgreementID: queryParams.LoanAgreementID,
-		Search:          queryParams.Search,
-		BudgetYear:      queryParams.BudgetYear,
-		Quarter:         queryParams.Quarter,
+		LoanAgreementID:  queryParams.LoanAgreementID,
+		Search:           queryParams.Search,
+		BudgetYear:       queryParams.BudgetYear,
+		Quarter:          queryParams.Quarter,
+		RiskCodes:        queryParams.RiskCodes,
+		DataQualityCodes: queryParams.DataQualityCodes,
 	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung monitoring")
@@ -96,22 +133,39 @@ func buildMonitoringListParams(laID pgtype.UUID, filter model.MonitoringListFilt
 	if err != nil {
 		return queries.ListMonitoringByLAParams{}, err
 	}
-	quarter := pgtype.Text{}
-	if filter.Quarter != nil && strings.TrimSpace(*filter.Quarter) != "" {
-		value := strings.ToUpper(strings.TrimSpace(*filter.Quarter))
-		if value != "TW1" && value != "TW2" && value != "TW3" && value != "TW4" {
-			return queries.ListMonitoringByLAParams{}, validation("quarter", "harus TW1, TW2, TW3, atau TW4")
-		}
-		quarter = pgtype.Text{String: value, Valid: true}
+	quarter, err := optionalQuarter(filter.Quarter, "quarter")
+	if err != nil {
+		return queries.ListMonitoringByLAParams{}, err
+	}
+	riskCodes, err := allowedValues(filter.RiskCodes, monitoringRiskCodeSet, "risk_codes")
+	if err != nil {
+		return queries.ListMonitoringByLAParams{}, err
+	}
+	dataQualityCodes, err := allowedValues(filter.DataQualityCodes, monitoringDataQualityCodeSet, "data_quality_codes")
+	if err != nil {
+		return queries.ListMonitoringByLAParams{}, err
 	}
 	return queries.ListMonitoringByLAParams{
-		LoanAgreementID: laID,
-		Search:          nullableText(params.Search),
-		BudgetYear:      budgetYear,
-		Quarter:         quarter,
-		Limit:           int32(limit),
-		Offset:          int32(offset),
+		LoanAgreementID:  laID,
+		Search:           nullableText(params.Search),
+		BudgetYear:       budgetYear,
+		Quarter:          quarter,
+		RiskCodes:        riskCodes,
+		DataQualityCodes: dataQualityCodes,
+		Limit:            int32(limit),
+		Offset:           int32(offset),
 	}, nil
+}
+
+func optionalQuarter(value *string, field string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	quarter := strings.ToUpper(strings.TrimSpace(*value))
+	if quarter != "TW1" && quarter != "TW2" && quarter != "TW3" && quarter != "TW4" {
+		return pgtype.Text{}, validation(field, "harus TW1, TW2, TW3, atau TW4")
+	}
+	return pgtype.Text{String: quarter, Valid: true}, nil
 }
 
 func optionalBool(value *string, field string) (pgtype.Bool, error) {

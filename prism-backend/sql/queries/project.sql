@@ -208,9 +208,126 @@ WITH project_rows AS (
           )
       )
 ),
+project_data_quality_matches AS (
+    SELECT DISTINCT pr.id
+    FROM project_rows pr
+    CROSS JOIN LATERAL (
+        VALUES
+            ('NO_EXECUTING_AGENCY'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_institution bpi
+                WHERE bpi.bb_project_id = pr.id
+                  AND bpi.role = 'Executing Agency'
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_institution gpi
+                      WHERE gpi.gb_project_id = gbp.gb_project_id
+                        AND gpi.role = 'Executing Agency'
+                  )
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_project dp ON dp.id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND dp.institution_id IS NULL
+            )),
+            ('NO_LENDER'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM lender_indication li
+                WHERE li.bb_project_id = pr.id
+            )),
+            ('NO_LENDER'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_LENDER'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                        AND dfd.lender_id IS NOT NULL
+                  )
+            )),
+            ('NO_REGION'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_location bpl
+                WHERE bpl.bb_project_id = pr.id
+            )),
+            ('NO_REGION'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_location gpl
+                      WHERE gpl.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_REGION'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_project_location dpl
+                      WHERE dpl.dk_project_id = dpg.dk_project_id
+                  )
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Blue Book'::text, pr.foreign_loan_usd <= 0),
+            ('NO_FUNDING_AMOUNT'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(gfs.loan_usd + gfs.grant_usd + gfs.local_usd)
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  ), 0) <= 0
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(dfd.amount_usd + dfd.grant_usd + dfd.counterpart_usd)
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                  ), 0) <= 0
+            ))
+    ) AS issue(code, stage, matched)
+    WHERE issue.matched
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+          OR issue.code = ANY(sqlc.arg('data_quality_codes')::text[])
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+          OR issue.stage = ANY(sqlc.arg('data_quality_stages')::text[])
+      )
+),
 filtered_projects AS (
-    SELECT *
-    FROM project_rows
+    SELECT pr.*
+    FROM project_rows pr
+    LEFT JOIN project_data_quality_matches pdqm ON pdqm.id = pr.id
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
       AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
@@ -229,6 +346,13 @@ filtered_projects AS (
               WHERE (sqlc.narg('dk_date_from')::date IS NULL OR item.dk_date::date >= sqlc.narg('dk_date_from')::date)
                 AND (sqlc.narg('dk_date_to')::date IS NULL OR item.dk_date::date <= sqlc.narg('dk_date_to')::date)
           )
+      )
+      AND (
+          (
+              COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+              AND COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+          )
+          OR pdqm.id IS NOT NULL
       )
       AND (
           sqlc.narg('search')::text IS NULL
@@ -462,9 +586,126 @@ WITH project_rows AS (
               LIMIT 1
           )
       )
+),
+project_data_quality_matches AS (
+    SELECT DISTINCT pr.id
+    FROM project_rows pr
+    CROSS JOIN LATERAL (
+        VALUES
+            ('NO_EXECUTING_AGENCY'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_institution bpi
+                WHERE bpi.bb_project_id = pr.id
+                  AND bpi.role = 'Executing Agency'
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_institution gpi
+                      WHERE gpi.gb_project_id = gbp.gb_project_id
+                        AND gpi.role = 'Executing Agency'
+                  )
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_project dp ON dp.id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND dp.institution_id IS NULL
+            )),
+            ('NO_LENDER'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM lender_indication li
+                WHERE li.bb_project_id = pr.id
+            )),
+            ('NO_LENDER'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_LENDER'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                        AND dfd.lender_id IS NOT NULL
+                  )
+            )),
+            ('NO_REGION'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_location bpl
+                WHERE bpl.bb_project_id = pr.id
+            )),
+            ('NO_REGION'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_location gpl
+                      WHERE gpl.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_REGION'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_project_location dpl
+                      WHERE dpl.dk_project_id = dpg.dk_project_id
+                  )
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Blue Book'::text, pr.foreign_loan_usd <= 0),
+            ('NO_FUNDING_AMOUNT'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(gfs.loan_usd + gfs.grant_usd + gfs.local_usd)
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  ), 0) <= 0
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(dfd.amount_usd + dfd.grant_usd + dfd.counterpart_usd)
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                  ), 0) <= 0
+            ))
+    ) AS issue(code, stage, matched)
+    WHERE issue.matched
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+          OR issue.code = ANY(sqlc.arg('data_quality_codes')::text[])
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+          OR issue.stage = ANY(sqlc.arg('data_quality_stages')::text[])
+      )
 )
 SELECT COUNT(*)::bigint
-FROM project_rows
+FROM project_rows pr
+LEFT JOIN project_data_quality_matches pdqm ON pdqm.id = pr.id
 WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
   AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
   AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
@@ -483,6 +724,13 @@ WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_type
           WHERE (sqlc.narg('dk_date_from')::date IS NULL OR item.dk_date::date >= sqlc.narg('dk_date_from')::date)
             AND (sqlc.narg('dk_date_to')::date IS NULL OR item.dk_date::date <= sqlc.narg('dk_date_to')::date)
       )
+  )
+  AND (
+      (
+          COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+          AND COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+      )
+      OR pdqm.id IS NOT NULL
   )
   AND (
       sqlc.narg('search')::text IS NULL
@@ -705,9 +953,126 @@ WITH project_rows AS (
           )
       )
 ),
+project_data_quality_matches AS (
+    SELECT DISTINCT pr.id
+    FROM project_rows pr
+    CROSS JOIN LATERAL (
+        VALUES
+            ('NO_EXECUTING_AGENCY'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_institution bpi
+                WHERE bpi.bb_project_id = pr.id
+                  AND bpi.role = 'Executing Agency'
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_institution gpi
+                      WHERE gpi.gb_project_id = gbp.gb_project_id
+                        AND gpi.role = 'Executing Agency'
+                  )
+            )),
+            ('NO_EXECUTING_AGENCY'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_project dp ON dp.id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND dp.institution_id IS NULL
+            )),
+            ('NO_LENDER'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM lender_indication li
+                WHERE li.bb_project_id = pr.id
+            )),
+            ('NO_LENDER'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_LENDER'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                        AND dfd.lender_id IS NOT NULL
+                  )
+            )),
+            ('NO_REGION'::text, 'Blue Book'::text, NOT EXISTS (
+                SELECT 1
+                FROM bb_project_location bpl
+                WHERE bpl.bb_project_id = pr.id
+            )),
+            ('NO_REGION'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM gb_project_location gpl
+                      WHERE gpl.gb_project_id = gbp.gb_project_id
+                  )
+            )),
+            ('NO_REGION'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dk_project_location dpl
+                      WHERE dpl.dk_project_id = dpg.dk_project_id
+                  )
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Blue Book'::text, pr.foreign_loan_usd <= 0),
+            ('NO_FUNDING_AMOUNT'::text, 'Green Book Funding Source'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(gfs.loan_usd + gfs.grant_usd + gfs.local_usd)
+                      FROM gb_funding_source gfs
+                      WHERE gfs.gb_project_id = gbp.gb_project_id
+                  ), 0) <= 0
+            )),
+            ('NO_FUNDING_AMOUNT'::text, 'Daftar Kegiatan Financing'::text, EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = pr.id
+                  AND COALESCE((
+                      SELECT SUM(dfd.amount_usd + dfd.grant_usd + dfd.counterpart_usd)
+                      FROM dk_financing_detail dfd
+                      WHERE dfd.dk_project_id = dpg.dk_project_id
+                  ), 0) <= 0
+            ))
+    ) AS issue(code, stage, matched)
+    WHERE issue.matched
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+          OR issue.code = ANY(sqlc.arg('data_quality_codes')::text[])
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+          OR issue.stage = ANY(sqlc.arg('data_quality_stages')::text[])
+      )
+),
 filtered_projects AS (
-    SELECT *
-    FROM project_rows
+    SELECT pr.*
+    FROM project_rows pr
+    LEFT JOIN project_data_quality_matches pdqm ON pdqm.id = pr.id
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
       AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
@@ -726,6 +1091,13 @@ filtered_projects AS (
               WHERE (sqlc.narg('dk_date_from')::date IS NULL OR item.dk_date::date >= sqlc.narg('dk_date_from')::date)
                 AND (sqlc.narg('dk_date_to')::date IS NULL OR item.dk_date::date <= sqlc.narg('dk_date_to')::date)
           )
+      )
+      AND (
+          (
+              COALESCE(cardinality(sqlc.arg('data_quality_codes')::text[]), 0) = 0
+              AND COALESCE(cardinality(sqlc.arg('data_quality_stages')::text[]), 0) = 0
+          )
+          OR pdqm.id IS NOT NULL
       )
       AND (
           sqlc.narg('search')::text IS NULL

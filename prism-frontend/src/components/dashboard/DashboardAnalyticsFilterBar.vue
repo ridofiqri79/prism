@@ -145,6 +145,32 @@ function assignFilters(
   target.include_history = source.include_history
 }
 
+function arraysEqual<T>(left: T[], right: T[]) {
+  if (left.length !== right.length) return false
+
+  return left.every((item, index) => item === right[index])
+}
+
+function filtersEqual(
+  left: DashboardAnalyticsFilterState,
+  right: DashboardAnalyticsFilterState,
+) {
+  return (
+    left.budget_year === right.budget_year &&
+    left.quarter === right.quarter &&
+    arraysEqual(left.lender_ids, right.lender_ids) &&
+    arraysEqual(left.lender_types, right.lender_types) &&
+    arraysEqual(left.institution_ids, right.institution_ids) &&
+    arraysEqual(left.pipeline_statuses, right.pipeline_statuses) &&
+    arraysEqual(left.project_statuses, right.project_statuses) &&
+    arraysEqual(left.region_ids, right.region_ids) &&
+    arraysEqual(left.program_title_ids, right.program_title_ids) &&
+    left.foreign_loan_min === right.foreign_loan_min &&
+    left.foreign_loan_max === right.foreign_loan_max &&
+    left.include_history === right.include_history
+  )
+}
+
 function formatProgramTitle(programTitle: ProgramTitle) {
   const parent = props.programTitles.find((item) => item.id === programTitle.parent_id)
 
@@ -175,11 +201,25 @@ function isCoveredBySelectedCountry(region: Region) {
 
 watch(
   () => props.modelValue,
-  (value) => assignFilters(localFilters, value),
+  (value) => {
+    if (!filtersEqual(localFilters, value)) {
+      assignFilters(localFilters, value)
+    }
+  },
   { deep: true },
 )
 
-watch(localFilters, () => emit('update:modelValue', cloneFilters(localFilters)), { deep: true })
+watch(
+  localFilters,
+  () => {
+    const nextFilters = cloneFilters(localFilters)
+
+    if (!filtersEqual(nextFilters, props.modelValue)) {
+      emit('update:modelValue', nextFilters)
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>

@@ -3,6 +3,15 @@ import type { PaginatedResponse } from '@/types/api.types'
 
 export type ProjectStatus = 'Pipeline' | 'Ongoing'
 export type ProjectPipelineStatus = 'BB' | 'GB' | 'DK' | 'LA' | 'Monitoring'
+export type ProjectDataQualityCode =
+  | 'NO_EXECUTING_AGENCY'
+  | 'NO_LENDER'
+  | 'NO_REGION'
+  | 'NO_FUNDING_AMOUNT'
+export type ProjectDataQualityStage =
+  | 'Blue Book'
+  | 'Green Book Funding Source'
+  | 'Daftar Kegiatan Financing'
 export type ProjectMasterSortOrder = 'asc' | 'desc'
 export type ProjectMasterSortField =
   | 'bb_code'
@@ -83,6 +92,8 @@ export interface ProjectMasterListParams {
   foreign_loan_max?: number
   dk_date_from?: string
   dk_date_to?: string
+  data_quality_codes?: ProjectDataQualityCode[]
+  data_quality_stages?: ProjectDataQualityStage[]
   search?: string
   include_history?: boolean
 }
@@ -100,6 +111,8 @@ export interface ProjectMasterFilterState {
   foreign_loan_max: number | null
   dk_date_from: string
   dk_date_to: string
+  data_quality_codes: ProjectDataQualityCode[]
+  data_quality_stages: ProjectDataQualityStage[]
   search: string
   include_history: boolean
 }

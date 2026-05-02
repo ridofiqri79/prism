@@ -215,15 +215,15 @@ Jangan membuat file dokumentasi baru jika informasi cukup di plan dan API contra
 
 ## Checklist
 
-- [ ] Risk & Data Quality section selesai
-- [ ] Watchlist tables selesai
-- [ ] Data quality cards clickable
-- [ ] Drilldown target Project Master bekerja
-- [ ] Drilldown target Monitoring bekerja
-- [ ] Drilldown target Loan Agreement bekerja jika digunakan
-- [ ] Section-level loading/error/empty state selesai
-- [ ] Backend verification selesai
-- [ ] Frontend verification selesai
-- [ ] Browser smoke selesai atau blocker dicatat
-- [ ] API contract final sinkron
-- [ ] Handover notes siap
+- [x] Risk & Data Quality section selesai
+- [x] Watchlist tables selesai
+- [x] Data quality cards clickable
+- [x] Drilldown target Project Master bekerja
+- [x] Drilldown target Monitoring bekerja
+- [x] Drilldown target Loan Agreement bekerja jika digunakan
+- [x] Section-level loading/error/empty state selesai
+- [x] Backend verification selesai
+- [x] Frontend verification selesai
+- [x] Browser smoke selesai atau blocker dicatat
+- [x] API contract final sinkron
+- [x] Handover notes siap

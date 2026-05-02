@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
@@ -13,16 +15,23 @@ import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { LoanAgreement, LoanAgreementListParams } from '@/types/loan-agreement.types'
+import type {
+  LoanAgreement,
+  LoanAgreementListParams,
+  LoanAgreementRiskCode,
+} from '@/types/loan-agreement.types'
 import { formatDate } from './loan-agreement-page-utils'
 
 const loanAgreementStore = useLoanAgreementStore()
 const masterStore = useMasterStore()
 const { can } = usePermission()
+const route = useRoute()
+const hydratingRouteQuery = ref(false)
 interface LAFilterState {
   lender_id: string | null
   is_extended: boolean | null
   closing_date_before: string
+  risk_codes: LoanAgreementRiskCode[]
 }
 
 const listControls = useListControls<LAFilterState>({
@@ -30,11 +39,13 @@ const listControls = useListControls<LAFilterState>({
     lender_id: null,
     is_extended: null,
     closing_date_before: '',
+    risk_codes: [],
   },
   filterLabels: {
     lender_id: 'Lender',
     is_extended: 'Status Perpanjangan',
     closing_date_before: 'Penutupan sebelum',
+    risk_codes: 'Risiko',
   },
   formatFilterValue: (key, value) => {
     if (key === 'lender_id' && typeof value === 'string') {
@@ -42,6 +53,9 @@ const listControls = useListControls<LAFilterState>({
     }
     if (key === 'is_extended') {
       return value ? 'Diperpanjang' : 'Tidak diperpanjang'
+    }
+    if (Array.isArray(value) && key === 'risk_codes') {
+      return selectedLabelSummary(value.map((item) => riskCodeLabel(item)))
     }
     return String(value)
   },
@@ -51,6 +65,10 @@ const isExtendedOptions = [
   { label: 'Semua', value: null },
   { label: 'Diperpanjang', value: true },
   { label: 'Tidak diperpanjang', value: false },
+]
+const riskCodeOptions: Array<{ label: string; value: LoanAgreementRiskCode }> = [
+  { label: 'Mendekati closing date', value: 'CLOSING_RISK' },
+  { label: 'Loan Agreement diperpanjang', value: 'EXTENDED_LOAN' },
 ]
 const columns: ColumnDef[] = [
   { field: 'loan_code', header: 'Kode Pinjaman' },
@@ -71,6 +89,60 @@ async function loadData() {
   await loanAgreementStore.fetchLoanAgreements(buildListParams())
 }
 
+function routeQueryValues(key: string) {
+  const value = route.query[key]
+  const rawValues = Array.isArray(value) ? value : [value]
+
+  return rawValues
+    .flatMap((item) => (typeof item === 'string' ? item.split(',') : []))
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function routeQueryString(key: string) {
+  return routeQueryValues(key)[0] ?? ''
+}
+
+function routeQueryBoolean(key: string): boolean | null {
+  const value = routeQueryString(key).toLowerCase()
+  if (value === 'true' || value === '1') return true
+  if (value === 'false' || value === '0') return false
+  return null
+}
+
+function routeRiskCodes(key: string): LoanAgreementRiskCode[] {
+  return routeQueryValues(key).filter(
+    (value): value is LoanAgreementRiskCode =>
+      value === 'CLOSING_RISK' || value === 'EXTENDED_LOAN',
+  )
+}
+
+function hydrateFiltersFromRouteQuery() {
+  hydratingRouteQuery.value = true
+  listControls.draftFilters.lender_id = routeQueryString('lender_id') || null
+  listControls.draftFilters.is_extended = routeQueryBoolean('is_extended')
+  listControls.draftFilters.closing_date_before = routeQueryString('closing_date_before')
+  listControls.draftFilters.risk_codes = routeRiskCodes('risk_codes')
+  listControls.appliedFilters.lender_id = listControls.draftFilters.lender_id
+  listControls.appliedFilters.is_extended = listControls.draftFilters.is_extended
+  listControls.appliedFilters.closing_date_before = listControls.draftFilters.closing_date_before
+  listControls.appliedFilters.risk_codes = [...listControls.draftFilters.risk_codes]
+  listControls.search.value = routeQueryString('search')
+  listControls.debouncedSearch.value = routeQueryString('search')
+  window.queueMicrotask(() => {
+    hydratingRouteQuery.value = false
+  })
+}
+
+function selectedLabelSummary(labels: string[]) {
+  if (labels.length <= 2) return labels.join(', ')
+  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
+}
+
+function riskCodeLabel(code: LoanAgreementRiskCode) {
+  return riskCodeOptions.find((option) => option.value === code)?.label ?? code
+}
+
 watch(
   [
     listControls.page,
@@ -79,11 +151,21 @@ watch(
     () => JSON.stringify(listControls.appliedFilters),
   ],
   () => {
+    if (hydratingRouteQuery.value) return
+    void loadData()
+  },
+)
+
+watch(
+  () => route.query,
+  () => {
+    hydrateFiltersFromRouteQuery()
     void loadData()
   },
 )
 
 onMounted(() => {
+  hydrateFiltersFromRouteQuery()
   void Promise.all([masterStore.fetchLenders(true, { limit: 1000 }), loadData()])
 })
 </script>
@@ -129,6 +211,18 @@ onMounted(() => {
         <label class="block space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Penutupan Sebelum Tanggal</span>
           <InputText v-model="listControls.draftFilters.closing_date_before" type="date" class="w-full" />
+        </label>
+        <label class="block space-y-2 xl:col-span-2">
+          <span class="text-sm font-medium text-surface-700">Risiko</span>
+          <MultiSelect
+            v-model="listControls.draftFilters.risk_codes"
+            :options="riskCodeOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Semua risiko"
+            display="chip"
+            class="w-full"
+          />
         </label>
       </template>
     </SearchFilterBar>
