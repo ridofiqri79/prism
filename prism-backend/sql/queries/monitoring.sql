@@ -220,34 +220,6 @@ RETURNING *;
 DELETE FROM monitoring_komponen
 WHERE monitoring_disbursement_id = $1;
 
--- ===== DASHBOARD =====
-
--- name: GetDashboardSummary :one
-SELECT
-    (SELECT COUNT(DISTINCT project_identity_id) FROM bb_project WHERE status = 'active')::bigint AS total_bb_projects,
-    (SELECT COUNT(DISTINCT gb_project_identity_id) FROM gb_project WHERE status = 'active')::bigint AS total_gb_projects,
-    (SELECT COUNT(*) FROM loan_agreement)::bigint AS total_loan_agreements,
-    COALESCE((SELECT SUM(amount_usd) FROM loan_agreement), 0)::numeric AS total_amount_usd,
-    COALESCE((SELECT SUM(realized_usd) FROM monitoring_disbursement), 0)::numeric AS total_realized_usd,
-    (SELECT COUNT(*) FROM monitoring_disbursement)::bigint AS active_monitoring;
-
--- name: GetMonitoringSummary :many
-SELECT
-    md.budget_year,
-    md.quarter,
-    l.id AS lender_id,
-    l.name AS lender_name,
-    COALESCE(SUM(md.planned_usd), 0)::numeric AS total_planned_usd,
-    COALESCE(SUM(md.realized_usd), 0)::numeric AS total_realized_usd
-FROM monitoring_disbursement md
-JOIN loan_agreement la ON la.id = md.loan_agreement_id
-JOIN lender l ON l.id = la.lender_id
-WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-  AND (sqlc.narg('quarter')::varchar IS NULL OR md.quarter = sqlc.narg('quarter')::varchar)
-  AND (sqlc.narg('lender_id')::uuid IS NULL OR l.id = sqlc.narg('lender_id')::uuid)
-GROUP BY md.budget_year, md.quarter, l.id, l.name
-ORDER BY md.budget_year ASC, md.quarter ASC, l.name ASC;
-
 -- ===== JOURNEY =====
 
 -- name: GetJourneyBBProject :one

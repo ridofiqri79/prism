@@ -244,7 +244,12 @@ func main() {
 
 	dashboard := api.Group("/dashboard")
 	dashboard.GET("/summary", dashboardHandler.Summary)
-	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
+	dashboard.GET("/stage-funnel", dashboardHandler.StageFunnel)
+	dashboard.GET("/monitoring-rollup", dashboardHandler.MonitoringRollup)
+	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringRollup)
+	dashboard.GET("/filter-options", dashboardHandler.FilterOptions)
+	dashboard.GET("/executive-portfolio", dashboardHandler.ExecutivePortfolio)
+	dashboard.GET("/pipeline-bottleneck", dashboardHandler.PipelineBottleneck)
 
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))

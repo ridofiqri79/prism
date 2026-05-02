@@ -1,25 +1,38 @@
 import http from '@/services/http'
 import type { ApiResponse } from '@/types/api.types'
 import type {
+  DashboardFilterOptions,
   DashboardFilterParams,
   DashboardSummary,
   DashboardSummaryApiResponse,
+  ExecutivePortfolioDashboard,
   JourneyResponse,
   MonitoringSummary,
   MonitoringSummaryApiResponse,
+  PipelineBottleneckApiResponse,
+  PipelineBottleneckParams,
 } from '@/types/dashboard.types'
 
 function normalizeSummary(data: DashboardSummaryApiResponse): DashboardSummary {
-  const realized = data.total_realized_usd ?? data.total_realisasi_usd ?? 0
+  const realized =
+    data.total_realized_usd ??
+    data.total_realisasi_usd ??
+    data.realized_disbursement_usd ??
+    0
 
   return {
     total_bb_projects: data.total_bb_projects ?? 0,
     total_gb_projects: data.total_gb_projects ?? 0,
     total_loan_agreements: data.total_loan_agreements ?? 0,
-    total_amount_usd: data.total_amount_usd ?? 0,
+    total_amount_usd:
+      data.total_amount_usd ??
+      data.la_commitment_usd ??
+      data.gb_pipeline_usd ??
+      data.bb_pipeline_usd ??
+      0,
     total_realized_usd: realized,
     total_realisasi_usd: realized,
-    overall_absorption_pct: data.overall_absorption_pct ?? 0,
+    overall_absorption_pct: data.overall_absorption_pct ?? data.absorption_pct ?? 0,
     active_monitoring: data.active_monitoring ?? 0,
   }
 }
@@ -66,6 +79,27 @@ export const DashboardService = {
       { params },
     )
     return normalizeMonitoringSummary(response.data.data)
+  },
+
+  async getFilterOptions() {
+    const response = await http.get<ApiResponse<DashboardFilterOptions>>('/dashboard/filter-options')
+    return response.data.data
+  },
+
+  async getExecutivePortfolio(params?: DashboardFilterParams) {
+    const response = await http.get<ApiResponse<ExecutivePortfolioDashboard>>(
+      '/dashboard/executive-portfolio',
+      { params },
+    )
+    return response.data.data
+  },
+
+  async getPipelineBottleneck(params?: PipelineBottleneckParams) {
+    const response = await http.get<PipelineBottleneckApiResponse>(
+      '/dashboard/pipeline-bottleneck',
+      { params },
+    )
+    return response.data
   },
 
   async getJourney(bbProjectId: string) {

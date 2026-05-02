@@ -1,6 +1,120 @@
 import type { Lender } from '@/types/master.types'
+import type { PaginationMeta } from '@/types/api.types'
 
 export type DashboardQuarter = 'TW1' | 'TW2' | 'TW3' | 'TW4'
+
+export interface MetricCard {
+  key: string
+  label: string
+  value: number
+  unit?: 'USD' | 'percent' | 'project' | string
+  category?: string
+}
+
+export interface StageMetric {
+  stage: string
+  label: string
+  project_count: number
+  amount_usd: number
+}
+
+export interface BreakdownItem {
+  id?: string
+  key?: string
+  label: string
+  item_count?: number
+  amount_usd?: number
+  realized_usd?: number
+  percentage?: number
+}
+
+export interface RiskItem {
+  id?: string
+  risk_type?: string
+  reference_id?: string
+  reference_type?: string
+  journey_bb_project_id?: string
+  code?: string
+  title: string
+  description?: string
+  severity: 'low' | 'medium' | 'high' | string
+  amount_usd?: number
+  days_until_closing?: number
+  absorption_pct?: number
+  score?: number
+}
+
+export interface ExecutivePortfolioDashboard {
+  cards: MetricCard[]
+  funnel: StageMetric[]
+  top_institutions: BreakdownItem[]
+  top_lenders: BreakdownItem[]
+  risk_items: RiskItem[]
+  insights: string[]
+}
+
+export type DashboardFilterOptions = Record<string, BreakdownItem[]>
+
+export type PipelineBottleneckStage =
+  | 'BB_NO_LENDER'
+  | 'INDICATION_NO_LOI'
+  | 'LOI_NO_GB'
+  | 'GB_NO_DK'
+  | 'DK_NO_LA'
+  | 'LA_NOT_EFFECTIVE'
+  | 'EFFECTIVE_NO_MONITORING'
+
+export type PipelineBottleneckSort = 'stage' | 'project_name' | 'amount_usd' | 'age_days'
+
+export type SortOrder = 'asc' | 'desc'
+
+export interface PipelineStageSummary {
+  stage: PipelineBottleneckStage
+  label: string
+  project_count: number
+  amount_usd: number
+  avg_age_days: number
+}
+
+export interface PipelineBottleneckItem {
+  project_id: string
+  reference_type: string
+  journey_bb_project_id?: string
+  code?: string
+  project_name: string
+  current_stage: PipelineBottleneckStage
+  stage_label: string
+  age_days: number
+  amount_usd: number
+  institution_name?: string
+  lender_names: string[]
+  recommended_action: string
+  relevant_at?: string
+}
+
+export interface PipelineBottleneckResponse {
+  stage_summary: PipelineStageSummary[]
+  items: PipelineBottleneckItem[]
+}
+
+export interface PipelineBottleneckParams {
+  stage?: PipelineBottleneckStage
+  period_id?: string
+  publish_year?: number
+  institution_id?: string
+  lender_id?: string
+  min_age_days?: number
+  page?: number
+  limit?: number
+  sort?: PipelineBottleneckSort
+  order?: SortOrder
+  search?: string
+}
+
+export interface PipelineBottleneckApiResponse {
+  data: PipelineBottleneckResponse
+  meta: PaginationMeta
+}
 
 export interface DashboardSummary {
   total_bb_projects: number
@@ -218,9 +332,13 @@ export interface JourneyFlowLink {
 }
 
 export interface DashboardFilterParams {
+  period_id?: string
+  publish_year?: number
   budget_year?: number
   quarter?: DashboardQuarter
   lender_id?: string
+  institution_id?: string
+  include_history?: boolean
 }
 
 export type DashboardSummaryApiResponse = Omit<
@@ -229,6 +347,12 @@ export type DashboardSummaryApiResponse = Omit<
 > & {
   total_realized_usd?: number
   total_realisasi_usd?: number
+  bb_pipeline_usd?: number
+  gb_pipeline_usd?: number
+  la_commitment_usd?: number
+  realized_disbursement_usd?: number
+  absorption_pct?: number
+  metrics?: MetricCard[]
 }
 
 export type MonitoringSummaryApiResponse = Partial<Omit<MonitoringSummary, 'by_lender'>> & {

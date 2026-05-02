@@ -24,6 +24,11 @@ type DataResponse[T any] struct {
 	Data T `json:"data"`
 }
 
+type DataMetaResponse[T any] struct {
+	Data T              `json:"data"`
+	Meta PaginationMeta `json:"meta"`
+}
+
 type ErrorDetail struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
