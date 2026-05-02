@@ -1583,6 +1583,300 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ---
 
+## Dashboard Analytics
+
+> Cakupan: portfolio, Kementerian/Lembaga, lender, penyerapan, risiko, dan data quality.
+> Permission: Authenticated saja (mengikuti dashboard existing). Tidak ada modul permission baru.
+
+### Filter Umum
+
+Semua endpoint analytics menerima filter berikut. Multi-value mengikuti pola repeated query param, comma-separated, atau array suffix.
+
+| Param | Format | Keterangan |
+|-------|--------|-----------|
+| `budget_year` | int | Tahun anggaran monitoring |
+| `quarter` | enum | `TW1`, `TW2`, `TW3`, `TW4` |
+| `lender_ids` | multi-value UUID | Filter lender spesifik |
+| `lender_types` | multi-value enum | `Bilateral`, `Multilateral`, `KSA` |
+| `institution_ids` | multi-value UUID | Resolve ke root Kementerian/Lembaga |
+| `pipeline_statuses` | multi-value enum | `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `project_statuses` | multi-value enum | `Pipeline`, `Ongoing` |
+| `region_ids` | multi-value UUID | Filter region lokasi |
+| `program_title_ids` | multi-value UUID | Filter program title |
+| `foreign_loan_min` | float | Batas bawah nilai pinjaman USD |
+| `foreign_loan_max` | float | Batas atas nilai pinjaman USD |
+| `include_history` | bool | Default `false` — hanya latest snapshot |
+
+### Catatan Data
+
+- Default `include_history=false` — semua hitungan portfolio default latest snapshot per `project_identity_id`.
+- Stage lender tidak dicampur: performa utama memakai Loan Agreement + Monitoring. Data BB/GB ditampilkan sebagai pipeline dengan label stage eksplisit.
+- `absorption_pct` dihitung server-side, div-by-zero safe (planned=0 → 0).
+- Drilldown response memuat query object yang bisa diterjemahkan frontend ke Project Master atau Monitoring.
+
+---
+
+### `GET /dashboard/analytics/overview`
+
+**Permission:** Authenticated
+
+Ringkasan portfolio, funnel pipeline, dan top-level insight.
+
+**Query Params:** Semua filter umum di atas.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "total_projects": 52,
+    "total_loan_agreements": 42,
+    "agreement_amount_usd": 9000000000,
+    "total_planned_usd": 3200000000,
+    "total_realized_usd": 2400000000,
+    "overall_absorption_pct": 75.0,
+    "active_monitoring": 38,
+    "pipeline_funnel": {
+      "bb": { "project_count": 120, "estimated_loan_usd": 12000000000 },
+      "gb": { "project_count": 85, "estimated_loan_usd": 9500000000 },
+      "dk": { "project_count": 52, "estimated_loan_usd": 9000000000 },
+      "la": { "project_count": 42, "agreement_amount_usd": 9000000000 },
+      "monitoring": { "la_count": 38, "planned_usd": 3200000000, "realized_usd": 2400000000, "absorption_pct": 75.0 }
+    },
+    "lender_proportion": {
+      "bilateral": { "agreement_amount_usd": 5400000000, "pct": 60.0 },
+      "multilateral": { "agreement_amount_usd": 2700000000, "pct": 30.0 },
+      "ksa": { "agreement_amount_usd": 900000000, "pct": 10.0 }
+    },
+    "top_institutions": [
+      {
+        "institution": { "id": "uuid", "name": "Kementerian PUPR", "level": "Kementerian/Badan/Lembaga" },
+        "project_count": 12,
+        "agreement_amount_usd": 2400000000,
+        "absorption_pct": 82.5
+      }
+    ],
+    "top_lenders": [
+      {
+        "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" },
+        "agreement_amount_usd": 3500000000,
+        "absorption_pct": 78.3
+      }
+    ]
+  }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/institutions`
+
+**Permission:** Authenticated
+
+Distribusi dan performa Kementerian/Lembaga. Institution di-roll-up ke root ancestor.
+
+**Query Params:** Semua filter umum + pagination standar (`page`, `limit`, `sort`, `order`).
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "institution": { "id": "uuid", "name": "Kementerian PUPR", "level": "Kementerian/Badan/Lembaga" },
+      "project_count": 12,
+      "assignment_count": 15,
+      "agreement_amount_usd": 2400000000,
+      "planned_usd": 800000000,
+      "realized_usd": 660000000,
+      "absorption_pct": 82.5,
+      "loan_types": ["Bilateral", "Multilateral"]
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 25, "total_pages": 2 }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/lenders`
+
+**Permission:** Authenticated
+
+Performa lender dan matrix lender per Kementerian/Lembaga.
+
+**Query Params:** Semua filter umum + pagination standar.
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" },
+      "agreement_amount_usd": 3500000000,
+      "project_count": 15,
+      "planned_usd": 1200000000,
+      "realized_usd": 940000000,
+      "absorption_pct": 78.3,
+      "top_institutions": [
+        { "institution": { "id": "uuid", "name": "Kementerian PUPR" }, "agreement_amount_usd": 1800000000 }
+      ]
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 18, "total_pages": 1 }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/absorption`
+
+**Permission:** Authenticated
+
+Penyerapan dikelompokkan berdasarkan dimensi yang dipilih: Kementerian/Lembaga, project, atau lender.
+
+**Query Params:** Semua filter umum + `group_by` (enum: `institution`, `project`, `lender`) + pagination standar.
+
+**Response `200` (group_by=lender):**
+```json
+{
+  "data": [
+    {
+      "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" },
+      "planned_usd": 1200000000,
+      "realized_usd": 940000000,
+      "absorption_pct": 78.3,
+      "monitoring_count": 45
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 18, "total_pages": 1 }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/yearly`
+
+**Permission:** Authenticated
+
+Performa tahunan dan triwulan.
+
+**Query Params:** Semua filter umum + pagination standar.
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "budget_year": 2025,
+      "planned_usd": 1500000000,
+      "realized_usd": 1200000000,
+      "absorption_pct": 80.0,
+      "monitoring_count": 120,
+      "quarters": {
+        "tw1": { "planned_usd": 350000000, "realized_usd": 280000000, "absorption_pct": 80.0 },
+        "tw2": { "planned_usd": 400000000, "realized_usd": 320000000, "absorption_pct": 80.0 },
+        "tw3": { "planned_usd": 400000000, "realized_usd": 330000000, "absorption_pct": 82.5 },
+        "tw4": { "planned_usd": 350000000, "realized_usd": 270000000, "absorption_pct": 77.1 }
+      }
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 5, "total_pages": 1 }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/lender-proportion`
+
+**Permission:** Authenticated
+
+Proporsi Bilateral, Multilateral, KSA berdasarkan stage pipeline.
+
+**Query Params:** Semua filter umum.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "by_stage": {
+      "bb": {
+        "bilateral": { "project_count": 45, "estimated_loan_usd": 5000000000, "pct": 41.7 },
+        "multilateral": { "project_count": 38, "estimated_loan_usd": 4200000000, "pct": 35.0 },
+        "ksa": { "project_count": 25, "estimated_loan_usd": 2800000000, "pct": 23.3 }
+      },
+      "la": {
+        "bilateral": { "agreement_amount_usd": 5400000000, "pct": 60.0 },
+        "multilateral": { "agreement_amount_usd": 2700000000, "pct": 30.0 },
+        "ksa": { "agreement_amount_usd": 900000000, "pct": 10.0 }
+      },
+      "monitoring": {
+        "bilateral": { "planned_usd": 1800000000, "realized_usd": 1440000000, "absorption_pct": 80.0 },
+        "multilateral": { "planned_usd": 900000000, "realized_usd": 630000000, "absorption_pct": 70.0 },
+        "ksa": { "planned_usd": 300000000, "realized_usd": 210000000, "absorption_pct": 70.0 }
+      }
+    }
+  }
+}
+```
+
+---
+
+### `GET /dashboard/analytics/risks`
+
+**Permission:** Authenticated
+
+Risk watchlist, monitoring compliance, dan data quality flags.
+
+**Query Params:** Semua filter umum + pagination standar.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "closing_risk": {
+      "count": 12,
+      "agreement_amount_usd": 1800000000,
+      "items": [
+        {
+          "loan_agreement": { "id": "uuid", "loan_code": "IP-603" },
+          "closing_date": "2026-12-31",
+          "days_to_closing": 245,
+          "absorption_pct": 42.0,
+          "drilldown": { "target": "monitoring", "query": { "loan_agreement_id": ["uuid"] } }
+        }
+      ]
+    },
+    "effective_without_monitoring": {
+      "count": 8,
+      "agreement_amount_usd": 600000000,
+      "items": [
+        {
+          "loan_agreement": { "id": "uuid", "loan_code": "IP-701" },
+          "effective_date": "2025-06-01",
+          "drilldown": { "target": "monitoring", "query": { "loan_agreement_id": ["uuid"] } }
+        }
+      ]
+    },
+    "extended_loans": {
+      "count": 5,
+      "items": [
+        {
+          "loan_agreement": { "id": "uuid", "loan_code": "IP-500" },
+          "extension_days": 365,
+          "drilldown": { "target": "la", "query": { "id": ["uuid"] } }
+        }
+      ]
+    },
+    "data_quality": {
+      "missing_executing_agency_count": 3,
+      "missing_lender_indication_count": 12,
+      "project_without_gb_count": 25
+    }
+  }
+}
+```
+
+---
+
 ## Spatial Distribution
 
 Endpoint ini dipakai menu frontend `/spatial-distribution` dengan label sidebar **Sebaran Wilayah**. Route frontend tetap berbahasa Inggris, sedangkan label UI/menu memakai Bahasa Indonesia.

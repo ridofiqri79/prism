@@ -392,14 +392,14 @@ Invoke-RestMethod http://localhost:8080/api/v1/dashboard/analytics/overview -Hea
 
 ## Checklist
 
-- [ ] Overview analytics query/service selesai
-- [ ] Institution analytics query/service selesai
-- [ ] Lender analytics query/service selesai
-- [ ] Lender per Kementerian/Lembaga matrix selesai
-- [ ] Absorption analytics selesai
-- [ ] Yearly performance selesai
-- [ ] Lender type proportion selesai
-- [ ] DTO response strongly typed
-- [ ] Tests coverage agregasi utama
-- [ ] `make generate` berhasil
-- [ ] `go test ./...` berhasil atau blocker dicatat
+- [x] Overview analytics query/service selesai
+- [x] Institution analytics query/service selesai
+- [x] Lender analytics query/service selesai
+- [x] Lender per Kementerian/Lembaga matrix selesai
+- [x] Absorption analytics selesai
+- [x] Yearly performance selesai
+- [x] Lender type proportion selesai
+- [x] DTO response strongly typed
+- [x] Tests coverage agregasi utama
+- [x] `make generate` berhasil
+- [x] `go test ./...` berhasil atau blocker dicatat

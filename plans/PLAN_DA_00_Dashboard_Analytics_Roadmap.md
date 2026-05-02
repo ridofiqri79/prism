@@ -181,8 +181,8 @@ Setelah selesai, update checklist di plan aktif dan jalankan verifikasi yang dim
 
 ## Checklist
 
-- [ ] Phase order disetujui user
-- [ ] Definisi Kementerian/Lembaga disetujui user
-- [ ] Definisi stage lender disetujui user
-- [ ] Permission strategy disetujui user
-- [ ] Lanjut ke `PLAN_DA_01_Backend_Analytics_Contract_Foundation.md`
+- [x] Phase order disetujui user
+- [x] Definisi Kementerian/Lembaga disetujui user
+- [x] Definisi stage lender disetujui user
+- [x] Permission strategy disetujui user
+- [x] Lanjut ke `PLAN_DA_01_Backend_Analytics_Contract_Foundation.md`

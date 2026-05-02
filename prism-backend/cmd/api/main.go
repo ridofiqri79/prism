@@ -55,6 +55,7 @@ func main() {
 	journeyService := service.NewJourneyService(q)
 	projectService := service.NewProjectService(q)
 	spatialDistributionService := service.NewSpatialDistributionService(q, projectService)
+	dashboardAnalyticsService := service.NewDashboardAnalyticsService(q)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -67,6 +68,7 @@ func main() {
 	journeyHandler := handler.NewJourneyHandler(journeyService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	spatialDistributionHandler := handler.NewSpatialDistributionHandler(spatialDistributionService)
+	dashboardAnalyticsHandler := handler.NewDashboardAnalyticsHandler(dashboardAnalyticsService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -245,6 +247,15 @@ func main() {
 	dashboard := api.Group("/dashboard")
 	dashboard.GET("/summary", dashboardHandler.Summary)
 	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
+
+	analytics := api.Group("/dashboard/analytics")
+	analytics.GET("/overview", dashboardAnalyticsHandler.Overview)
+	analytics.GET("/institutions", dashboardAnalyticsHandler.Institutions)
+	analytics.GET("/lenders", dashboardAnalyticsHandler.Lenders)
+	analytics.GET("/absorption", dashboardAnalyticsHandler.Absorption)
+	analytics.GET("/yearly", dashboardAnalyticsHandler.Yearly)
+	analytics.GET("/lender-proportion", dashboardAnalyticsHandler.LenderProportion)
+	analytics.GET("/risks", dashboardAnalyticsHandler.Risks)
 
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))
