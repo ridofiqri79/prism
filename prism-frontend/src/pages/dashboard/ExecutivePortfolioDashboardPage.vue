@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive } from 'vue'
-import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
+import DashboardFilterBar from '@/components/dashboard/DashboardFilterBar.vue'
 import InsightCallout from '@/components/dashboard/InsightCallout.vue'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import RiskItemTable from '@/components/dashboard/RiskItemTable.vue'
@@ -94,8 +94,12 @@ onMounted(() => {
       subtitle="Kontrol portofolio nasional dari pipeline hingga realisasi monitoring."
     />
 
-    <section class="rounded-lg border border-surface-200 bg-white p-4">
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_11rem_11rem_10rem_auto_auto]">
+    <DashboardFilterBar
+      :loading="dashboard.loading"
+      grid-class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_11rem_11rem_10rem]"
+      @apply="loadPortfolio"
+      @reset="clearFilters"
+    >
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Period</span>
           <Select
@@ -143,14 +147,7 @@ onMounted(() => {
             class="w-full"
           />
         </label>
-        <div class="flex items-end">
-          <Button icon="pi pi-filter" label="Terapkan" :loading="dashboard.loading" @click="loadPortfolio" />
-        </div>
-        <div class="flex items-end">
-          <Button icon="pi pi-times" label="Reset" severity="secondary" outlined @click="clearFilters" />
-        </div>
-      </div>
-    </section>
+    </DashboardFilterBar>
 
     <Message v-if="dashboard.error" severity="error" icon="pi pi-exclamation-triangle">
       {{ dashboard.error }}

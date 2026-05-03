@@ -61,6 +61,37 @@ func TestBlueBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDoc
 	assertAppErrorCode(t, err, "CONFLICT")
 }
 
+func TestCreateBBProjectReusesPreviousIdentityWhenCodeMatchesRevisionSource(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	sourceProject := env.createBBProject(t, original.ID, "BB-REUSE", "Flood Control")
+
+	if err := env.queries.SupersedeBlueBooksByPeriod(env.ctx, env.period.ID); err != nil {
+		t.Fatalf("SupersedeBlueBooksByPeriod error = %v", err)
+	}
+	revision, err := env.queries.CreateBlueBook(env.ctx, queries.CreateBlueBookParams{
+		PeriodID:       env.period.ID,
+		PublishDate:    testDate(2026, time.March, 1),
+		RevisionNumber: 1,
+		RevisionYear:   pgtype.Int4{Int32: 2026, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateBlueBook(manual revision) error = %v", err)
+	}
+
+	created, err := env.service.CreateBBProject(env.ctx, revision.ID, env.bbProjectRequest("BB-REUSE", "Flood Control Updated"))
+	if err != nil {
+		t.Fatalf("CreateBBProject(reuse code) error = %v", err)
+	}
+	if created.ID == sourceProject.ID {
+		t.Fatal("created project reused source snapshot id")
+	}
+	if created.ProjectIdentityID != sourceProject.ProjectIdentityID {
+		t.Fatalf("created identity = %s, want %s", created.ProjectIdentityID, sourceProject.ProjectIdentityID)
+	}
+}
+
 func TestCreateBlueBookRejectsDuplicatePeriodAndVersion(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 

@@ -3,6 +3,15 @@ import type { PaginationMeta } from '@/types/api.types'
 
 export type DashboardQuarter = 'TW1' | 'TW2' | 'TW3' | 'TW4'
 
+export interface DashboardNavigationItem {
+  key: string
+  title: string
+  description: string
+  route_name: string
+  icon: string
+  accent: 'portfolio' | 'pipeline' | 'readiness' | 'financing' | 'institution' | 'disbursement' | 'quality'
+}
+
 export interface MetricCard {
   key: string
   label: string
@@ -16,6 +25,15 @@ export interface StageMetric {
   label: string
   project_count: number
   amount_usd: number
+}
+
+export interface TimeSeriesPoint {
+  period: string
+  budget_year?: number
+  quarter?: DashboardQuarter
+  planned_usd: number
+  realized_usd: number
+  absorption_pct: number
 }
 
 export interface BreakdownItem {
@@ -114,6 +132,332 @@ export interface PipelineBottleneckParams {
 export interface PipelineBottleneckApiResponse {
   data: PipelineBottleneckResponse
   meta: PaginationMeta
+}
+
+export type GreenBookReadinessStatus = 'READY' | 'PARTIAL' | 'INCOMPLETE' | 'COFINANCING'
+
+export interface GreenBookReadinessSummary {
+  total_projects: number
+  total_loan_usd: number
+  total_grant_usd: number
+  total_local_usd: number
+  projects_with_cofinancing: number
+  projects_incomplete: number
+  projects_ready: number
+  projects_partial: number
+}
+
+export interface GreenBookDisbursementYear {
+  year: number
+  amount_usd: number
+}
+
+export interface GreenBookFundingAllocation {
+  services: number
+  constructions: number
+  goods: number
+  trainings: number
+  other: number
+}
+
+export interface GreenBookReadinessItem {
+  project_id: string
+  green_book_id: string
+  gb_code: string
+  project_name: string
+  publish_year: number
+  readiness_score: number
+  readiness_status: Exclude<GreenBookReadinessStatus, 'COFINANCING'>
+  is_cofinancing: boolean
+  missing_fields: string[]
+  total_funding_usd: number
+  institution_name?: string
+  lender_names: string[]
+}
+
+export interface GreenBookReadinessDashboard {
+  summary: GreenBookReadinessSummary
+  disbursement_plan_by_year: GreenBookDisbursementYear[]
+  funding_allocation: GreenBookFundingAllocation
+  readiness_items: GreenBookReadinessItem[]
+}
+
+export interface GreenBookReadinessParams {
+  publish_year?: number
+  green_book_id?: string
+  institution_id?: string
+  lender_id?: string
+  readiness_status?: GreenBookReadinessStatus
+}
+
+export type LenderType = 'Bilateral' | 'Multilateral' | 'KSA'
+
+export type LenderCertaintyStage =
+  | 'LENDER_INDICATION'
+  | 'LOI'
+  | 'GB_FUNDING_SOURCE'
+  | 'DK_FINANCING'
+  | 'LA'
+
+export interface LenderFinancingMixSummary {
+  total_lenders: number
+  bilateral_usd: number
+  multilateral_usd: number
+  ksa_usd: number
+  cofinancing_projects: number
+}
+
+export interface LenderCertaintyPoint {
+  stage: LenderCertaintyStage
+  lender_id: string
+  lender_name: string
+  lender_type: LenderType | string
+  project_count: number
+  amount_usd: number
+}
+
+export interface LenderConversionItem {
+  lender_id: string
+  lender_name: string
+  lender_type: LenderType | string
+  indication_count: number
+  loi_count: number
+  gb_count: number
+  dk_count: number
+  la_count: number
+  indication_usd: number
+  la_usd: number
+  la_conversion_pct: number
+}
+
+export interface CurrencyExposureItem {
+  currency: string
+  stage: LenderCertaintyStage | string
+  project_count: number
+  amount_original: number
+  amount_usd: number
+}
+
+export interface CofinancingItem {
+  project_id: string
+  reference_type: 'GB' | 'DK' | string
+  project_code?: string
+  project_name: string
+  lender_count: number
+  lender_names: string[]
+  amount_usd: number
+}
+
+export interface LenderFinancingMixDashboard {
+  summary: LenderFinancingMixSummary
+  certainty_ladder: LenderCertaintyPoint[]
+  lender_conversion: LenderConversionItem[]
+  currency_exposure: CurrencyExposureItem[]
+  cofinancing_items: CofinancingItem[]
+}
+
+export interface LenderFinancingMixParams {
+  lender_type?: LenderType
+  lender_id?: string
+  currency?: string
+  period_id?: string
+  publish_year?: number
+  budget_year?: number
+}
+
+export type InstitutionRole = 'Executing Agency' | 'Implementing Agency'
+
+export type KLPortfolioSortBy =
+  | 'pipeline_usd'
+  | 'la_commitment_usd'
+  | 'absorption_pct'
+  | 'risk_count'
+
+export interface KLPortfolioPerformanceSummary {
+  total_institutions: number
+  top_exposure_institution?: string
+  top_exposure_usd?: number
+  lowest_absorption_institution?: string
+  lowest_absorption_pct?: number
+  highest_risk_institution?: string
+  highest_risk_count?: number
+  average_absorption_pct?: number
+  total_institution_exposure_usd?: number
+  total_institution_risk_count?: number
+}
+
+export interface KLPortfolioPerformanceItem {
+  institution_id: string
+  institution_name: string
+  bb_project_count: number
+  gb_project_count: number
+  dk_project_count: number
+  la_count: number
+  pipeline_usd: number
+  la_commitment_usd: number
+  planned_usd: number
+  realized_usd: number
+  absorption_pct: number
+  risk_count: number
+  performance_score: number
+  performance_category: 'Good' | 'Watch' | 'High Risk' | string
+}
+
+export interface KLPortfolioPerformanceDashboard {
+  summary: KLPortfolioPerformanceSummary
+  items: KLPortfolioPerformanceItem[]
+}
+
+export interface KLPortfolioPerformanceParams {
+  institution_id?: string
+  institution_role?: InstitutionRole
+  period_id?: string
+  publish_year?: number
+  budget_year?: number
+  quarter?: DashboardQuarter
+  sort_by?: KLPortfolioSortBy
+}
+
+export type LARiskLevel = 'low' | 'medium' | 'high'
+
+export interface LADisbursementSummary {
+  la_count: number
+  effective_count: number
+  not_effective_count: number
+  extended_count: number
+  commitment_usd: number
+  planned_usd: number
+  realized_usd: number
+  absorption_pct: number
+  undisbursed_usd: number
+}
+
+export interface LADisbursementTrendPoint {
+  period: string
+  budget_year: number
+  quarter: DashboardQuarter
+  planned_usd: number
+  realized_usd: number
+  absorption_pct: number
+}
+
+export interface LAClosingRiskItem {
+  loan_agreement_id: string
+  loan_code: string
+  project_name: string
+  lender_name: string
+  effective_date: string
+  closing_date: string
+  days_until_closing: number
+  commitment_usd: number
+  cumulative_realized_usd: number
+  undisbursed_usd: number
+  la_absorption_pct: number
+  risk_type: string
+  risk_level: LARiskLevel | string
+}
+
+export interface LAUnderDisbursementRiskItem {
+  loan_agreement_id: string
+  loan_code: string
+  project_name: string
+  lender_name: string
+  effective_date: string
+  closing_date: string
+  commitment_usd: number
+  cumulative_realized_usd: number
+  undisbursed_usd: number
+  la_absorption_pct: number
+  time_elapsed_pct: number
+  absorption_gap_pct: number
+  remaining_months: number
+  required_monthly_disbursement_usd: number
+  monitoring_count: number
+  is_extended: boolean
+  risk_type: string
+  risk_level: LARiskLevel | string
+}
+
+export interface LAComponentBreakdownItem {
+  component_name: string
+  la_count: number
+  planned_usd: number
+  realized_usd: number
+  absorption_pct: number
+}
+
+export interface LADisbursementDashboard {
+  summary: LADisbursementSummary
+  quarterly_trend: LADisbursementTrendPoint[]
+  closing_risks: LAClosingRiskItem[]
+  under_disbursement_risks: LAUnderDisbursementRiskItem[]
+  component_breakdown: LAComponentBreakdownItem[]
+}
+
+export interface LADisbursementParams {
+  budget_year?: number
+  quarter?: DashboardQuarter
+  lender_id?: string
+  institution_id?: string
+  is_extended?: boolean
+  closing_months?: 3 | 6 | 12
+  risk_level?: LARiskLevel
+}
+
+export type DataQualitySeverity = 'info' | 'warning' | 'error'
+
+export interface DataQualityGovernanceParams {
+  severity?: DataQualitySeverity
+  module?: string
+  issue_type?: string
+  only_unresolved?: boolean
+  audit_days?: number
+}
+
+export interface DataQualityIssueSummary {
+  total_issues: number
+  error_count: number
+  warning_count: number
+  info_count: number
+  audit_events?: number
+}
+
+export interface DataQualityIssueItem {
+  severity: DataQualitySeverity | string
+  module: string
+  issue_type: string
+  record_id: string
+  record_label: string
+  message: string
+  recommended_action: string
+  is_resolved: boolean
+}
+
+export interface AuditSummaryItem {
+  label: string
+  event_count: number
+  last_changed_at?: string
+}
+
+export interface AuditRecentActivityItem {
+  id: string
+  username: string
+  action: string
+  table_name: string
+  record_id: string
+  changed_at?: string
+}
+
+export interface DataQualityAuditSummary {
+  by_user: AuditSummaryItem[]
+  by_table: AuditSummaryItem[]
+  recent_activity: AuditRecentActivityItem[]
+}
+
+export interface DataQualityGovernanceDashboard {
+  summary: DataQualityIssueSummary
+  issues: DataQualityIssueItem[]
+  audit_summary?: DataQualityAuditSummary
 }
 
 export interface DashboardSummary {

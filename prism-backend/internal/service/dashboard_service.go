@@ -276,6 +276,245 @@ func (s *DashboardService) GetPipelineBottleneck(ctx context.Context, filter mod
 	}, nil
 }
 
+func (s *DashboardService) GetGreenBookReadiness(ctx context.Context, filter model.GreenBookReadinessFilterRequest) (*model.GreenBookReadinessDashboard, error) {
+	params, err := dashboardGreenBookReadinessParams(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	summaryRow, err := s.queries.GetDashboardGreenBookReadinessSummary(ctx, queries.GetDashboardGreenBookReadinessSummaryParams(params))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil ringkasan Green Book readiness")
+	}
+
+	disbursementRows, err := s.queries.GetDashboardGreenBookReadinessDisbursementByYear(ctx, queries.GetDashboardGreenBookReadinessDisbursementByYearParams{
+		GreenBookID:     params.GreenBookID,
+		PublishYear:     params.PublishYear,
+		InstitutionID:   params.InstitutionID,
+		LenderID:        params.LenderID,
+		ReadinessStatus: params.ReadinessStatus,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil rencana disbursement Green Book")
+	}
+
+	allocationRow, err := s.queries.GetDashboardGreenBookReadinessFundingAllocation(ctx, queries.GetDashboardGreenBookReadinessFundingAllocationParams{
+		GreenBookID:     params.GreenBookID,
+		PublishYear:     params.PublishYear,
+		InstitutionID:   params.InstitutionID,
+		LenderID:        params.LenderID,
+		ReadinessStatus: params.ReadinessStatus,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil funding allocation Green Book")
+	}
+
+	itemRows, err := s.queries.ListDashboardGreenBookReadinessItems(ctx, queries.ListDashboardGreenBookReadinessItemsParams{
+		ReadinessStatus: params.ReadinessStatus,
+		GreenBookID:     params.GreenBookID,
+		PublishYear:     params.PublishYear,
+		InstitutionID:   params.InstitutionID,
+		LenderID:        params.LenderID,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil readiness item Green Book")
+	}
+
+	return &model.GreenBookReadinessDashboard{
+		Summary:                greenBookReadinessSummary(summaryRow),
+		DisbursementPlanByYear: greenBookDisbursementYears(disbursementRows),
+		FundingAllocation:      greenBookFundingAllocation(allocationRow),
+		ReadinessItems:         greenBookReadinessItems(itemRows),
+	}, nil
+}
+
+func (s *DashboardService) GetLenderFinancingMix(ctx context.Context, filter model.LenderFinancingMixFilterRequest) (*model.LenderFinancingMixDashboard, error) {
+	params, err := dashboardLenderFinancingMixParams(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	summaryRow, err := s.queries.GetDashboardLenderFinancingMixSummary(ctx, queries.GetDashboardLenderFinancingMixSummaryParams(params))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil ringkasan lender financing mix")
+	}
+	certaintyRows, err := s.queries.GetDashboardLenderCertaintyLadder(ctx, queries.GetDashboardLenderCertaintyLadderParams(params))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil certainty ladder lender")
+	}
+	conversionRows, err := s.queries.GetDashboardLenderConversion(ctx, queries.GetDashboardLenderConversionParams(params))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil conversion lender")
+	}
+	currencyRows, err := s.queries.GetDashboardCurrencyExposure(ctx, queries.GetDashboardCurrencyExposureParams{
+		PublishYear: params.PublishYear,
+		PeriodID:    params.PeriodID,
+		LenderType:  params.LenderType,
+		LenderID:    params.LenderID,
+		Currency:    params.Currency,
+		BudgetYear:  params.BudgetYear,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil currency exposure")
+	}
+	cofinancingRows, err := s.queries.ListDashboardCofinancingItems(ctx, queries.ListDashboardCofinancingItemsParams{
+		LenderType:  params.LenderType,
+		LenderID:    params.LenderID,
+		Currency:    params.Currency,
+		PublishYear: params.PublishYear,
+		PeriodID:    params.PeriodID,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil cofinancing item")
+	}
+
+	return &model.LenderFinancingMixDashboard{
+		Summary:          lenderFinancingMixSummary(summaryRow),
+		CertaintyLadder:  lenderCertaintyPoints(certaintyRows),
+		LenderConversion: lenderConversionItems(conversionRows),
+		CurrencyExposure: currencyExposureItems(currencyRows),
+		CofinancingItems: cofinancingItems(cofinancingRows),
+	}, nil
+}
+
+func (s *DashboardService) GetKLPortfolioPerformance(ctx context.Context, filter model.KLPortfolioPerformanceFilterRequest) (*model.KLPortfolioPerformanceDashboard, error) {
+	params, err := dashboardKLPortfolioPerformanceParams(filter)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.GetDashboardKLPortfolioPerformanceItems(ctx, params)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil K/L portfolio performance")
+	}
+	items := klPortfolioPerformanceItems(rows)
+	return &model.KLPortfolioPerformanceDashboard{
+		Summary: klPortfolioPerformanceSummary(items),
+		Items:   items,
+	}, nil
+}
+
+func (s *DashboardService) GetLADisbursement(ctx context.Context, filter model.LADisbursementFilterRequest) (*model.LADisbursementDashboard, error) {
+	params, err := dashboardLADisbursementParams(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	summaryRow, err := s.queries.GetDashboardLADisbursementSummary(ctx, queries.GetDashboardLADisbursementSummaryParams{
+		LenderID:      params.LenderID,
+		InstitutionID: params.InstitutionID,
+		IsExtended:    params.IsExtended,
+		ClosingMonths: params.ClosingMonths,
+		BudgetYear:    params.BudgetYear,
+		Quarter:       params.Quarter,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil ringkasan Loan Agreement disbursement")
+	}
+
+	trendRows, err := s.queries.GetDashboardLADisbursementQuarterlyTrend(ctx, queries.GetDashboardLADisbursementQuarterlyTrendParams{
+		BudgetYear:    params.BudgetYear,
+		Quarter:       params.Quarter,
+		LenderID:      params.LenderID,
+		InstitutionID: params.InstitutionID,
+		IsExtended:    params.IsExtended,
+		ClosingMonths: params.ClosingMonths,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil tren Loan Agreement disbursement")
+	}
+
+	closingRows, err := s.queries.ListDashboardLAClosingRisks(ctx, queries.ListDashboardLAClosingRisksParams{
+		RiskLevel:     params.RiskLevel,
+		LenderID:      params.LenderID,
+		InstitutionID: params.InstitutionID,
+		IsExtended:    params.IsExtended,
+		ClosingMonths: params.ClosingMonths,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil risiko closing Loan Agreement")
+	}
+
+	underRows, err := s.queries.ListDashboardLAUnderDisbursementRisks(ctx, queries.ListDashboardLAUnderDisbursementRisksParams{
+		RiskLevel:     params.RiskLevel,
+		LenderID:      params.LenderID,
+		InstitutionID: params.InstitutionID,
+		IsExtended:    params.IsExtended,
+		ClosingMonths: params.ClosingMonths,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil risiko under-disbursement")
+	}
+
+	componentRows, err := s.queries.GetDashboardLAComponentBreakdown(ctx, queries.GetDashboardLAComponentBreakdownParams{
+		BudgetYear:    params.BudgetYear,
+		Quarter:       params.Quarter,
+		LenderID:      params.LenderID,
+		InstitutionID: params.InstitutionID,
+		IsExtended:    params.IsExtended,
+		ClosingMonths: params.ClosingMonths,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil breakdown komponen monitoring")
+	}
+
+	return &model.LADisbursementDashboard{
+		Summary:                laDisbursementSummary(summaryRow),
+		QuarterlyTrend:         laDisbursementTrend(trendRows),
+		ClosingRisks:           laClosingRisks(closingRows),
+		UnderDisbursementRisks: laUnderDisbursementRisks(underRows),
+		ComponentBreakdown:     laComponentBreakdown(componentRows),
+	}, nil
+}
+
+func (s *DashboardService) GetDataQualityGovernance(ctx context.Context, filter model.DataQualityGovernanceFilterRequest, includeAudit bool) (*model.DataQualityGovernanceDashboard, error) {
+	params, err := dashboardDataQualityParams(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	issueRows, err := s.queries.ListDashboardDataQualityIssues(ctx, params)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil data quality issues")
+	}
+	issues := dataQualityIssues(issueRows)
+
+	var auditEvents *int
+	var auditSummary *model.DataQualityAuditSummary
+	if includeAudit {
+		auditDays := normalizeAuditDays(filter.AuditDays)
+		eventCount, err := s.queries.CountDashboardAuditEvents(ctx, auditDays)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung audit event")
+		}
+		eventCountInt := int(eventCount)
+		auditEvents = &eventCountInt
+
+		byUserRows, err := s.queries.GetDashboardAuditSummaryByUser(ctx, auditDays)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil audit summary per user")
+		}
+		byTableRows, err := s.queries.GetDashboardAuditSummaryByTable(ctx, auditDays)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil audit summary per table")
+		}
+		recentRows, err := s.queries.ListDashboardAuditRecentActivity(ctx, auditDays)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil audit activity terbaru")
+		}
+		auditSummary = &model.DataQualityAuditSummary{
+			ByUser:         auditSummaryByUser(byUserRows),
+			ByTable:        auditSummaryByTable(byTableRows),
+			RecentActivity: auditRecentActivity(recentRows),
+		}
+	}
+
+	return &model.DataQualityGovernanceDashboard{
+		Summary:      dataQualityIssueSummary(issues, auditEvents),
+		Issues:       issues,
+		AuditSummary: auditSummary,
+	}, nil
+}
+
 func dashboardSummaryParams(filter model.DashboardFilterRequest) (queries.GetDashboardSummaryParams, error) {
 	periodID, err := optionalUUID(filter.PeriodID)
 	if err != nil {
@@ -432,6 +671,146 @@ func dashboardPipelineListParams(filter model.PipelineBottleneckFilterRequest, p
 	}, nil
 }
 
+func dashboardGreenBookReadinessParams(filter model.GreenBookReadinessFilterRequest) (queries.GetDashboardGreenBookReadinessSummaryParams, error) {
+	greenBookID, err := optionalUUID(filter.GreenBookID)
+	if err != nil {
+		return queries.GetDashboardGreenBookReadinessSummaryParams{}, validation("green_book_id", "UUID tidak valid")
+	}
+	lenderID, err := optionalUUID(filter.LenderID)
+	if err != nil {
+		return queries.GetDashboardGreenBookReadinessSummaryParams{}, validation("lender_id", "UUID tidak valid")
+	}
+	institutionID, err := optionalUUID(filter.InstitutionID)
+	if err != nil {
+		return queries.GetDashboardGreenBookReadinessSummaryParams{}, validation("institution_id", "UUID tidak valid")
+	}
+	readinessStatus, err := optionalReadinessStatus(filter.ReadinessStatus)
+	if err != nil {
+		return queries.GetDashboardGreenBookReadinessSummaryParams{}, err
+	}
+	return queries.GetDashboardGreenBookReadinessSummaryParams{
+		GreenBookID:     greenBookID,
+		PublishYear:     optionalDashboardInt4(filter.PublishYear),
+		InstitutionID:   institutionID,
+		LenderID:        lenderID,
+		ReadinessStatus: readinessStatus,
+	}, nil
+}
+
+func dashboardLenderFinancingMixParams(filter model.LenderFinancingMixFilterRequest) (queries.GetDashboardLenderFinancingMixSummaryParams, error) {
+	periodID, err := optionalUUID(filter.PeriodID)
+	if err != nil {
+		return queries.GetDashboardLenderFinancingMixSummaryParams{}, validation("period_id", "UUID tidak valid")
+	}
+	lenderID, err := optionalUUID(filter.LenderID)
+	if err != nil {
+		return queries.GetDashboardLenderFinancingMixSummaryParams{}, validation("lender_id", "UUID tidak valid")
+	}
+	lenderType, err := optionalLenderType(filter.LenderType)
+	if err != nil {
+		return queries.GetDashboardLenderFinancingMixSummaryParams{}, err
+	}
+	currency := pgtype.Text{}
+	if filter.Currency != nil && strings.TrimSpace(*filter.Currency) != "" {
+		currency = pgtype.Text{String: strings.ToUpper(strings.TrimSpace(*filter.Currency)), Valid: true}
+	}
+	return queries.GetDashboardLenderFinancingMixSummaryParams{
+		PeriodID:    periodID,
+		PublishYear: optionalDashboardInt4(filter.PublishYear),
+		Currency:    currency,
+		LenderType:  lenderType,
+		LenderID:    lenderID,
+		BudgetYear:  optionalDashboardInt4(filter.BudgetYear),
+	}, nil
+}
+
+func dashboardKLPortfolioPerformanceParams(filter model.KLPortfolioPerformanceFilterRequest) (queries.GetDashboardKLPortfolioPerformanceItemsParams, error) {
+	institutionID, err := optionalUUID(filter.InstitutionID)
+	if err != nil {
+		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, validation("institution_id", "UUID tidak valid")
+	}
+	periodID, err := optionalUUID(filter.PeriodID)
+	if err != nil {
+		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, validation("period_id", "UUID tidak valid")
+	}
+	institutionRole, err := optionalInstitutionRole(filter.InstitutionRole)
+	if err != nil {
+		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, err
+	}
+	quarter, err := optionalQuarter(filter.Quarter)
+	if err != nil {
+		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, err
+	}
+	return queries.GetDashboardKLPortfolioPerformanceItemsParams{
+		SortBy:          optionalKLSortBy(filter.SortBy),
+		InstitutionID:   institutionID,
+		PeriodID:        periodID,
+		PublishYear:     optionalDashboardInt4(filter.PublishYear),
+		InstitutionRole: institutionRole,
+		BudgetYear:      optionalDashboardInt4(filter.BudgetYear),
+		Quarter:         quarter,
+	}, nil
+}
+
+type dashboardLADisbursementQueryParams struct {
+	BudgetYear    pgtype.Int4
+	Quarter       pgtype.Text
+	LenderID      pgtype.UUID
+	InstitutionID pgtype.UUID
+	IsExtended    pgtype.Bool
+	ClosingMonths pgtype.Int4
+	RiskLevel     pgtype.Text
+}
+
+func dashboardLADisbursementParams(filter model.LADisbursementFilterRequest) (dashboardLADisbursementQueryParams, error) {
+	lenderID, err := optionalUUID(filter.LenderID)
+	if err != nil {
+		return dashboardLADisbursementQueryParams{}, validation("lender_id", "UUID tidak valid")
+	}
+	institutionID, err := optionalUUID(filter.InstitutionID)
+	if err != nil {
+		return dashboardLADisbursementQueryParams{}, validation("institution_id", "UUID tidak valid")
+	}
+	quarter, err := optionalQuarter(filter.Quarter)
+	if err != nil {
+		return dashboardLADisbursementQueryParams{}, err
+	}
+	closingMonths, err := optionalClosingMonths(filter.ClosingMonths)
+	if err != nil {
+		return dashboardLADisbursementQueryParams{}, err
+	}
+	riskLevel, err := optionalDashboardRiskLevel(filter.RiskLevel)
+	if err != nil {
+		return dashboardLADisbursementQueryParams{}, err
+	}
+	return dashboardLADisbursementQueryParams{
+		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
+		Quarter:       quarter,
+		LenderID:      lenderID,
+		InstitutionID: institutionID,
+		IsExtended:    optionalDashboardBool(filter.IsExtended),
+		ClosingMonths: closingMonths,
+		RiskLevel:     riskLevel,
+	}, nil
+}
+
+func dashboardDataQualityParams(filter model.DataQualityGovernanceFilterRequest) (queries.ListDashboardDataQualityIssuesParams, error) {
+	severity, err := optionalDataQualitySeverity(filter.Severity)
+	if err != nil {
+		return queries.ListDashboardDataQualityIssuesParams{}, err
+	}
+	issueType, err := optionalDataQualityIssueType(filter.IssueType)
+	if err != nil {
+		return queries.ListDashboardDataQualityIssuesParams{}, err
+	}
+	return queries.ListDashboardDataQualityIssuesParams{
+		Severity:       severity,
+		Module:         optionalText(filter.Module),
+		IssueType:      issueType,
+		OnlyUnresolved: filter.OnlyUnresolved,
+	}, nil
+}
+
 func optionalUUID(value *string) (pgtype.UUID, error) {
 	if value == nil || *value == "" {
 		return pgtype.UUID{}, nil
@@ -446,6 +825,72 @@ func optionalDashboardInt4(value *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *value, Valid: true}
 }
 
+func optionalDashboardBool(value *bool) pgtype.Bool {
+	if value == nil {
+		return pgtype.Bool{}
+	}
+	return pgtype.Bool{Bool: *value, Valid: true}
+}
+
+func optionalClosingMonths(value *int32) (pgtype.Int4, error) {
+	if value == nil {
+		return pgtype.Int4{}, nil
+	}
+	switch *value {
+	case 3, 6, 12:
+		return pgtype.Int4{Int32: *value, Valid: true}, nil
+	default:
+		return pgtype.Int4{}, validation("closing_months", "closing_months harus 3, 6, atau 12")
+	}
+}
+
+func optionalDashboardRiskLevel(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	riskLevel := strings.ToLower(strings.TrimSpace(*value))
+	switch riskLevel {
+	case "low", "medium", "high":
+		return pgtype.Text{String: riskLevel, Valid: true}, nil
+	default:
+		return pgtype.Text{}, validation("risk_level", "risk_level harus low, medium, atau high")
+	}
+}
+
+func optionalDataQualitySeverity(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	severity := strings.ToLower(strings.TrimSpace(*value))
+	switch severity {
+	case "info", "warning", "error":
+		return pgtype.Text{String: severity, Valid: true}, nil
+	default:
+		return pgtype.Text{}, validation("severity", "severity harus info, warning, atau error")
+	}
+}
+
+func optionalDataQualityIssueType(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	issueType := strings.ToUpper(strings.TrimSpace(*value))
+	if _, ok := dataQualityIssueTypes[issueType]; !ok {
+		return pgtype.Text{}, validation("issue_type", "issue_type tidak valid")
+	}
+	return pgtype.Text{String: issueType, Valid: true}, nil
+}
+
+func normalizeAuditDays(value int32) int32 {
+	if value <= 0 {
+		return 30
+	}
+	if value > 365 {
+		return 365
+	}
+	return value
+}
+
 func optionalPipelineStage(value *string) (pgtype.Text, error) {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return pgtype.Text{}, nil
@@ -455,6 +900,65 @@ func optionalPipelineStage(value *string) (pgtype.Text, error) {
 		return pgtype.Text{}, validation("stage", "stage tidak valid")
 	}
 	return pgtype.Text{String: stage, Valid: true}, nil
+}
+
+func optionalReadinessStatus(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	status := strings.ToUpper(strings.TrimSpace(*value))
+	if _, ok := greenBookReadinessStatusLabels[status]; !ok {
+		return pgtype.Text{}, validation("readiness_status", "readiness_status tidak valid")
+	}
+	return pgtype.Text{String: status, Valid: true}, nil
+}
+
+func optionalLenderType(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	switch strings.TrimSpace(*value) {
+	case "Bilateral", "Multilateral", "KSA":
+		return pgtype.Text{String: strings.TrimSpace(*value), Valid: true}, nil
+	default:
+		return pgtype.Text{}, validation("lender_type", "lender_type tidak valid")
+	}
+}
+
+func optionalInstitutionRole(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	role := strings.TrimSpace(*value)
+	if role != "Executing Agency" && role != "Implementing Agency" {
+		return pgtype.Text{}, validation("institution_role", "institution_role tidak valid")
+	}
+	return pgtype.Text{String: role, Valid: true}, nil
+}
+
+func optionalQuarter(value *string) (pgtype.Text, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Text{}, nil
+	}
+	quarter := strings.ToUpper(strings.TrimSpace(*value))
+	switch quarter {
+	case "TW1", "TW2", "TW3", "TW4":
+		return pgtype.Text{String: quarter, Valid: true}, nil
+	default:
+		return pgtype.Text{}, validation("quarter", "quarter tidak valid")
+	}
+}
+
+func optionalKLSortBy(value *string) pgtype.Text {
+	if value == nil {
+		return pgtype.Text{String: "pipeline_usd", Valid: true}
+	}
+	switch strings.TrimSpace(*value) {
+	case "pipeline_usd", "la_commitment_usd", "absorption_pct", "risk_count":
+		return pgtype.Text{String: strings.TrimSpace(*value), Valid: true}
+	default:
+		return pgtype.Text{String: "pipeline_usd", Valid: true}
+	}
 }
 
 func allowedDashboardSort(value string) string {
@@ -514,6 +1018,385 @@ func pipelineBottleneckItems(rows []queries.ListDashboardPipelineBottleneckItems
 	return items
 }
 
+func greenBookReadinessSummary(row queries.GetDashboardGreenBookReadinessSummaryRow) model.GreenBookReadinessSummary {
+	return model.GreenBookReadinessSummary{
+		TotalProjects:           int(row.TotalProjects),
+		TotalLoanUSD:            floatFromNumeric(row.TotalLoanUsd),
+		TotalGrantUSD:           floatFromNumeric(row.TotalGrantUsd),
+		TotalLocalUSD:           floatFromNumeric(row.TotalLocalUsd),
+		ProjectsWithCofinancing: int(row.ProjectsWithCofinancing),
+		ProjectsIncomplete:      int(row.ProjectsIncomplete),
+		ProjectsReady:           int(row.ProjectsReady),
+		ProjectsPartial:         int(row.ProjectsPartial),
+	}
+}
+
+func greenBookDisbursementYears(rows []queries.GetDashboardGreenBookReadinessDisbursementByYearRow) []model.GreenBookDisbursementYear {
+	items := make([]model.GreenBookDisbursementYear, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.GreenBookDisbursementYear{
+			Year:      row.Year,
+			AmountUSD: floatFromNumeric(row.AmountUsd),
+		})
+	}
+	return items
+}
+
+func greenBookFundingAllocation(row queries.GetDashboardGreenBookReadinessFundingAllocationRow) model.GreenBookFundingAllocation {
+	return model.GreenBookFundingAllocation{
+		Services:      floatFromNumeric(row.Services),
+		Constructions: floatFromNumeric(row.Constructions),
+		Goods:         floatFromNumeric(row.Goods),
+		Trainings:     floatFromNumeric(row.Trainings),
+		Other:         floatFromNumeric(row.Other),
+	}
+}
+
+func greenBookReadinessItems(rows []queries.ListDashboardGreenBookReadinessItemsRow) []model.GreenBookReadinessItem {
+	items := make([]model.GreenBookReadinessItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.GreenBookReadinessItem{
+			ProjectID:       model.UUIDToString(row.ProjectID),
+			GreenBookID:     model.UUIDToString(row.GreenBookID),
+			GBCode:          row.GbCode,
+			ProjectName:     row.ProjectName,
+			PublishYear:     row.PublishYear,
+			ReadinessScore:  int(row.ReadinessScore),
+			ReadinessStatus: row.ReadinessStatus,
+			IsCofinancing:   row.IsCofinancing,
+			MissingFields:   safeStringSlice(row.MissingFields),
+			TotalFundingUSD: floatFromNumeric(row.TotalFundingUsd),
+			InstitutionName: row.InstitutionName,
+			LenderNames:     safeStringSlice(row.LenderNames),
+		})
+	}
+	return items
+}
+
+func lenderFinancingMixSummary(row queries.GetDashboardLenderFinancingMixSummaryRow) model.LenderFinancingMixSummary {
+	return model.LenderFinancingMixSummary{
+		TotalLenders:        int(row.TotalLenders),
+		BilateralUSD:        floatFromNumeric(row.BilateralUsd),
+		MultilateralUSD:     floatFromNumeric(row.MultilateralUsd),
+		KSAUSD:              floatFromNumeric(row.KsaUsd),
+		CofinancingProjects: int(row.CofinancingProjects),
+	}
+}
+
+func lenderCertaintyPoints(rows []queries.GetDashboardLenderCertaintyLadderRow) []model.LenderCertaintyPoint {
+	items := make([]model.LenderCertaintyPoint, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.LenderCertaintyPoint{
+			Stage:        row.Stage,
+			LenderID:     model.UUIDToString(row.LenderID),
+			LenderName:   row.LenderName,
+			LenderType:   row.LenderType,
+			ProjectCount: int(row.ProjectCount),
+			AmountUSD:    floatFromNumeric(row.AmountUsd),
+		})
+	}
+	return items
+}
+
+func lenderConversionItems(rows []queries.GetDashboardLenderConversionRow) []model.LenderConversionItem {
+	items := make([]model.LenderConversionItem, 0, len(rows))
+	for _, row := range rows {
+		indicationCount := int(row.IndicationCount)
+		laCount := int(row.LaCount)
+		conversionPct := 0.0
+		if indicationCount > 0 {
+			conversionPct = float64(laCount) / float64(indicationCount) * 100
+		}
+		items = append(items, model.LenderConversionItem{
+			LenderID:        model.UUIDToString(row.LenderID),
+			LenderName:      row.LenderName,
+			LenderType:      row.LenderType,
+			IndicationCount: indicationCount,
+			LoICount:        int(row.LoiCount),
+			GBCount:         int(row.GbCount),
+			DKCount:         int(row.DkCount),
+			LACount:         laCount,
+			IndicationUSD:   floatFromNumeric(row.IndicationUsd),
+			LAUSD:           floatFromNumeric(row.LaUsd),
+			LAConversionPct: conversionPct,
+		})
+	}
+	return items
+}
+
+func currencyExposureItems(rows []queries.GetDashboardCurrencyExposureRow) []model.CurrencyExposureItem {
+	items := make([]model.CurrencyExposureItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.CurrencyExposureItem{
+			Currency:       row.Currency,
+			Stage:          row.Stage,
+			ProjectCount:   int(row.ProjectCount),
+			AmountOriginal: floatFromNumeric(row.AmountOriginal),
+			AmountUSD:      floatFromNumeric(row.AmountUsd),
+		})
+	}
+	return items
+}
+
+func cofinancingItems(rows []queries.ListDashboardCofinancingItemsRow) []model.CofinancingItem {
+	items := make([]model.CofinancingItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.CofinancingItem{
+			ProjectID:     model.UUIDToString(row.ProjectID),
+			ReferenceType: row.ReferenceType,
+			ProjectCode:   row.ProjectCode,
+			ProjectName:   row.ProjectName,
+			LenderCount:   int(row.LenderCount),
+			LenderNames:   safeStringSlice(row.LenderNames),
+			AmountUSD:     floatFromNumeric(row.AmountUsd),
+		})
+	}
+	return items
+}
+
+func klPortfolioPerformanceItems(rows []queries.GetDashboardKLPortfolioPerformanceItemsRow) []model.KLPortfolioPerformanceItem {
+	items := make([]model.KLPortfolioPerformanceItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.KLPortfolioPerformanceItem{
+			InstitutionID:       model.UUIDToString(row.InstitutionID),
+			InstitutionName:     row.InstitutionName,
+			BBProjectCount:      int(row.BbProjectCount),
+			GBProjectCount:      int(row.GbProjectCount),
+			DKProjectCount:      int(row.DkProjectCount),
+			LACount:             int(row.LaCount),
+			PipelineUSD:         floatFromNumeric(row.PipelineUsd),
+			LACommitmentUSD:     floatFromNumeric(row.LaCommitmentUsd),
+			PlannedUSD:          floatFromNumeric(row.PlannedUsd),
+			RealizedUSD:         floatFromNumeric(row.RealizedUsd),
+			AbsorptionPct:       floatFromNumeric(row.AbsorptionPct),
+			RiskCount:           int(row.RiskCount),
+			PerformanceScore:    floatFromNumeric(row.PerformanceScore),
+			PerformanceCategory: row.PerformanceCategory,
+		})
+	}
+	return items
+}
+
+func klPortfolioPerformanceSummary(items []model.KLPortfolioPerformanceItem) model.KLPortfolioPerformanceSummary {
+	summary := model.KLPortfolioPerformanceSummary{TotalInstitutions: len(items)}
+	if len(items) == 0 {
+		return summary
+	}
+
+	topExposure := items[0]
+	lowestAbsorption := items[0]
+	highestRisk := items[0]
+	absorptionTotal := 0.0
+	for _, item := range items {
+		exposure := item.PipelineUSD + item.LACommitmentUSD
+		if exposure > topExposure.PipelineUSD+topExposure.LACommitmentUSD {
+			topExposure = item
+		}
+		if item.AbsorptionPct < lowestAbsorption.AbsorptionPct {
+			lowestAbsorption = item
+		}
+		if item.RiskCount > highestRisk.RiskCount {
+			highestRisk = item
+		}
+		summary.TotalInstitutionExposureUSD += exposure
+		summary.TotalInstitutionRiskCount += item.RiskCount
+		absorptionTotal += item.AbsorptionPct
+	}
+	summary.TopExposureInstitution = topExposure.InstitutionName
+	summary.TopExposureUSD = topExposure.PipelineUSD + topExposure.LACommitmentUSD
+	summary.LowestAbsorptionInstitution = lowestAbsorption.InstitutionName
+	summary.LowestAbsorptionPct = lowestAbsorption.AbsorptionPct
+	summary.HighestRiskInstitution = highestRisk.InstitutionName
+	summary.HighestRiskCount = highestRisk.RiskCount
+	summary.AverageAbsorptionPct = absorptionTotal / float64(len(items))
+	return summary
+}
+
+func laDisbursementSummary(row queries.GetDashboardLADisbursementSummaryRow) model.LADisbursementSummary {
+	return model.LADisbursementSummary{
+		LACount:           int(row.LaCount),
+		EffectiveCount:    int(row.EffectiveCount),
+		NotEffectiveCount: int(row.NotEffectiveCount),
+		ExtendedCount:     int(row.ExtendedCount),
+		CommitmentUSD:     floatFromNumeric(row.CommitmentUsd),
+		PlannedUSD:        floatFromNumeric(row.PlannedUsd),
+		RealizedUSD:       floatFromNumeric(row.RealizedUsd),
+		AbsorptionPct:     floatFromNumeric(row.AbsorptionPct),
+		UndisbursedUSD:    floatFromNumeric(row.UndisbursedUsd),
+	}
+}
+
+func laDisbursementTrend(rows []queries.GetDashboardLADisbursementQuarterlyTrendRow) []model.LADisbursementTrendPoint {
+	items := make([]model.LADisbursementTrendPoint, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.LADisbursementTrendPoint{
+			Period:        fmt.Sprintf("%d-%s", row.BudgetYear, row.Quarter),
+			BudgetYear:    row.BudgetYear,
+			Quarter:       row.Quarter,
+			PlannedUSD:    floatFromNumeric(row.PlannedUsd),
+			RealizedUSD:   floatFromNumeric(row.RealizedUsd),
+			AbsorptionPct: floatFromNumeric(row.AbsorptionPct),
+		})
+	}
+	return items
+}
+
+func laClosingRisks(rows []queries.ListDashboardLAClosingRisksRow) []model.LAClosingRiskItem {
+	items := make([]model.LAClosingRiskItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.LAClosingRiskItem{
+			LoanAgreementID:       model.UUIDToString(row.LoanAgreementID),
+			LoanCode:              row.LoanCode,
+			ProjectName:           row.ProjectName,
+			LenderName:            row.LenderName,
+			EffectiveDate:         dateString(row.EffectiveDate),
+			ClosingDate:           dateString(row.ClosingDate),
+			DaysUntilClosing:      int(row.DaysUntilClosing),
+			CommitmentUSD:         floatFromNumeric(row.CommitmentUsd),
+			CumulativeRealizedUSD: floatFromNumeric(row.CumulativeRealizedUsd),
+			UndisbursedUSD:        floatFromNumeric(row.UndisbursedUsd),
+			LAAbsorptionPct:       floatFromNumeric(row.LaAbsorptionPct),
+			RiskType:              row.RiskType,
+			RiskLevel:             row.RiskLevel,
+		})
+	}
+	return items
+}
+
+func laUnderDisbursementRisks(rows []queries.ListDashboardLAUnderDisbursementRisksRow) []model.LAUnderDisbursementRiskItem {
+	items := make([]model.LAUnderDisbursementRiskItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.LAUnderDisbursementRiskItem{
+			LoanAgreementID:                model.UUIDToString(row.LoanAgreementID),
+			LoanCode:                       row.LoanCode,
+			ProjectName:                    row.ProjectName,
+			LenderName:                     row.LenderName,
+			EffectiveDate:                  dateString(row.EffectiveDate),
+			ClosingDate:                    dateString(row.ClosingDate),
+			CommitmentUSD:                  floatFromNumeric(row.CommitmentUsd),
+			CumulativeRealizedUSD:          floatFromNumeric(row.CumulativeRealizedUsd),
+			UndisbursedUSD:                 floatFromNumeric(row.UndisbursedUsd),
+			LAAbsorptionPct:                floatFromNumeric(row.LaAbsorptionPct),
+			TimeElapsedPct:                 floatFromNumeric(row.TimeElapsedPct),
+			AbsorptionGapPct:               floatFromNumeric(row.AbsorptionGapPct),
+			RemainingMonths:                floatFromNumeric(row.RemainingMonths),
+			RequiredMonthlyDisbursementUSD: floatFromNumeric(row.RequiredMonthlyDisbursementUsd),
+			MonitoringCount:                int(row.MonitoringCount),
+			IsExtended:                     row.IsExtended,
+			RiskType:                       row.RiskType,
+			RiskLevel:                      row.RiskLevel,
+		})
+	}
+	return items
+}
+
+func laComponentBreakdown(rows []queries.GetDashboardLAComponentBreakdownRow) []model.LAComponentBreakdownItem {
+	items := make([]model.LAComponentBreakdownItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.LAComponentBreakdownItem{
+			ComponentName: row.ComponentName,
+			LACount:       int(row.LaCount),
+			PlannedUSD:    floatFromNumeric(row.PlannedUsd),
+			RealizedUSD:   floatFromNumeric(row.RealizedUsd),
+			AbsorptionPct: floatFromNumeric(row.AbsorptionPct),
+		})
+	}
+	return items
+}
+
+func dataQualityIssues(rows []queries.ListDashboardDataQualityIssuesRow) []model.DataQualityIssueItem {
+	items := make([]model.DataQualityIssueItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.DataQualityIssueItem{
+			Severity:          row.Severity,
+			Module:            row.Module,
+			IssueType:         row.IssueType,
+			RecordID:          model.UUIDToString(row.RecordID),
+			RecordLabel:       row.RecordLabel,
+			Message:           row.Message,
+			RecommendedAction: row.RecommendedAction,
+			IsResolved:        row.IsResolved,
+		})
+	}
+	return items
+}
+
+func dataQualityIssueSummary(items []model.DataQualityIssueItem, auditEvents *int) model.DataQualityIssueSummary {
+	summary := model.DataQualityIssueSummary{
+		TotalIssues: len(items),
+		AuditEvents: auditEvents,
+	}
+	for _, item := range items {
+		switch item.Severity {
+		case "error":
+			summary.ErrorCount++
+		case "warning":
+			summary.WarningCount++
+		case "info":
+			summary.InfoCount++
+		}
+	}
+	return summary
+}
+
+func auditSummaryByUser(rows []queries.GetDashboardAuditSummaryByUserRow) []model.AuditSummaryItem {
+	items := make([]model.AuditSummaryItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.AuditSummaryItem{
+			Label:         row.Label,
+			EventCount:    int(row.EventCount),
+			LastChangedAt: formatMasterTime(row.LastChangedAt),
+		})
+	}
+	return items
+}
+
+func auditSummaryByTable(rows []queries.GetDashboardAuditSummaryByTableRow) []model.AuditSummaryItem {
+	items := make([]model.AuditSummaryItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.AuditSummaryItem{
+			Label:         row.Label,
+			EventCount:    int(row.EventCount),
+			LastChangedAt: formatMasterTime(row.LastChangedAt),
+		})
+	}
+	return items
+}
+
+func auditRecentActivity(rows []queries.ListDashboardAuditRecentActivityRow) []model.AuditRecentActivityItem {
+	items := make([]model.AuditRecentActivityItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.AuditRecentActivityItem{
+			ID:        model.UUIDToString(row.ID),
+			Username:  row.Username,
+			Action:    row.Action,
+			TableName: row.TableName,
+			RecordID:  model.UUIDToString(row.RecordID),
+			ChangedAt: formatMasterTime(row.ChangedAt),
+		})
+	}
+	return items
+}
+
+var dataQualityIssueTypes = map[string]struct{}{
+	"BB_WITHOUT_BAPPENAS_PARTNER":               {},
+	"BB_INDICATION_WITHOUT_LOI":                 {},
+	"LOI_WITHOUT_GB":                            {},
+	"GB_WITHOUT_BB_REFERENCE":                   {},
+	"GB_WITHOUT_FUNDING_SOURCE":                 {},
+	"GB_WITHOUT_DISBURSEMENT_PLAN":              {},
+	"GB_WITHOUT_ACTIVITY":                       {},
+	"DK_WITHOUT_FINANCING_DETAIL":               {},
+	"DK_WITHOUT_ACTIVITY_DETAIL":                {},
+	"DK_WITHOUT_LA":                             {},
+	"LA_NOT_EFFECTIVE":                          {},
+	"EFFECTIVE_LA_WITHOUT_MONITORING":           {},
+	"MONITORING_PLANNED_ZERO_REALIZED_POSITIVE": {},
+	"MONITORING_COMPONENT_NAME_EMPTY":           {},
+	"CURRENCY_USD_MISMATCH":                     {},
+	"CLOSING_DATE_SOON_NO_RECENT_MONITORING":    {},
+}
+
 var pipelineStageLabels = map[string]string{
 	"BB_NO_LENDER":            "Blue Book No Lender",
 	"INDICATION_NO_LOI":       "Indication No Letter of Intent",
@@ -522,6 +1405,13 @@ var pipelineStageLabels = map[string]string{
 	"DK_NO_LA":                "Daftar Kegiatan No Loan Agreement",
 	"LA_NOT_EFFECTIVE":        "Loan Agreement Not Effective",
 	"EFFECTIVE_NO_MONITORING": "Effective No Monitoring",
+}
+
+var greenBookReadinessStatusLabels = map[string]string{
+	"READY":       "Ready",
+	"PARTIAL":     "Partial",
+	"INCOMPLETE":  "Incomplete",
+	"COFINANCING": "Cofinancing",
 }
 
 func pipelineStageLabel(stage string) string {

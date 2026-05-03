@@ -250,6 +250,11 @@ func main() {
 	dashboard.GET("/filter-options", dashboardHandler.FilterOptions)
 	dashboard.GET("/executive-portfolio", dashboardHandler.ExecutivePortfolio)
 	dashboard.GET("/pipeline-bottleneck", dashboardHandler.PipelineBottleneck)
+	dashboard.GET("/green-book-readiness", dashboardHandler.GreenBookReadiness)
+	dashboard.GET("/lender-financing-mix", dashboardHandler.LenderFinancingMix)
+	dashboard.GET("/kl-portfolio-performance", dashboardHandler.KLPortfolioPerformance)
+	dashboard.GET("/la-disbursement", dashboardHandler.LADisbursement)
+	dashboard.GET("/data-quality-governance", dashboardHandler.DataQualityGovernance)
 
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))

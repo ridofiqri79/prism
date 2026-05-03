@@ -67,6 +67,11 @@ export interface BBProject {
   updated_at?: string
 }
 
+export interface BBProjectRevisionSourceOption extends BBProject {
+  source_blue_book_id: string
+  source_blue_book_label: string
+}
+
 export interface BBProjectListParams extends ListParams {
   executing_agency_ids?: string[]
   location_ids?: string[]

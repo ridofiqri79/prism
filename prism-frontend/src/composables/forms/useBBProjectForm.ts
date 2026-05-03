@@ -10,6 +10,7 @@ import type {
 } from '@/types/blue-book.types'
 
 export interface BBProjectFormValues {
+  project_identity_id: string
   program_title_id: string
   bappenas_partner_ids: string[]
   bb_code: string
@@ -41,6 +42,7 @@ export function categoriesForFundingType(type: FundingType) {
 
 function defaultValues(): BBProjectFormValues {
   return {
+    project_identity_id: '',
     program_title_id: '',
     bappenas_partner_ids: [],
     bb_code: '',
@@ -61,6 +63,7 @@ function fromProject(project?: BBProject | null): Partial<BBProjectFormValues> {
   if (!project) return {}
 
   return {
+    project_identity_id: project.project_identity_id,
     program_title_id: project.program_title_id ?? project.program_title?.id ?? '',
     bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
     bb_code: project.bb_code,
@@ -135,6 +138,7 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
   function toPayload(): BBProjectPayload {
     return {
       ...values,
+      project_identity_id: values.project_identity_id || null,
       duration: values.duration ?? null,
       objective: values.objective || null,
       scope_of_work: values.scope_of_work || null,
@@ -176,6 +180,12 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
     }))
   }
 
+  function reset() {
+    Object.assign(values, defaultValues())
+    projectCosts.value = []
+    lenderIndications.value = []
+  }
+
   return {
     values,
     errors,
@@ -187,5 +197,6 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
     removeIndication,
     submit,
     applyProject,
+    reset,
   }
 }

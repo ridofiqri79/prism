@@ -1,31 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import Tag from 'primevue/tag'
+import AmountDisplay from '@/components/dashboard/AmountDisplay.vue'
 import type { MetricCard } from '@/types/dashboard.types'
 
-const props = defineProps<{
+defineProps<{
   card: MetricCard
 }>()
-
-const formattedValue = computed(() => {
-  if (props.card.unit === 'USD') {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(props.card.value)
-  }
-  if (props.card.unit === 'percent') {
-    return `${props.card.value.toFixed(2)}%`
-  }
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(props.card.value)
-})
-
-const unitLabel = computed(() => {
-  if (props.card.unit === 'project') return 'proyek'
-  if (props.card.unit === 'USD' || props.card.unit === 'percent') return ''
-  return props.card.unit ?? ''
-})
 </script>
 
 <template>
@@ -35,8 +15,14 @@ const unitLabel = computed(() => {
       <Tag v-if="card.category" :value="card.category" severity="secondary" />
     </div>
     <p class="mt-3 break-words text-2xl font-semibold text-surface-950">
-      {{ formattedValue }}
+      <AmountDisplay
+        :value="card.value"
+        :unit="card.unit"
+        :maximum-fraction-digits="card.unit === 'percent' ? 2 : 0"
+      />
     </p>
-    <p v-if="unitLabel" class="mt-1 text-sm text-surface-500">{{ unitLabel }}</p>
+    <p v-if="card.unit && !['USD', 'percent'].includes(card.unit)" class="mt-1 text-sm text-surface-500">
+      {{ card.unit === 'project' ? 'proyek' : card.unit }}
+    </p>
   </article>
 </template>

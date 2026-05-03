@@ -133,3 +133,306 @@ type PipelineBottleneckDashboard struct {
 	StageSummary []PipelineStageSummary   `json:"stage_summary"`
 	Items        []PipelineBottleneckItem `json:"items"`
 }
+
+type GreenBookReadinessFilterRequest struct {
+	PublishYear     *int32  `json:"publish_year,omitempty"`
+	GreenBookID     *string `json:"green_book_id,omitempty"`
+	InstitutionID   *string `json:"institution_id,omitempty"`
+	LenderID        *string `json:"lender_id,omitempty"`
+	ReadinessStatus *string `json:"readiness_status,omitempty"`
+}
+
+type GreenBookReadinessSummary struct {
+	TotalProjects           int     `json:"total_projects"`
+	TotalLoanUSD            float64 `json:"total_loan_usd"`
+	TotalGrantUSD           float64 `json:"total_grant_usd"`
+	TotalLocalUSD           float64 `json:"total_local_usd"`
+	ProjectsWithCofinancing int     `json:"projects_with_cofinancing"`
+	ProjectsIncomplete      int     `json:"projects_incomplete"`
+	ProjectsReady           int     `json:"projects_ready"`
+	ProjectsPartial         int     `json:"projects_partial"`
+}
+
+type GreenBookDisbursementYear struct {
+	Year      int32   `json:"year"`
+	AmountUSD float64 `json:"amount_usd"`
+}
+
+type GreenBookFundingAllocation struct {
+	Services      float64 `json:"services"`
+	Constructions float64 `json:"constructions"`
+	Goods         float64 `json:"goods"`
+	Trainings     float64 `json:"trainings"`
+	Other         float64 `json:"other"`
+}
+
+type GreenBookReadinessItem struct {
+	ProjectID       string   `json:"project_id"`
+	GreenBookID     string   `json:"green_book_id"`
+	GBCode          string   `json:"gb_code"`
+	ProjectName     string   `json:"project_name"`
+	PublishYear     int32    `json:"publish_year"`
+	ReadinessScore  int      `json:"readiness_score"`
+	ReadinessStatus string   `json:"readiness_status"`
+	IsCofinancing   bool     `json:"is_cofinancing"`
+	MissingFields   []string `json:"missing_fields"`
+	TotalFundingUSD float64  `json:"total_funding_usd"`
+	InstitutionName string   `json:"institution_name,omitempty"`
+	LenderNames     []string `json:"lender_names"`
+}
+
+type GreenBookReadinessDashboard struct {
+	Summary                GreenBookReadinessSummary   `json:"summary"`
+	DisbursementPlanByYear []GreenBookDisbursementYear `json:"disbursement_plan_by_year"`
+	FundingAllocation      GreenBookFundingAllocation  `json:"funding_allocation"`
+	ReadinessItems         []GreenBookReadinessItem    `json:"readiness_items"`
+}
+
+type LenderFinancingMixFilterRequest struct {
+	LenderType  *string `json:"lender_type,omitempty"`
+	LenderID    *string `json:"lender_id,omitempty"`
+	Currency    *string `json:"currency,omitempty"`
+	PeriodID    *string `json:"period_id,omitempty"`
+	PublishYear *int32  `json:"publish_year,omitempty"`
+	BudgetYear  *int32  `json:"budget_year,omitempty"`
+}
+
+type LenderFinancingMixSummary struct {
+	TotalLenders        int     `json:"total_lenders"`
+	BilateralUSD        float64 `json:"bilateral_usd"`
+	MultilateralUSD     float64 `json:"multilateral_usd"`
+	KSAUSD              float64 `json:"ksa_usd"`
+	CofinancingProjects int     `json:"cofinancing_projects"`
+}
+
+type LenderCertaintyPoint struct {
+	Stage        string  `json:"stage"`
+	LenderID     string  `json:"lender_id"`
+	LenderName   string  `json:"lender_name"`
+	LenderType   string  `json:"lender_type"`
+	ProjectCount int     `json:"project_count"`
+	AmountUSD    float64 `json:"amount_usd"`
+}
+
+type LenderConversionItem struct {
+	LenderID        string  `json:"lender_id"`
+	LenderName      string  `json:"lender_name"`
+	LenderType      string  `json:"lender_type"`
+	IndicationCount int     `json:"indication_count"`
+	LoICount        int     `json:"loi_count"`
+	GBCount         int     `json:"gb_count"`
+	DKCount         int     `json:"dk_count"`
+	LACount         int     `json:"la_count"`
+	IndicationUSD   float64 `json:"indication_usd"`
+	LAUSD           float64 `json:"la_usd"`
+	LAConversionPct float64 `json:"la_conversion_pct"`
+}
+
+type CurrencyExposureItem struct {
+	Currency       string  `json:"currency"`
+	Stage          string  `json:"stage"`
+	ProjectCount   int     `json:"project_count"`
+	AmountOriginal float64 `json:"amount_original"`
+	AmountUSD      float64 `json:"amount_usd"`
+}
+
+type CofinancingItem struct {
+	ProjectID     string   `json:"project_id"`
+	ReferenceType string   `json:"reference_type"`
+	ProjectCode   string   `json:"project_code,omitempty"`
+	ProjectName   string   `json:"project_name"`
+	LenderCount   int      `json:"lender_count"`
+	LenderNames   []string `json:"lender_names"`
+	AmountUSD     float64  `json:"amount_usd"`
+}
+
+type LenderFinancingMixDashboard struct {
+	Summary          LenderFinancingMixSummary `json:"summary"`
+	CertaintyLadder  []LenderCertaintyPoint    `json:"certainty_ladder"`
+	LenderConversion []LenderConversionItem    `json:"lender_conversion"`
+	CurrencyExposure []CurrencyExposureItem    `json:"currency_exposure"`
+	CofinancingItems []CofinancingItem         `json:"cofinancing_items"`
+}
+
+type KLPortfolioPerformanceFilterRequest struct {
+	InstitutionID   *string `json:"institution_id,omitempty"`
+	InstitutionRole *string `json:"institution_role,omitempty"`
+	PeriodID        *string `json:"period_id,omitempty"`
+	PublishYear     *int32  `json:"publish_year,omitempty"`
+	BudgetYear      *int32  `json:"budget_year,omitempty"`
+	Quarter         *string `json:"quarter,omitempty"`
+	SortBy          *string `json:"sort_by,omitempty"`
+}
+
+type KLPortfolioPerformanceSummary struct {
+	TotalInstitutions           int     `json:"total_institutions"`
+	TopExposureInstitution      string  `json:"top_exposure_institution,omitempty"`
+	TopExposureUSD              float64 `json:"top_exposure_usd,omitempty"`
+	LowestAbsorptionInstitution string  `json:"lowest_absorption_institution,omitempty"`
+	LowestAbsorptionPct         float64 `json:"lowest_absorption_pct,omitempty"`
+	HighestRiskInstitution      string  `json:"highest_risk_institution,omitempty"`
+	HighestRiskCount            int     `json:"highest_risk_count,omitempty"`
+	AverageAbsorptionPct        float64 `json:"average_absorption_pct,omitempty"`
+	TotalInstitutionExposureUSD float64 `json:"total_institution_exposure_usd,omitempty"`
+	TotalInstitutionRiskCount   int     `json:"total_institution_risk_count,omitempty"`
+}
+
+type KLPortfolioPerformanceItem struct {
+	InstitutionID       string  `json:"institution_id"`
+	InstitutionName     string  `json:"institution_name"`
+	BBProjectCount      int     `json:"bb_project_count"`
+	GBProjectCount      int     `json:"gb_project_count"`
+	DKProjectCount      int     `json:"dk_project_count"`
+	LACount             int     `json:"la_count"`
+	PipelineUSD         float64 `json:"pipeline_usd"`
+	LACommitmentUSD     float64 `json:"la_commitment_usd"`
+	PlannedUSD          float64 `json:"planned_usd"`
+	RealizedUSD         float64 `json:"realized_usd"`
+	AbsorptionPct       float64 `json:"absorption_pct"`
+	RiskCount           int     `json:"risk_count"`
+	PerformanceScore    float64 `json:"performance_score"`
+	PerformanceCategory string  `json:"performance_category"`
+}
+
+type KLPortfolioPerformanceDashboard struct {
+	Summary KLPortfolioPerformanceSummary `json:"summary"`
+	Items   []KLPortfolioPerformanceItem  `json:"items"`
+}
+
+type LADisbursementFilterRequest struct {
+	BudgetYear    *int32  `json:"budget_year,omitempty"`
+	Quarter       *string `json:"quarter,omitempty"`
+	LenderID      *string `json:"lender_id,omitempty"`
+	InstitutionID *string `json:"institution_id,omitempty"`
+	IsExtended    *bool   `json:"is_extended,omitempty"`
+	ClosingMonths *int32  `json:"closing_months,omitempty"`
+	RiskLevel     *string `json:"risk_level,omitempty"`
+}
+
+type LADisbursementSummary struct {
+	LACount           int     `json:"la_count"`
+	EffectiveCount    int     `json:"effective_count"`
+	NotEffectiveCount int     `json:"not_effective_count"`
+	ExtendedCount     int     `json:"extended_count"`
+	CommitmentUSD     float64 `json:"commitment_usd"`
+	PlannedUSD        float64 `json:"planned_usd"`
+	RealizedUSD       float64 `json:"realized_usd"`
+	AbsorptionPct     float64 `json:"absorption_pct"`
+	UndisbursedUSD    float64 `json:"undisbursed_usd"`
+}
+
+type LADisbursementTrendPoint struct {
+	Period        string  `json:"period"`
+	BudgetYear    int32   `json:"budget_year"`
+	Quarter       string  `json:"quarter"`
+	PlannedUSD    float64 `json:"planned_usd"`
+	RealizedUSD   float64 `json:"realized_usd"`
+	AbsorptionPct float64 `json:"absorption_pct"`
+}
+
+type LAClosingRiskItem struct {
+	LoanAgreementID       string  `json:"loan_agreement_id"`
+	LoanCode              string  `json:"loan_code"`
+	ProjectName           string  `json:"project_name"`
+	LenderName            string  `json:"lender_name"`
+	EffectiveDate         string  `json:"effective_date"`
+	ClosingDate           string  `json:"closing_date"`
+	DaysUntilClosing      int     `json:"days_until_closing"`
+	CommitmentUSD         float64 `json:"commitment_usd"`
+	CumulativeRealizedUSD float64 `json:"cumulative_realized_usd"`
+	UndisbursedUSD        float64 `json:"undisbursed_usd"`
+	LAAbsorptionPct       float64 `json:"la_absorption_pct"`
+	RiskType              string  `json:"risk_type"`
+	RiskLevel             string  `json:"risk_level"`
+}
+
+type LAUnderDisbursementRiskItem struct {
+	LoanAgreementID                string  `json:"loan_agreement_id"`
+	LoanCode                       string  `json:"loan_code"`
+	ProjectName                    string  `json:"project_name"`
+	LenderName                     string  `json:"lender_name"`
+	EffectiveDate                  string  `json:"effective_date"`
+	ClosingDate                    string  `json:"closing_date"`
+	CommitmentUSD                  float64 `json:"commitment_usd"`
+	CumulativeRealizedUSD          float64 `json:"cumulative_realized_usd"`
+	UndisbursedUSD                 float64 `json:"undisbursed_usd"`
+	LAAbsorptionPct                float64 `json:"la_absorption_pct"`
+	TimeElapsedPct                 float64 `json:"time_elapsed_pct"`
+	AbsorptionGapPct               float64 `json:"absorption_gap_pct"`
+	RemainingMonths                float64 `json:"remaining_months"`
+	RequiredMonthlyDisbursementUSD float64 `json:"required_monthly_disbursement_usd"`
+	MonitoringCount                int     `json:"monitoring_count"`
+	IsExtended                     bool    `json:"is_extended"`
+	RiskType                       string  `json:"risk_type"`
+	RiskLevel                      string  `json:"risk_level"`
+}
+
+type LAComponentBreakdownItem struct {
+	ComponentName string  `json:"component_name"`
+	LACount       int     `json:"la_count"`
+	PlannedUSD    float64 `json:"planned_usd"`
+	RealizedUSD   float64 `json:"realized_usd"`
+	AbsorptionPct float64 `json:"absorption_pct"`
+}
+
+type LADisbursementDashboard struct {
+	Summary                LADisbursementSummary         `json:"summary"`
+	QuarterlyTrend         []LADisbursementTrendPoint    `json:"quarterly_trend"`
+	ClosingRisks           []LAClosingRiskItem           `json:"closing_risks"`
+	UnderDisbursementRisks []LAUnderDisbursementRiskItem `json:"under_disbursement_risks"`
+	ComponentBreakdown     []LAComponentBreakdownItem    `json:"component_breakdown"`
+}
+
+type DataQualityGovernanceFilterRequest struct {
+	Severity       *string `json:"severity,omitempty"`
+	Module         *string `json:"module,omitempty"`
+	IssueType      *string `json:"issue_type,omitempty"`
+	OnlyUnresolved bool    `json:"only_unresolved"`
+	AuditDays      int32   `json:"audit_days"`
+}
+
+type DataQualityIssueSummary struct {
+	TotalIssues  int  `json:"total_issues"`
+	ErrorCount   int  `json:"error_count"`
+	WarningCount int  `json:"warning_count"`
+	InfoCount    int  `json:"info_count"`
+	AuditEvents  *int `json:"audit_events,omitempty"`
+}
+
+type DataQualityIssueItem struct {
+	Severity          string `json:"severity"`
+	Module            string `json:"module"`
+	IssueType         string `json:"issue_type"`
+	RecordID          string `json:"record_id"`
+	RecordLabel       string `json:"record_label"`
+	Message           string `json:"message"`
+	RecommendedAction string `json:"recommended_action"`
+	IsResolved        bool   `json:"is_resolved"`
+}
+
+type AuditSummaryItem struct {
+	Label         string `json:"label"`
+	EventCount    int    `json:"event_count"`
+	LastChangedAt string `json:"last_changed_at,omitempty"`
+}
+
+type AuditRecentActivityItem struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Action    string `json:"action"`
+	TableName string `json:"table_name"`
+	RecordID  string `json:"record_id"`
+	ChangedAt string `json:"changed_at"`
+}
+
+type DataQualityAuditSummary struct {
+	ByUser         []AuditSummaryItem        `json:"by_user"`
+	ByTable        []AuditSummaryItem        `json:"by_table"`
+	RecentActivity []AuditRecentActivityItem `json:"recent_activity"`
+}
+
+type DataQualityGovernanceDashboard struct {
+	Summary      DataQualityIssueSummary  `json:"summary"`
+	Issues       []DataQualityIssueItem   `json:"issues"`
+	AuditSummary *DataQualityAuditSummary `json:"audit_summary,omitempty"`
+}

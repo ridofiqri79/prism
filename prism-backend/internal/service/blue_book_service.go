@@ -251,7 +251,7 @@ func (s *BlueBookService) CreateBBProject(ctx context.Context, bbID pgtype.UUID,
 		if err := s.ensureBBCodeAvailable(ctx, qtx, bbID, req.BBCode); err != nil {
 			return err
 		}
-		identityID, err := s.resolveProjectIdentity(ctx, qtx, req.ProjectIdentityID)
+		identityID, err := s.resolveProjectIdentityForBBProject(ctx, qtx, bbID, req.ProjectIdentityID, req.BBCode)
 		if err != nil {
 			return err
 		}
@@ -677,6 +677,22 @@ func (s *BlueBookService) resolveProjectIdentity(ctx context.Context, qtx *queri
 		return pgtype.UUID{}, mapNotFound(err, "Project identity tidak ditemukan")
 	}
 	return identityID, nil
+}
+
+func (s *BlueBookService) resolveProjectIdentityForBBProject(ctx context.Context, qtx *queries.Queries, bbID pgtype.UUID, identity *string, bbCode string) (pgtype.UUID, error) {
+	if identity != nil && strings.TrimSpace(*identity) != "" {
+		return s.resolveProjectIdentity(ctx, qtx, identity)
+	}
+
+	previous, err := qtx.FindPreviousBBProjectByCodeForBlueBook(ctx, queries.FindPreviousBBProjectByCodeForBlueBookParams{ID: bbID, Lower: strings.TrimSpace(bbCode)})
+	if err == nil && previous.ProjectIdentityID.Valid {
+		return previous.ProjectIdentityID, nil
+	}
+	if err != nil && err != pgx.ErrNoRows {
+		return pgtype.UUID{}, apperrors.Internal("Gagal memeriksa histori BB Code")
+	}
+
+	return s.resolveProjectIdentity(ctx, qtx, nil)
 }
 
 func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row queries.BbProject) (*model.BBProjectResponse, error) {

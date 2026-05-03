@@ -10,6 +10,12 @@ const optionalText = z
   .optional()
   .transform((value) => value?.trim() || undefined)
 
+const optionalUUID = (message: string) =>
+  z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.string().uuid(message).optional(),
+  )
+
 const optionalDurationMonths = z
   .number()
   .int('Durasi harus berupa bulan bulat')
@@ -36,6 +42,7 @@ export const lenderIndicationSchema = z.object({
 })
 
 export const bbProjectSchema = z.object({
+  project_identity_id: optionalUUID('Project identity tidak valid'),
   program_title_id: z.string().uuid('Judul program wajib dipilih'),
   bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   bb_code: z.string().min(1, 'Kode Blue Book wajib diisi'),

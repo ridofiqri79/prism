@@ -5,6 +5,7 @@ import { LegendComponent, TooltipComponent } from 'echarts/components'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
+import DashboardChartCard from '@/components/dashboard/DashboardChartCard.vue'
 import type { StageMetric } from '@/types/dashboard.types'
 
 use([FunnelChart, LegendComponent, TooltipComponent, CanvasRenderer])
@@ -75,11 +76,13 @@ const option = computed(() => ({
 </script>
 
 <template>
-  <section class="rounded-lg border border-surface-200 bg-white p-4">
-    <div class="mb-3">
-      <h2 class="text-lg font-semibold text-surface-950">Portfolio Funnel</h2>
-      <p class="text-sm text-surface-500">Blue Book sampai Monitoring tanpa penghitungan ulang di komponen.</p>
-    </div>
+  <DashboardChartCard
+    title="Portfolio Funnel"
+    subtitle="Blue Book sampai Monitoring tanpa penghitungan ulang di komponen."
+    :empty="data.length === 0"
+    empty-title="Tidak ada data funnel"
+    empty-message="Ubah filter untuk melihat funnel portfolio."
+  >
     <VChart :option="option" autoresize class="h-[24rem] w-full" />
-  </section>
+  </DashboardChartCard>
 </template>

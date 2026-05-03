@@ -5,6 +5,8 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Tag from 'primevue/tag'
+import AmountDisplay from '@/components/dashboard/AmountDisplay.vue'
+import RiskBadge from '@/components/dashboard/RiskBadge.vue'
 import type { PaginationMeta } from '@/types/api.types'
 import type {
   PipelineBottleneckItem,
@@ -38,12 +40,6 @@ const sortableFields = new Set<PipelineBottleneckSort>([
   'age_days',
 ])
 
-const usdFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-})
-
 const dateFormatter = new Intl.DateTimeFormat('id-ID', {
   day: '2-digit',
   month: 'short',
@@ -58,12 +54,6 @@ function riskLabel(ageDays: number) {
   if (ageDays > 180) return 'High'
   if (ageDays >= 90) return 'Medium'
   return 'Low'
-}
-
-function riskTone(ageDays: number) {
-  if (ageDays > 180) return 'danger'
-  if (ageDays >= 90) return 'warn'
-  return 'success'
 }
 
 function formatDate(value?: string) {
@@ -139,7 +129,7 @@ function handleSort(event: { sortField?: unknown; sortOrder?: number | null }) {
       <Column field="age_days" header="Age" sortable class="w-36">
         <template #body="{ data }">
           <div class="space-y-1">
-            <Tag :value="riskLabel(data.age_days)" :severity="riskTone(data.age_days)" />
+            <RiskBadge :level="riskLabel(data.age_days)" />
             <p class="text-xs text-surface-500">{{ data.age_days }} hari</p>
           </div>
         </template>
@@ -147,7 +137,7 @@ function handleSort(event: { sortField?: unknown; sortOrder?: number | null }) {
 
       <Column field="amount_usd" header="Amount" sortable class="w-44">
         <template #body="{ data }">
-          {{ usdFormatter.format(data.amount_usd ?? 0) }}
+          <AmountDisplay :value="data.amount_usd ?? 0" unit="USD" />
         </template>
       </Column>
 
