@@ -13,6 +13,7 @@ import {
   readStoredUser,
   storeSession,
 } from '@/utils/auth-session'
+import { emitLoginRedirect } from '@/utils/app-events'
 
 type PermissionKey = `can_${PermissionAction}`
 
@@ -65,12 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     clearSession()
-
-    const { default: router } = await import('@/router')
-
-    if (router.currentRoute.value.name !== 'login') {
-      await router.push({ name: 'login' })
-    }
+    emitLoginRedirect()
   }
 
   async function fetchMe() {
