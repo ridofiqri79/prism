@@ -1,7 +1,7 @@
 import axios, { type AxiosError } from 'axios'
 import type { ApiErrorResponse } from '@/types/api.types'
 import { clearStoredSession, readStoredToken } from '@/utils/auth-session'
-import { emitToast, emitUnauthorized } from '@/utils/app-events'
+import { emitLoginRedirect, emitToast, emitUnauthorized } from '@/utils/app-events'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -26,19 +26,14 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError<ApiErrorResponse>) => {
+  (error: AxiosError<ApiErrorResponse>) => {
     const status = error.response?.status
     const skipAuthRedirect = error.config?.skipAuthRedirect === true
 
     if (status === 401 && !skipAuthRedirect) {
       clearStoredSession()
       emitUnauthorized()
-
-      const { default: router } = await import('@/router')
-
-      if (router.currentRoute.value.name !== 'login') {
-        await router.push({ name: 'login' })
-      }
+      emitLoginRedirect()
     }
 
     if (status === 403 && !error.response?.data?.error?.details?.length) {
