@@ -30,6 +30,7 @@ jobs:
             VITE_APP_NAME=${{ secrets.VITE_APP_NAME }}
             CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
           script: |
+            cd /home/prism.admin/prism
             git pull origin main
 
             # Generate .env dari GitHub Secrets
