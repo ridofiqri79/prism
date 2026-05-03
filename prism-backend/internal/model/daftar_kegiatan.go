@@ -16,19 +16,33 @@ type DaftarKegiatanResponse struct {
 	UpdatedAt    string  `json:"updated_at,omitempty"`
 }
 
+type DaftarKegiatanListFilter struct {
+	DateFrom *string
+	DateTo   *string
+}
+
 type CreateDKProjectRequest struct {
-	ProgramTitleID   *string                 `json:"program_title_id"`
-	InstitutionID    *string                 `json:"institution_id"`
-	Duration         *string                 `json:"duration"`
-	Objectives       *string                 `json:"objectives"`
-	GBProjectIDs     []string                `json:"gb_project_ids" validate:"required,min=1"`
-	LocationIDs      []string                `json:"location_ids"`
-	FinancingDetails []DKFinancingDetailItem `json:"financing_details"`
-	LoanAllocations  []DKLoanAllocationItem  `json:"loan_allocations"`
-	ActivityDetails  []DKActivityDetailItem  `json:"activity_details"`
+	ProgramTitleID     *string                 `json:"program_title_id"`
+	InstitutionID      *string                 `json:"institution_id"`
+	ProjectName        string                  `json:"project_name" validate:"required"`
+	Duration           *int32                  `json:"duration"`
+	Objectives         *string                 `json:"objectives"`
+	GBProjectIDs       []string                `json:"gb_project_ids" validate:"required,min=1"`
+	BappenasPartnerIDs []string                `json:"bappenas_partner_ids"`
+	LocationIDs        []string                `json:"location_ids"`
+	FinancingDetails   []DKFinancingDetailItem `json:"financing_details"`
+	LoanAllocations    []DKLoanAllocationItem  `json:"loan_allocations"`
+	ActivityDetails    []DKActivityDetailItem  `json:"activity_details"`
 }
 
 type UpdateDKProjectRequest = CreateDKProjectRequest
+
+type DKProjectListFilter struct {
+	GBProjectIDs       []string
+	ExecutingAgencyIDs []string
+	LocationIDs        []string
+	LenderIDs          []string
+}
 
 type DKFinancingDetailItem struct {
 	LenderID            *string `json:"lender_id"`
@@ -64,21 +78,28 @@ type DKProjectResponse struct {
 	DKID             string                      `json:"dk_id"`
 	ProgramTitleID   *string                     `json:"program_title_id,omitempty"`
 	InstitutionID    *string                     `json:"institution_id,omitempty"`
-	Duration         *string                     `json:"duration"`
+	ProjectName      string                      `json:"project_name"`
+	Duration         *int32                      `json:"duration"`
 	Objectives       *string                     `json:"objectives"`
 	GBProjects       []GBProjectSummary          `json:"gb_projects"`
+	BappenasPartners []BappenasPartnerResponse   `json:"bappenas_partners"`
 	Locations        []RegionResponse            `json:"locations"`
 	FinancingDetails []DKFinancingDetailResponse `json:"financing_details"`
 	LoanAllocations  []DKLoanAllocationResponse  `json:"loan_allocations"`
 	ActivityDetails  []DKActivityDetailResponse  `json:"activity_details"`
+	LoanAgreement    *LoanAgreementSummary       `json:"loan_agreement,omitempty"`
 	CreatedAt        string                      `json:"created_at,omitempty"`
 	UpdatedAt        string                      `json:"updated_at,omitempty"`
 }
 
 type GBProjectSummary struct {
-	ID          string `json:"id"`
-	GBCode      string `json:"gb_code"`
-	ProjectName string `json:"project_name"`
+	ID                  string `json:"id"`
+	GBProjectIdentityID string `json:"gb_project_identity_id,omitempty"`
+	GreenBookID         string `json:"green_book_id,omitempty"`
+	GBCode              string `json:"gb_code"`
+	ProjectName         string `json:"project_name"`
+	IsLatest            bool   `json:"is_latest,omitempty"`
+	HasNewerRevision    bool   `json:"has_newer_revision,omitempty"`
 }
 
 type DKFinancingDetailResponse struct {

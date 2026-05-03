@@ -21,17 +21,34 @@ type MasterService struct {
 	queries *queries.Queries
 }
 
+var institutionLevels = []string{
+	"Kementerian/Badan/Lembaga",
+	"Eselon I",
+	"Eselon II",
+	"BUMN",
+	"Pemerintah Daerah Tk. I",
+	"Pemerintah Daerah Tk. II",
+	"BUMD",
+	"Lainya",
+}
+
 func NewMasterService(db *pgxpool.Pool, queries *queries.Queries) *MasterService {
 	return &MasterService{db: db, queries: queries}
 }
 
 func (s *MasterService) ListCountries(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.CountryResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: int32(limit), Offset: int32(offset)})
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "name", "asc", "code", "name")
+	rows, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		Search:    search,
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar country")
 	}
-	total, err := s.queries.CountCountries(ctx)
+	total, err := s.queries.CountCountries(ctx, search)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung country")
 	}
@@ -92,14 +109,111 @@ func (s *MasterService) DeleteCountry(ctx context.Context, id pgtype.UUID) error
 	})
 }
 
-func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderType string) (*model.ListResponse[model.LenderResponse], error) {
-	page, limit, offset := normalizeList(params)
-	typeFilter := nullableText(lenderType)
-	rows, err := s.queries.ListLenders(ctx, queries.ListLendersParams{Limit: int32(limit), Offset: int32(offset), TypeFilter: typeFilter})
+func (s *MasterService) ListCurrencies(ctx context.Context, params model.PaginationParams, active string) (*model.ListResponse[model.CurrencyResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "sort_order", "asc", "code", "name", "sort_order", "is_active")
+	activeFilter, err := nullableBool(active)
+	if err != nil {
+		return nil, validation("active", "harus true atau false")
+	}
+	rows, err := s.queries.ListCurrencies(ctx, queries.ListCurrenciesParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		ActiveFilter: activeFilter,
+		Search:       search,
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil daftar currency")
+	}
+	total, err := s.queries.CountCurrencies(ctx, queries.CountCurrenciesParams{ActiveFilter: activeFilter, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung currency")
+	}
+	data := make([]model.CurrencyResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toCurrencyResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) GetCurrency(ctx context.Context, id pgtype.UUID) (*model.CurrencyResponse, error) {
+	row, err := s.queries.GetCurrency(ctx, id)
+	if err != nil {
+		return nil, mapNotFound(err, "Currency tidak ditemukan")
+	}
+	res := toCurrencyResponse(row)
+	return &res, nil
+}
+
+func (s *MasterService) CreateCurrency(ctx context.Context, req model.CurrencyRequest) (*model.CurrencyResponse, error) {
+	if err := validateCurrency(req); err != nil {
+		return nil, err
+	}
+	var created queries.Currency
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		row, err := qtx.CreateCurrency(ctx, queries.CreateCurrencyParams{
+			Code:      strings.ToUpper(strings.TrimSpace(req.Code)),
+			Name:      req.Name,
+			Symbol:    nullableTextPtr(req.Symbol),
+			IsActive:  req.IsActive,
+			SortOrder: req.SortOrder,
+		})
+		created = row
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	res := toCurrencyResponse(created)
+	return &res, nil
+}
+
+func (s *MasterService) UpdateCurrency(ctx context.Context, id pgtype.UUID, req model.CurrencyRequest) (*model.CurrencyResponse, error) {
+	if err := validateCurrency(req); err != nil {
+		return nil, err
+	}
+	var updated queries.Currency
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		row, err := qtx.UpdateCurrency(ctx, queries.UpdateCurrencyParams{
+			ID:        id,
+			Code:      strings.ToUpper(strings.TrimSpace(req.Code)),
+			Name:      req.Name,
+			Symbol:    nullableTextPtr(req.Symbol),
+			IsActive:  req.IsActive,
+			SortOrder: req.SortOrder,
+		})
+		if err != nil {
+			return mapNotFound(err, "Currency tidak ditemukan")
+		}
+		updated = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	res := toCurrencyResponse(updated)
+	return &res, nil
+}
+
+func (s *MasterService) DeleteCurrency(ctx context.Context, id pgtype.UUID) error {
+	return s.withTx(ctx, func(qtx *queries.Queries) error {
+		return fromPg(qtx.DeleteCurrency(ctx, id))
+	})
+}
+
+func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderTypes []string) (*model.ListResponse[model.LenderResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "name", "asc", "name", "short_name", "type", "country")
+	rows, err := s.queries.ListLenders(ctx, queries.ListLendersParams{
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		TypeFilters: lenderTypes,
+		Search:      search,
+		SortField:   sortField,
+		SortOrder:   sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar lender")
 	}
-	total, err := s.queries.CountLenders(ctx, typeFilter)
+	total, err := s.queries.CountLenders(ctx, queries.CountLendersParams{TypeFilters: lenderTypes, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung lender")
 	}
@@ -168,18 +282,80 @@ func (s *MasterService) DeleteLender(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListInstitutions(ctx context.Context, params model.PaginationParams, level string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
-	page, limit, offset := normalizeList(params)
+func (s *MasterService) ListInstitutions(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "short_name", "level")
 	parentFilter, err := nullableUUID(parentID)
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
-	arg := queries.ListInstitutionsParams{Limit: int32(limit), Offset: int32(offset), LevelFilter: nullableText(level), ParentIDFilter: parentFilter}
+	if parentFilter.Valid {
+		arg := queries.ListInstitutionTreeChildrenParams{
+			Limit:        int32(limit),
+			Offset:       int32(offset),
+			SortField:    sortField,
+			SortOrder:    sortOrder,
+			ParentID:     parentFilter,
+			LevelFilters: levels,
+			Search:       search,
+		}
+		rows, err := s.queries.ListInstitutionTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak institution")
+		}
+		total, err := s.queries.CountInstitutionTreeChildren(ctx, queries.CountInstitutionTreeChildrenParams{ParentID: parentFilter, LevelFilters: levels, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak institution")
+		}
+		data := make([]model.InstitutionResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toInstitutionTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	arg := queries.ListInstitutionTreeRootsParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+		LevelFilters: levels,
+		Search:       search,
+	}
+	rows, err := s.queries.ListInstitutionTreeRoots(ctx, arg)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root institution")
+	}
+	total, err := s.queries.CountInstitutionTreeRoots(ctx, queries.CountInstitutionTreeRootsParams{LevelFilters: levels, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root institution")
+	}
+	data := make([]model.InstitutionResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toInstitutionTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupInstitutions(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.InstitutionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "short_name", "level")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
+	arg := queries.ListInstitutionsParams{
+		Limit:          int32(limit),
+		Offset:         int32(offset),
+		LevelFilters:   levels,
+		ParentIDFilter: parentFilter,
+		Search:         search,
+		SortField:      sortField,
+		SortOrder:      sortOrder,
+	}
 	rows, err := s.queries.ListInstitutions(ctx, arg)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar institution")
 	}
-	total, err := s.queries.CountInstitutions(ctx, queries.CountInstitutionsParams{LevelFilter: arg.LevelFilter, ParentIDFilter: arg.ParentIDFilter})
+	total, err := s.queries.CountInstitutions(ctx, queries.CountInstitutionsParams{LevelFilters: arg.LevelFilters, ParentIDFilter: arg.ParentIDFilter, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung institution")
 	}
@@ -207,10 +383,15 @@ func (s *MasterService) CreateInstitution(ctx context.Context, req model.Institu
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
+	name := strings.TrimSpace(req.Name)
+	level := strings.TrimSpace(req.Level)
 	shortName := nullableTextPtr(req.ShortName)
 	var created queries.Institution
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		row, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{ParentID: parentID, Name: req.Name, ShortName: shortName, Level: req.Level})
+		if err := ensureInstitutionNameUnique(ctx, qtx, name, parentID, pgtype.UUID{}); err != nil {
+			return err
+		}
+		row, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{ParentID: parentID, Name: name, ShortName: shortName, Level: level})
 		created = row
 		return err
 	}); err != nil {
@@ -228,10 +409,18 @@ func (s *MasterService) UpdateInstitution(ctx context.Context, id pgtype.UUID, r
 	if err != nil {
 		return nil, validation("parent_id", "UUID tidak valid")
 	}
+	name := strings.TrimSpace(req.Name)
+	level := strings.TrimSpace(req.Level)
 	shortName := nullableTextPtr(req.ShortName)
 	var updated queries.Institution
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		row, err := qtx.UpdateInstitution(ctx, queries.UpdateInstitutionParams{ID: id, ParentID: parentID, Name: req.Name, ShortName: shortName, Level: req.Level})
+		if _, err := qtx.GetInstitution(ctx, id); err != nil {
+			return mapNotFound(err, "Institution tidak ditemukan")
+		}
+		if err := ensureInstitutionNameUnique(ctx, qtx, name, parentID, id); err != nil {
+			return err
+		}
+		row, err := qtx.UpdateInstitution(ctx, queries.UpdateInstitutionParams{ID: id, ParentID: parentID, Name: name, ShortName: shortName, Level: level})
 		if err != nil {
 			return mapNotFound(err, "Institution tidak ditemukan")
 		}
@@ -250,14 +439,72 @@ func (s *MasterService) DeleteInstitution(ctx context.Context, id pgtype.UUID) e
 	})
 }
 
-func (s *MasterService) ListRegions(ctx context.Context, params model.PaginationParams, regionType, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
-	page, limit, offset := normalizeList(params)
-	arg := queries.ListRegionsParams{Limit: int32(limit), Offset: int32(offset), TypeFilter: nullableText(regionType), ParentCodeFilter: nullableText(parentCode)}
+func (s *MasterService) ListRegions(ctx context.Context, params model.PaginationParams, regionTypes []string, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "type", "asc", "code", "name", "type")
+	if strings.TrimSpace(parentCode) != "" {
+		arg := queries.ListRegionTreeChildrenParams{
+			Limit:       int32(limit),
+			Offset:      int32(offset),
+			SortField:   sortField,
+			SortOrder:   sortOrder,
+			ParentCode:  strings.TrimSpace(parentCode),
+			TypeFilters: regionTypes,
+			Search:      search,
+		}
+		rows, err := s.queries.ListRegionTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak region")
+		}
+		total, err := s.queries.CountRegionTreeChildren(ctx, queries.CountRegionTreeChildrenParams{ParentCode: arg.ParentCode, TypeFilters: regionTypes, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak region")
+		}
+		data := make([]model.RegionResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toRegionTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	arg := queries.ListRegionTreeRootsParams{
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		SortField:   sortField,
+		SortOrder:   sortOrder,
+		TypeFilters: regionTypes,
+		Search:      search,
+	}
+	rows, err := s.queries.ListRegionTreeRoots(ctx, arg)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root region")
+	}
+	total, err := s.queries.CountRegionTreeRoots(ctx, queries.CountRegionTreeRootsParams{TypeFilters: regionTypes, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root region")
+	}
+	data := make([]model.RegionResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toRegionTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupRegions(ctx context.Context, params model.PaginationParams, regionTypes []string, parentCode string) (*model.ListResponse[model.RegionResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "type", "asc", "code", "name", "type")
+	arg := queries.ListRegionsParams{
+		Limit:            int32(limit),
+		Offset:           int32(offset),
+		TypeFilters:      regionTypes,
+		ParentCodeFilter: nullableText(parentCode),
+		Search:           search,
+		SortField:        sortField,
+		SortOrder:        sortOrder,
+	}
 	rows, err := s.queries.ListRegions(ctx, arg)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar region")
 	}
-	total, err := s.queries.CountRegions(ctx, queries.CountRegionsParams{TypeFilter: arg.TypeFilter, ParentCodeFilter: arg.ParentCodeFilter})
+	total, err := s.queries.CountRegions(ctx, queries.CountRegionsParams{TypeFilters: arg.TypeFilters, ParentCodeFilter: arg.ParentCodeFilter, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung region")
 	}
@@ -318,13 +565,70 @@ func (s *MasterService) DeleteRegion(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListProgramTitles(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.ProgramTitleResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: int32(limit), Offset: int32(offset)})
+func (s *MasterService) ListProgramTitles(ctx context.Context, params model.PaginationParams, parentID *string) (*model.ListResponse[model.ProgramTitleResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
+	if parentFilter.Valid {
+		arg := queries.ListProgramTitleTreeChildrenParams{
+			Limit:     int32(limit),
+			Offset:    int32(offset),
+			SortField: sortField,
+			SortOrder: sortOrder,
+			ParentID:  parentFilter,
+			Search:    search,
+		}
+		rows, err := s.queries.ListProgramTitleTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak program title")
+		}
+		total, err := s.queries.CountProgramTitleTreeChildren(ctx, queries.CountProgramTitleTreeChildrenParams{ParentID: parentFilter, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak program title")
+		}
+		data := make([]model.ProgramTitleResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toProgramTitleTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	rows, err := s.queries.ListProgramTitleTreeRoots(ctx, queries.ListProgramTitleTreeRootsParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		SortField: sortField,
+		SortOrder: sortOrder,
+		Search:    search,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root program title")
+	}
+	total, err := s.queries.CountProgramTitleTreeRoots(ctx, search)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root program title")
+	}
+	data := make([]model.ProgramTitleResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toProgramTitleTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupProgramTitles(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.ProgramTitleResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title")
+	rows, err := s.queries.ListProgramTitles(ctx, queries.ListProgramTitlesParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		Search:    search,
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar program title")
 	}
-	total, err := s.queries.CountProgramTitles(ctx)
+	total, err := s.queries.CountProgramTitles(ctx, search)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung program title")
 	}
@@ -393,13 +697,73 @@ func (s *MasterService) DeleteProgramTitle(ctx context.Context, id pgtype.UUID) 
 	})
 }
 
-func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.BappenasPartnerResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: int32(limit), Offset: int32(offset)})
+func (s *MasterService) ListBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string, parentID *string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "level")
+	parentFilter, err := nullableUUID(parentID)
+	if err != nil {
+		return nil, validation("parent_id", "UUID tidak valid")
+	}
+	if parentFilter.Valid {
+		arg := queries.ListBappenasPartnerTreeChildrenParams{
+			Limit:        int32(limit),
+			Offset:       int32(offset),
+			SortField:    sortField,
+			SortOrder:    sortOrder,
+			ParentID:     parentFilter,
+			LevelFilters: levels,
+			Search:       search,
+		}
+		rows, err := s.queries.ListBappenasPartnerTreeChildren(ctx, arg)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil anak bappenas partner")
+		}
+		total, err := s.queries.CountBappenasPartnerTreeChildren(ctx, queries.CountBappenasPartnerTreeChildrenParams{ParentID: parentFilter, LevelFilters: levels, Search: search})
+		if err != nil {
+			return nil, apperrors.Internal("Gagal menghitung anak bappenas partner")
+		}
+		data := make([]model.BappenasPartnerResponse, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, toBappenasPartnerTreeChildResponse(row))
+		}
+		return listResponse(data, page, limit, total), nil
+	}
+
+	rows, err := s.queries.ListBappenasPartnerTreeRoots(ctx, queries.ListBappenasPartnerTreeRootsParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+		LevelFilters: levels,
+		Search:       search,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil root bappenas partner")
+	}
+	total, err := s.queries.CountBappenasPartnerTreeRoots(ctx, queries.CountBappenasPartnerTreeRootsParams{LevelFilters: levels, Search: search})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung root bappenas partner")
+	}
+	data := make([]model.BappenasPartnerResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toBappenasPartnerTreeRootResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) LookupBappenasPartners(ctx context.Context, params model.PaginationParams, levels []string) (*model.ListResponse[model.BappenasPartnerResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "level", "asc", "name", "level")
+	rows, err := s.queries.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+		LevelFilters: levels,
+		Search:       search,
+		SortField:    sortField,
+		SortOrder:    sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar bappenas partner")
 	}
-	total, err := s.queries.CountBappenasPartners(ctx)
+	total, err := s.queries.CountBappenasPartners(ctx, queries.CountBappenasPartnersParams{LevelFilters: levels, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung bappenas partner")
 	}
@@ -469,8 +833,13 @@ func (s *MasterService) DeleteBappenasPartner(ctx context.Context, id pgtype.UUI
 }
 
 func (s *MasterService) ListPeriods(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.PeriodResponse], error) {
-	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{Limit: int32(limit), Offset: int32(offset)})
+	page, limit, offset, _, sortField, sortOrder := normalizeMasterList(params, "year_start", "desc", "name", "year_start", "year_end")
+	rows, err := s.queries.ListPeriods(ctx, queries.ListPeriodsParams{
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+		SortField: sortField,
+		SortOrder: sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar period")
 	}
@@ -535,17 +904,24 @@ func (s *MasterService) DeletePeriod(ctx context.Context, id pgtype.UUID) error 
 	})
 }
 
-func (s *MasterService) ListNationalPriorities(ctx context.Context, params model.PaginationParams, periodID *string) (*model.ListResponse[model.NationalPriorityResponse], error) {
-	page, limit, offset := normalizeList(params)
-	periodFilter, err := nullableUUID(periodID)
+func (s *MasterService) ListNationalPriorities(ctx context.Context, params model.PaginationParams, periodIDs []string) (*model.ListResponse[model.NationalPriorityResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "title", "asc", "title", "period")
+	periodFilters, err := uuidFilters(periodIDs, "period_id")
 	if err != nil {
-		return nil, validation("period_id", "UUID tidak valid")
+		return nil, err
 	}
-	rows, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: int32(limit), Offset: int32(offset), PeriodIDFilter: periodFilter})
+	rows, err := s.queries.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{
+		Limit:           int32(limit),
+		Offset:          int32(offset),
+		PeriodIDFilters: periodFilters,
+		Search:          search,
+		SortField:       sortField,
+		SortOrder:       sortOrder,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar national priority")
 	}
-	total, err := s.queries.CountNationalPriorities(ctx, periodFilter)
+	total, err := s.queries.CountNationalPriorities(ctx, queries.CountNationalPrioritiesParams{PeriodIDFilters: periodFilters, Search: search})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung national priority")
 	}
@@ -638,6 +1014,24 @@ func normalizeList(params model.PaginationParams) (int, int, int) {
 	return page, limit, (page - 1) * limit
 }
 
+func normalizeMasterList(params model.PaginationParams, defaultSort, defaultOrder string, allowedSorts ...string) (int, int, int, pgtype.Text, string, string) {
+	page, limit, offset := normalizeList(params)
+	sortField := defaultSort
+	for _, allowed := range allowedSorts {
+		if params.Sort == allowed {
+			sortField = params.Sort
+			break
+		}
+	}
+
+	sortOrder := strings.ToLower(params.Order)
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = defaultOrder
+	}
+
+	return page, limit, offset, nullableText(params.Search), sortField, sortOrder
+}
+
 func listResponse[T any](data []T, page, limit int, total int64) *model.ListResponse[T] {
 	return &model.ListResponse[T]{
 		Data: data,
@@ -656,6 +1050,21 @@ func validateCountry(req model.CountryRequest) error {
 	}
 	if len(req.Code) != 3 {
 		return validation("code", "harus 3 karakter")
+	}
+	return nil
+}
+
+func validateCurrency(req model.CurrencyRequest) error {
+	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Code) == "" {
+		return validation("name", "name dan code wajib diisi")
+	}
+	if len(strings.TrimSpace(req.Code)) != 3 {
+		return validation("code", "harus 3 karakter")
+	}
+	for _, char := range strings.ToUpper(strings.TrimSpace(req.Code)) {
+		if char < 'A' || char > 'Z' {
+			return validation("code", "harus kode ISO 4217")
+		}
 	}
 	return nil
 }
@@ -680,7 +1089,37 @@ func validateInstitution(req model.InstitutionRequest) error {
 	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Level) == "" {
 		return validation("name", "name dan level wajib diisi")
 	}
+	if !isAllowedValue(req.Level, institutionLevels) {
+		return validation("level", "level institution tidak valid")
+	}
 	return nil
+}
+
+func ensureInstitutionNameUnique(ctx context.Context, q *queries.Queries, name string, parentID pgtype.UUID, exceptID pgtype.UUID) error {
+	count, err := q.CountInstitutionsByNameScope(ctx, queries.CountInstitutionsByNameScopeParams{
+		Name:     name,
+		ParentID: parentID,
+		ExceptID: exceptID,
+	})
+	if err != nil {
+		return apperrors.Internal("Gagal memeriksa duplikasi institution")
+	}
+	if count == 0 {
+		return nil
+	}
+	if parentID.Valid {
+		return apperrors.Conflict("Nama institution sudah digunakan dalam parent yang sama")
+	}
+	return apperrors.Conflict("Nama institution top-level sudah digunakan")
+}
+
+func isAllowedValue(value string, allowed []string) bool {
+	for _, item := range allowed {
+		if value == item {
+			return true
+		}
+	}
+	return false
 }
 
 func validateRegion(req model.RegionRequest) error {
@@ -725,6 +1164,20 @@ func nullableUUID(value *string) (pgtype.UUID, error) {
 	return model.ParseUUID(*value)
 }
 
+func uuidFilters(values []string, field string) ([]pgtype.UUID, error) {
+	filters := make([]pgtype.UUID, 0, len(values))
+
+	for _, value := range values {
+		parsed, err := model.ParseUUID(value)
+		if err != nil {
+			return nil, validation(field, "UUID tidak valid")
+		}
+		filters = append(filters, parsed)
+	}
+
+	return filters, nil
+}
+
 func nullableText(value string) pgtype.Text {
 	if strings.TrimSpace(value) == "" {
 		return pgtype.Text{}
@@ -737,6 +1190,19 @@ func nullableTextPtr(value *string) pgtype.Text {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: *value, Valid: true}
+}
+
+func nullableBool(value string) (pgtype.Bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return pgtype.Bool{}, nil
+	case "true":
+		return pgtype.Bool{Bool: true, Valid: true}, nil
+	case "false":
+		return pgtype.Bool{Bool: false, Valid: true}, nil
+	default:
+		return pgtype.Bool{}, pgx.ErrNoRows
+	}
 }
 
 func stringPtrFromText(value pgtype.Text) *string {
@@ -765,6 +1231,10 @@ func toCountryResponse(row queries.Country) model.CountryResponse {
 	return model.CountryResponse{ID: model.UUIDToString(row.ID), Name: row.Name, Code: row.Code, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toCurrencyResponse(row queries.Currency) model.CurrencyResponse {
+	return model.CurrencyResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Symbol: stringPtrFromText(row.Symbol), IsActive: row.IsActive, SortOrder: row.SortOrder, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toLenderListResponse(row queries.ListLendersRow) model.LenderResponse {
 	res := model.LenderResponse{ID: model.UUIDToString(row.ID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Type: row.Type, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 	if row.CountryID.Valid {
@@ -785,6 +1255,14 @@ func toInstitutionResponse(row queries.Institution) model.InstitutionResponse {
 	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toInstitutionTreeRootResponse(row queries.ListInstitutionTreeRootsRow) model.InstitutionResponse {
+	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toInstitutionTreeChildResponse(row queries.ListInstitutionTreeChildrenRow) model.InstitutionResponse {
+	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toInstitutionDetailResponse(row queries.GetInstitutionRow) model.InstitutionResponse {
 	return model.InstitutionResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), ParentName: stringPtrFromText(row.ParentName), Name: row.Name, ShortName: stringPtrFromText(row.ShortName), Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
@@ -793,12 +1271,36 @@ func toRegionResponse(row queries.Region) model.RegionResponse {
 	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toRegionTreeRootResponse(row queries.ListRegionTreeRootsRow) model.RegionResponse {
+	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toRegionTreeChildResponse(row queries.ListRegionTreeChildrenRow) model.RegionResponse {
+	return model.RegionResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Type: row.Type, ParentCode: stringPtrFromText(row.ParentCode), HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toProgramTitleResponse(row queries.ProgramTitle) model.ProgramTitleResponse {
 	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
+func toProgramTitleTreeRootResponse(row queries.ListProgramTitleTreeRootsRow) model.ProgramTitleResponse {
+	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toProgramTitleTreeChildResponse(row queries.ListProgramTitleTreeChildrenRow) model.ProgramTitleResponse {
+	return model.ProgramTitleResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Title: row.Title, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
 func toBappenasPartnerResponse(row queries.BappenasPartner) model.BappenasPartnerResponse {
 	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toBappenasPartnerTreeRootResponse(row queries.ListBappenasPartnerTreeRootsRow) model.BappenasPartnerResponse {
+	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toBappenasPartnerTreeChildResponse(row queries.ListBappenasPartnerTreeChildrenRow) model.BappenasPartnerResponse {
+	return model.BappenasPartnerResponse{ID: model.UUIDToString(row.ID), ParentID: stringPtrFromUUID(row.ParentID), Name: row.Name, Level: row.Level, HasChildren: row.HasChildren, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func toPeriodResponse(row queries.Period) model.PeriodResponse {

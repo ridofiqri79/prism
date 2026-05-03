@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -24,13 +25,21 @@ func NewDKService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.Broker
 	return &DKService{db: db, queries: queries, broker: broker}
 }
 
-func (s *DKService) ListDaftarKegiatan(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.DaftarKegiatanResponse], error) {
+func (s *DKService) ListDaftarKegiatan(ctx context.Context, filter model.DaftarKegiatanListFilter, params model.PaginationParams) (*model.ListResponse[model.DaftarKegiatanResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListDaftarKegiatan(ctx, queries.ListDaftarKegiatanParams{Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildDaftarKegiatanListParams(filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListDaftarKegiatan(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil daftar kegiatan")
 	}
-	total, err := s.queries.CountDaftarKegiatan(ctx)
+	total, err := s.queries.CountDaftarKegiatan(ctx, queries.CountDaftarKegiatanParams{
+		Search:   queryParams.Search,
+		DateFrom: queryParams.DateFrom,
+		DateTo:   queryParams.DateTo,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung daftar kegiatan")
 	}
@@ -39,6 +48,27 @@ func (s *DKService) ListDaftarKegiatan(ctx context.Context, params model.Paginat
 		data = append(data, daftarKegiatanResponse(row))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildDaftarKegiatanListParams(filter model.DaftarKegiatanListFilter, params model.PaginationParams, limit, offset int) (queries.ListDaftarKegiatanParams, error) {
+	dateFrom, err := optionalDate(filter.DateFrom, "date_from")
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
+	dateTo, err := optionalDate(filter.DateTo, "date_to")
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
+	if dateFrom.Valid && dateTo.Valid && dateFrom.Time.After(dateTo.Time) {
+		return queries.ListDaftarKegiatanParams{}, validation("date_to", "harus setelah tanggal mulai")
+	}
+	return queries.ListDaftarKegiatanParams{
+		Search:   nullableText(params.Search),
+		DateFrom: dateFrom,
+		DateTo:   dateTo,
+		Limit:    int32(limit),
+		Offset:   int32(offset),
+	}, nil
 }
 
 func (s *DKService) GetDaftarKegiatan(ctx context.Context, id pgtype.UUID) (*model.DaftarKegiatanResponse, error) {
@@ -111,13 +141,24 @@ func (s *DKService) DeleteDaftarKegiatan(ctx context.Context, id pgtype.UUID) er
 	})
 }
 
-func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, params model.PaginationParams) (*model.ListResponse[model.DKProjectResponse], error) {
+func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, filter model.DKProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.DKProjectResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListDKProjectsByDK(ctx, queries.ListDKProjectsByDKParams{DkID: dkID, Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildDKProjectListParams(dkID, filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListDKProjectsByDK(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil DK Project")
 	}
-	total, err := s.queries.CountDKProjectsByDK(ctx, dkID)
+	total, err := s.queries.CountDKProjectsByDK(ctx, queries.CountDKProjectsByDKParams{
+		DkID:               queryParams.DkID,
+		Search:             queryParams.Search,
+		GbProjectIds:       queryParams.GbProjectIds,
+		ExecutingAgencyIds: queryParams.ExecutingAgencyIds,
+		LocationIds:        queryParams.LocationIds,
+		LenderIds:          queryParams.LenderIds,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung DK Project")
 	}
@@ -130,6 +171,35 @@ func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, params
 		data = append(data, *res)
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter, params model.PaginationParams, limit, offset int) (queries.ListDKProjectsByDKParams, error) {
+	gbProjectIDs, err := uuidArray(filter.GBProjectIDs, "gb_project_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	executingAgencyIDs, err := uuidArray(filter.ExecutingAgencyIDs, "executing_agency_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	locationIDs, err := uuidArray(filter.LocationIDs, "location_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	lenderIDs, err := uuidArray(filter.LenderIDs, "lender_ids")
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
+	return queries.ListDKProjectsByDKParams{
+		DkID:               dkID,
+		Search:             nullableText(params.Search),
+		GbProjectIds:       gbProjectIDs,
+		ExecutingAgencyIds: executingAgencyIDs,
+		LocationIds:        locationIDs,
+		LenderIds:          lenderIDs,
+		Limit:              int32(limit),
+		Offset:             int32(offset),
+	}, nil
 }
 
 func (s *DKService) GetDKProject(ctx context.Context, dkID, id pgtype.UUID) (*model.DKProjectResponse, error) {
@@ -153,7 +223,8 @@ func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req m
 			DkID:           dkID,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
-			Duration:       nullableTextPtr(req.Duration),
+			ProjectName:    strings.TrimSpace(req.ProjectName),
+			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
 		if err != nil {
@@ -183,7 +254,8 @@ func (s *DKService) UpdateDKProject(ctx context.Context, dkID, id pgtype.UUID, r
 			ID:             id,
 			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
 			InstitutionID:  uuidOrInvalid(req.InstitutionID),
-			Duration:       nullableTextPtr(req.Duration),
+			ProjectName:    strings.TrimSpace(req.ProjectName),
+			Duration:       int4Ptr(req.Duration),
 			Objectives:     nullableTextPtr(req.Objectives),
 		})
 		if err != nil {
@@ -225,14 +297,26 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 	if err := qtx.DeleteDKProjectGBProjects(ctx, projectID); err != nil {
 		return err
 	}
+	if err := qtx.DeleteDKProjectBappenasPartners(ctx, projectID); err != nil {
+		return err
+	}
 	for _, id := range req.GBProjectIDs {
 		gbProjectID, err := model.ParseUUID(id)
 		if err != nil {
 			return validation("gb_project_ids", "UUID tidak valid")
 		}
-		if err := qtx.AddDKProjectGBProject(ctx, queries.AddDKProjectGBProjectParams{DkProjectID: projectID, GbProjectID: gbProjectID}); err != nil {
+		latestGB, err := qtx.ResolveLatestGBProjectForDK(ctx, gbProjectID)
+		if err != nil {
+			return mapNotFound(err, "GB Project tidak ditemukan")
+		}
+		if err := qtx.AddDKProjectGBProject(ctx, queries.AddDKProjectGBProjectParams{DkProjectID: projectID, GbProjectID: latestGB.ID}); err != nil {
 			return err
 		}
+	}
+	if err := addProjectBappenasPartners(ctx, qtx, "bappenas_partner_ids", req.BappenasPartnerIDs, func(partnerID pgtype.UUID) error {
+		return qtx.AddDKProjectBappenasPartner(ctx, queries.AddDKProjectBappenasPartnerParams{DkProjectID: projectID, BappenasPartnerID: partnerID})
+	}); err != nil {
+		return err
 	}
 	for _, id := range req.LocationIDs {
 		regionID, err := model.ParseUUID(id)
@@ -258,16 +342,23 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 				return apperrors.BusinessRule("Lender tidak terdaftar di GB atau BB terkait")
 			}
 		}
+		currency := normalizeCurrency(item.Currency)
+		if err := validateActiveCurrency(ctx, qtx, "financing_details.currency", currency); err != nil {
+			return err
+		}
+		amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, item.AmountOriginal, item.AmountUSD)
+		grantOriginal, grantUSD := normalizeCurrencyAmountPair(currency, item.GrantOriginal, item.GrantUSD)
+		counterpartOriginal, counterpartUSD := normalizeCurrencyAmountPair(currency, item.CounterpartOriginal, item.CounterpartUSD)
 		if _, err := qtx.CreateDKFinancingDetail(ctx, queries.CreateDKFinancingDetailParams{
 			DkProjectID:         projectID,
 			LenderID:            lenderID,
-			Currency:            normalizeCurrency(item.Currency),
-			AmountOriginal:      numericFromFloat(item.AmountOriginal),
-			GrantOriginal:       numericFromFloat(item.GrantOriginal),
-			CounterpartOriginal: numericFromFloat(item.CounterpartOriginal),
-			AmountUsd:           numericFromFloat(item.AmountUSD),
-			GrantUsd:            numericFromFloat(item.GrantUSD),
-			CounterpartUsd:      numericFromFloat(item.CounterpartUSD),
+			Currency:            currency,
+			AmountOriginal:      numericFromFloat(amountOriginal),
+			GrantOriginal:       numericFromFloat(grantOriginal),
+			CounterpartOriginal: numericFromFloat(counterpartOriginal),
+			AmountUsd:           numericFromFloat(amountUSD),
+			GrantUsd:            numericFromFloat(grantUSD),
+			CounterpartUsd:      numericFromFloat(counterpartUSD),
 			Remarks:             nullableTextPtr(item.Remarks),
 		}); err != nil {
 			return err
@@ -278,16 +369,23 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 		if err != nil {
 			return err
 		}
+		currency := normalizeCurrency(item.Currency)
+		if err := validateActiveCurrency(ctx, qtx, "loan_allocations.currency", currency); err != nil {
+			return err
+		}
+		amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, item.AmountOriginal, item.AmountUSD)
+		grantOriginal, grantUSD := normalizeCurrencyAmountPair(currency, item.GrantOriginal, item.GrantUSD)
+		counterpartOriginal, counterpartUSD := normalizeCurrencyAmountPair(currency, item.CounterpartOriginal, item.CounterpartUSD)
 		if _, err := qtx.CreateDKLoanAllocation(ctx, queries.CreateDKLoanAllocationParams{
 			DkProjectID:         projectID,
 			InstitutionID:       institutionID,
-			Currency:            normalizeCurrency(item.Currency),
-			AmountOriginal:      numericFromFloat(item.AmountOriginal),
-			GrantOriginal:       numericFromFloat(item.GrantOriginal),
-			CounterpartOriginal: numericFromFloat(item.CounterpartOriginal),
-			AmountUsd:           numericFromFloat(item.AmountUSD),
-			GrantUsd:            numericFromFloat(item.GrantUSD),
-			CounterpartUsd:      numericFromFloat(item.CounterpartUSD),
+			Currency:            currency,
+			AmountOriginal:      numericFromFloat(amountOriginal),
+			GrantOriginal:       numericFromFloat(grantOriginal),
+			CounterpartOriginal: numericFromFloat(counterpartOriginal),
+			AmountUsd:           numericFromFloat(amountUSD),
+			GrantUsd:            numericFromFloat(grantUSD),
+			CounterpartUsd:      numericFromFloat(counterpartUSD),
 			Remarks:             nullableTextPtr(item.Remarks),
 		}); err != nil {
 			return err
@@ -310,6 +408,10 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil relasi GB Project")
 	}
+	partners, err := s.queries.GetDKProjectBappenasPartners(ctx, row.ID)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil mitra Bappenas DK Project")
+	}
 	locations, err := s.queries.GetDKProjectLocations(ctx, row.ID)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil lokasi DK Project")
@@ -326,14 +428,20 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil activity detail")
 	}
+	loanAgreement, err := s.queries.GetLoanAgreementByDKProject(ctx, row.ID)
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, apperrors.Internal("Gagal mengambil Loan Agreement DK Project")
+	}
 	res := model.DKProjectResponse{
 		ID:               model.UUIDToString(row.ID),
 		DKID:             model.UUIDToString(row.DkID),
 		ProgramTitleID:   stringPtrFromUUID(row.ProgramTitleID),
 		InstitutionID:    stringPtrFromUUID(row.InstitutionID),
-		Duration:         stringPtrFromText(row.Duration),
+		ProjectName:      row.ProjectName,
+		Duration:         int32PtrFromInt4(row.Duration),
 		Objectives:       stringPtrFromText(row.Objectives),
 		GBProjects:       make([]model.GBProjectSummary, 0, len(gbProjects)),
+		BappenasPartners: make([]model.BappenasPartnerResponse, 0, len(partners)),
 		Locations:        make([]model.RegionResponse, 0, len(locations)),
 		FinancingDetails: make([]model.DKFinancingDetailResponse, 0, len(financingDetails)),
 		LoanAllocations:  make([]model.DKLoanAllocationResponse, 0, len(loanAllocations)),
@@ -341,8 +449,29 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		CreatedAt:        formatMasterTime(row.CreatedAt),
 		UpdatedAt:        formatMasterTime(row.UpdatedAt),
 	}
+	if err == nil {
+		res.LoanAgreement = &model.LoanAgreementSummary{
+			ID:       model.UUIDToString(loanAgreement.ID),
+			LoanCode: loanAgreement.LoanCode,
+		}
+	}
 	for _, item := range gbProjects {
-		res.GBProjects = append(res.GBProjects, model.GBProjectSummary{ID: model.UUIDToString(item.ID), GBCode: item.GbCode, ProjectName: item.ProjectName})
+		summary := model.GBProjectSummary{
+			ID:                  model.UUIDToString(item.ID),
+			GBProjectIdentityID: model.UUIDToString(item.GbProjectIdentityID),
+			GreenBookID:         model.UUIDToString(item.GreenBookID),
+			GBCode:              item.GbCode,
+			ProjectName:         item.ProjectName,
+		}
+		latest, err := s.queries.GetLatestGBProjectByIdentity(ctx, item.GbProjectIdentityID)
+		if err == nil {
+			summary.IsLatest = model.UUIDToString(latest.ID) == summary.ID
+			summary.HasNewerRevision = !summary.IsLatest
+		}
+		res.GBProjects = append(res.GBProjects, summary)
+	}
+	for _, item := range partners {
+		res.BappenasPartners = append(res.BappenasPartners, toBappenasPartnerResponse(item))
 	}
 	for _, item := range locations {
 		res.Locations = append(res.Locations, toRegionResponse(item))
@@ -381,8 +510,14 @@ func (s *DKService) withTx(ctx context.Context, fn func(*queries.Queries) error)
 }
 
 func validateDKProjectRequest(req model.CreateDKProjectRequest) error {
+	if strings.TrimSpace(req.ProjectName) == "" {
+		return validation("project_name", "wajib diisi")
+	}
 	if len(req.GBProjectIDs) == 0 {
 		return validation("gb_project_ids", "Minimal 1 GB Project")
+	}
+	if req.Duration != nil && *req.Duration <= 0 {
+		return validation("duration", "harus lebih dari 0 bulan")
 	}
 	for _, item := range req.ActivityDetails {
 		if item.ActivityNumber <= 0 {
@@ -441,4 +576,28 @@ func normalizeCurrency(value string) string {
 		return "USD"
 	}
 	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+func normalizeCurrencyAmountPair(currency string, original, usd float64) (float64, float64) {
+	if normalizeCurrency(currency) != "USD" {
+		return original, usd
+	}
+	if original == 0 && usd != 0 {
+		original = usd
+	}
+	return original, original
+}
+
+func validateActiveCurrency(ctx context.Context, qtx *queries.Queries, field, code string) error {
+	currency, err := qtx.GetCurrencyByCode(ctx, code)
+	if err == pgx.ErrNoRows {
+		return validation(field, "harus terdaftar di Master Currency")
+	}
+	if err != nil {
+		return err
+	}
+	if !currency.IsActive {
+		return validation(field, "tidak aktif di Master Currency")
+	}
+	return nil
 }

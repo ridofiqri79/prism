@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import TreeTable from 'primevue/treetable'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -13,7 +12,8 @@ import { useToast } from '@/composables/useToast'
 import { programTitleSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { ProgramTitle, ProgramTitlePayload } from '@/types/master.types'
-import { buildIdTree, toFormErrors, type FormErrors } from './master-page-utils'
+import MasterTreeTable from './MasterTreeTable.vue'
+import { buildLazyIdNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type ProgramTitleField = keyof ProgramTitlePayload
 
@@ -21,16 +21,51 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('title', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<ProgramTitle | null>(null)
+const treeNodes = ref<AppTreeNode<ProgramTitle>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<ProgramTitlePayload>({ title: '', parent_id: undefined })
 const errors = ref<FormErrors<ProgramTitleField>>({})
-const treeNodes = computed(() => buildIdTree(masterStore.programTitles))
 const parentOptions = computed(() => masterStore.programTitles.filter((item) => item.id !== editing.value?.id))
 
 async function loadData() {
-  await masterStore.fetchProgramTitles(true, { limit: 1000, sort: 'title', order: 'asc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchProgramTitleTree(controls.params())
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyIdNodes(response.data)
+    expandedKeys.value = {}
+  } finally {
+    controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchProgramTitles(true, { limit: 10000, sort: 'title', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<ProgramTitle>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchProgramTitleTree(
+      controls.params({
+        parent_id: node.data.id,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyIdNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
+  }
 }
 
 function openCreate() {
@@ -68,19 +103,23 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(programTitle: ProgramTitle) {
   confirm.confirmDelete(`program title ${programTitle.title}`, async () => {
     await masterStore.deleteProgramTitle(programTitle.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Judul program berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
+})
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
 })
 </script>
 
@@ -92,8 +131,31 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
-      <Column field="title" header="Judul" expander />
+    <div class="rounded-lg border border-surface-200 bg-white p-4">
+      <label class="block max-w-md space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Judul Program</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Judul program" />
+        </span>
+      </label>
+    </div>
+
+    <MasterTreeTable
+      :value="treeNodes"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<ProgramTitle>)"
+      @sort="(value) => controls.handleSort(value, loadData)"
+    >
+      <Column field="title" header="Judul" sortable expander />
       <Column header="Aksi">
         <template #body="{ node }">
           <div class="flex flex-wrap gap-2">
@@ -117,7 +179,7 @@ onMounted(() => {
           </div>
         </template>
       </Column>
-    </TreeTable>
+    </MasterTreeTable>
 
     <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Judul Program' : 'Tambah Judul Program'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">

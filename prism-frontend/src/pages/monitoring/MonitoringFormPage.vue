@@ -77,7 +77,7 @@ onMounted(async () => {
     </PageHeader>
 
     <Message v-if="isNotEffective" severity="warn" :closable="false">
-      LA belum efektif - monitoring belum bisa diinput. Tanggal efektif:
+      Loan Agreement belum efektif - monitoring belum bisa diinput. Tanggal efektif:
       {{ formatDate(currentLA?.effective_date ?? '') }}
     </Message>
 
@@ -118,7 +118,7 @@ onMounted(async () => {
             </small>
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Kurs Mata Uang LA/IDR</span>
+            <span class="text-sm font-medium text-surface-700">Kurs Mata Uang Loan Agreement/IDR</span>
             <InputNumber
               v-model="form.values.exchange_rate_la_idr"
               :min="0"
@@ -135,7 +135,7 @@ onMounted(async () => {
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Rencana vs Realisasi</h2>
-          <p class="text-sm text-surface-500">Simpan nilai LA, USD, dan IDR secara manual tanpa konversi otomatis.</p>
+          <p class="text-sm text-surface-500">Simpan nilai Loan Agreement, USD, dan IDR secara manual tanpa konversi otomatis.</p>
         </div>
 
         <div class="overflow-auto rounded-lg border border-surface-200">
@@ -149,7 +149,7 @@ onMounted(async () => {
             </thead>
             <tbody class="divide-y divide-surface-100">
               <tr>
-                <td class="px-4 py-3 font-medium text-surface-900">Mata Uang LA</td>
+                <td class="px-4 py-3 font-medium text-surface-900">Mata Uang Loan Agreement</td>
                 <td class="px-4 py-3"><InputNumber v-model="form.values.planned_la" :min="0" :min-fraction-digits="2" class="w-full" /></td>
                 <td class="px-4 py-3"><InputNumber v-model="form.values.realized_la" :min="0" :min-fraction-digits="2" class="w-full" /></td>
               </tr>
@@ -177,7 +177,7 @@ onMounted(async () => {
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 class="text-lg font-semibold text-surface-950">Breakdown Komponen</h2>
-            <p class="text-sm text-surface-500">Opsional; total komponen tidak wajib sama dengan level LA.</p>
+            <p class="text-sm text-surface-500">Opsional; total komponen tidak wajib sama dengan level Loan Agreement.</p>
           </div>
           <label class="flex items-center gap-3 text-sm font-medium text-surface-700">
             <ToggleSwitch v-model="form.showKomponen.value" />

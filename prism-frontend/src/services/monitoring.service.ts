@@ -3,9 +3,12 @@ import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   MonitoringApiResponse,
   MonitoringDisbursement,
+  MonitoringLoanAgreementListParams,
+  MonitoringLoanAgreementReference,
   MonitoringListParams,
   MonitoringPayload,
 } from '@/types/monitoring.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 function normalizeMonitoring(item: MonitoringApiResponse): MonitoringDisbursement {
   return {
@@ -16,6 +19,14 @@ function normalizeMonitoring(item: MonitoringApiResponse): MonitoringDisbursemen
 }
 
 export const MonitoringService = {
+  async getLoanAgreementReferences(params?: MonitoringLoanAgreementListParams) {
+    const response = await http.get<PaginatedResponse<MonitoringLoanAgreementReference>>(
+      '/monitoring/loan-agreements',
+      { params },
+    )
+    return response.data
+  },
+
   async getMonitorings(loanAgreementId: string, params?: MonitoringListParams) {
     const response = await http.get<PaginatedResponse<MonitoringApiResponse>>(
       `/loan-agreements/${loanAgreementId}/monitoring`,
@@ -53,5 +64,32 @@ export const MonitoringService = {
 
   async deleteMonitoring(loanAgreementId: string, id: string) {
     await http.delete(`/loan-agreements/${loanAgreementId}/monitoring/${id}`)
+  },
+
+  async downloadImportTemplate() {
+    const response = await http.get<Blob>('/monitoring/import/template', {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  async previewImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/monitoring/import/preview',
+      formData,
+    )
+    return response.data.data
+  },
+
+  async executeImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/monitoring/import/execute',
+      formData,
+    )
+    return response.data.data
   },
 }

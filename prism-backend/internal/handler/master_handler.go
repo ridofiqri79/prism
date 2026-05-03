@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -77,8 +78,67 @@ func (h *MasterHandler) DeleteCountry(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *MasterHandler) ListCurrencies(c echo.Context) error {
+	res, err := h.service.ListCurrencies(c.Request().Context(), paginationParams(c), c.QueryParam("active"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) GetCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	res, err := h.service.GetCurrency(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) CreateCurrency(c echo.Context) error {
+	var req model.CurrencyRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.CreateCurrency(c.Request().Context(), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) UpdateCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	var req model.CurrencyRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.UpdateCurrency(c.Request().Context(), id, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[*model.CurrencyResponse]{Data: res})
+}
+
+func (h *MasterHandler) DeleteCurrency(c echo.Context) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+	if err := h.service.DeleteCurrency(c.Request().Context(), id); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *MasterHandler) ListLenders(c echo.Context) error {
-	res, err := h.service.ListLenders(c.Request().Context(), paginationParams(c), c.QueryParam("type"))
+	res, err := h.service.ListLenders(c.Request().Context(), paginationParams(c), queryStrings(c, "type"))
 	if err != nil {
 		return err
 	}
@@ -137,7 +197,15 @@ func (h *MasterHandler) DeleteLender(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListInstitutions(c echo.Context) error {
-	res, err := h.service.ListInstitutions(c.Request().Context(), paginationParams(c), c.QueryParam("level"), queryStringPtr(c, "parent_id"))
+	res, err := h.service.ListInstitutions(c.Request().Context(), paginationParams(c), queryStrings(c, "level"), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupInstitutions(c echo.Context) error {
+	res, err := h.service.LookupInstitutions(c.Request().Context(), paginationParams(c), queryStrings(c, "level"), queryStringPtr(c, "parent_id"))
 	if err != nil {
 		return err
 	}
@@ -196,7 +264,15 @@ func (h *MasterHandler) DeleteInstitution(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListRegions(c echo.Context) error {
-	res, err := h.service.ListRegions(c.Request().Context(), paginationParams(c), c.QueryParam("type"), c.QueryParam("parent_code"))
+	res, err := h.service.ListRegions(c.Request().Context(), paginationParams(c), queryStrings(c, "type"), c.QueryParam("parent_code"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupRegions(c echo.Context) error {
+	res, err := h.service.LookupRegions(c.Request().Context(), paginationParams(c), queryStrings(c, "type"), c.QueryParam("parent_code"))
 	if err != nil {
 		return err
 	}
@@ -255,7 +331,15 @@ func (h *MasterHandler) DeleteRegion(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListProgramTitles(c echo.Context) error {
-	res, err := h.service.ListProgramTitles(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListProgramTitles(c.Request().Context(), paginationParams(c), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupProgramTitles(c echo.Context) error {
+	res, err := h.service.LookupProgramTitles(c.Request().Context(), paginationParams(c))
 	if err != nil {
 		return err
 	}
@@ -314,7 +398,15 @@ func (h *MasterHandler) DeleteProgramTitle(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListBappenasPartners(c echo.Context) error {
-	res, err := h.service.ListBappenasPartners(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListBappenasPartners(c.Request().Context(), paginationParams(c), queryStrings(c, "level"), queryStringPtr(c, "parent_id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) LookupBappenasPartners(c echo.Context) error {
+	res, err := h.service.LookupBappenasPartners(c.Request().Context(), paginationParams(c), queryStrings(c, "level"))
 	if err != nil {
 		return err
 	}
@@ -432,7 +524,7 @@ func (h *MasterHandler) DeletePeriod(c echo.Context) error {
 }
 
 func (h *MasterHandler) ListNationalPriorities(c echo.Context) error {
-	res, err := h.service.ListNationalPriorities(c.Request().Context(), paginationParams(c), queryStringPtr(c, "period_id"))
+	res, err := h.service.ListNationalPriorities(c.Request().Context(), paginationParams(c), queryStrings(c, "period_id"))
 	if err != nil {
 		return err
 	}
@@ -535,10 +627,11 @@ func (h *MasterHandler) handleImportData(c echo.Context, preview bool) error {
 
 func paginationParams(c echo.Context) model.PaginationParams {
 	return model.PaginationParams{
-		Page:  parseIntQuery(c, "page", 1),
-		Limit: parseIntQuery(c, "limit", 20),
-		Sort:  c.QueryParam("sort"),
-		Order: c.QueryParam("order"),
+		Page:   parseIntQuery(c, "page", 1),
+		Limit:  parseIntQuery(c, "limit", 20),
+		Sort:   c.QueryParam("sort"),
+		Order:  c.QueryParam("order"),
+		Search: c.QueryParam("search"),
 	}
 }
 
@@ -548,6 +641,23 @@ func queryStringPtr(c echo.Context, name string) *string {
 		return nil
 	}
 	return &value
+}
+
+func queryStrings(c echo.Context, name string) []string {
+	values := append([]string{}, c.QueryParams()[name]...)
+	values = append(values, c.QueryParams()[name+"[]"]...)
+	filters := make([]string, 0, len(values))
+
+	for _, rawValue := range values {
+		for _, part := range strings.Split(rawValue, ",") {
+			value := strings.TrimSpace(part)
+			if value != "" {
+				filters = append(filters, value)
+			}
+		}
+	}
+
+	return filters
 }
 
 func bind(c echo.Context, dst any) error {

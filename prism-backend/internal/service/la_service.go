@@ -25,13 +25,22 @@ func NewLAService(db *pgxpool.Pool, queries *queries.Queries, broker *sse.Broker
 	return &LAService{db: db, queries: queries, broker: broker}
 }
 
-func (s *LAService) ListLoanAgreements(ctx context.Context, params model.PaginationParams) (*model.ListResponse[model.LoanAgreementResponse], error) {
+func (s *LAService) ListLoanAgreements(ctx context.Context, filter model.LoanAgreementListFilter, params model.PaginationParams) (*model.ListResponse[model.LoanAgreementResponse], error) {
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListLoanAgreements(ctx, queries.ListLoanAgreementsParams{Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildLoanAgreementListParams(filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListLoanAgreements(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil Loan Agreement")
 	}
-	total, err := s.queries.CountLoanAgreements(ctx)
+	total, err := s.queries.CountLoanAgreements(ctx, queries.CountLoanAgreementsParams{
+		Search:            queryParams.Search,
+		LenderID:          queryParams.LenderID,
+		IsExtended:        queryParams.IsExtended,
+		ClosingDateBefore: queryParams.ClosingDateBefore,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung Loan Agreement")
 	}
@@ -40,6 +49,36 @@ func (s *LAService) ListLoanAgreements(ctx context.Context, params model.Paginat
 		data = append(data, laListResponse(row))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildLoanAgreementListParams(filter model.LoanAgreementListFilter, params model.PaginationParams, limit, offset int) (queries.ListLoanAgreementsParams, error) {
+	lenderID, err := parseOptionalUUID(filter.LenderID, "lender_id")
+	if err != nil {
+		return queries.ListLoanAgreementsParams{}, err
+	}
+	isExtended := pgtype.Bool{}
+	if filter.IsExtended != nil && strings.TrimSpace(*filter.IsExtended) != "" {
+		switch strings.ToLower(strings.TrimSpace(*filter.IsExtended)) {
+		case "true":
+			isExtended = pgtype.Bool{Bool: true, Valid: true}
+		case "false":
+			isExtended = pgtype.Bool{Bool: false, Valid: true}
+		default:
+			return queries.ListLoanAgreementsParams{}, validation("is_extended", "harus true atau false")
+		}
+	}
+	closingDateBefore, err := optionalDate(filter.ClosingDateBefore, "closing_date_before")
+	if err != nil {
+		return queries.ListLoanAgreementsParams{}, err
+	}
+	return queries.ListLoanAgreementsParams{
+		Search:            nullableText(params.Search),
+		LenderID:          lenderID,
+		IsExtended:        isExtended,
+		ClosingDateBefore: closingDateBefore,
+		Limit:             int32(limit),
+		Offset:            int32(offset),
+	}, nil
 }
 
 func (s *LAService) GetLoanAgreement(ctx context.Context, id pgtype.UUID) (*model.LoanAgreementResponse, error) {
@@ -64,6 +103,9 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 			return err
 		}
 		if err := validateLALender(ctx, qtx, parsed.DKProjectID, parsed.LenderID); err != nil {
+			return err
+		}
+		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
 			return err
 		}
 		row, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
@@ -102,6 +144,9 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 			return mapNotFound(err, "Loan Agreement tidak ditemukan")
 		}
 		if err := validateLALender(ctx, qtx, current.DkProjectID, parsed.LenderID); err != nil {
+			return err
+		}
+		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
 			return err
 		}
 		row, err := qtx.UpdateLoanAgreement(ctx, queries.UpdateLoanAgreementParams{
@@ -205,6 +250,8 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 	if strings.TrimSpace(req.Currency) == "" {
 		return parsedLoanAgreementRequest{}, validation("currency", "wajib diisi")
 	}
+	currency := normalizeCurrency(req.Currency)
+	amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, req.AmountOriginal, req.AmountUSD)
 	return parsedLoanAgreementRequest{
 		DKProjectID:         dkProjectID,
 		LenderID:            lenderID,
@@ -213,9 +260,9 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 		EffectiveDate:       effectiveDate,
 		OriginalClosingDate: originalClosingDate,
 		ClosingDate:         closingDate,
-		Currency:            normalizeCurrency(req.Currency),
-		AmountOriginal:      numericFromFloat(req.AmountOriginal),
-		AmountUsd:           numericFromFloat(req.AmountUSD),
+		Currency:            currency,
+		AmountOriginal:      numericFromFloat(amountOriginal),
+		AmountUsd:           numericFromFloat(amountUSD),
 	}, nil
 }
 

@@ -10,6 +10,19 @@ const optionalText = z
   .optional()
   .transform((value) => value?.trim() || undefined)
 
+const optionalUUID = (message: string) =>
+  z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.string().uuid(message).optional(),
+  )
+
+const optionalDurationMonths = z
+  .number()
+  .int('Durasi harus berupa bulan bulat')
+  .positive('Durasi harus lebih dari 0 bulan')
+  .optional()
+  .nullable()
+
 export const blueBookSchema = z.object({
   period_id: z.string().uuid('Periode wajib dipilih'),
   publish_date: z.string().min(1, 'Tanggal terbit wajib diisi'),
@@ -29,11 +42,12 @@ export const lenderIndicationSchema = z.object({
 })
 
 export const bbProjectSchema = z.object({
+  project_identity_id: optionalUUID('Project identity tidak valid'),
   program_title_id: z.string().uuid('Judul program wajib dipilih'),
-  bappenas_partner_id: z.string().uuid('Mitra Bappenas wajib dipilih'),
-  bb_code: z.string().min(1, 'Kode BB wajib diisi'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
+  bb_code: z.string().min(1, 'Kode Blue Book wajib diisi'),
   project_name: z.string().min(1, 'Nama proyek wajib diisi'),
-  duration: optionalText,
+  duration: optionalDurationMonths,
   objective: optionalText,
   scope_of_work: optionalText,
   outputs: optionalText,

@@ -3,18 +3,26 @@ import { defineStore } from 'pinia'
 import { LoanAgreementService } from '@/services/loan-agreement.service'
 import { MonitoringService } from '@/services/monitoring.service'
 import type { LoanAgreement } from '@/types/loan-agreement.types'
+import type { MasterImportSummary } from '@/types/master.types'
 import type {
   MonitoringDisbursement,
+  MonitoringLoanAgreementListParams,
+  MonitoringLoanAgreementReference,
   MonitoringListParams,
   MonitoringPayload,
 } from '@/types/monitoring.types'
 
 export const useMonitoringStore = defineStore('monitoring', () => {
+  const loanAgreementReferences = ref<MonitoringLoanAgreementReference[]>([])
   const monitorings = ref<MonitoringDisbursement[]>([])
   const currentMonitoring = ref<MonitoringDisbursement | null>(null)
   const currentLA = ref<LoanAgreement | null>(null)
   const loading = ref(false)
+  const templateDownloading = ref(false)
+  const importPreviewing = ref(false)
+  const importExecuting = ref(false)
   const total = ref(0)
+  const referenceTotal = ref(0)
 
   async function withLoading<T>(action: () => Promise<T>) {
     loading.value = true
@@ -29,6 +37,15 @@ export const useMonitoringStore = defineStore('monitoring', () => {
     return withLoading(async () => {
       currentLA.value = await LoanAgreementService.getLoanAgreement(loanAgreementId)
       return currentLA.value
+    })
+  }
+
+  async function fetchLoanAgreementReferences(params?: MonitoringLoanAgreementListParams) {
+    return withLoading(async () => {
+      const response = await MonitoringService.getLoanAgreementReferences(params)
+      loanAgreementReferences.value = response.data
+      referenceTotal.value = response.meta.total
+      return response
     })
   }
 
@@ -74,26 +91,69 @@ export const useMonitoringStore = defineStore('monitoring', () => {
     })
   }
 
+  async function downloadImportTemplate(): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await MonitoringService.downloadImportTemplate()
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
+  async function previewImport(file: File): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await MonitoringService.previewImport(file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
+  async function executeImport(file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await MonitoringService.executeImport(file)
+      await fetchLoanAgreementReferences()
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
   function $reset() {
+    loanAgreementReferences.value = []
     monitorings.value = []
     currentMonitoring.value = null
     currentLA.value = null
     loading.value = false
+    templateDownloading.value = false
+    importPreviewing.value = false
+    importExecuting.value = false
     total.value = 0
+    referenceTotal.value = 0
   }
 
   return {
+    loanAgreementReferences,
     monitorings,
     currentMonitoring,
     currentLA,
     loading,
+    templateDownloading,
+    importPreviewing,
+    importExecuting,
     total,
+    referenceTotal,
     fetchLoanAgreement,
+    fetchLoanAgreementReferences,
     fetchMonitorings,
     fetchMonitoring,
     createMonitoring,
     updateMonitoring,
     deleteMonitoring,
+    downloadImportTemplate,
+    previewImport,
+    executeImport,
     $reset,
   }
 })

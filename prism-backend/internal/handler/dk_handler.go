@@ -19,11 +19,18 @@ func NewDKHandler(service *service.DKService) *DKHandler {
 }
 
 func (h *DKHandler) ListDK(c echo.Context) error {
-	res, err := h.service.ListDaftarKegiatan(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListDaftarKegiatan(c.Request().Context(), daftarKegiatanListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func daftarKegiatanListFilter(c echo.Context) model.DaftarKegiatanListFilter {
+	return model.DaftarKegiatanListFilter{
+		DateFrom: queryStringPtr(c, "date_from"),
+		DateTo:   queryStringPtr(c, "date_to"),
+	}
 }
 
 func (h *DKHandler) GetDK(c echo.Context) error {
@@ -100,11 +107,20 @@ func (h *DKHandler) ListDKProjects(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.ListDKProjects(c.Request().Context(), dkID, paginationParams(c))
+	res, err := h.service.ListDKProjects(c.Request().Context(), dkID, dkProjectListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func dkProjectListFilter(c echo.Context) model.DKProjectListFilter {
+	return model.DKProjectListFilter{
+		GBProjectIDs:       queryStrings(c, "gb_project_ids"),
+		ExecutingAgencyIDs: queryStrings(c, "executing_agency_ids"),
+		LocationIDs:        queryStrings(c, "location_ids"),
+		LenderIDs:          queryStrings(c, "lender_ids"),
+	}
 }
 
 func (h *DKHandler) GetDKProject(c echo.Context) error {

@@ -19,6 +19,25 @@ type CountryInfo struct {
 	Code string `json:"code"`
 }
 
+type CurrencyRequest struct {
+	Code      string  `json:"code" validate:"required"`
+	Name      string  `json:"name" validate:"required"`
+	Symbol    *string `json:"symbol"`
+	IsActive  bool    `json:"is_active"`
+	SortOrder int32   `json:"sort_order"`
+}
+
+type CurrencyResponse struct {
+	ID        string  `json:"id"`
+	Code      string  `json:"code"`
+	Name      string  `json:"name"`
+	Symbol    *string `json:"symbol"`
+	IsActive  bool    `json:"is_active"`
+	SortOrder int32   `json:"sort_order"`
+	CreatedAt string  `json:"created_at,omitempty"`
+	UpdatedAt string  `json:"updated_at,omitempty"`
+}
+
 type CreateLenderRequest struct {
 	CountryID *string `json:"country_id"`
 	Name      string  `json:"name" validate:"required"`
@@ -46,14 +65,15 @@ type InstitutionRequest struct {
 }
 
 type InstitutionResponse struct {
-	ID         string  `json:"id"`
-	ParentID   *string `json:"parent_id"`
-	ParentName *string `json:"parent_name,omitempty"`
-	Name       string  `json:"name"`
-	ShortName  *string `json:"short_name"`
-	Level      string  `json:"level"`
-	CreatedAt  string  `json:"created_at,omitempty"`
-	UpdatedAt  string  `json:"updated_at,omitempty"`
+	ID          string  `json:"id"`
+	ParentID    *string `json:"parent_id"`
+	ParentName  *string `json:"parent_name,omitempty"`
+	Name        string  `json:"name"`
+	ShortName   *string `json:"short_name"`
+	Level       string  `json:"level"`
+	HasChildren bool    `json:"has_children,omitempty"`
+	CreatedAt   string  `json:"created_at,omitempty"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
 }
 
 type RegionRequest struct {
@@ -64,13 +84,14 @@ type RegionRequest struct {
 }
 
 type RegionResponse struct {
-	ID         string  `json:"id"`
-	Code       string  `json:"code"`
-	Name       string  `json:"name"`
-	Type       string  `json:"type"`
-	ParentCode *string `json:"parent_code"`
-	CreatedAt  string  `json:"created_at,omitempty"`
-	UpdatedAt  string  `json:"updated_at,omitempty"`
+	ID          string  `json:"id"`
+	Code        string  `json:"code"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	ParentCode  *string `json:"parent_code"`
+	HasChildren bool    `json:"has_children,omitempty"`
+	CreatedAt   string  `json:"created_at,omitempty"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
 }
 
 type ProgramTitleRequest struct {
@@ -79,11 +100,12 @@ type ProgramTitleRequest struct {
 }
 
 type ProgramTitleResponse struct {
-	ID        string  `json:"id"`
-	ParentID  *string `json:"parent_id"`
-	Title     string  `json:"title"`
-	CreatedAt string  `json:"created_at,omitempty"`
-	UpdatedAt string  `json:"updated_at,omitempty"`
+	ID          string  `json:"id"`
+	ParentID    *string `json:"parent_id"`
+	Title       string  `json:"title"`
+	HasChildren bool    `json:"has_children,omitempty"`
+	CreatedAt   string  `json:"created_at,omitempty"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
 }
 
 type BappenasPartnerRequest struct {
@@ -93,12 +115,13 @@ type BappenasPartnerRequest struct {
 }
 
 type BappenasPartnerResponse struct {
-	ID        string  `json:"id"`
-	ParentID  *string `json:"parent_id"`
-	Name      string  `json:"name"`
-	Level     string  `json:"level"`
-	CreatedAt string  `json:"created_at,omitempty"`
-	UpdatedAt string  `json:"updated_at,omitempty"`
+	ID          string  `json:"id"`
+	ParentID    *string `json:"parent_id"`
+	Name        string  `json:"name"`
+	Level       string  `json:"level"`
+	HasChildren bool    `json:"has_children,omitempty"`
+	CreatedAt   string  `json:"created_at,omitempty"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
 }
 
 type PeriodRequest struct {

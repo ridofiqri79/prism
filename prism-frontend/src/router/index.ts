@@ -10,6 +10,7 @@ import { loanAgreementRoutes } from '@/router/routes/loan-agreement.routes'
 import { masterRoutes } from '@/router/routes/master.routes'
 import { monitoringRoutes } from '@/router/routes/monitoring.routes'
 import { projectRoutes } from '@/router/routes/project.routes'
+import { spatialDistributionRoutes } from '@/router/routes/spatial-distribution.routes'
 import { userRoutes } from '@/router/routes/user.routes'
 import { resolveRouteTitle } from '@/utils/route-title'
 
@@ -19,6 +20,7 @@ const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/layouts/AppLayout.vue'),
     children: [
       ...dashboardRoutes,
+      ...spatialDistributionRoutes,
       ...projectRoutes,
       ...masterRoutes,
       ...blueBookRoutes,

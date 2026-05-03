@@ -42,6 +42,10 @@ function daysBetween(start: string, end: string) {
   return Math.round((endTime - startTime) / 86_400_000)
 }
 
+function normalizeCurrency(value?: string | null) {
+  return (value || 'USD').trim().toUpperCase()
+}
+
 export function useLAForm(
   initialData?: LoanAgreement | null,
   options?: {
@@ -75,6 +79,7 @@ export function useLAForm(
     Math.max(0, daysBetween(values.original_closing_date, values.closing_date)),
   )
   const isExtended = computed(() => extensionDays.value > 0)
+  const isUSD = computed(() => normalizeCurrency(values.currency) === 'USD')
 
   watch(
     allowedLenderIds,
@@ -89,7 +94,19 @@ export function useLAForm(
   watch(
     () => values.currency,
     (currency) => {
-      values.currency = currency.toUpperCase().slice(0, 3)
+      values.currency = normalizeCurrency(currency).slice(0, 3)
+      if (values.currency === 'USD') {
+        values.amount_usd = values.amount_original
+      }
+    },
+  )
+
+  watch(
+    () => values.amount_original,
+    (amount) => {
+      if (isUSD.value) {
+        values.amount_usd = amount
+      }
     },
   )
 
@@ -119,7 +136,17 @@ export function useLAForm(
       Object.keys(errors).forEach((key) => {
         delete errors[key as keyof LAFormErrors]
       })
-      await callback(parsed.data)
+      const payload = {
+        ...parsed.data,
+        currency: normalizeCurrency(parsed.data.currency),
+        amount_usd:
+          normalizeCurrency(parsed.data.currency) === 'USD'
+            ? parsed.data.amount_original === 0 && parsed.data.amount_usd !== 0
+              ? parsed.data.amount_usd
+              : parsed.data.amount_original
+            : parsed.data.amount_usd,
+      }
+      await callback(payload)
     }
   }
 
@@ -129,6 +156,7 @@ export function useLAForm(
     selectedDKProject,
     allowedLenderIds,
     isExtended,
+    isUSD,
     extensionDays,
     submit,
     applyLoanAgreement,

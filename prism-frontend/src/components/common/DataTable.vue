@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type CSSProperties } from 'vue'
 import PrimeColumn from 'primevue/column'
 import PrimeDataTable from 'primevue/datatable'
-import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/common/EmptyState.vue'
+import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
 
 export interface ColumnDef {
   field: string
   header: string
   sortable?: boolean
-}
-
-interface PageEvent {
-  page: number
-  rows: number
+  width?: string
+  minWidth?: string
+  maxWidth?: string
+  align?: 'left' | 'center' | 'right'
+  nowrap?: boolean
 }
 
 interface SortEvent {
   sortField?: unknown
   sortOrder?: unknown
 }
+
+type SortOrder = 'asc' | 'desc'
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +33,8 @@ const props = withDefaults(
     total: number
     page: number
     limit: number
+    sortField?: string
+    sortOrder?: SortOrder
   }>(),
   {
     loading: false,
@@ -40,19 +44,20 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:page': [value: number]
   'update:limit': [value: number]
-  sort: [value: { sort: string; order: 'asc' | 'desc' }]
+  sort: [value: { sort: string; order: SortOrder }]
 }>()
 
-const first = computed(() => (props.page - 1) * props.limit)
+const tableSortOrder = computed(() => {
+  if (!props.sortOrder) return undefined
+  return props.sortOrder === 'asc' ? 1 : -1
+})
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.data.length === 0)
 const refreshingRows = computed(() => props.loading && props.data.length > 0)
-
-function handlePage(event: PageEvent) {
-  emit('update:page', event.page + 1)
-  emit('update:limit', event.rows)
+const tableStyle: CSSProperties = {
+  tableLayout: 'fixed',
+  width: '100%',
 }
-
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
     return
@@ -62,6 +67,19 @@ function handleSort(event: SortEvent) {
     sort: event.sortField,
     order: event.sortOrder === 1 ? 'asc' : 'desc',
   })
+}
+
+function columnCellStyle(column: ColumnDef): CSSProperties {
+  return {
+    maxWidth: column.maxWidth,
+    minWidth: column.minWidth,
+    overflowWrap: column.nowrap ? 'normal' : 'anywhere',
+    textAlign: column.align ?? 'left',
+    verticalAlign: 'top',
+    whiteSpace: column.nowrap ? 'nowrap' : 'normal',
+    width: column.width,
+    wordBreak: column.nowrap ? 'normal' : 'break-word',
+  }
 }
 </script>
 
@@ -78,15 +96,21 @@ function handleSort(event: SortEvent) {
       </div>
     </div>
 
-    <EmptyState v-else-if="data.length === 0" />
+    <EmptyState v-else-if="data.length === 0" compact />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
       <PrimeDataTable
         :value="data"
         lazy
         striped-rows
+        removable-sort
+        resizable-columns
+        column-resize-mode="fit"
         data-key="id"
-        class="overflow-hidden rounded-lg border border-surface-200"
+        :sort-field="sortField"
+        :sort-order="tableSortOrder"
+        :table-style="tableStyle"
+        class="w-full overflow-hidden rounded-lg border border-surface-200"
         @sort="handleSort"
       >
         <PrimeColumn
@@ -95,6 +119,9 @@ function handleSort(event: SortEvent) {
           :field="column.field"
           :header="column.header"
           :sortable="column.sortable"
+          :style="columnCellStyle(column)"
+          :header-style="columnCellStyle(column)"
+          :body-style="columnCellStyle(column)"
         >
           <template #body="{ data: row }">
             <slot name="body-row" :row="row" :column="column">
@@ -105,12 +132,12 @@ function handleSort(event: SortEvent) {
       </PrimeDataTable>
     </TableReloadShell>
 
-    <Paginator
-      :first="first"
-      :rows="limit"
-      :total-records="total"
-      :rows-per-page-options="[10, 20, 50, 100]"
-      @page="handlePage"
+    <ListPaginationFooter
+      :page="page"
+      :limit="limit"
+      :total="total"
+      @update:page="emit('update:page', $event)"
+      @update:limit="emit('update:limit', $event)"
     />
   </div>
 </template>

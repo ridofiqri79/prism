@@ -12,12 +12,16 @@ import {
   blueBookImportFileSchema,
   daftarKegiatanImportFileSchema,
   greenBookImportFileSchema,
+  loanAgreementImportFileSchema,
   masterImportFileSchema,
+  monitoringImportFileSchema,
 } from '@/schemas/master.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
+import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
+import { useMonitoringStore } from '@/stores/monitoring.store'
 import type { ApiErrorResponse } from '@/types/api.types'
 import type { BlueBook } from '@/types/blue-book.types'
 import type { GreenBook } from '@/types/green-book.types'
@@ -29,7 +33,13 @@ import type {
 } from '@/types/master.types'
 
 type ImportStatusFilter = MasterImportRowStatus | 'all'
-type ImportKind = 'master' | 'blue_book' | 'green_book' | 'daftar_kegiatan'
+type ImportKind =
+  | 'master'
+  | 'blue_book'
+  | 'green_book'
+  | 'daftar_kegiatan'
+  | 'loan_agreement'
+  | 'monitoring'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
 type ParsedImportInput = { file: File; blueBookId?: string; greenBookId?: string }
 type ImportKindOption = { value: ImportKind; label: string; description: string }
@@ -43,6 +53,8 @@ const masterStore = useMasterStore()
 const blueBookStore = useBlueBookStore()
 const greenBookStore = useGreenBookStore()
 const daftarKegiatanStore = useDaftarKegiatanStore()
+const loanAgreementStore = useLoanAgreementStore()
+const monitoringStore = useMonitoringStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -67,17 +79,27 @@ const importKindOptions: ImportKindOption[] = [
   {
     value: 'blue_book',
     label: 'Blue Book',
-    description: 'Proyek Blue Book beserta EA, IA, lokasi, cost, dan lender indication',
+    description: 'Proyek Blue Book beserta Executing Agency, Implementing Agency, lokasi, biaya, dan indikasi lender',
   },
   {
     value: 'green_book',
     label: 'Green Book',
-    description: 'Proyek Green Book beserta BB Project, activity, funding, dan allocation',
+    description: 'Proyek Green Book beserta Proyek Blue Book, kegiatan, funding, dan alokasi',
   },
   {
     value: 'daftar_kegiatan',
     label: 'Daftar Kegiatan',
-    description: 'Header DK baru beserta project, GB Project, pembiayaan, alokasi, dan aktivitas',
+    description: 'Header Daftar Kegiatan baru beserta proyek, Proyek Green Book, pembiayaan, alokasi, dan aktivitas',
+  },
+  {
+    value: 'loan_agreement',
+    label: 'Loan Agreement',
+    description: 'Create-only Loan Agreement dari Proyek Daftar Kegiatan yang eligible',
+  },
+  {
+    value: 'monitoring',
+    label: 'Monitoring Disbursement',
+    description: 'Create-only monitoring triwulan beserta breakdown komponen opsional',
   },
 ]
 
@@ -123,10 +145,21 @@ const daftarKegiatanWorkbookSheets = [
   'Relasi - Activity Detail',
 ]
 
+const loanAgreementWorkbookSheets = ['Loan Agreement']
+
+const monitoringWorkbookSheets = ['Monitoring Disbursement', 'Relasi - Komponen']
+
+const sheetDisplayLabels: Record<string, string> = {
+  'Relasi - BB Project': 'Relasi - Proyek Blue Book',
+  'Relasi - GB Project': 'Relasi - Proyek Green Book',
+}
+
 const workbookSheets = computed(() => {
   if (activeImportKind.value === 'master') return masterWorkbookSheets
   if (activeImportKind.value === 'blue_book') return blueBookWorkbookSheets
   if (activeImportKind.value === 'green_book') return greenBookWorkbookSheets
+  if (activeImportKind.value === 'loan_agreement') return loanAgreementWorkbookSheets
+  if (activeImportKind.value === 'monitoring') return monitoringWorkbookSheets
 
   return daftarKegiatanWorkbookSheets
 })
@@ -158,7 +191,11 @@ const importBusy = computed(() =>
       ? blueBookStore.importPreviewing || blueBookStore.importExecuting
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importPreviewing || greenBookStore.importExecuting
-        : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importPreviewing || loanAgreementStore.importExecuting
+          : activeImportKind.value === 'monitoring'
+            ? monitoringStore.importPreviewing || monitoringStore.importExecuting
+          : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
 )
 
 const previewLoading = computed(() =>
@@ -168,7 +205,11 @@ const previewLoading = computed(() =>
       ? blueBookStore.importPreviewing
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importPreviewing
-        : daftarKegiatanStore.importPreviewing,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importPreviewing
+          : activeImportKind.value === 'monitoring'
+            ? monitoringStore.importPreviewing
+          : daftarKegiatanStore.importPreviewing,
 )
 
 const executeLoading = computed(() =>
@@ -178,7 +219,11 @@ const executeLoading = computed(() =>
       ? blueBookStore.importExecuting
       : activeImportKind.value === 'green_book'
         ? greenBookStore.importExecuting
-        : daftarKegiatanStore.importExecuting,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.importExecuting
+          : activeImportKind.value === 'monitoring'
+            ? monitoringStore.importExecuting
+          : daftarKegiatanStore.importExecuting,
 )
 
 const templateLoading = computed(() =>
@@ -188,7 +233,11 @@ const templateLoading = computed(() =>
       ? blueBookStore.templateDownloading
       : activeImportKind.value === 'green_book'
         ? greenBookStore.templateDownloading
-        : daftarKegiatanStore.templateDownloading,
+        : activeImportKind.value === 'loan_agreement'
+          ? loanAgreementStore.templateDownloading
+          : activeImportKind.value === 'monitoring'
+            ? monitoringStore.templateDownloading
+          : daftarKegiatanStore.templateDownloading,
 )
 
 const targetMissing = computed(
@@ -251,7 +300,7 @@ const sheetFilterOptions = computed(() => {
     { value: 'all', label: 'Semua sheet', count: statusRows.length },
     ...(summary.value?.sheets.map((sheet) => ({
       value: sheet.sheet,
-      label: sheet.sheet,
+      label: sheetLabel(sheet.sheet),
       count: statusRows.filter((row) => row.sheet === sheet.sheet).length,
     })) ?? []),
   ]
@@ -336,6 +385,10 @@ async function previewFile() {
       summary.value = await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
     } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.previewProjectImport(input.greenBookId ?? '', input.file)
+    } else if (activeImportKind.value === 'loan_agreement') {
+      summary.value = await loanAgreementStore.previewImport(input.file)
+    } else if (activeImportKind.value === 'monitoring') {
+      summary.value = await monitoringStore.previewImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.previewImport(input.file)
     }
@@ -368,6 +421,10 @@ async function executeFile() {
       summary.value = await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
     } else if (activeImportKind.value === 'green_book') {
       summary.value = await greenBookStore.importProjects(input.greenBookId ?? '', input.file)
+    } else if (activeImportKind.value === 'loan_agreement') {
+      summary.value = await loanAgreementStore.executeImport(input.file)
+    } else if (activeImportKind.value === 'monitoring') {
+      summary.value = await monitoringStore.executeImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.executeImport(input.file)
     }
@@ -414,6 +471,23 @@ async function downloadTemplate() {
       return
     }
 
+    if (activeImportKind.value === 'loan_agreement') {
+      const laBlob = await loanAgreementStore.downloadImportTemplate()
+      saveBlob(laBlob, 'loan_agreement_import_template.xlsx')
+      toast.success('Template diunduh', 'Template Loan Agreement sudah dibuat dari snapshot master data')
+      return
+    }
+
+    if (activeImportKind.value === 'monitoring') {
+      const monitoringBlob = await monitoringStore.downloadImportTemplate()
+      saveBlob(monitoringBlob, 'monitoring_disbursement_import_template.xlsx')
+      toast.success(
+        'Template diunduh',
+        'Template Monitoring Disbursement sudah dibuat dari snapshot master data',
+      )
+      return
+    }
+
     const dkBlob = await daftarKegiatanStore.downloadImportTemplate()
     saveBlob(dkBlob, 'daftar_kegiatan_import_template.xlsx')
     toast.success('Template diunduh', 'Template Daftar Kegiatan sudah dibuat dari snapshot master data')
@@ -457,6 +531,26 @@ function getImportInput(): ParsedImportInput | null {
     }
 
     return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
+  }
+
+  if (activeImportKind.value === 'loan_agreement') {
+    const parsed = loanAgreementImportFileSchema.safeParse({ file: selectedFile.value })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file }
+  }
+
+  if (activeImportKind.value === 'monitoring') {
+    const parsed = monitoringImportFileSchema.safeParse({ file: selectedFile.value })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file }
   }
 
   const parsed = daftarKegiatanImportFileSchema.safeParse({ file: selectedFile.value })
@@ -537,6 +631,10 @@ function rowNumberLabel(row: number) {
   return row > 0 ? row.toString() : 'Otomatis'
 }
 
+function sheetLabel(sheet: string) {
+  return sheetDisplayLabels[sheet] ?? sheet
+}
+
 function blueBookOptionLabel(blueBook: BlueBook) {
   const revision =
     blueBook.revision_number > 0
@@ -549,7 +647,7 @@ function blueBookOptionLabel(blueBook: BlueBook) {
 function greenBookOptionLabel(greenBook: GreenBook) {
   const revision = greenBook.revision_number > 0 ? `Revisi ${greenBook.revision_number}` : 'Awal'
 
-  return `GB ${greenBook.publish_year} - ${revision}`
+  return `Green Book ${greenBook.publish_year} - ${revision}`
 }
 
 function saveBlob(blob: Blob, fileName: string) {
@@ -702,7 +800,7 @@ function filterButtonClass(active: boolean) {
           <Tag
             v-for="sheet in workbookSheets"
             :key="sheet"
-            :value="sheet"
+            :value="sheetLabel(sheet)"
             severity="info"
             rounded
           />
@@ -748,7 +846,7 @@ function filterButtonClass(active: boolean) {
           </thead>
           <tbody class="divide-y divide-surface-100">
             <tr v-for="sheet in summary.sheets" :key="sheet.sheet">
-              <td class="px-3 py-2 font-medium text-surface-900">{{ sheet.sheet }}</td>
+              <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(sheet.sheet) }}</td>
               <td class="px-3 py-2">
                 <Tag
                   :value="sheet.failed > 0 ? 'Perlu cek' : 'Selesai'"
@@ -818,7 +916,7 @@ function filterButtonClass(active: boolean) {
                 v-for="row in paginatedImportRows"
                 :key="`${row.sheet}-${row.row}-${row.status}-${row.label}`"
               >
-                <td class="px-3 py-2 font-medium text-surface-900">{{ row.sheet }}</td>
+                <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(row.sheet) }}</td>
                 <td class="px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
                 <td class="px-3 py-2">
                   <Tag
@@ -867,7 +965,7 @@ function filterButtonClass(active: boolean) {
           :key="`${sheet.sheet}-errors`"
           class="rounded-lg border border-red-100 bg-red-50 p-4"
         >
-          <p class="text-sm font-semibold text-red-800">{{ sheet.sheet }}</p>
+          <p class="text-sm font-semibold text-red-800">{{ sheetLabel(sheet.sheet) }}</p>
           <ul class="mt-2 space-y-1 text-sm text-red-700">
             <li v-for="error in sheet.errors" :key="`${sheet.sheet}-${error.row}-${error.message}`">
               Baris {{ error.row }}: {{ error.message }}

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
-import MonitoringChart from '@/components/monitoring/MonitoringChart.vue'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SummaryCard from '@/components/common/SummaryCard.vue'
@@ -18,6 +17,7 @@ import type {
 } from '@/types/dashboard.types'
 import type { MonitoringDisbursement } from '@/types/monitoring.types'
 
+const MonitoringChart = defineAsyncComponent(() => import('@/components/monitoring/MonitoringChart.vue'))
 const currentYear = new Date().getFullYear()
 const summary = ref<DashboardSummary | null>(null)
 const monitoringSummary = ref<MonitoringSummary | null>(null)
@@ -47,8 +47,8 @@ const cards = computed(() => {
   const data = summary.value
 
   return [
-    { label: 'Total BB Projects', value: data?.total_bb_projects ?? 0, format: 'number' as const },
-    { label: 'Total GB Projects', value: data?.total_gb_projects ?? 0, format: 'number' as const },
+  { label: 'Total Proyek Blue Book', value: data?.total_bb_projects ?? 0, format: 'number' as const },
+  { label: 'Total Proyek Green Book', value: data?.total_gb_projects ?? 0, format: 'number' as const },
     { label: 'Total Loan Agreements', value: data?.total_loan_agreements ?? 0, format: 'number' as const },
     { label: 'Total Nilai Pinjaman', value: data?.total_amount_usd ?? 0, unit: 'USD', format: 'currency' as const },
     { label: 'Total Realisasi', value: data?.total_realized_usd ?? 0, unit: 'USD', format: 'currency' as const },

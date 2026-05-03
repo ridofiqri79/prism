@@ -12,7 +12,7 @@
 **`src/types/daftar-kegiatan.types.ts`:**
 ```typescript
 export interface DaftarKegiatan { id: string; letter_number?: string; subject: string; date: string }
-export interface DKProject { id: string; dk: DaftarKegiatan; program_title?: ProgramTitle; institution?: Institution; duration?: string; objectives?: string; gb_projects: GBProjectSummary[]; locations: Region[]; financing_details: DKFinancingDetail[]; loan_allocations: DKLoanAllocation[]; activity_details: DKActivityDetail[] }
+export interface DKProject { id: string; dk: DaftarKegiatan; project_name: string; program_title?: ProgramTitle; institution?: Institution; duration?: number | null; objectives?: string; gb_projects: GBProjectSummary[]; bappenas_partners: BappenasPartner[]; locations: Region[]; financing_details: DKFinancingDetail[]; loan_allocations: DKLoanAllocation[]; activity_details: DKActivityDetail[] }
 export interface DKFinancingDetail { id: string; lender?: Lender; currency: string; amount_original: number; grant_original: number; counterpart_original: number; amount_usd: number; grant_usd: number; counterpart_usd: number; remarks?: string }
 export interface DKLoanAllocation { id: string; institution?: Institution; currency: string; amount_original: number; grant_original: number; counterpart_original: number; amount_usd: number; grant_usd: number; counterpart_usd: number; remarks?: string }
 export interface DKActivityDetail { id: string; activity_number: number; activity_name: string }
@@ -29,9 +29,11 @@ export const daftarKegiatanSchema = z.object({
 export const dkProjectSchema = z.object({
   program_title_id: z.string().uuid().optional(),
   institution_id: z.string().uuid('Executing Agency wajib dipilih'),
-  duration: z.string().optional(),
+  project_name: z.string().min(1, 'Nama proyek wajib diisi'),
+  duration: z.number().int().positive().optional().nullable(),
   objectives: z.string().optional(),
   gb_project_ids: z.array(z.string().uuid()).min(1, 'Minimal 1 GB Project'),
+  bappenas_partner_ids: z.array(z.string().uuid('Mitra Kerja Bappenas tidak valid')),
   location_ids: z.array(z.string().uuid()).min(1, 'Lokasi wajib dipilih'),
 })
 ```
@@ -90,7 +92,7 @@ export function useDKProjectForm(initialData?) {
 
 - Header surat: subject, date, letter_number
 - Daftar DK Projects dalam surat: accordion per proyek
-- Setiap proyek accordion memuat: info proyek, GB references, Financing Detail table, Loan Allocation table, Activity Details list
+- Setiap proyek accordion memuat: info proyek, Mitra Kerja Bappenas, GB references, Financing Detail table, Loan Allocation table, Activity Details list
 - Tombol "Tambah Proyek ke Surat" -> form DK Project
 
 ---
@@ -100,7 +102,7 @@ export function useDKProjectForm(initialData?) {
 Gunakan `useDKProjectForm()`.
 
 **Section 1 - Header Proyek:**
-program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), duration, objectives, gb_project_ids (MultiSelect GB Project), location_ids (`<LocationMultiSelect>`)
+gb_project_ids (MultiSelect GB Project) ditempatkan paling atas. Saat user memilih GB Project, form mengisi otomatis project_name dari nama proyek GB pertama, program_title_id, institution_id dari Executing Agency GB pertama, bappenas_partner_ids dari Mitra Kerja Bappenas GB terpilih, duration bulan, objectives dari objective GB, location_ids, financing detail dari funding source GB, loan allocation dari institution funding source atau institution proyek GB, dan activity detail dari activities GB. Semua field hasil autofill tetap editable sebelum disimpan. Field setelahnya: project_name (`<InputText>`), program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), bappenas_partner_ids (multi-select Eselon II, opsional), duration bulan (`<InputNumber>` integer), location_ids (`<LocationMultiSelect>`), objectives.
 
 **Section 2 - Financing Detail (tabel multi-currency):**
 Kolom: lender_id (`<LenderSelect :allowedIds>`), currency (text input ISO), amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd (`<CurrencyInput>`), remarks. Tombol "Tambah Baris". Tampilkan catatan: "Konversi ke USD dilakukan manual".

@@ -62,7 +62,7 @@ Setiap proyek di Blue Book juga sudah memiliki **unit kerja Bappenas yang bertan
 | Outputs | Keluaran proyek |
 | Outcomes | Hasil proyek |
 | National Priority | Multi-select — satu atau lebih National Priority yang didukung proyek ini |
-| Bappenas Partner (Eselon II) | Unit kerja Bappenas penanggung jawab — Eselon I diturunkan otomatis dari hierarki |
+| Mitra Kerja Bappenas (Eselon II) | Opsional dan boleh lebih dari satu; Eselon I diturunkan otomatis dari hierarki |
 | **Lender Indication** | Lender yang memberikan indikasi ketertarikan *(masih bersifat indikasi, belum pasti)* — memuat: Nama Lender + Keterangan |
 
 #### Project Cost
@@ -261,13 +261,13 @@ Periode perencanaan **5 tahunan** yang menjadi acuan bersama untuk **Blue Book**
 - Period
 - Publish Date
 - Versi revisi — format: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`, contoh: *"BB 2025–2029 Revisi ke-1 Tahun 2026"*
-- *(Riwayat semua versi disimpan; proyek yang dihapus tetap ada dengan status `deleted`)*
+- *(Riwayat versi tetap disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream)*
 
 ### 5.3 Green Book
 - List of Green Book Projects
 - Publish Date (tahun terbit)
 - Versi revisi — format: `GB [YYYY] Revisi ke-[N]`
-- *(Riwayat semua versi disimpan; proyek yang dihapus tetap ada dengan status `deleted`)*
+- *(Riwayat versi tetap disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream)*
 
 ### 5.4 Daftar Kegiatan
 Berupa **surat** yang diterbitkan Bappenas dengan struktur dua level:
@@ -407,14 +407,14 @@ Bappenas Publish Blue Book (per 5 tahun)
 ## 7. Catatan Pengembangan Awal
 
 - Sistem bersifat **input-centric**: data diinput oleh Staff, ditampilkan sebagai tabel dan visualisasi.
-- **Manajemen versi/revisi** untuk BB dan GB: riwayat semua versi disimpan, proyek yang dihapus tetap ada dengan status `deleted`. Format versi: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`.
+- **Manajemen versi/revisi** untuk BB dan GB: riwayat semua versi disimpan; penghapusan proyek memakai hard delete dan ditolak jika masih punya relasi downstream. Format versi: `[Nama Period] Revisi ke-[N] Tahun [YYYY]`.
 - **Multi-currency** pada Daftar Kegiatan: konversi ke USD dilakukan manual oleh Staff, sistem menyimpan nilai original (mata uang lender) dan nilai USD secara bersamaan.
 - Relasi **BB ↔ GB bersifat many-to-many** dan **DK ↔ GB bersifat many-to-many** — keduanya perlu tabel penghubung di skema database.
 - **LoI** memiliki perihal dan tanggal (wajib) serta nomor surat (opsional); satu BB project bisa menerima banyak LoI dari lender yang berbeda.
 - **Daftar Kegiatan** bersifat final (tidak direvisi), terdiri dari header surat dan list proyek GB. Activity Details diinput bebas (tidak dipilih dari Activities GB) — secara konteks merupakan realisasi rencana GB, namun tidak ada relasi teknis langsung.
 - **Period** hanya berlaku untuk Blue Book dan National Priority (5 tahunan); Green Book tidak menggunakan entitas Period.
 - **Program Title** adalah entitas master bersama (shared) antara BB dan GB — dipilih dari daftar, tidak diketik bebas.
-- **Bappenas Partner** pada BB Project cukup menyimpan Eselon II per proyek — Eselon I diturunkan otomatis dari hierarki parent-child.
+- **Mitra Kerja Bappenas** pada BB, GB, dan DK Project bersifat opsional dan boleh lebih dari satu. Simpan Eselon II; Eselon I diturunkan otomatis dari hierarki parent-child.
 - **Executing Agency & Implementing Agency** keduanya bersifat multi-select di BB maupun GB, mengacu ke entitas Institution yang sama (Kementerian/Eselon I).
 - **Lender Indication** dicatat di level BB Project — lender masih bersifat indikasi (belum pasti). Berbeda dengan Funding Source di GB yang sudah hampir pasti.
 - **Funding Source di DK** dipilih dari lender yang sudah terdaftar (dari Lender Indication BB atau Funding Source GB), bukan diinput bebas.

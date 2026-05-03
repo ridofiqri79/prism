@@ -2,16 +2,19 @@ import http from '@/services/http'
 import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
 import type {
   BBProject,
+  BBProjectHistoryItem,
+  BBProjectListParams,
   BBProjectPayload,
   BlueBook,
+  BlueBookListParams,
   BlueBookPayload,
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const BlueBookService = {
-  async getBlueBooks(params?: ListParams) {
+  async getBlueBooks(params?: BlueBookListParams) {
     const response = await http.get<PaginatedResponse<BlueBook>>('/blue-books', { params })
     return response.data
   },
@@ -35,7 +38,7 @@ export const BlueBookService = {
     await http.delete(`/blue-books/${id}`)
   },
 
-  async getProjects(blueBookId: string, params?: ListParams) {
+  async getProjects(blueBookId: string, params?: BBProjectListParams) {
     const response = await http.get<PaginatedResponse<BBProject>>(
       `/blue-books/${blueBookId}/projects`,
       { params },
@@ -46,6 +49,13 @@ export const BlueBookService = {
   async getProject(blueBookId: string, id: string) {
     const response = await http.get<ApiResponse<BBProject>>(
       `/blue-books/${blueBookId}/projects/${id}`,
+    )
+    return response.data.data
+  },
+
+  async getBBProjectHistory(id: string) {
+    const response = await http.get<ApiResponse<BBProjectHistoryItem[]>>(
+      `/bb-projects/${id}/history`,
     )
     return response.data.data
   },

@@ -1,6 +1,8 @@
+import type { ProjectAuditEntry } from '@/types/audit.types'
 import type {
   BappenasPartner,
   Institution,
+  ListParams,
   Lender,
   NationalPriority,
   Period,
@@ -9,12 +11,13 @@ import type {
 } from '@/types/master.types'
 
 export type BlueBookStatus = 'active' | 'superseded'
-export type BBProjectStatus = 'active' | 'deleted'
+export type BBProjectStatus = 'active'
 export type FundingType = 'Foreign' | 'Counterpart'
 
 export interface BlueBook {
   id: string
   period: Period
+  replaces_blue_book_id?: string | null
   publish_date: string
   revision_number: number
   revision_year?: number | null
@@ -25,34 +28,54 @@ export interface BlueBook {
 
 export interface BlueBookPayload {
   period_id: string
+  replaces_blue_book_id?: string | null
   publish_date: string
   revision_number: number
   revision_year?: number | null
 }
 
+export interface BlueBookListParams extends ListParams {
+  search?: string
+  period_id?: string[]
+  status?: BlueBookStatus[]
+}
+
 export interface BBProject {
   id: string
   blue_book_id?: string
+  project_identity_id: string
   program_title_id?: string
-  bappenas_partner_id?: string
   bb_code: string
   project_name: string
   program_title?: ProgramTitle
-  bappenas_partner?: BappenasPartner
+  bappenas_partners: BappenasPartner[]
   executing_agencies: Institution[]
   implementing_agencies: Institution[]
   locations: Region[]
   national_priorities: NationalPriority[]
   project_costs: BBProjectCost[]
   lender_indications: LenderIndication[]
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_work?: string | null
   outputs?: string | null
   outcomes?: string | null
   status: BBProjectStatus
+  is_latest: boolean
+  has_newer_revision: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface BBProjectRevisionSourceOption extends BBProject {
+  source_blue_book_id: string
+  source_blue_book_label: string
+}
+
+export interface BBProjectListParams extends ListParams {
+  executing_agency_ids?: string[]
+  location_ids?: string[]
+  search?: string
 }
 
 export interface BBProjectCost {
@@ -80,11 +103,12 @@ export interface LenderIndicationPayload {
 }
 
 export interface BBProjectPayload {
+  project_identity_id?: string | null
   program_title_id: string
-  bappenas_partner_id: string
+  bappenas_partner_ids: string[]
   bb_code: string
   project_name: string
-  duration?: string | null
+  duration?: number | null
   objective?: string | null
   scope_of_work?: string | null
   outputs?: string | null
@@ -95,6 +119,24 @@ export interface BBProjectPayload {
   national_priority_ids: string[]
   project_costs: ProjectCostPayload[]
   lender_indications: LenderIndicationPayload[]
+}
+
+export interface BBProjectHistoryItem {
+  id: string
+  project_identity_id: string
+  blue_book_id: string
+  bb_code: string
+  project_name: string
+  book_label: string
+  revision_number: number
+  revision_year?: number | null
+  book_status: BlueBookStatus
+  is_latest: boolean
+  used_by_downstream: boolean
+  last_changed_by?: string
+  last_changed_at?: string
+  last_change_summary?: string
+  audit_entries?: ProjectAuditEntry[]
 }
 
 export interface LoI {
@@ -114,4 +156,3 @@ export interface LoIPayload {
   date: string
   letter_number?: string | null
 }
-

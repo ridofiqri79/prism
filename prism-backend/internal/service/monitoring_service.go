@@ -28,16 +28,55 @@ func NewMonitoringService(db *pgxpool.Pool, queries *queries.Queries, broker *ss
 	return &MonitoringService{db: db, queries: queries, broker: broker}
 }
 
-func (s *MonitoringService) ListMonitoring(ctx context.Context, laID pgtype.UUID, params model.PaginationParams) (*model.ListResponse[model.MonitoringResponse], error) {
+func (s *MonitoringService) ListLoanAgreementReferences(ctx context.Context, filter model.MonitoringLoanAgreementListFilter, params model.PaginationParams) (*model.ListResponse[model.MonitoringLoanAgreementResponse], error) {
+	page, limit, offset := normalizeList(params)
+	isEffective, err := optionalBool(filter.IsEffective, "is_effective")
+	if err != nil {
+		return nil, err
+	}
+	queryParams := queries.ListMonitoringLoanAgreementReferencesParams{
+		Search:      nullableText(params.Search),
+		IsEffective: isEffective,
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+	}
+	rows, err := s.queries.ListMonitoringLoanAgreementReferences(ctx, queryParams)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil daftar Loan Agreement untuk monitoring")
+	}
+	total, err := s.queries.CountMonitoringLoanAgreementReferences(ctx, queries.CountMonitoringLoanAgreementReferencesParams{
+		Search:      queryParams.Search,
+		IsEffective: queryParams.IsEffective,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung daftar Loan Agreement untuk monitoring")
+	}
+	data := make([]model.MonitoringLoanAgreementResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, monitoringLoanAgreementResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MonitoringService) ListMonitoring(ctx context.Context, laID pgtype.UUID, filter model.MonitoringListFilter, params model.PaginationParams) (*model.ListResponse[model.MonitoringResponse], error) {
 	if _, err := s.queries.GetLoanAgreement(ctx, laID); err != nil {
 		return nil, mapNotFound(err, "Loan Agreement tidak ditemukan")
 	}
 	page, limit, offset := normalizeList(params)
-	rows, err := s.queries.ListMonitoringByLA(ctx, queries.ListMonitoringByLAParams{LoanAgreementID: laID, Limit: int32(limit), Offset: int32(offset)})
+	queryParams, err := buildMonitoringListParams(laID, filter, params, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListMonitoringByLA(ctx, queryParams)
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil monitoring")
 	}
-	total, err := s.queries.CountMonitoringByLA(ctx, laID)
+	total, err := s.queries.CountMonitoringByLA(ctx, queries.CountMonitoringByLAParams{
+		LoanAgreementID: queryParams.LoanAgreementID,
+		Search:          queryParams.Search,
+		BudgetYear:      queryParams.BudgetYear,
+		Quarter:         queryParams.Quarter,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal menghitung monitoring")
 	}
@@ -50,6 +89,43 @@ func (s *MonitoringService) ListMonitoring(ctx context.Context, laID pgtype.UUID
 		data = append(data, toMonitoringResponse(row, komponen))
 	}
 	return listResponse(data, page, limit, total), nil
+}
+
+func buildMonitoringListParams(laID pgtype.UUID, filter model.MonitoringListFilter, params model.PaginationParams, limit, offset int) (queries.ListMonitoringByLAParams, error) {
+	budgetYear, err := optionalInt4(filter.BudgetYear, "budget_year")
+	if err != nil {
+		return queries.ListMonitoringByLAParams{}, err
+	}
+	quarter := pgtype.Text{}
+	if filter.Quarter != nil && strings.TrimSpace(*filter.Quarter) != "" {
+		value := strings.ToUpper(strings.TrimSpace(*filter.Quarter))
+		if value != "TW1" && value != "TW2" && value != "TW3" && value != "TW4" {
+			return queries.ListMonitoringByLAParams{}, validation("quarter", "harus TW1, TW2, TW3, atau TW4")
+		}
+		quarter = pgtype.Text{String: value, Valid: true}
+	}
+	return queries.ListMonitoringByLAParams{
+		LoanAgreementID: laID,
+		Search:          nullableText(params.Search),
+		BudgetYear:      budgetYear,
+		Quarter:         quarter,
+		Limit:           int32(limit),
+		Offset:          int32(offset),
+	}, nil
+}
+
+func optionalBool(value *string, field string) (pgtype.Bool, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return pgtype.Bool{}, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(*value)) {
+	case "true":
+		return pgtype.Bool{Bool: true, Valid: true}, nil
+	case "false":
+		return pgtype.Bool{Bool: false, Valid: true}, nil
+	default:
+		return pgtype.Bool{}, validation(field, "harus true atau false")
+	}
 }
 
 func (s *MonitoringService) GetMonitoring(ctx context.Context, laID, id pgtype.UUID) (*model.MonitoringResponse, error) {
@@ -294,4 +370,20 @@ func absorptionPct(planned, realized float64) float64 {
 		return 0
 	}
 	return math.Round(realized/planned*1000) / 10
+}
+
+func monitoringLoanAgreementResponse(row queries.ListMonitoringLoanAgreementReferencesRow) model.MonitoringLoanAgreementResponse {
+	return model.MonitoringLoanAgreementResponse{
+		ID:                 model.UUIDToString(row.ID),
+		LoanCode:           row.LoanCode,
+		EffectiveDate:      dateString(row.EffectiveDate),
+		IsEffective:        row.IsEffective,
+		Currency:           row.Currency,
+		AmountUSD:          floatFromNumeric(row.AmountUsd),
+		Lender:             model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
+		DKLetterNumber:     stringPtrFromText(row.DkLetterNumber),
+		DKProjectName:      row.DkProjectName,
+		MonitoringCount:    row.MonitoringCount,
+		LatestMonitoringAt: formatMasterTime(row.LatestMonitoringAt),
+	}
 }

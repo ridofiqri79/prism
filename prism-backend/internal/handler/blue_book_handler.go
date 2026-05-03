@@ -19,11 +19,18 @@ func NewBlueBookHandler(service *service.BlueBookService) *BlueBookHandler {
 }
 
 func (h *BlueBookHandler) ListBlueBooks(c echo.Context) error {
-	res, err := h.service.ListBlueBooks(c.Request().Context(), paginationParams(c))
+	res, err := h.service.ListBlueBooks(c.Request().Context(), blueBookListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func blueBookListFilter(c echo.Context) model.BlueBookListFilter {
+	return model.BlueBookListFilter{
+		PeriodIDs: queryStrings(c, "period_id"),
+		Statuses:  queryStrings(c, "status"),
+	}
 }
 
 func (h *BlueBookHandler) GetBlueBook(c echo.Context) error {
@@ -82,11 +89,18 @@ func (h *BlueBookHandler) ListBBProjects(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := h.service.ListBBProjects(c.Request().Context(), bbID, paginationParams(c))
+	res, err := h.service.ListBBProjects(c.Request().Context(), bbID, bbProjectListFilter(c), paginationParams(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func bbProjectListFilter(c echo.Context) model.BBProjectListFilter {
+	return model.BBProjectListFilter{
+		ExecutingAgencyIDs: queryStrings(c, "executing_agency_ids"),
+		LocationIDs:        queryStrings(c, "location_ids"),
+	}
 }
 
 func (h *BlueBookHandler) GetBBProject(c echo.Context) error {
@@ -150,10 +164,27 @@ func (h *BlueBookHandler) DeleteBBProject(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := h.service.DeleteBBProject(c.Request().Context(), bbID, id); err != nil {
+	user, ok := c.Get("user").(*model.AuthUser)
+	if !ok || user == nil {
+		return apperrors.Unauthorized("User tidak ditemukan")
+	}
+	if err := h.service.DeleteBBProject(c.Request().Context(), bbID, id, user); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *BlueBookHandler) GetBBProjectHistory(c echo.Context) error {
+	id, err := parseIDParam(c, "bbProjectId")
+	if err != nil {
+		return err
+	}
+	user, _ := c.Get("user").(*model.AuthUser)
+	res, err := h.service.GetBBProjectHistoryWithAudit(c.Request().Context(), id, user != nil && user.Role == "ADMIN")
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[[]model.BBProjectHistoryItem]{Data: res})
 }
 
 func (h *BlueBookHandler) ImportBBProjects(c echo.Context) error {

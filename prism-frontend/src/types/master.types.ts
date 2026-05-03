@@ -6,6 +6,17 @@ export interface Country {
 
 export type CountryPayload = Omit<Country, 'id'>
 
+export interface Currency {
+  id: string
+  code: string
+  name: string
+  symbol?: string
+  is_active: boolean
+  sort_order: number
+}
+
+export type CurrencyPayload = Omit<Currency, 'id'>
+
 export type LenderType = 'Bilateral' | 'Multilateral' | 'KSA'
 
 export interface Lender {
@@ -27,10 +38,12 @@ export interface LenderPayload {
 export type InstitutionLevel =
   | 'Kementerian/Badan/Lembaga'
   | 'Eselon I'
+  | 'Eselon II'
   | 'BUMN'
-  | 'Pemerintah Daerah'
+  | 'Pemerintah Daerah Tk. I'
+  | 'Pemerintah Daerah Tk. II'
   | 'BUMD'
-  | 'Lainnya'
+  | 'Lainya'
 
 export interface Institution {
   id: string
@@ -39,6 +52,7 @@ export interface Institution {
   level: InstitutionLevel
   parent_id?: string
   parent?: Institution
+  has_children?: boolean
 }
 
 export interface InstitutionPayload {
@@ -56,6 +70,7 @@ export interface Region {
   name: string
   type: RegionType
   parent_code?: string
+  has_children?: boolean
 }
 
 export interface RegionPayload {
@@ -70,6 +85,7 @@ export interface ProgramTitle {
   title: string
   parent_id?: string
   parent?: ProgramTitle
+  has_children?: boolean
 }
 
 export interface ProgramTitlePayload {
@@ -85,6 +101,7 @@ export interface BappenasPartner {
   level: BappenasPartnerLevel
   parent_id?: string
   parent?: BappenasPartner
+  has_children?: boolean
 }
 
 export interface BappenasPartnerPayload {
@@ -150,7 +167,7 @@ export interface ListParams {
   limit?: number
   sort?: string
   order?: 'asc' | 'desc'
-  [key: string]: string | number | boolean | undefined
+  [key: string]: string | string[] | number | number[] | boolean | undefined
 }
 
 export type CreatePayload<T extends { id: string }> = Omit<T, 'id'>

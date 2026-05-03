@@ -1,6 +1,7 @@
 import { reactive, ref, watch } from 'vue'
 import type { ZodError } from 'zod'
 import { gbProjectSchema } from '@/schemas/green-book.schema'
+import type { BBProject } from '@/types/blue-book.types'
 import type {
   GBActivityPayload,
   GBAllocationValues,
@@ -14,10 +15,11 @@ export interface GBProjectFormValues {
   program_title_id: string
   gb_code: string
   project_name: string
-  duration: string
+  duration: number | null
   objective: string
   scope_of_project: string
   bb_project_ids: string[]
+  bappenas_partner_ids: string[]
   executing_agency_ids: string[]
   implementing_agency_ids: string[]
   location_ids: string[]
@@ -30,10 +32,11 @@ function defaultValues(): GBProjectFormValues {
     program_title_id: '',
     gb_code: '',
     project_name: '',
-    duration: '',
+    duration: null,
     objective: '',
     scope_of_project: '',
     bb_project_ids: [],
+    bappenas_partner_ids: [],
     executing_agency_ids: [],
     implementing_agency_ids: [],
     location_ids: [],
@@ -50,6 +53,15 @@ function emptyAllocation(): GBAllocationValues {
   }
 }
 
+function normalizeCurrency(value?: string | null) {
+  return (value || 'USD').trim().toUpperCase()
+}
+
+function normalizeUSDAmount(currency: string, original: number, usd: number) {
+  if (normalizeCurrency(currency) !== 'USD') return usd
+  return original === 0 && usd !== 0 ? usd : original
+}
+
 function fromProject(project?: GBProject | null): Partial<GBProjectFormValues> {
   if (!project) return {}
 
@@ -57,10 +69,11 @@ function fromProject(project?: GBProject | null): Partial<GBProjectFormValues> {
     program_title_id: project.program_title_id ?? project.program_title?.id ?? '',
     gb_code: project.gb_code,
     project_name: project.project_name,
-    duration: project.duration ?? '',
+    duration: project.duration ?? null,
     objective: project.objective ?? '',
     scope_of_project: project.scope_of_project ?? '',
     bb_project_ids: project.bb_projects.map((item) => item.id),
+    bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
     executing_agency_ids: project.executing_agencies.map((item) => item.id),
     implementing_agency_ids: project.implementing_agencies.map((item) => item.id),
     location_ids: project.locations.map((item) => item.id),
@@ -85,6 +98,8 @@ function normalizeActivitySort(rows: GBActivityPayload[]) {
     row.sort_order = index
   })
 }
+
+export type GBProjectSourceMode = 'new' | 'existing'
 
 export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GBProject | null) {
   const initialValues: Partial<GBProjectFormValues> =
@@ -111,6 +126,10 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
       ? initialData.funding_sources.map((item) => ({
           lender_id: item.lender.id,
           institution_id: item.institution?.id ?? null,
+          currency: normalizeCurrency(item.currency),
+          loan_original: item.loan_original ?? item.loan_usd,
+          grant_original: item.grant_original ?? item.grant_usd,
+          local_original: item.local_original ?? item.local_usd,
           loan_usd: item.loan_usd,
           grant_usd: item.grant_usd,
           local_usd: item.local_usd,
@@ -184,6 +203,10 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     fundingSources.value.push({
       lender_id: '',
       institution_id: null,
+      currency: 'USD',
+      loan_original: 0,
+      grant_original: 0,
+      local_original: 0,
       loan_usd: 0,
       grant_usd: 0,
       local_usd: 0,
@@ -233,7 +256,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
   function toPayload(): GBProjectPayload {
     return {
       ...values,
-      duration: values.duration || null,
+      duration: values.duration ?? null,
       objective: values.objective || null,
       scope_of_project: values.scope_of_project || null,
       activities: activities.value.map((item, index) => ({
@@ -245,9 +268,13 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
       funding_sources: fundingSources.value.map((item) => ({
         lender_id: item.lender_id,
         institution_id: item.institution_id || null,
-        loan_usd: item.loan_usd,
-        grant_usd: item.grant_usd,
-        local_usd: item.local_usd,
+        currency: normalizeCurrency(item.currency),
+        loan_original: item.loan_original ?? item.loan_usd,
+        grant_original: item.grant_original ?? item.grant_usd,
+        local_original: item.local_original ?? item.local_usd,
+        loan_usd: normalizeUSDAmount(item.currency, item.loan_original, item.loan_usd),
+        grant_usd: normalizeUSDAmount(item.currency, item.grant_original, item.grant_usd),
+        local_usd: normalizeUSDAmount(item.currency, item.local_original, item.local_usd),
       })),
       disbursement_plan: disbursementPlan.value,
       funding_allocations: activities.value.map((_, index) => ({
@@ -283,6 +310,10 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     fundingSources.value = project.funding_sources.map((item) => ({
       lender_id: item.lender.id,
       institution_id: item.institution?.id ?? null,
+      currency: normalizeCurrency(item.currency),
+      loan_original: item.loan_original,
+      grant_original: item.grant_original,
+      local_original: item.local_original,
       loan_usd: item.loan_usd,
       grant_usd: item.grant_usd,
       local_usd: item.local_usd,
@@ -292,7 +323,9 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
       amount_usd: item.amount_usd,
     }))
     allocationValues.value = project.activities.map((activity) => {
-      const allocation = project.funding_allocations.find((item) => item.gb_activity_id === activity.id)
+      const allocation = project.funding_allocations.find(
+        (item) => item.gb_activity_id === activity.id,
+      )
       return allocation
         ? {
             services: allocation.services,
@@ -303,6 +336,29 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
           }
         : emptyAllocation()
     })
+  }
+
+  function applyBBProjectSource(project: BBProject, mode: GBProjectSourceMode) {
+    const base: Partial<GBProjectFormValues> = {
+      bb_project_ids: [project.id],
+      gb_code: project.bb_code,
+    }
+
+    if (mode === 'existing') {
+      Object.assign(base, {
+        program_title_id: project.program_title_id ?? project.program_title?.id ?? '',
+        project_name: project.project_name,
+        duration: project.duration ?? null,
+        objective: project.objective ?? '',
+        scope_of_project: project.scope_of_work ?? '',
+        bappenas_partner_ids: project.bappenas_partners.map((item) => item.id),
+        executing_agency_ids: project.executing_agencies.map((item) => item.id),
+        implementing_agency_ids: project.implementing_agencies.map((item) => item.id),
+        location_ids: project.locations.map((item) => item.id),
+      })
+    }
+
+    Object.assign(values, base)
   }
 
   return {
@@ -323,5 +379,6 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     allocationValues,
     submit,
     applyProject,
+    applyBBProjectSource,
   }
 }

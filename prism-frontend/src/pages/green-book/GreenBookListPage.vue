@@ -1,26 +1,46 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
+import MultiSelect from 'primevue/multiselect'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { greenBookSchema } from '@/schemas/green-book.schema'
 import { useGreenBookStore } from '@/stores/green-book.store'
-import type { GreenBook, GreenBookPayload } from '@/types/green-book.types'
+import type {
+  GreenBook,
+  GreenBookListParams,
+  GreenBookPayload,
+  GreenBookStatus,
+} from '@/types/green-book.types'
 import { formatGBRevision, toFormErrors, type FormErrors } from './green-book-page-utils'
 
 type GreenBookField = keyof GreenBookPayload
+interface GreenBookFilterState {
+  publish_year: number[]
+  status: GreenBookStatus[]
+}
 
 const greenBookStore = useGreenBookStore()
 const toast = useToast()
 const { can } = usePermission()
 
-const page = ref(1)
-const limit = ref(20)
+const listControls = useListControls<GreenBookFilterState>({
+  initialFilters: {
+    publish_year: [],
+    status: [],
+  },
+  filterLabels: {
+    publish_year: 'Tahun Terbit',
+    status: 'Status',
+  },
+})
 const dialogVisible = ref(false)
 const form = reactive<GreenBookPayload>({
   publish_year: new Date().getFullYear(),
@@ -33,9 +53,24 @@ const columns: ColumnDef[] = [
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
+const statusOptions = ['active', 'superseded']
+const publishYearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years = new Set<number>(greenBookStore.greenBooks.map((greenBook) => greenBook.publish_year))
+
+  for (let year = currentYear - 5; year <= currentYear + 5; year += 1) {
+    years.add(year)
+  }
+
+  return [...years].sort((a, b) => b - a)
+})
+
+function buildListParams(): GreenBookListParams {
+  return listControls.buildParams() as GreenBookListParams
+}
 
 async function loadData() {
-  await greenBookStore.fetchGreenBooks({ page: page.value, limit: limit.value })
+  await greenBookStore.fetchGreenBooks(buildListParams())
 }
 
 function openCreate() {
@@ -57,9 +92,17 @@ async function save() {
   await loadData()
 }
 
-watch([page, limit], () => {
-  void loadData()
-})
+watch(
+  [
+    listControls.page,
+    listControls.limit,
+    listControls.debouncedSearch,
+    () => JSON.stringify(listControls.appliedFilters),
+  ],
+  () => {
+    void loadData()
+  },
+)
 
 onMounted(() => {
   void loadData()
@@ -79,9 +122,43 @@ onMounted(() => {
       </template>
     </PageHeader>
 
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari tahun atau status Green Book"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
+          <MultiSelect
+            v-model="listControls.draftFilters.publish_year"
+            :options="publishYearOptions"
+            placeholder="Semua tahun"
+            filter
+            display="chip"
+            class="w-full"
+          />
+        </label>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Status</span>
+          <MultiSelect
+            v-model="listControls.draftFilters.status"
+            :options="statusOptions"
+            placeholder="Semua status"
+            display="chip"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
+
     <DataTable
-      v-model:page="page"
-      v-model:limit="limit"
+      v-model:page="listControls.page.value"
+      v-model:limit="listControls.limit.value"
       :data="greenBookStore.greenBooks"
       :columns="columns"
       :loading="greenBookStore.loading"

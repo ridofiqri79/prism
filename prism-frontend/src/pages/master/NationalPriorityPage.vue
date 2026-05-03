@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -12,7 +13,7 @@ import { useToast } from '@/composables/useToast'
 import { nationalPrioritySchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { NationalPriority, NationalPriorityPayload } from '@/types/master.types'
-import { toFormErrors, type FormErrors } from './master-page-utils'
+import { toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
 type NationalPriorityField = keyof NationalPriorityPayload
 
@@ -20,32 +21,33 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('title', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<NationalPriority | null>(null)
-const selectedPeriodId = ref<string | null>(null)
+const selectedPeriodIds = ref<string[]>([])
 const form = reactive<NationalPriorityPayload>({ period_id: '', title: '' })
 const errors = ref<FormErrors<NationalPriorityField>>({})
 const columns: ColumnDef[] = [
   { field: 'title', header: 'Judul', sortable: true },
-  { field: 'period', header: 'Periode' },
+  { field: 'period', header: 'Periode', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
-const filteredPriorities = computed(() => {
-  if (!selectedPeriodId.value) return masterStore.nationalPriorities
-  return masterStore.nationalPriorities.filter((priority) => priority.period_id === selectedPeriodId.value)
-})
 
 async function loadData() {
-  await Promise.all([
-    masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' }),
-    masterStore.fetchNationalPriorities(true, {
-      limit: 1000,
-      sort: 'title',
-      order: 'asc',
-      ...(selectedPeriodId.value ? { period_id: selectedPeriodId.value } : {}),
-    }),
-  ])
+  controls.loading.value = true
+  try {
+    const [, priorityResponse] = await Promise.all([
+      masterStore.fetchPeriods(true, { limit: 100, sort: 'year_start', order: 'desc' }),
+      masterStore.fetchNationalPriorities(
+        true,
+        controls.params({ period_id: selectedPeriodIds.value }),
+      ),
+    ])
+    if (priorityResponse) controls.syncMeta(priorityResponse.meta)
+  } finally {
+    controls.loading.value = false
+  }
 }
 
 function periodName(priority: NationalPriority) {
@@ -54,7 +56,10 @@ function periodName(priority: NationalPriority) {
 
 function openCreate() {
   editing.value = null
-  Object.assign(form, { period_id: selectedPeriodId.value ?? '', title: '' })
+  Object.assign(form, {
+    period_id: selectedPeriodIds.value.length === 1 ? selectedPeriodIds.value[0] : '',
+    title: '',
+  })
   errors.value = {}
   dialogVisible.value = true
 }
@@ -93,8 +98,12 @@ function deleteItem(priority: NationalPriority) {
   })
 }
 
-watch(selectedPeriodId, () => {
-  void loadData()
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
+
+watch(selectedPeriodIds, () => {
+  controls.resetAndLoad(loadData)
 })
 
 onMounted(() => {
@@ -110,31 +119,52 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div class="rounded-lg border border-surface-200 bg-white p-4">
-      <label class="block max-w-sm space-y-2">
+    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Prioritas Nasional</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama prioritas" />
+        </span>
+      </label>
+
+      <label class="block space-y-2">
         <span class="text-sm font-medium text-surface-700">Filter Periode</span>
-        <Select
-          v-model="selectedPeriodId"
+        <MultiSelect
+          v-model="selectedPeriodIds"
           :options="masterStore.periods"
           option-label="name"
           option-value="id"
           placeholder="Semua period"
-          show-clear
+          display="chip"
+          :max-selected-labels="2"
+          filter
           class="w-full"
         />
       </label>
     </div>
 
     <DataTable
-      :data="filteredPriorities"
+      :data="masterStore.nationalPriorities"
       :columns="columns"
-      :loading="false"
-      :total="filteredPriorities.length"
-      :page="1"
-      :limit="1000"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @sort="(value) => controls.handleSort(value, loadData)"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'period'">{{ periodName(row as NationalPriority) }}</span>
+        <span
+          v-else-if="column.field === 'title'"
+          class="block max-w-[42rem] whitespace-normal break-words leading-relaxed"
+        >
+          {{ (row as NationalPriority).title }}
+        </span>
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             v-if="can('national_priority', 'update')"

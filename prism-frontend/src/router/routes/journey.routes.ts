@@ -7,7 +7,7 @@ export const journeyRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/journey/ProjectJourneyPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Project Journey',
+      title: 'Perjalanan Proyek',
       permission: { module: 'bb_project', action: 'read' },
     },
   },
@@ -17,7 +17,7 @@ export const journeyRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/journey/ProjectJourneyPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Project Journey',
+      title: 'Perjalanan Proyek',
       permission: { module: 'bb_project', action: 'read' },
     },
   },

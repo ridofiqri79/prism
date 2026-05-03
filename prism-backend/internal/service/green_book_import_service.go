@@ -33,9 +33,10 @@ type greenBookImportProjectDraft struct {
 	gbCode                string
 	projectName           string
 	programTitleID        pgtype.UUID
-	duration              *string
+	duration              *int32
 	objective             *string
 	scopeOfProject        *string
+	gbProjectIdentityID   pgtype.UUID
 	bbProjectIDs          []string
 	executingAgencyIDs    []string
 	implementingAgencyIDs []string
@@ -171,7 +172,7 @@ func (s *GreenBookService) processGreenBookProjectsWorkbook(ctx context.Context,
 
 func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, fileName string) (*model.MasterImportResponse, []string, error) {
 	inputResult := model.MasterImportSheetResult{Sheet: greenBookImportSheetInput}
-	projects, projectsByCode, err := s.parseGreenBookInputRows(ctx, qtx, workbook, lookups, &inputResult)
+	projects, projectsByCode, err := s.parseGreenBookInputRows(ctx, qtx, workbook, lookups, greenBook, &inputResult)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -223,14 +224,24 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 		case draft.failed():
 			addImportError(&inputResult, draft.row, strings.Join(draft.errors, "; "))
 		default:
+			isRevisionSnapshot := draft.gbProjectIdentityID.Valid
+			identityID := draft.gbProjectIdentityID
+			if !identityID.Valid {
+				identity, err := qtx.CreateGBProjectIdentity(ctx)
+				if err != nil {
+					return nil, nil, fromPg(err)
+				}
+				identityID = identity.ID
+			}
 			created, err := qtx.CreateGBProject(ctx, queries.CreateGBProjectParams{
-				GreenBookID:    greenBook.ID,
-				ProgramTitleID: draft.programTitleID,
-				GbCode:         draft.gbCode,
-				ProjectName:    draft.projectName,
-				Duration:       nullableTextPtr(draft.duration),
-				Objective:      nullableTextPtr(draft.objective),
-				ScopeOfProject: nullableTextPtr(draft.scopeOfProject),
+				GreenBookID:         greenBook.ID,
+				GbProjectIdentityID: identityID,
+				ProgramTitleID:      draft.programTitleID,
+				GbCode:              draft.gbCode,
+				ProjectName:         draft.projectName,
+				Duration:            int4Ptr(draft.duration),
+				Objective:           nullableTextPtr(draft.objective),
+				ScopeOfProject:      nullableTextPtr(draft.scopeOfProject),
 			})
 			if err != nil {
 				return nil, nil, fromPg(err)
@@ -249,7 +260,11 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 				return nil, nil, err
 			}
 			createdIDs = append(createdIDs, model.UUIDToString(created.ID))
-			addImportCreated(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.gbCode, draft.projectName))
+			message := "Created new logical GB Project"
+			if isRevisionSnapshot {
+				message = "Created revision snapshot for existing logical GB Project"
+			}
+			addImportCreatedWithMessage(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.gbCode, draft.projectName), message)
 		}
 	}
 
@@ -289,7 +304,7 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 	return response, createdIDs, nil
 }
 
-func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
+func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
 	rows, ok := workbook.importRows(greenBookImportSheetInput, []string{"program_title", "gb_code", "project_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")
@@ -308,13 +323,17 @@ func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *que
 			row:                  row.number,
 			gbCode:               strings.TrimSpace(row.value("gb_code")),
 			projectName:          strings.TrimSpace(row.value("project_name")),
-			duration:             row.optionalString("duration"),
 			objective:            row.optionalString("objective"),
 			scopeOfProject:       row.optionalString("scope_of_project"),
 			activityIndexByNo:    map[string]int{},
 			disbursementYears:    map[int32]struct{}{},
 			allocationByActivity: map[int]model.GBFundingAllocationItem{},
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		if draft.gbCode == "" {
@@ -329,13 +348,20 @@ func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *que
 		seenCodes[codeKey] = struct{}{}
 		projectsByCode[codeKey] = draft
 
-		existing, err := qtx.GetGBProjectByCode(ctx, draft.gbCode)
+		existing, err := qtx.GetGBProjectByGreenBookAndCode(ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: greenBook.ID, Lower: draft.gbCode})
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, nil, apperrors.Internal("Gagal memeriksa GB Code")
 		}
 		if err == nil && existing.ID.Valid {
 			draft.skipExisting = true
 			continue
+		}
+		previous, err := qtx.FindPreviousGBProjectByCodeForGreenBook(ctx, queries.FindPreviousGBProjectByCodeForGreenBookParams{ID: greenBook.ID, Lower: draft.gbCode})
+		if err != nil && err != pgx.ErrNoRows {
+			return nil, nil, apperrors.Internal("Gagal memeriksa histori GB Code")
+		}
+		if err == nil && previous.ID.Valid {
+			draft.gbProjectIdentityID = previous.GbProjectIdentityID
 		}
 
 		if draft.projectName == "" {
@@ -453,7 +479,14 @@ func (s *GreenBookService) parseGreenBookInstitutionRelation(workbook *xlsxWorkb
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(name)]
+		institution, exists, ambiguous := lookups.lookupInstitutionReference(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", name)
@@ -652,7 +685,14 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
-		lender, exists := lookups.lendersByName[normalizeLookupKey(lenderName)]
+		lender, exists, ambiguous := lookups.lookupLenderReference(lenderName)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Lender %q ambigu karena cocok dengan lebih dari satu short_name di master data", lenderName)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Lender %q belum ada di master data", lenderName)
@@ -663,7 +703,14 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 		var institutionID *string
 		institutionKey := ""
 		if institutionName != "" {
-			institution, exists := lookups.institutionsByName[normalizeLookupKey(institutionName)]
+			institution, exists, ambiguous := lookups.lookupInstitutionReference(institutionName)
+			if ambiguous {
+				relation.status = masterImportStatusFailed
+				relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", institutionName)
+				draft.addError(relation.message)
+				relations = append(relations, relation)
+				continue
+			}
 			if !exists {
 				relation.status = masterImportStatusFailed
 				relation.message = fmt.Sprintf("Institution %q belum ada di master data", institutionName)
@@ -675,7 +722,15 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			institutionID = &id
 			institutionKey = id
 		}
-		key := normalizeLookupKey(code) + "|" + model.UUIDToString(lender.ID) + "|" + institutionKey
+		currency, err := parseDKImportCurrency(row.value("currency"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = err.Error()
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		key := normalizeLookupKey(code) + "|" + model.UUIDToString(lender.ID) + "|" + institutionKey + "|" + currency
 		if _, exists := seen[key]; exists {
 			relation.status = masterImportStatusSkip
 			relation.message = "Duplikat relasi di workbook, dilewati"
@@ -690,6 +745,17 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
+		loanOriginal, err := parseImportFloat(row.value("loan_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Loan Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("loan_original") == "" {
+			loanOriginal = loanUSD
+		}
 		grantUSD, err := parseImportFloat(row.value("grant_usd"))
 		if err != nil {
 			relation.status = masterImportStatusFailed
@@ -697,6 +763,17 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			draft.addError(relation.message)
 			relations = append(relations, relation)
 			continue
+		}
+		grantOriginal, err := parseImportFloat(row.value("grant_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Grant Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("grant_original") == "" {
+			grantOriginal = grantUSD
 		}
 		localUSD, err := parseImportFloat(row.value("local_usd"))
 		if err != nil {
@@ -706,10 +783,25 @@ func (s *GreenBookService) parseGreenBookFundingSourceRelation(workbook *xlsxWor
 			relations = append(relations, relation)
 			continue
 		}
+		localOriginal, err := parseImportFloat(row.value("local_original"))
+		if err != nil {
+			relation.status = masterImportStatusFailed
+			relation.message = "Local Original wajib berupa angka"
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
+		if currency == "USD" && row.value("local_original") == "" {
+			localOriginal = localUSD
+		}
 		seen[key] = struct{}{}
 		draft.fundingSources = append(draft.fundingSources, model.GBFundingSourceItem{
 			LenderID:      model.UUIDToString(lender.ID),
 			InstitutionID: institutionID,
+			Currency:      currency,
+			LoanOriginal:  loanOriginal,
+			GrantOriginal: grantOriginal,
+			LocalOriginal: localOriginal,
 			LoanUSD:       loanUSD,
 			GrantUSD:      grantUSD,
 			LocalUSD:      localUSD,

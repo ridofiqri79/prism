@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
@@ -13,7 +14,7 @@ import { useToast } from '@/composables/useToast'
 import { lenderSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Lender, LenderPayload, LenderType } from '@/types/master.types'
-import { toFormErrors, type FormErrors } from './master-page-utils'
+import { toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
 type LenderField = keyof LenderPayload
 
@@ -21,9 +22,11 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('name', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<Lender | null>(null)
+const selectedTypes = ref<LenderType[]>([])
 const form = reactive<LenderPayload>({
   name: '',
   short_name: '',
@@ -36,17 +39,23 @@ const showCountry = computed(() => form.type !== 'Multilateral')
 
 const columns: ColumnDef[] = [
   { field: 'name', header: 'Nama', sortable: true },
-  { field: 'short_name', header: 'Nama Singkat' },
-  { field: 'type', header: 'Tipe' },
-  { field: 'country', header: 'Negara' },
+  { field: 'short_name', header: 'Nama Singkat', sortable: true },
+  { field: 'type', header: 'Tipe', sortable: true },
+  { field: 'country', header: 'Negara', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
 async function loadData() {
-  await Promise.all([
-    masterStore.fetchCountries(true, { limit: 1000, sort: 'name', order: 'asc' }),
-    masterStore.fetchLenders(true, { limit: 1000, sort: 'name', order: 'asc' }),
-  ])
+  controls.loading.value = true
+  try {
+    const [, lendersResponse] = await Promise.all([
+      masterStore.fetchCountries(true, { limit: 100, sort: 'name', order: 'asc' }),
+      masterStore.fetchLenders(true, controls.params({ type: selectedTypes.value })),
+    ])
+    if (lendersResponse) controls.syncMeta(lendersResponse.meta)
+  } finally {
+    controls.loading.value = false
+  }
 }
 
 function openCreate() {
@@ -108,6 +117,14 @@ function deleteItem(lender: Lender) {
 onMounted(() => {
   void loadData()
 })
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
+
+watch(selectedTypes, () => {
+  controls.resetAndLoad(loadData)
+})
 </script>
 
 <template>
@@ -118,13 +135,40 @@ onMounted(() => {
       </template>
     </PageHeader>
 
+    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Lender</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama atau nama singkat" />
+        </span>
+      </label>
+
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Filter Tipe</span>
+        <MultiSelect
+          v-model="selectedTypes"
+          :options="typeOptions"
+          placeholder="Semua tipe"
+          display="chip"
+          :max-selected-labels="2"
+          class="w-full"
+        />
+      </label>
+    </div>
+
     <DataTable
       :data="masterStore.lenders"
       :columns="columns"
-      :loading="false"
-      :total="masterStore.lenders.length"
-      :page="1"
-      :limit="1000"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @sort="(value) => controls.handleSort(value, loadData)"
     >
       <template #body-row="{ row, column }">
         <Tag v-if="column.field === 'type'" :value="row.type" severity="info" rounded />

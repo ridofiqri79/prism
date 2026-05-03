@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -12,11 +13,13 @@ import DisbursementPlanTable from '@/components/green-book/DisbursementPlanTable
 import FundingAllocationTable from '@/components/green-book/FundingAllocationTable.vue'
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
+import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
 import { joinNames } from './green-book-page-utils'
 
 const route = useRoute()
@@ -28,6 +31,7 @@ const { can } = usePermission()
 
 const greenBookId = computed(() => String(route.params.gbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
+const isRevisionHistoryOpen = ref(false)
 const project = computed(() => greenBookStore.currentProject)
 const programTitleName = computed(
   () =>
@@ -35,17 +39,52 @@ const programTitleName = computed(
     masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
     '-',
 )
+const auditRailItems = computed(() =>
+  greenBookStore.projectHistory.flatMap((item) =>
+    (item.audit_entries ?? []).map((entry) => ({
+      ...entry,
+      snapshot_label: item.book_label,
+    })),
+  ),
+)
+const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
-function bbProjectBlueBookId(id: string) {
-  return blueBookStore.projectOptions.find((item) => item.id === id)?.blue_book_id
+function bbProjectBlueBookId(project: BBProjectSummary) {
+  return (
+    project.blue_book_id ??
+    blueBookStore.projectOptions.find((item) => item.id === project.id)?.blue_book_id
+  )
 }
 
 async function loadData() {
   await Promise.all([
     greenBookStore.fetchProject(greenBookId.value, projectId.value),
+    greenBookStore.fetchProjectHistory(projectId.value),
     blueBookStore.fetchProjectOptions(),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
   ])
+}
+
+function historyRoute(item: GBProjectHistoryItem) {
+  return { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } }
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function bbProjectRoute(bbProject: BBProjectSummary) {
+  const bbId = bbProjectBlueBookId(bbProject)
+  return bbId
+    ? { name: 'bb-project-detail', params: { bbId, id: bbProject.id } }
+    : { name: 'blue-books' }
 }
 
 onMounted(() => {
@@ -55,7 +94,10 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader :title="project?.gb_code ?? 'Detail GB Project'" :subtitle="project?.project_name">
+    <PageHeader
+      :title="project?.gb_code ?? 'Detail Proyek Green Book'"
+      :subtitle="project?.project_name"
+    >
       <template #actions>
         <Button
           label="Kembali"
@@ -78,15 +120,26 @@ onMounted(() => {
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
-          <StatusBadge :status="project.status" />
+          <div class="mt-1 flex flex-wrap items-center gap-2">
+            <StatusBadge :status="project.status" />
+            <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
+            <Tag
+              v-else-if="project.has_newer_revision"
+              value="Ada revisi lebih baru"
+              severity="warn"
+              rounded
+            />
+          </div>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Judul Program</p>
           <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Duration</p>
-          <p class="font-semibold text-surface-950">{{ project.duration || '-' }}</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
+          <p class="font-semibold text-surface-950">
+            {{ project.duration ? `${project.duration} bulan` : '-' }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
@@ -94,31 +147,125 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="font-semibold text-surface-950">{{ joinNames(project.implementing_agencies) }}</p>
+          <p class="font-semibold text-surface-950">
+            {{ joinNames(project.implementing_agencies) }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
           <p class="font-semibold text-surface-950">{{ joinNames(project.locations) }}</p>
         </div>
+        <div class="md:col-span-3">
+          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
+          <p class="font-semibold text-surface-950">{{ joinNames(project.bappenas_partners) }}</p>
+        </div>
       </div>
 
       <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <p class="text-xs uppercase tracking-wide text-surface-500">Referensi BB Projects</p>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <RouterLink
             v-for="bbProject in project.bb_projects"
             :key="bbProject.id"
-            :to="
-              bbProjectBlueBookId(bbProject.id)
-                ? { name: 'bb-project-detail', params: { bbId: bbProjectBlueBookId(bbProject.id), id: bbProject.id } }
-                : { name: 'blue-books' }
-            "
-            class="rounded-full border border-surface-200 px-3 py-1.5 text-sm font-medium text-primary"
+            :to="bbProjectRoute(bbProject)"
+            class="inline-flex items-center gap-2 rounded-full border border-surface-200 px-3 py-1.5 text-sm font-medium text-primary"
           >
-            {{ bbProject.bb_code }} - {{ bbProject.project_name }}
+            <span>{{ bbProject.bb_code }} - {{ bbProject.project_name }}</span>
+            <Tag
+              v-if="bbProject.has_newer_revision"
+              value="Ada revisi lebih baru"
+              severity="warn"
+              rounded
+            />
+            <Tag v-else-if="bbProject.is_latest" value="Terbaru" severity="success" rounded />
           </RouterLink>
         </div>
       </div>
+
+      <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
+            <Tag
+              :value="`${greenBookStore.projectHistory.length} snapshot`"
+              severity="secondary"
+              rounded
+            />
+          </div>
+          <Button
+            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
+            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+            severity="secondary"
+            size="small"
+            outlined
+            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
+          />
+        </div>
+        <div
+          v-if="isRevisionHistoryOpen"
+          class="overflow-auto rounded-lg border border-surface-200"
+        >
+          <table class="w-full min-w-[60rem] text-left text-sm">
+            <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+              <tr>
+                <th class="px-4 py-3">Green Book</th>
+                <th class="px-4 py-3">Kode</th>
+                <th class="px-4 py-3">Status Dokumen</th>
+                <th class="px-4 py-3">Snapshot</th>
+                <th class="px-4 py-3">Referensi Blue Book</th>
+                <th class="px-4 py-3">Downstream</th>
+                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
+                <th class="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-100">
+              <tr v-for="item in greenBookStore.projectHistory" :key="item.id">
+                <td class="px-4 py-3 font-medium text-surface-900">{{ item.book_label }}</td>
+                <td class="px-4 py-3 text-surface-700">{{ item.gb_code }}</td>
+                <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
+                    :severity="item.is_latest ? 'success' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td class="px-4 py-3 text-surface-700">
+                  {{ item.bb_projects?.map((bbProject) => bbProject.bb_code).join(', ') || '-' }}
+                </td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
+                    :severity="item.used_by_downstream ? 'info' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
+                  <div v-if="item.last_change_summary">
+                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
+                    <p class="text-xs text-surface-500">
+                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
+                    </p>
+                  </div>
+                  <span v-else>-</span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <Button
+                    as="router-link"
+                    :to="historyRoute(item)"
+                    icon="pi pi-eye"
+                    severity="secondary"
+                    size="small"
+                    outlined
+                    rounded
+                    aria-label="Lihat snapshot"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <Tabs value="0" class="rounded-lg border border-surface-200 bg-white p-2">
         <TabList>
@@ -154,6 +301,8 @@ onMounted(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      <ProjectAuditRail :items="auditRailItems" />
     </div>
   </section>
 </template>

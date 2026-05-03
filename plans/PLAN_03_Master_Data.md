@@ -40,7 +40,7 @@ export const lenderSchema = z.object({
 export const institutionSchema = z.object({
   name: z.string().min(1),
   short_name: z.string().optional(),
-  level: z.enum(['Kementerian/Badan/Lembaga', 'Eselon I', 'BUMN', 'Pemerintah Daerah', 'BUMD', 'Lainnya']),
+  level: z.enum(['Kementerian/Badan/Lembaga', 'Eselon I', 'Eselon II', 'BUMN', 'Pemerintah Daerah Tk. I', 'Pemerintah Daerah Tk. II', 'BUMD', 'Lainya']),
   parent_id: z.string().uuid().optional(),
 })
 
@@ -100,9 +100,9 @@ export const bappenasPartnerSchema = z.object({
 
 ## Task 4 — InstitutionPage.vue
 
-- PrimeVue `<TreeTable>` — Kementerian/Badan/Lembaga sebagai root, Eselon I sebagai child
+- PrimeVue `<TreeTable>` — tampilkan hierarki institution berdasarkan `parent_id`
 - Kolom: name, short_name, level badge, actions
-- Dialog form: name, short_name, level (Select 6 pilihan), parent_id (muncul jika level bukan Kementerian/Badan/Lembaga)
+- Dialog form: name, short_name, level (Select 8 pilihan), parent_id (muncul jika level bukan Kementerian/Badan/Lembaga)
 
 ---
 
@@ -150,7 +150,7 @@ export const bappenasPartnerSchema = z.object({
 - [x] `master.schema.ts` — semua Zod schemas dengan refine
 - [x] `CountryPage.vue`
 - [x] `LenderPage.vue` — conditional country_id field
-- [x] `InstitutionPage.vue` — TreeTable 6 level
+- [x] `InstitutionPage.vue` — TreeTable 8 level
 - [x] `RegionPage.vue` — TreeTable 3 level
 - [x] `ProgramTitlePage.vue` — TreeTable
 - [x] `BappenasPartnerPage.vue` — TreeTable

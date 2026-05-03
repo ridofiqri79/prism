@@ -300,13 +300,16 @@ ORDER BY bb_code ASC;
 
 -- name: CreateBBProject :one
 INSERT INTO bb_project (
-    blue_book_id, program_title_id, bappenas_partner_id,
+    blue_book_id, project_identity_id, program_title_id,
     bb_code, project_name, duration, objective,
     scope_of_work, outputs, outcomes
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 RETURNING *;
+
+-- Mitra Kerja Bappenas disimpan lewat junction:
+-- bb_project_bappenas_partner (bb_project_id, bappenas_partner_id)
 ```
 
 **2. Jangan edit `internal/database/queries/` secara manual**

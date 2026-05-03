@@ -21,9 +21,11 @@ export function formatDate(date?: string | null) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(date))
 }
 
-export function formatDKProjectLabel(project?: { id?: string; objectives?: string | null; label?: string } | null) {
+export function formatDKProjectLabel(
+  project?: { id?: string; project_name?: string | null; objectives?: string | null; label?: string } | null,
+) {
   if (!project) return '-'
-  return project.label || project.objectives || project.id || '-'
+  return project.label || project.project_name || project.objectives || project.id || '-'
 }
 
 export function parseDateModel(value: string) {

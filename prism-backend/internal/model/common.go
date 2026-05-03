@@ -1,10 +1,11 @@
 package model
 
 type PaginationParams struct {
-	Page  int    `query:"page"`
-	Limit int    `query:"limit"`
-	Sort  string `query:"sort"`
-	Order string `query:"order"`
+	Page   int    `query:"page"`
+	Limit  int    `query:"limit"`
+	Sort   string `query:"sort"`
+	Order  string `query:"order"`
+	Search string `query:"search"`
 }
 
 type PaginationMeta struct {
@@ -21,6 +22,11 @@ type ListResponse[T any] struct {
 
 type DataResponse[T any] struct {
 	Data T `json:"data"`
+}
+
+type DataMetaResponse[T any] struct {
+	Data T              `json:"data"`
+	Meta PaginationMeta `json:"meta"`
 }
 
 type ErrorDetail struct {

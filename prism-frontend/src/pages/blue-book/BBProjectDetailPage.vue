@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Tag from 'primevue/tag'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import LoITable from '@/components/blue-book/LoITable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
 import { usePermission } from '@/composables/usePermission'
@@ -15,7 +17,7 @@ import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { LoIPayload } from '@/types/blue-book.types'
+import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import type { BappenasPartner } from '@/types/master.types'
 import { joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
@@ -31,6 +33,7 @@ const { can } = usePermission()
 const blueBookId = computed(() => String(route.params.bbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
+const isRevisionHistoryOpen = ref(false)
 const loiForm = reactive<LoIPayload>({
   lender_id: '',
   subject: '',
@@ -46,29 +49,66 @@ const programTitleName = computed(
     masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
     '-',
 )
-const bappenasPartner = computed(
+const bappenasPartnerNames = computed(
   () =>
-    project.value?.bappenas_partner ??
-    masterStore.bappenasPartners.find((item) => item.id === project.value?.bappenas_partner_id),
+    project.value?.bappenas_partners
+      .map((partner) => {
+        const parent = findPartnerParent(partner)
+        return parent === '-' ? partner.name : `${partner.name} / ${parent}`
+      })
+      .join(', ') || '-',
 )
-const bappenasPartnerParent = computed(() => findPartnerParent(bappenasPartner.value))
 const allowedLenderIds = computed(
   () => project.value?.lender_indications.map((item) => item.lender.id) ?? [],
 )
+const auditRailItems = computed(() =>
+  blueBookStore.projectHistory.flatMap((item) =>
+    (item.audit_entries ?? []).map((entry) => ({
+      ...entry,
+      snapshot_label: historyLabel(item),
+    })),
+  ),
+)
+const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
-  return masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ?? partner.parent?.name ?? '-'
+  return (
+    masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
+    partner.parent?.name ??
+    '-'
+  )
 }
 
 async function loadData() {
   await Promise.all([
     blueBookStore.fetchProject(blueBookId.value, projectId.value),
+    blueBookStore.fetchProjectHistory(projectId.value),
     blueBookStore.fetchLoI(projectId.value),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchLenders(true, { limit: 1000 }),
   ])
+}
+
+function historyRoute(item: BBProjectHistoryItem) {
+  return { name: 'bb-project-detail', params: { bbId: item.blue_book_id, id: item.id } }
+}
+
+function historyLabel(item: BBProjectHistoryItem) {
+  const year = item.revision_year ? ` / ${item.revision_year}` : ''
+  return `${item.book_label} - Rev ${item.revision_number}${year}`
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 function openLoIDialog() {
@@ -106,7 +146,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
-      :title="project?.bb_code ?? 'Detail BB Project'"
+      :title="project?.bb_code ?? 'Detail Proyek Blue Book'"
       :subtitle="project?.project_name"
     >
       <template #actions>
@@ -127,7 +167,7 @@ onMounted(() => {
         <Button
           as="router-link"
           :to="{ name: 'project-journey', params: { bbProjectId: projectId } }"
-          label="Lihat Journey"
+          label="Lihat Perjalanan"
           icon="pi pi-share-alt"
           severity="secondary"
         />
@@ -137,9 +177,18 @@ onMounted(() => {
     <div v-if="project" class="space-y-6">
       <div class="rounded-lg border border-surface-200 bg-white p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div class="space-y-2">
             <p class="text-sm text-surface-500">Status</p>
-            <StatusBadge :status="project.status" />
+            <div class="flex flex-wrap items-center gap-2">
+              <StatusBadge :status="project.status" />
+              <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
+              <Tag
+                v-else-if="project.has_newer_revision"
+                value="Ada revisi lebih baru"
+                severity="warn"
+                rounded
+              />
+            </div>
           </div>
           <div class="text-right">
             <p class="text-sm text-surface-500">Judul Program</p>
@@ -148,20 +197,104 @@ onMounted(() => {
         </div>
       </div>
 
+      <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
+            <Tag
+              :value="`${blueBookStore.projectHistory.length} snapshot`"
+              severity="secondary"
+              rounded
+            />
+          </div>
+          <Button
+            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
+            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+            severity="secondary"
+            size="small"
+            outlined
+            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
+          />
+        </div>
+        <div
+          v-if="isRevisionHistoryOpen"
+          class="overflow-auto rounded-lg border border-surface-200"
+        >
+          <table class="w-full min-w-[56rem] text-left text-sm">
+            <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+              <tr>
+                <th class="px-4 py-3">Blue Book</th>
+                <th class="px-4 py-3">Kode</th>
+                <th class="px-4 py-3">Status Dokumen</th>
+                <th class="px-4 py-3">Snapshot</th>
+                <th class="px-4 py-3">Downstream</th>
+                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
+                <th class="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-100">
+              <tr v-for="item in blueBookStore.projectHistory" :key="item.id">
+                <td class="px-4 py-3 font-medium text-surface-900">{{ historyLabel(item) }}</td>
+                <td class="px-4 py-3 text-surface-700">{{ item.bb_code }}</td>
+                <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
+                    :severity="item.is_latest ? 'success' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td class="px-4 py-3">
+                  <Tag
+                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
+                    :severity="item.used_by_downstream ? 'info' : 'secondary'"
+                    rounded
+                  />
+                </td>
+                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
+                  <div v-if="item.last_change_summary">
+                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
+                    <p class="text-xs text-surface-500">
+                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
+                    </p>
+                  </div>
+                  <span v-else>-</span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <Button
+                    as="router-link"
+                    :to="historyRoute(item)"
+                    icon="pi pi-eye"
+                    severity="secondary"
+                    size="small"
+                    outlined
+                    rounded
+                    aria-label="Lihat snapshot"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.executing_agencies) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.executing_agencies) }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.implementing_agencies) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.implementing_agencies) }}
+          </p>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Bappenas Partner</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
           <p class="mt-1 font-medium text-surface-950">
-            {{ bappenasPartner?.name ?? '-' }}
-            <span class="text-surface-500">/ {{ bappenasPartnerParent }}</span>
+            {{ bappenasPartnerNames }}
           </p>
         </div>
         <div>
@@ -170,14 +303,18 @@ onMounted(() => {
         </div>
         <div class="md:col-span-2">
           <p class="text-xs uppercase tracking-wide text-surface-500">Prioritas Nasional</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.national_priorities) }}</p>
+          <p class="mt-1 font-medium text-surface-950">
+            {{ joinNames(project.national_priorities) }}
+          </p>
         </div>
       </div>
 
       <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Duration</p>
-          <p class="mt-1 text-surface-950">{{ project.duration || '-' }}</p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
+          <p class="mt-1 text-surface-950">
+            {{ project.duration ? `${project.duration} bulan` : '-' }}
+          </p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Objective</p>
@@ -189,7 +326,9 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Outputs / Outcomes</p>
-          <p class="mt-1 text-surface-950">{{ project.outputs || '-' }} / {{ project.outcomes || '-' }}</p>
+          <p class="mt-1 text-surface-950">
+            {{ project.outputs || '-' }} / {{ project.outcomes || '-' }}
+          </p>
         </div>
       </div>
 
@@ -208,9 +347,16 @@ onMounted(() => {
         :can-add="can('bb_project', 'update')"
         @add="openLoIDialog"
       />
+
+      <ProjectAuditRail :items="auditRailItems" />
     </div>
 
-    <Dialog v-model:visible="dialogVisible" modal header="Tambah LoI" class="w-[36rem] max-w-[95vw]">
+    <Dialog
+      v-model:visible="dialogVisible"
+      modal
+      header="Tambah LoI"
+      class="w-[36rem] max-w-[95vw]"
+    >
       <form class="space-y-4" @submit.prevent="saveLoI">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Lender</span>
@@ -228,7 +374,12 @@ onMounted(() => {
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Tanggal</span>
-          <InputText v-model="loiForm.date" type="date" class="w-full" :invalid="Boolean(errors.date)" />
+          <InputText
+            v-model="loiForm.date"
+            type="date"
+            class="w-full"
+            :invalid="Boolean(errors.date)"
+          />
           <small v-if="errors.date" class="text-red-600">{{ errors.date }}</small>
         </label>
         <label class="block space-y-2">

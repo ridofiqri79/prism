@@ -7,6 +7,7 @@ import DatePicker from 'primevue/datepicker'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import CurrencyInput from '@/components/forms/CurrencyInput.vue'
+import CurrencySelect from '@/components/forms/CurrencySelect.vue'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useLAForm } from '@/composables/forms/useLAForm'
@@ -23,6 +24,13 @@ const toast = useToast()
 const loanAgreementId = computed(() => String(route.params.id ?? ''))
 const isEditMode = computed(() => route.name === 'loan-agreement-edit')
 const pageTitle = computed(() => (isEditMode.value ? 'Edit Loan Agreement' : 'Buat Loan Agreement'))
+const sourceDKId = computed(() => queryString(route.query.dk_id))
+const sourceDKProjectId = computed(() => queryString(route.query.dk_project_id))
+const backRoute = computed(() =>
+  sourceDKId.value && !isEditMode.value
+    ? { name: 'daftar-kegiatan-detail', params: { id: sourceDKId.value } }
+    : { name: 'loan-agreements' },
+)
 const form = useLAForm(null, {
   dkProjects: () => loanAgreementStore.dkProjectOptions,
 })
@@ -62,12 +70,28 @@ async function searchDKProjects(event: AutoCompleteCompleteEvent) {
 }
 
 async function loadData() {
-  await loanAgreementStore.fetchDKProjectOptions()
-
   if (isEditMode.value) {
+    await loanAgreementStore.fetchDKProjectOptions()
     const loanAgreement = await loanAgreementStore.fetchLoanAgreement(loanAgreementId.value)
     form.applyLoanAgreement(loanAgreement)
+    return
   }
+
+  if (sourceDKId.value && sourceDKProjectId.value) {
+    const selectedProject = await loanAgreementStore.fetchDKProjectOption(
+      sourceDKId.value,
+      sourceDKProjectId.value,
+    )
+    form.values.dk_project_id = selectedProject.id
+    return
+  }
+
+  await loanAgreementStore.fetchDKProjectOptions()
+}
+
+function queryString(value: unknown) {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
 }
 
 const onSubmit = form.submit(async (values) => {
@@ -96,7 +120,7 @@ onMounted(() => {
           label="Kembali"
           icon="pi pi-arrow-left"
           outlined
-          @click="router.push({ name: 'loan-agreements' })"
+          @click="router.push(backRoute)"
         />
       </template>
     </PageHeader>
@@ -104,20 +128,20 @@ onMounted(() => {
     <form class="space-y-6" @submit.prevent="onSubmit">
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <h2 class="text-lg font-semibold text-surface-950">Referensi DK dan Lender</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Referensi Daftar Kegiatan dan Lender</h2>
           <p class="text-sm text-surface-500">
-            Lender hanya dapat dipilih dari rincian pembiayaan DK Project terkait.
+            Lender hanya dapat dipilih dari rincian pembiayaan Proyek Daftar Kegiatan terkait.
           </p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">DK Project</span>
+            <span class="text-sm font-medium text-surface-700">Proyek Daftar Kegiatan</span>
             <AutoComplete
               v-model="dkProjectModel"
               :suggestions="loanAgreementStore.dkProjectOptions"
               option-label="label"
-              placeholder="Cari objectives atau GB code"
+              placeholder="Cari tujuan atau kode Green Book"
               dropdown
               force-selection
               class="w-full"
@@ -139,7 +163,7 @@ onMounted(() => {
               v-model="form.values.lender_id"
               :allowed-ids="form.allowedLenderIds.value"
               :disabled="!form.values.dk_project_id"
-              placeholder="Pilih DK Project dulu"
+              placeholder="Pilih Proyek Daftar Kegiatan dulu"
             />
             <small v-if="form.errors.lender_id" class="text-red-600">{{ form.errors.lender_id }}</small>
           </label>
@@ -148,7 +172,7 @@ onMounted(() => {
 
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
-          <h2 class="text-lg font-semibold text-surface-950">Informasi Loan</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Informasi Pinjaman</h2>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -159,7 +183,11 @@ onMounted(() => {
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Mata Uang</span>
-            <InputText v-model="form.values.currency" class="w-full" placeholder="JPY" />
+            <CurrencySelect
+              v-model="form.values.currency"
+              :invalid="Boolean(form.errors.currency)"
+              placeholder="Pilih mata uang pinjaman"
+            />
             <small v-if="form.errors.currency" class="text-red-600">{{ form.errors.currency }}</small>
           </label>
           <label class="block space-y-2">
@@ -194,18 +222,20 @@ onMounted(() => {
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Nilai Pinjaman</h2>
-          <p class="text-sm text-surface-500">Konversi ke USD diisi manual oleh Staff.</p>
+          <p class="text-sm text-surface-500">
+            Konversi ke USD diisi manual oleh staf untuk mata uang selain USD.
+          </p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">
-              {{ form.values.currency || 'Currency' }} (mata uang lender)
+              {{ form.values.currency || 'Mata uang pinjaman' }} (mata uang lender)
             </span>
             <CurrencyInput v-model="form.values.amount_original" :currency="form.values.currency || 'USD'" />
             <small v-if="form.errors.amount_original" class="text-red-600">{{ form.errors.amount_original }}</small>
           </label>
-          <label class="block space-y-2">
+          <label v-if="!form.isUSD.value" class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">USD</span>
             <CurrencyInput v-model="form.values.amount_usd" currency="USD" />
             <small v-if="form.errors.amount_usd" class="text-red-600">{{ form.errors.amount_usd }}</small>
@@ -214,7 +244,7 @@ onMounted(() => {
       </section>
 
       <div class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
-        <Button label="Batal" severity="secondary" outlined @click="router.push({ name: 'loan-agreements' })" />
+        <Button label="Batal" severity="secondary" outlined @click="router.push(backRoute)" />
         <Button type="submit" label="Simpan" icon="pi pi-save" :loading="loanAgreementStore.loading" />
       </div>
     </form>

@@ -31,9 +31,10 @@ const isCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
 )
 const expandedGroups = ref<Record<string, boolean>>({
-  'Tahapan Perencanaan': true,
-  'Master Data': true,
-  Administrasi: true,
+  Dashboard: true,
+  'Dokumen Perencanaan': true,
+  Referensi: true,
+  'Akses Admin': true,
 })
 
 const accountLabel = computed(() => auth.user?.email || auth.user?.username || 'PRISM')
@@ -65,9 +66,22 @@ function filterNavigation(items: NavigationItem[]) {
 
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
-    { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-home' },
-    { label: 'Project', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
+    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
+    { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
+  ]),
+)
+
+const dashboardItems = computed<NavigationItem[]>(() =>
+  filterNavigation([
+    { label: 'Beranda Dashboard', to: '/dashboard', icon: 'pi pi-chart-bar' },
+    { label: 'Executive Portfolio', to: '/dashboard/executive-portfolio', icon: 'pi pi-briefcase' },
+    { label: 'Pipeline & Bottleneck', to: '/dashboard/pipeline-bottleneck', icon: 'pi pi-sort-amount-down' },
+    { label: 'Green Book Readiness', to: '/dashboard/green-book-readiness', icon: 'pi pi-check-square' },
+    { label: 'Lender & Financing Mix', to: '/dashboard/lender-financing-mix', icon: 'pi pi-building-columns' },
+    { label: 'K/L Portfolio Performance', to: '/dashboard/kl-portfolio-performance', icon: 'pi pi-sitemap' },
+    { label: 'Loan Agreement & Disbursement', to: '/dashboard/la-disbursement', icon: 'pi pi-chart-line' },
+    { label: 'Data Quality & Governance', to: '/dashboard/data-quality-governance', icon: 'pi pi-shield' },
   ]),
 )
 
@@ -82,10 +96,16 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
       module: 'daftar_kegiatan',
     },
     {
-      label: 'Loan Agreement',
+      label: 'Perjanjian Pinjaman',
       to: '/loan-agreements',
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
+    },
+    {
+      label: 'Monitoring Disbursement',
+      to: '/monitoring',
+      icon: 'pi pi-chart-line',
+      module: 'monitoring_disbursement',
     },
   ]),
 )
@@ -93,7 +113,13 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
 const referenceItems = computed<NavigationItem[]>(() =>
   filterNavigation([
     { label: 'Negara', to: '/master/countries', icon: 'pi pi-globe', module: 'country' },
-    { label: 'Lender', to: '/master/lenders', icon: 'pi pi-building-columns', module: 'lender' },
+    {
+      label: 'Pemberi Pinjaman',
+      to: '/master/lenders',
+      icon: 'pi pi-building-columns',
+      module: 'lender',
+    },
+    { label: 'Mata Uang', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
     { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
     { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {
@@ -103,7 +129,7 @@ const referenceItems = computed<NavigationItem[]>(() =>
       module: 'program_title',
     },
     {
-      label: 'Mitra Bappenas',
+      label: 'Mitra Kerja Bappenas',
       to: '/master/bappenas-partners',
       icon: 'pi pi-users',
       module: 'bappenas_partner',
@@ -133,15 +159,21 @@ const adminAccessItems = computed<NavigationItem[]>(() =>
 const navigationGroups = computed<NavigationGroup[]>(() =>
   [
     {
+      section: 'Utama',
+      label: 'Dashboard',
+      icon: 'pi pi-chart-bar',
+      items: dashboardItems.value,
+    },
+    {
       section: 'Perencanaan',
-      label: 'Tahapan Perencanaan',
+      label: 'Dokumen Perencanaan',
       icon: 'pi pi-compass',
       items: planningDocumentItems.value,
     },
-    { section: 'Data', label: 'Master Data', icon: 'pi pi-database', items: referenceItems.value },
+    { section: 'Data', label: 'Referensi', icon: 'pi pi-database', items: referenceItems.value },
     {
       section: 'Sistem',
-      label: 'Administrasi',
+      label: 'Akses Admin',
       icon: 'pi pi-shield',
       items: adminAccessItems.value,
     },
@@ -165,6 +197,7 @@ const visibleNavigationGroups = computed<NavigationGroup[]>(() => {
 })
 
 function isActive(path: string) {
+  if (path === '/dashboard') return route.path === path
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 
@@ -209,7 +242,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
 <template>
   <aside
     class="prism-sidebar hidden shrink-0 border-r transition-[width] duration-200 lg:flex lg:flex-col"
-    :class="isCollapsed ? 'w-[68px]' : 'w-[260px]'"
+    :class="isCollapsed ? 'w-[68px]' : 'w-[288px]'"
   >
     <div
       class="prism-sidebar-header flex items-center border-b"
@@ -246,7 +279,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
           v-model="searchQuery"
           type="search"
           class="prism-sidebar-search-input h-9 w-full rounded-lg border px-9 pr-16 text-sm outline-none transition"
-          placeholder="Quick search..."
+          placeholder="Cari menu..."
         />
         <span
           class="prism-sidebar-kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]"
@@ -256,7 +289,10 @@ function handleSearchShortcut(event: KeyboardEvent) {
       </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto pb-4" :class="isCollapsed ? 'px-2 py-3' : 'px-3'">
+    <nav
+      class="prism-sidebar-nav flex-1 overflow-y-auto pb-4"
+      :class="isCollapsed ? 'px-2 py-3' : 'px-3'"
+    >
       <div class="space-y-1">
         <RouterLink
           v-for="item in visiblePrimaryItems"
@@ -271,14 +307,16 @@ function handleSearchShortcut(event: KeyboardEvent) {
           :title="isCollapsed ? item.label : undefined"
         >
           <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-          <span v-if="!isCollapsed" class="truncate">{{ item.label }}</span>
+          <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+            {{ item.label }}
+          </span>
         </RouterLink>
       </div>
 
       <section
         v-for="group in visibleNavigationGroups"
         :key="group.label"
-        :class="isCollapsed ? 'mt-3' : 'mt-5'"
+        :class="[isCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
       >
         <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
           {{ group.section }}
@@ -295,7 +333,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
             @click="toggleGroup(group)"
           >
             <i :class="[group.icon, 'shrink-0 text-[13px]']" />
-            <span v-if="!isCollapsed" class="min-w-0 flex-1 truncate">{{ group.label }}</span>
+            <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+              {{ group.label }}
+            </span>
             <i
               v-if="!isCollapsed"
               :class="[
@@ -320,7 +360,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
               :aria-label="item.label"
             >
               <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-              <span class="truncate">{{ item.label }}</span>
+              <span class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+                {{ item.label }}
+              </span>
             </RouterLink>
           </div>
         </div>

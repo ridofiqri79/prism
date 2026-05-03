@@ -41,15 +41,15 @@ SELECT * FROM bb_project WHERE id = $1;
 SELECT * FROM bb_project WHERE bb_code = $1;
 
 -- name: CreateBBProject :one
-INSERT INTO bb_project (blue_book_id, program_title_id, bappenas_partner_id, bb_code, project_name, duration, objective, scope_of_work, outputs, outcomes)
+INSERT INTO bb_project (blue_book_id, project_identity_id, program_title_id, bb_code, project_name, duration, objective, scope_of_work, outputs, outcomes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- name: UpdateBBProject :one
-UPDATE bb_project SET program_title_id=$2, bappenas_partner_id=$3, project_name=$4, duration=$5, objective=$6, scope_of_work=$7, outputs=$8, outcomes=$9, updated_at=NOW()
+UPDATE bb_project SET program_title_id=$2, project_name=$3, duration=$4, objective=$5, scope_of_work=$6, outputs=$7, outcomes=$8, updated_at=NOW()
 WHERE id=$1 RETURNING *;
 
--- name: SoftDeleteBBProject :one
-UPDATE bb_project SET status='deleted', updated_at=NOW() WHERE id=$1 RETURNING *;
+-- name: HardDeleteBBProject :one
+DELETE FROM bb_project WHERE id=$1 RETURNING *;
 
 -- ===== BB INSTITUTIONS =====
 -- name: GetBBProjectInstitutions :many
@@ -134,10 +134,10 @@ Request/response types. Contoh:
 ```go
 type CreateBBProjectRequest struct {
     ProgramTitleID      *string  `json:"program_title_id"`
-    BappenasPartnerID   *string  `json:"bappenas_partner_id"`
+  BappenasPartnerIDs  []string `json:"bappenas_partner_ids"`
     BBCode              string   `json:"bb_code" validate:"required"`
     ProjectName         string   `json:"project_name" validate:"required"`
-    Duration            *string  `json:"duration"`
+    Duration            *int32   `json:"duration"` // jumlah bulan
     Objective           *string  `json:"objective"`
     ScopeOfWork         *string  `json:"scope_of_work"`
     Outputs             *string  `json:"outputs"`
@@ -240,7 +240,8 @@ loi.DELETE("/:id", bbHandler.DeleteLoI, permission.Require("bb_project", "update
 - [x] `internal/service/blue_book_service.go` — CRUD + validasi bisnis + transaksi + SSE
 - [x] `internal/handler/blue_book_handler.go`
 - [x] Routes terdaftar
+- [x] Catatan terkini: delete BB Project memakai hard delete dan ditolak jika masih dipakai GB/DK/LA/Monitoring
 - [x] `POST /bb-projects` dengan bb_code duplikat → 409
 - [x] `POST /bb-projects` dengan EA = IA → diterima bila payload lain valid
 - [x] `POST /bb-projects` sukses → SSE event terkirim
-- [x] `DELETE /blue-books/:bbId/projects/:id` → status `deleted`, record tetap ada di DB
+- [x] `DELETE /blue-books/:bbId/projects/:id` → hard delete; ditolak jika masih ada relasi GB/DK/LA/Monitoring

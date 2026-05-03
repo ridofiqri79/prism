@@ -1,30 +1,47 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
+import Select from 'primevue/select'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
 import MonitoringCard from '@/components/monitoring/MonitoringCard.vue'
-import MonitoringChart from '@/components/monitoring/MonitoringChart.vue'
 import { useConfirm } from '@/composables/useConfirm'
-import { usePagination } from '@/composables/usePagination'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useMonitoringStore } from '@/stores/monitoring.store'
-import type { MonitoringDisbursement } from '@/types/monitoring.types'
+import type { MonitoringDisbursement, MonitoringListParams, Quarter } from '@/types/monitoring.types'
 import { formatDate } from '@/pages/loan-agreement/loan-agreement-page-utils'
 
+const MonitoringChart = defineAsyncComponent(() => import('@/components/monitoring/MonitoringChart.vue'))
 const route = useRoute()
 const router = useRouter()
 const monitoringStore = useMonitoringStore()
-const pagination = usePagination()
 const { can } = usePermission()
 const confirm = useConfirm()
 const toast = useToast()
+interface MonitoringFilterState {
+  budget_year: string
+  quarter: Quarter | ''
+}
+
+const listControls = useListControls<MonitoringFilterState>({
+  initialFilters: {
+    budget_year: '',
+    quarter: '',
+  },
+  filterLabels: {
+    budget_year: 'Tahun Anggaran',
+    quarter: 'Triwulan',
+  },
+})
 
 const loanAgreementId = computed(() => String(route.params.laId ?? ''))
 const currentLA = computed(() => monitoringStore.currentLA)
@@ -37,20 +54,27 @@ const columns: ColumnDef[] = [
   { field: 'budget_year', header: 'Tahun Anggaran' },
   { field: 'quarter', header: 'Triwulan' },
   { field: 'exchange_rate_usd_idr', header: 'USD/IDR' },
-  { field: 'exchange_rate_la_idr', header: 'LA/IDR' },
+  { field: 'exchange_rate_la_idr', header: 'Loan Agreement/IDR' },
   { field: 'planned_usd', header: 'Rencana USD' },
   { field: 'realized_usd', header: 'Realisasi USD' },
   { field: 'absorption_pct', header: 'Penyerapan' },
   { field: 'actions', header: 'Aksi' },
 ]
+const quarterOptions: Array<{ label: string; value: Quarter }> = [
+  { label: 'TW1', value: 'TW1' },
+  { label: 'TW2', value: 'TW2' },
+  { label: 'TW3', value: 'TW3' },
+  { label: 'TW4', value: 'TW4' },
+]
+
+function buildListParams(): MonitoringListParams {
+  return listControls.buildParams() as MonitoringListParams
+}
 
 async function loadData() {
   await Promise.all([
     monitoringStore.fetchLoanAgreement(loanAgreementId.value),
-    monitoringStore.fetchMonitorings(loanAgreementId.value, {
-      page: pagination.page.value,
-      limit: pagination.limit.value,
-    }),
+    monitoringStore.fetchMonitorings(loanAgreementId.value, buildListParams()),
   ])
 }
 
@@ -62,12 +86,14 @@ function deleteMonitoring(row: MonitoringDisbursement) {
 }
 
 watch(
-  () => [pagination.page.value, pagination.limit.value],
+  [
+    listControls.page,
+    listControls.limit,
+    listControls.debouncedSearch,
+    () => JSON.stringify(listControls.appliedFilters),
+  ],
   () => {
-    void monitoringStore.fetchMonitorings(loanAgreementId.value, {
-      page: pagination.page.value,
-      limit: pagination.limit.value,
-    })
+    void monitoringStore.fetchMonitorings(loanAgreementId.value, buildListParams())
   },
 )
 
@@ -84,7 +110,7 @@ onMounted(() => {
     >
       <template #actions>
         <Button
-          label="Kembali ke LA"
+          label="Kembali ke Loan Agreement"
           icon="pi pi-arrow-left"
           outlined
           @click="router.push({ name: 'loan-agreement-detail', params: { id: loanAgreementId } })"
@@ -106,7 +132,7 @@ onMounted(() => {
     </PageHeader>
 
     <Message v-if="isNotEffective" severity="warn" :closable="false">
-      LA belum efektif - monitoring belum bisa diinput. Tanggal efektif:
+      Loan Agreement belum efektif - monitoring belum bisa diinput. Tanggal efektif:
       {{ formatDate(currentLA?.effective_date ?? '') }}
     </Message>
 
@@ -139,9 +165,43 @@ onMounted(() => {
       />
     </div>
 
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari tahun, triwulan, atau komponen"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Tahun Anggaran</span>
+          <InputText
+            v-model="listControls.draftFilters.budget_year"
+            inputmode="numeric"
+            placeholder="Contoh: 2026"
+            class="w-full"
+          />
+        </label>
+        <label class="block space-y-2 xl:col-span-3">
+          <span class="text-sm font-medium text-surface-700">Triwulan</span>
+          <Select
+            v-model="listControls.draftFilters.quarter"
+            :options="quarterOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Semua triwulan"
+            show-clear
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
+
     <DataTable
-      v-model:page="pagination.page.value"
-      v-model:limit="pagination.limit.value"
+      v-model:page="listControls.page.value"
+      v-model:limit="listControls.limit.value"
       :data="monitoringStore.monitorings as unknown as Record<string, unknown>[]"
       :columns="columns"
       :loading="monitoringStore.loading"

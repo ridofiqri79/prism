@@ -105,7 +105,13 @@ type masterImportLookups struct {
 	countriesByCode           map[string]queries.Country
 	countriesByName           map[string]queries.Country
 	lendersByName             map[string]masterImportLenderRef
+	lendersByShortName        map[string]masterImportLenderRef
+	ambiguousLenderShortNames map[string]struct{}
+	institutionsByID          map[string]queries.Institution
 	institutionsByName        map[string]queries.Institution
+	institutionsByPath        map[string]queries.Institution
+	ambiguousInstitutionNames map[string]struct{}
+	institutionScopeKeys      map[string]struct{}
 	regionsByCode             map[string]queries.Region
 	regionsByName             map[string]queries.Region
 	programTitlesByTitle      map[string]queries.ProgramTitle
@@ -207,7 +213,13 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		countriesByCode:           map[string]queries.Country{},
 		countriesByName:           map[string]queries.Country{},
 		lendersByName:             map[string]masterImportLenderRef{},
+		lendersByShortName:        map[string]masterImportLenderRef{},
+		ambiguousLenderShortNames: map[string]struct{}{},
+		institutionsByID:          map[string]queries.Institution{},
 		institutionsByName:        map[string]queries.Institution{},
+		institutionsByPath:        map[string]queries.Institution{},
+		ambiguousInstitutionNames: map[string]struct{}{},
+		institutionScopeKeys:      map[string]struct{}{},
 		regionsByCode:             map[string]queries.Region{},
 		regionsByName:             map[string]queries.Region{},
 		programTitlesByTitle:      map[string]queries.ProgramTitle{},
@@ -220,7 +232,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		gbProjectsByCode:          map[string]queries.ListActiveGBProjectReferencesRow{},
 	}
 
-	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0})
+	countries, err := qtx.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi country")
 	}
@@ -228,7 +240,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addCountry(country)
 	}
 
-	lenders, err := qtx.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}})
+	lenders, err := qtx.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi lender")
 	}
@@ -236,15 +248,16 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addLender(lender.ID, lender.Name, lender.Type, lender.ShortName)
 	}
 
-	institutions, err := qtx.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilter: pgtype.Text{}, ParentIDFilter: pgtype.UUID{}})
+	institutions, err := qtx.ListInstitutions(ctx, queries.ListInstitutionsParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, ParentIDFilter: pgtype.UUID{}, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi institution")
 	}
 	for _, institution := range institutions {
 		lookups.addInstitution(institution)
 	}
+	lookups.rebuildInstitutionPathLookups()
 
-	regions, err := qtx.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilter: pgtype.Text{}, ParentCodeFilter: pgtype.Text{}})
+	regions, err := qtx.ListRegions(ctx, queries.ListRegionsParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, ParentCodeFilter: pgtype.Text{}, Search: pgtype.Text{}, SortField: "type", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi region")
 	}
@@ -252,7 +265,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addRegion(region)
 	}
 
-	programTitles, err := qtx.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0})
+	programTitles, err := qtx.ListProgramTitles(ctx, queries.ListProgramTitlesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi program title")
 	}
@@ -260,7 +273,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addProgramTitle(programTitle)
 	}
 
-	partners, err := qtx.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0})
+	partners, err := qtx.ListBappenasPartners(ctx, queries.ListBappenasPartnersParams{Limit: masterImportListLimit, Offset: 0, LevelFilters: nil, Search: pgtype.Text{}, SortField: "level", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi bappenas partner")
 	}
@@ -268,7 +281,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addBappenasPartner(partner)
 	}
 
-	periods, err := qtx.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0})
+	periods, err := qtx.ListPeriods(ctx, queries.ListPeriodsParams{Limit: masterImportListLimit, Offset: 0, SortField: "year_start", SortOrder: "desc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi period")
 	}
@@ -276,7 +289,7 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 		lookups.addPeriod(period)
 	}
 
-	priorities, err := qtx.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilter: pgtype.UUID{}})
+	priorities, err := qtx.ListNationalPriorities(ctx, queries.ListNationalPrioritiesParams{Limit: masterImportListLimit, Offset: 0, PeriodIDFilters: nil, Search: pgtype.Text{}, SortField: "title", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca referensi national priority")
 	}
@@ -443,19 +456,23 @@ func (s *MasterService) importInstitutions(ctx context.Context, qtx *queries.Que
 				addImportError(&result, row.number, "Level institution tidak valid")
 				continue
 			}
-			if _, exists := lookups.institutionsByName[normalizeLookupKey(name)]; exists {
-				addImportSkipped(&result, row.number, fmt.Sprintf("%s (%s)", name, level))
-				continue
-			}
 
 			parentID := pgtype.UUID{}
 			if parentName != "" {
-				parent, exists := lookups.institutionsByName[normalizeLookupKey(parentName)]
+				parent, exists, ambiguous := lookups.lookupInstitutionReference(parentName)
+				if ambiguous {
+					addImportError(&result, row.number, fmt.Sprintf("Parent Name %q ambigu karena ada lebih dari satu institution dengan nama sama", parentName))
+					continue
+				}
 				if !exists {
 					addImportError(&result, row.number, fmt.Sprintf("Parent Name %q belum ada", parentName))
 					continue
 				}
 				parentID = parent.ID
+			}
+			if lookups.hasInstitutionInScope(name, parentID) {
+				addImportSkipped(&result, row.number, fmt.Sprintf("%s (%s)", name, level))
+				continue
 			}
 
 			created, err := qtx.CreateInstitution(ctx, queries.CreateInstitutionParams{
@@ -983,6 +1000,11 @@ func addImportCreated(result *model.MasterImportSheetResult, row int, label stri
 	addImportRow(result, row, masterImportStatusCreate, label, "")
 }
 
+func addImportCreatedWithMessage(result *model.MasterImportSheetResult, row int, label, message string) {
+	result.Inserted++
+	addImportRow(result, row, masterImportStatusCreate, label, message)
+}
+
 func addImportSkipped(result *model.MasterImportSheetResult, row int, label string) {
 	result.Skipped++
 	addImportRow(result, row, masterImportStatusSkip, label, "Data sudah ada, dilewati")
@@ -1058,14 +1080,18 @@ func normalizeInstitutionLevel(value string) (string, bool) {
 		return "Kementerian/Badan/Lembaga", true
 	case "eselon i":
 		return "Eselon I", true
+	case "eselon ii":
+		return "Eselon II", true
 	case "bumn":
 		return "BUMN", true
-	case "pemerintah daerah":
-		return "Pemerintah Daerah", true
+	case "pemerintah daerah", "pemerintah daerah tk i", "pemerintah daerah tk. i", "pemerintah daerah tingkat i", "pemerintah daerah provinsi":
+		return "Pemerintah Daerah Tk. I", true
+	case "pemerintah daerah tk ii", "pemerintah daerah tk. ii", "pemerintah daerah tingkat ii", "pemerintah daerah kabupaten", "pemerintah daerah kota", "pemerintah daerah kabupaten/kota":
+		return "Pemerintah Daerah Tk. II", true
 	case "bumd":
 		return "BUMD", true
-	case "lainnya":
-		return "Lainnya", true
+	case "lainnya", "lainya":
+		return "Lainya", true
 	default:
 		return "", false
 	}
@@ -1097,6 +1123,22 @@ func parseImportInt(value string) (int, error) {
 		return int(parsed), nil
 	}
 	return strconv.Atoi(value)
+}
+
+func parseImportOptionalPositiveInt32(value string) (*int32, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := parseImportInt(value)
+	if err != nil {
+		return nil, err
+	}
+	if parsed <= 0 || parsed > 2147483647 {
+		return nil, fmt.Errorf("invalid positive int32")
+	}
+	result := int32(parsed)
+	return &result, nil
 }
 
 func shouldEnsureIndonesiaRegion(rows []importRow, lookups *masterImportLookups) bool {
@@ -1135,7 +1177,115 @@ func (l *masterImportLookups) addCountry(country queries.Country) {
 }
 
 func (l *masterImportLookups) addInstitution(institution queries.Institution) {
-	l.institutionsByName[normalizeLookupKey(institution.Name)] = institution
+	if l.institutionsByID == nil {
+		l.institutionsByID = map[string]queries.Institution{}
+	}
+	if l.institutionsByName == nil {
+		l.institutionsByName = map[string]queries.Institution{}
+	}
+	if l.institutionsByPath == nil {
+		l.institutionsByPath = map[string]queries.Institution{}
+	}
+	if l.ambiguousInstitutionNames == nil {
+		l.ambiguousInstitutionNames = map[string]struct{}{}
+	}
+	if l.institutionScopeKeys == nil {
+		l.institutionScopeKeys = map[string]struct{}{}
+	}
+
+	l.institutionsByID[model.UUIDToString(institution.ID)] = institution
+	nameKey := normalizeLookupKey(institution.Name)
+	if existing, exists := l.institutionsByName[nameKey]; exists && model.UUIDToString(existing.ID) != model.UUIDToString(institution.ID) {
+		l.ambiguousInstitutionNames[nameKey] = struct{}{}
+	} else if !exists {
+		l.institutionsByName[nameKey] = institution
+	}
+	l.institutionScopeKeys[institutionScopeKey(institution.Name, institution.ParentID)] = struct{}{}
+	if path := institutionPathLabel(institution, l.institutionsByID); path != "" {
+		l.institutionsByPath[normalizeInstitutionPathKey(path)] = institution
+	}
+}
+
+func (l *masterImportLookups) hasInstitutionInScope(name string, parentID pgtype.UUID) bool {
+	_, exists := l.institutionScopeKeys[institutionScopeKey(name, parentID)]
+	return exists
+}
+
+func (l *masterImportLookups) rebuildInstitutionPathLookups() {
+	l.institutionsByPath = map[string]queries.Institution{}
+	for _, institution := range l.institutionsByID {
+		if path := institutionPathLabel(institution, l.institutionsByID); path != "" {
+			l.institutionsByPath[normalizeInstitutionPathKey(path)] = institution
+		}
+	}
+}
+
+func (l *masterImportLookups) lookupInstitutionByName(name string) (queries.Institution, bool, bool) {
+	nameKey := normalizeLookupKey(name)
+	if _, ambiguous := l.ambiguousInstitutionNames[nameKey]; ambiguous {
+		return queries.Institution{}, false, true
+	}
+	institution, exists := l.institutionsByName[nameKey]
+	return institution, exists, false
+}
+
+func (l *masterImportLookups) lookupInstitutionReference(value string) (queries.Institution, bool, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return queries.Institution{}, false, false
+	}
+	if parsed, err := model.ParseUUID(value); err == nil {
+		institution, exists := l.institutionsByID[model.UUIDToString(parsed)]
+		return institution, exists, false
+	}
+	if strings.Contains(value, ";") {
+		institution, exists := l.institutionsByPath[normalizeInstitutionPathKey(value)]
+		return institution, exists, false
+	}
+	return l.lookupInstitutionByName(value)
+}
+
+func institutionPathLabel(institution queries.Institution, institutionsByID map[string]queries.Institution) string {
+	if strings.TrimSpace(institution.Name) == "" {
+		return ""
+	}
+	parts := []string{strings.TrimSpace(institution.Name)}
+	seen := map[string]struct{}{model.UUIDToString(institution.ID): {}}
+	current := institution
+	for current.ParentID.Valid {
+		parentID := model.UUIDToString(current.ParentID)
+		if _, loop := seen[parentID]; loop {
+			break
+		}
+		parent, exists := institutionsByID[parentID]
+		if !exists {
+			break
+		}
+		parts = append(parts, strings.TrimSpace(parent.Name))
+		seen[parentID] = struct{}{}
+		current = parent
+	}
+	return strings.Join(parts, "; ") + ";"
+}
+
+func normalizeInstitutionPathKey(value string) string {
+	parts := strings.Split(value, ";")
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		key := normalizeLookupKey(part)
+		if key != "" {
+			normalized = append(normalized, key)
+		}
+	}
+	return strings.Join(normalized, "|")
+}
+
+func institutionScopeKey(name string, parentID pgtype.UUID) string {
+	scope := "root"
+	if parentID.Valid {
+		scope = model.UUIDToString(parentID)
+	}
+	return scope + "|" + normalizeLookupKey(name)
 }
 
 func (l *masterImportLookups) addRegion(region queries.Region) {
@@ -1190,12 +1340,49 @@ func (l *masterImportLookups) countryByNameOrCode(value string) (queries.Country
 }
 
 func (l *masterImportLookups) addLender(id pgtype.UUID, name, lenderType string, shortName pgtype.Text) {
-	l.lendersByName[normalizeLookupKey(name)] = masterImportLenderRef{
+	if l.lendersByName == nil {
+		l.lendersByName = map[string]masterImportLenderRef{}
+	}
+	if l.lendersByShortName == nil {
+		l.lendersByShortName = map[string]masterImportLenderRef{}
+	}
+	if l.ambiguousLenderShortNames == nil {
+		l.ambiguousLenderShortNames = map[string]struct{}{}
+	}
+
+	ref := masterImportLenderRef{
 		ID:        id,
 		Name:      name,
 		Type:      lenderType,
 		ShortName: shortName,
 	}
+	l.lendersByName[normalizeLookupKey(name)] = ref
+
+	if !shortName.Valid || strings.TrimSpace(shortName.String) == "" {
+		return
+	}
+	shortNameKey := normalizeLookupKey(shortName.String)
+	if _, ambiguous := l.ambiguousLenderShortNames[shortNameKey]; ambiguous {
+		return
+	}
+	if existing, exists := l.lendersByShortName[shortNameKey]; exists && model.UUIDToString(existing.ID) != model.UUIDToString(id) {
+		l.ambiguousLenderShortNames[shortNameKey] = struct{}{}
+		delete(l.lendersByShortName, shortNameKey)
+		return
+	}
+	l.lendersByShortName[shortNameKey] = ref
+}
+
+func (l *masterImportLookups) lookupLenderReference(value string) (masterImportLenderRef, bool, bool) {
+	key := normalizeLookupKey(value)
+	if lender, exists := l.lendersByName[key]; exists {
+		return lender, true, false
+	}
+	if _, ambiguous := l.ambiguousLenderShortNames[key]; ambiguous {
+		return masterImportLenderRef{}, false, true
+	}
+	lender, exists := l.lendersByShortName[key]
+	return lender, exists, false
 }
 
 func (l *masterImportLookups) regionByNameOrCode(value string) (queries.Region, bool) {

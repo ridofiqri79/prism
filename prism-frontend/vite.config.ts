@@ -7,6 +7,22 @@ const usePolling = process.env.VITE_USE_POLLING === 'true'
 
 export default defineConfig({
   plugins: [tailwindcss(), vue()],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'chart-vendor',
+              test: /node_modules[\\/](echarts|zrender|vue-echarts)[\\/]/,
+              maxSize: 420 * 1024,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

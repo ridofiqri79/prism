@@ -21,6 +21,32 @@ CREATE TABLE country (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE currency (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code        CHAR(3) NOT NULL UNIQUE,
+    name        VARCHAR(255) NOT NULL,
+    symbol      VARCHAR(16),
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order  INT NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO currency (code, name, symbol, is_active, sort_order) VALUES
+('USD', 'United States Dollar', '$', TRUE, 10),
+('EUR', 'Euro', 'EUR', TRUE, 20),
+('JPY', 'Japanese Yen', 'JPY', TRUE, 30),
+('KRW', 'South Korean Won', 'KRW', TRUE, 40),
+('CNY', 'Chinese Yuan', 'CNY', TRUE, 50),
+('AUD', 'Australian Dollar', 'A$', TRUE, 60),
+('CAD', 'Canadian Dollar', 'C$', TRUE, 70),
+('GBP', 'Pound Sterling', 'GBP', TRUE, 80),
+('CHF', 'Swiss Franc', 'CHF', TRUE, 90),
+('SAR', 'Saudi Riyal', 'SAR', TRUE, 100),
+('SGD', 'Singapore Dollar', 'S$', TRUE, 110),
+('IDR', 'Indonesian Rupiah', 'Rp', TRUE, 120),
+('XDR', 'Special Drawing Rights', 'XDR', FALSE, 130);
+
 CREATE TABLE lender (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     country_id  UUID REFERENCES country(id),           -- NULL untuk Multilateral
@@ -40,10 +66,18 @@ CREATE TABLE institution (
     parent_id   UUID REFERENCES institution(id),       -- NULL untuk Kementerian (level parent)
     name        VARCHAR(255) NOT NULL,
     short_name  VARCHAR(100),    
-    level       VARCHAR(50) NOT NULL CHECK (level IN ('Kementerian/Badan/Lembaga', 'Eselon I', 'BUMN', 'Pemerintah Daerah', 'BUMD', 'Lainnya')),
+    level       VARCHAR(50) NOT NULL CHECK (level IN ('Kementerian/Badan/Lembaga', 'Eselon I', 'Eselon II', 'BUMN', 'Pemerintah Daerah Tk. I', 'Pemerintah Daerah Tk. II', 'BUMD', 'Lainya')),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX idx_institution_root_name
+    ON institution (LOWER(BTRIM(name)))
+    WHERE parent_id IS NULL;
+
+CREATE UNIQUE INDEX idx_institution_parent_name
+    ON institution (parent_id, LOWER(BTRIM(name)))
+    WHERE parent_id IS NOT NULL;
 
 CREATE TABLE region (
     id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -98,6 +132,7 @@ CREATE TABLE national_priority (
 CREATE TABLE blue_book (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     period_id        UUID NOT NULL REFERENCES period(id),
+    replaces_blue_book_id UUID REFERENCES blue_book(id),
     publish_date     DATE NOT NULL,
     revision_number  INT NOT NULL DEFAULT 0,
     revision_year    INT,                              -- NULL untuk versi awal
@@ -106,21 +141,28 @@ CREATE TABLE blue_book (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE project_identity (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE bb_project (
     id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     blue_book_id         UUID NOT NULL REFERENCES blue_book(id),
+    project_identity_id  UUID NOT NULL REFERENCES project_identity(id),
     program_title_id     UUID REFERENCES program_title(id),
-    bappenas_partner_id  UUID REFERENCES bappenas_partner(id), -- Eselon II; Eselon I diturunkan dari hierarki
-    bb_code              VARCHAR(50) NOT NULL UNIQUE,
+    bb_code              VARCHAR(50) NOT NULL,
     project_name         VARCHAR(500) NOT NULL,
-    duration             VARCHAR(100),
+    duration             INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objective            TEXT,
     scope_of_work        TEXT,
     outputs              TEXT,
     outcomes             TEXT,
-    status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active')),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (blue_book_id, bb_code)
 );
 
 -- EA & IA Blue Book (multi-select, shared Institution)
@@ -129,6 +171,13 @@ CREATE TABLE bb_project_institution (
     institution_id UUID NOT NULL REFERENCES institution(id),
     role           VARCHAR(30) NOT NULL CHECK (role IN ('Executing Agency', 'Implementing Agency')),
     PRIMARY KEY (bb_project_id, institution_id, role)
+);
+
+-- Mitra Kerja Bappenas Blue Book (multi-select, simpan Eselon II)
+CREATE TABLE bb_project_bappenas_partner (
+    bb_project_id       UUID NOT NULL REFERENCES bb_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (bb_project_id, bappenas_partner_id)
 );
 
 -- Location Blue Book (multi-select)
@@ -188,24 +237,33 @@ CREATE TABLE loi (
 CREATE TABLE green_book (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     publish_year     INT NOT NULL,
+    replaces_green_book_id UUID REFERENCES green_book(id),
     revision_number  INT NOT NULL DEFAULT 0,
     status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE gb_project_identity (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE gb_project (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     green_book_id    UUID NOT NULL REFERENCES green_book(id),
+    gb_project_identity_id UUID NOT NULL REFERENCES gb_project_identity(id),
     program_title_id UUID REFERENCES program_title(id),
-    gb_code          VARCHAR(50) NOT NULL UNIQUE,
+    gb_code          VARCHAR(50) NOT NULL,
     project_name     VARCHAR(500) NOT NULL,
-    duration         VARCHAR(100),
+    duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objective        TEXT,
     scope_of_project TEXT,
-    status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (green_book_id, gb_code)
 );
 
 -- Relasi BB Project <-> GB Project (many-to-many)
@@ -213,6 +271,13 @@ CREATE TABLE gb_project_bb_project (
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     bb_project_id  UUID NOT NULL REFERENCES bb_project(id) ON DELETE CASCADE,
     PRIMARY KEY (gb_project_id, bb_project_id)
+);
+
+-- Mitra Kerja Bappenas Green Book (multi-select, simpan Eselon II)
+CREATE TABLE gb_project_bappenas_partner (
+    gb_project_id       UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (gb_project_id, bappenas_partner_id)
 );
 
 -- EA & IA Green Book (multi-select, shared Institution)
@@ -248,6 +313,10 @@ CREATE TABLE gb_funding_source (
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     lender_id      UUID NOT NULL REFERENCES lender(id),
     institution_id UUID REFERENCES institution(id),    -- Implementing Agency per baris
+    currency       VARCHAR(10) NOT NULL DEFAULT 'USD',
+    loan_original  NUMERIC(20, 2) NOT NULL DEFAULT 0,
+    grant_original NUMERIC(20, 2) NOT NULL DEFAULT 0,
+    local_original NUMERIC(20, 2) NOT NULL DEFAULT 0,
     loan_usd       NUMERIC(20, 2) NOT NULL DEFAULT 0,
     grant_usd      NUMERIC(20, 2) NOT NULL DEFAULT 0,
     local_usd      NUMERIC(20, 2) NOT NULL DEFAULT 0,
@@ -298,7 +367,8 @@ CREATE TABLE dk_project (
     dk_id            UUID NOT NULL REFERENCES daftar_kegiatan(id),
     program_title_id UUID REFERENCES program_title(id),
     institution_id   UUID REFERENCES institution(id),  -- Executing Agency
-    duration         VARCHAR(100),
+    project_name     VARCHAR(500) NOT NULL,
+    duration         INT CHECK (duration IS NULL OR duration > 0), -- durasi proyek dalam bulan
     objectives       TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -309,6 +379,13 @@ CREATE TABLE dk_project_gb_project (
     dk_project_id  UUID NOT NULL REFERENCES dk_project(id) ON DELETE CASCADE,
     gb_project_id  UUID NOT NULL REFERENCES gb_project(id) ON DELETE CASCADE,
     PRIMARY KEY (dk_project_id, gb_project_id)
+);
+
+-- Mitra Kerja Bappenas Daftar Kegiatan (multi-select, simpan Eselon II)
+CREATE TABLE dk_project_bappenas_partner (
+    dk_project_id       UUID NOT NULL REFERENCES dk_project(id) ON DELETE CASCADE,
+    bappenas_partner_id UUID NOT NULL REFERENCES bappenas_partner(id),
+    PRIMARY KEY (dk_project_id, bappenas_partner_id)
 );
 
 -- Location Daftar Kegiatan (multi-select)
@@ -460,7 +537,7 @@ CREATE TABLE user_permission (
     module     VARCHAR(50) NOT NULL,
     -- contoh: 'blue_book' | 'bb_project' | 'green_book' | 'gb_project'
     --         'daftar_kegiatan' | 'dk_project' | 'loan_agreement' | 'monitoring_disbursement'
-    --         'institution' | 'lender' | 'region' | 'national_priority' | 'program_title'
+    --         'institution' | 'lender' | 'currency' | 'region' | 'national_priority' | 'program_title'
     can_create BOOLEAN NOT NULL DEFAULT FALSE,
     can_read   BOOLEAN NOT NULL DEFAULT FALSE,
     can_update BOOLEAN NOT NULL DEFAULT FALSE,
@@ -477,14 +554,26 @@ CREATE TABLE user_permission (
 
 -- Blue Book
 CREATE INDEX idx_bb_project_blue_book      ON bb_project(blue_book_id);
+CREATE INDEX idx_bb_project_identity       ON bb_project(project_identity_id);
+CREATE INDEX idx_bb_project_book_code      ON bb_project(blue_book_id, bb_code);
 CREATE INDEX idx_bb_project_bb_code        ON bb_project(bb_code);
 CREATE INDEX idx_bb_project_status         ON bb_project(status);
+CREATE UNIQUE INDEX idx_blue_book_period_version_with_year
+    ON blue_book(period_id, revision_number, revision_year)
+    WHERE revision_year IS NOT NULL;
+CREATE UNIQUE INDEX idx_blue_book_period_version_without_year
+    ON blue_book(period_id, revision_number)
+    WHERE revision_year IS NULL;
 CREATE INDEX idx_lender_indication_project ON lender_indication(bb_project_id);
 CREATE INDEX idx_loi_project               ON loi(bb_project_id);
 CREATE INDEX idx_loi_lender                ON loi(lender_id);
 
 -- Green Book
+CREATE UNIQUE INDEX idx_green_book_publish_year_revision
+    ON green_book(publish_year, revision_number);
 CREATE INDEX idx_gb_project_green_book     ON gb_project(green_book_id);
+CREATE INDEX idx_gb_project_identity       ON gb_project(gb_project_identity_id);
+CREATE INDEX idx_gb_project_book_code      ON gb_project(green_book_id, gb_code);
 CREATE INDEX idx_gb_project_gb_code        ON gb_project(gb_code);
 CREATE INDEX idx_gb_project_status         ON gb_project(status);
 CREATE INDEX idx_gb_activity_project       ON gb_activity(gb_project_id);
@@ -568,6 +657,36 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION audit_trigger_by_column_fn()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_old_data JSONB;
+    v_new_data JSONB;
+    v_record_data JSONB;
+    v_record_id UUID;
+BEGIN
+    BEGIN
+        v_user_id := current_setting('app.current_user_id', true)::UUID;
+    EXCEPTION WHEN OTHERS THEN
+        v_user_id := NULL;
+    END;
+
+    v_old_data := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE to_jsonb(OLD) END;
+    v_new_data := CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE to_jsonb(NEW) END;
+    v_record_data := COALESCE(v_new_data, v_old_data);
+    v_record_id := (v_record_data ->> TG_ARGV[0])::UUID;
+
+    INSERT INTO audit_log (table_name, record_id, action, old_data, new_data, changed_by)
+    VALUES (TG_TABLE_NAME, v_record_id, TG_OP, v_old_data, v_new_data, v_user_id);
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
 
 -- ============================================================
 -- PASANG TRIGGER KE SEMUA TABEL
@@ -576,6 +695,10 @@ $$;
 -- Master data
 CREATE TRIGGER trg_audit_country
     AFTER INSERT OR UPDATE OR DELETE ON country
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_currency
+    AFTER INSERT OR UPDATE OR DELETE ON currency
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
 CREATE TRIGGER trg_audit_lender
@@ -615,6 +738,22 @@ CREATE TRIGGER trg_audit_bb_project
     AFTER INSERT OR UPDATE OR DELETE ON bb_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
+CREATE TRIGGER trg_audit_bb_project_institution
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_institution
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
+CREATE TRIGGER trg_audit_bb_project_national_priority
+    AFTER INSERT OR UPDATE OR DELETE ON bb_project_national_priority
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('bb_project_id');
+
 CREATE TRIGGER trg_audit_bb_project_cost
     AFTER INSERT OR UPDATE OR DELETE ON bb_project_cost
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
@@ -635,6 +774,22 @@ CREATE TRIGGER trg_audit_green_book
 CREATE TRIGGER trg_audit_gb_project
     AFTER INSERT OR UPDATE OR DELETE ON gb_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_gb_project_bb_project
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_bb_project
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_institution
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_institution
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
+
+CREATE TRIGGER trg_audit_gb_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON gb_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('gb_project_id');
 
 CREATE TRIGGER trg_audit_gb_activity
     AFTER INSERT OR UPDATE OR DELETE ON gb_activity
@@ -660,6 +815,18 @@ CREATE TRIGGER trg_audit_daftar_kegiatan
 CREATE TRIGGER trg_audit_dk_project
     AFTER INSERT OR UPDATE OR DELETE ON dk_project
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_dk_project_gb_project
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_gb_project
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
+
+CREATE TRIGGER trg_audit_dk_project_bappenas_partner
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_bappenas_partner
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
+
+CREATE TRIGGER trg_audit_dk_project_location
+    AFTER INSERT OR UPDATE OR DELETE ON dk_project_location
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('dk_project_id');
 
 CREATE TRIGGER trg_audit_dk_financing_detail
     AFTER INSERT OR UPDATE OR DELETE ON dk_financing_detail

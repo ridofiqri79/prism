@@ -321,7 +321,7 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 - Satu `active` per Period â€” revisi baru â†’ lama jadi `superseded`
 - BB Project adalah snapshot per Blue Book/revisi dan dihubungkan lintas revisi oleh logical identity
 - `bb_code` unik hanya dalam Blue Book yang sama; kode yang sama boleh muncul di revisi lain untuk logical project yang sama
-- Bappenas Partner: simpan Eselon II saja, Eselon I diturunkan dari `parent_id`
+- Mitra Kerja Bappenas: opsional, boleh lebih dari satu; simpan Eselon II saja, Eselon I diturunkan dari `parent_id`
 - National Priority pada proyek Blue Book boleh menggunakan master National Priority dari period mana pun
 
 ### Green Book
@@ -330,6 +330,8 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 - `gb_code` unik hanya dalam Green Book yang sama; kode yang sama boleh muncul di revisi lain untuk logical GB Project yang sama
 - Saat GB dibuat/direvisi, relasi ke BB Project harus memakai versi BB Project terbaru
 - GB Project wajib referensikan minimal 1 BB Project
+- GB Project boleh mereferensikan lebih dari satu BB Project hanya jika seluruh BB Project berasal dari header Blue Book yang sama
+- Satu BB Project boleh dipakai oleh lebih dari satu GB Project
 - `gb_funding_allocation` CASCADE dengan `gb_activity` â€” selalu sinkron
 - Disbursement Plan: total proyek per tahun (bukan per lender), `(gb_project_id, year)` unik
 
@@ -374,11 +376,11 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 |-------|-----------|
 | `country` | Master negara (bukan `negara`) |
 | `lender` | Master lender dengan `country_id`, `short_name` |
-| `institution` | Hierarki Kementerian â†’ Eselon I, level: Kementerian/Badan/Lembaga, Eselon I, BUMN, Pemerintah Daerah, BUMD, Lainnya |
+| `institution` | Hierarki Kementerian â†’ Eselon I, level: Kementerian/Badan/Lembaga, Eselon I, Eselon II, BUMN, Pemerintah Daerah Tk. I, Pemerintah Daerah Tk. II, BUMD, Lainya |
 | `region` | Hierarki wilayah via `type` (COUNTRY/PROVINCE/CITY) + `parent_code` (bukan `parent_id`) |
 | `blue_book` | Header BB, relasi ke `period` |
 | `project_identity` | Identitas logical BB Project lintas revisi |
-| `bb_project` | Snapshot proyek BB, `status: active/deleted`, `bb_code` unik per `blue_book_id` |
+| `bb_project` | Snapshot proyek BB, status hanya `active`; penghapusan proyek memakai hard delete |
 | `lender_indication` | Indikasi lender per BB project, field `remarks` (bukan `keterangan`) |
 | `loi` | LoI per BB project, field `subject/date/letter_number` (bukan `perihal/tanggal/nomor_surat`) |
 | `green_book` | Header GB, tidak pakai `period` |
@@ -472,7 +474,7 @@ Kerjakan **satu plan per sesi**. Selesaikan semua task dan checklist sebelum pin
 | **FE-00** | `plans/PLAN_00_Setup.md` | `vite.config.ts` (Tailwind v4 plugin), `main.css` (@import tailwindcss + tailwindcss-primeui), `theme.ts` (definePreset Aura), `main.ts` (cssLayer: 'theme, base, primevue'), router + semua route files (placeholder), `AppLayout`, `AppSidebar`, `AppTopbar`, `auth.store.ts`, `http.ts` (Axios interceptors) |
 | **FE-01** | `plans/PLAN_01_Foundation.md` | Composables: `usePermission`, `usePagination`, `useToast`, `useConfirm`. Components: `PageHeader`, `DataTable`, `EmptyState`, `StatusBadge`, `CurrencyDisplay`, `ConfirmDialog`. Form components: `LocationMultiSelect`, `InstitutionSelect`, `LenderSelect`, `ProgramTitleSelect`, `NationalPriorityMultiSelect`, `CurrencyInput`. `master.store.ts` + `master.service.ts` + `master.types.ts` |
 | **FE-02** | `plans/PLAN_02_Auth.md` | `LoginPage.vue` fungsional, router guard (requiresAuth + adminOnly), session restore dari localStorage, `UserListPage`, `UserFormPage`, `UserPermissionPage` (permission matrix checkbox), `ForbiddenPage`, `NotFoundPage` |
-| **FE-03** | `plans/PLAN_03_Master_Data.md` | 8 halaman CRUD master: `CountryPage`, `LenderPage` (country_id conditional), `InstitutionPage` (TreeTable 6 level), `RegionPage` (TreeTable COUNTRY/PROVINCE/CITY), `ProgramTitlePage`, `BappenasPartnerPage`, `PeriodPage`, `NationalPriorityPage` (filter by period). `master.schema.ts` dengan Zod refine |
+| **FE-03** | `plans/PLAN_03_Master_Data.md` | 8 halaman CRUD master: `CountryPage`, `LenderPage` (country_id conditional), `InstitutionPage` (TreeTable 8 level), `RegionPage` (TreeTable COUNTRY/PROVINCE/CITY), `ProgramTitlePage`, `BappenasPartnerPage`, `PeriodPage`, `NationalPriorityPage` (filter by period). `master.schema.ts` dengan Zod refine |
 | **FE-04** | `plans/PLAN_04_Blue_Book.md` | `BlueBookListPage`, `BlueBookDetailPage`, `BBProjectFormPage` (5 section: info umum, pihak terlibat, lokasi+prioritas, project cost tabel, lender indication tabel), `BBProjectDetailPage`, LoI dialog, `useBBProjectForm.ts`, komponen: `ProjectCostTable`, `LenderIndicationTable`, `LoITable` |
 | **FE-05** | `plans/PLAN_05_Green_Book.md` | `GBProjectFormPage` (5 tab: info umum, activities, funding source, disbursement plan, funding allocation), `useGBProjectForm.ts` (activitiesâ†”allocationValues sync via `watch`), komponen: `ActivitiesTable` (drag reorder), `FundingSourceTable`, `DisbursementPlanTable`, `FundingAllocationTable` (computed dari activities) |
 | **FE-06** | `plans/PLAN_06_Daftar_Kegiatan.md` | `DKListPage`, `DKDetailPage` (accordion per proyek), `DKProjectFormPage` (4 section: header + financing multi-currency + loan allocation + activity details), `useDKProjectForm.ts` (`allowedLenderIds` computed dari GB funding source + BB lender indication) |

@@ -14,6 +14,19 @@ export const countrySchema = z.object({
     .transform((value) => value.toUpperCase()),
 })
 
+export const currencySchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .length(3, 'Kode harus 3 karakter')
+    .regex(/^[A-Za-z]{3}$/, 'Kode harus berupa huruf ISO 4217')
+    .transform((value) => value.toUpperCase()),
+  name: z.string().trim().min(1, 'Nama wajib diisi'),
+  symbol: z.string().trim().optional(),
+  is_active: z.boolean(),
+  sort_order: z.number().int().min(0, 'Urutan tidak boleh negatif'),
+})
+
 export const lenderSchema = z
   .object({
     name: z.string().min(1, 'Nama wajib diisi'),
@@ -35,10 +48,12 @@ export const institutionSchema = z.object({
   level: z.enum([
     'Kementerian/Badan/Lembaga',
     'Eselon I',
+    'Eselon II',
     'BUMN',
-    'Pemerintah Daerah',
+    'Pemerintah Daerah Tk. I',
+    'Pemerintah Daerah Tk. II',
     'BUMD',
-    'Lainnya',
+    'Lainya',
   ]),
   parent_id: optionalUuid,
 })
@@ -101,3 +116,7 @@ export const greenBookImportFileSchema = masterImportFileSchema.extend({
 })
 
 export const daftarKegiatanImportFileSchema = masterImportFileSchema
+
+export const loanAgreementImportFileSchema = masterImportFileSchema
+
+export const monitoringImportFileSchema = masterImportFileSchema

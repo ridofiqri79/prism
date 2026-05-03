@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import CurrencyInput from '@/components/forms/CurrencyInput.vue'
+import CurrencySelect from '@/components/forms/CurrencySelect.vue'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
 import type { DKFinancingDetailPayload } from '@/types/daftar-kegiatan.types'
 
@@ -17,10 +18,27 @@ const emit = defineEmits<{
 }>()
 
 function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
-  emit(
-    'update:rows',
-    props.rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)),
-  )
+  const next = props.rows.map((row, rowIndex) => {
+    const value = rowIndex === index ? { ...row, ...patch } : { ...row }
+    value.currency = (value.currency || 'USD').trim().toUpperCase()
+    if (value.currency === 'USD') {
+      if (value.amount_original === 0 && value.amount_usd !== 0) value.amount_original = value.amount_usd
+      if (value.grant_original === 0 && value.grant_usd !== 0) value.grant_original = value.grant_usd
+      if (value.counterpart_original === 0 && value.counterpart_usd !== 0) {
+        value.counterpart_original = value.counterpart_usd
+      }
+      value.amount_usd = value.amount_original
+      value.grant_usd = value.grant_original
+      value.counterpart_usd = value.counterpart_original
+    }
+    return value
+  })
+
+  emit('update:rows', next)
+}
+
+function isUSD(row: DKFinancingDetailPayload) {
+  return (row.currency || 'USD').trim().toUpperCase() === 'USD'
 }
 </script>
 
@@ -57,10 +75,9 @@ function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
               />
             </td>
             <td class="px-4 py-3">
-              <InputText
+              <CurrencySelect
                 :model-value="row.currency"
-                class="w-full"
-                maxlength="3"
+                placeholder="Pilih mata uang"
                 @update:model-value="updateRow(index, { currency: String($event ?? '').toUpperCase() })"
               />
             </td>
@@ -86,22 +103,28 @@ function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
               />
             </td>
             <td class="px-4 py-3">
-              <CurrencyInput
+            <CurrencyInput
+                v-if="!isUSD(row)"
                 :model-value="row.amount_usd"
                 @update:model-value="updateRow(index, { amount_usd: $event })"
               />
+              <CurrencyInput v-else :model-value="row.amount_usd" disabled />
             </td>
             <td class="px-4 py-3">
               <CurrencyInput
+                v-if="!isUSD(row)"
                 :model-value="row.grant_usd"
                 @update:model-value="updateRow(index, { grant_usd: $event })"
               />
+              <CurrencyInput v-else :model-value="row.grant_usd" disabled />
             </td>
             <td class="px-4 py-3">
               <CurrencyInput
+                v-if="!isUSD(row)"
                 :model-value="row.counterpart_usd"
                 @update:model-value="updateRow(index, { counterpart_usd: $event })"
               />
+              <CurrencyInput v-else :model-value="row.counterpart_usd" disabled />
             </td>
             <td class="px-4 py-3">
               <InputText
@@ -116,7 +139,7 @@ function updateRow(index: number, patch: Partial<DKFinancingDetailPayload>) {
           </tr>
           <tr v-if="rows.length === 0">
             <td colspan="10" class="px-4 py-6 text-center text-surface-500">
-              Pilih GB Project di header proyek, lalu tambah rincian pembiayaan.
+              Pilih Proyek Green Book di header proyek, lalu tambah rincian pembiayaan.
             </td>
           </tr>
         </tbody>

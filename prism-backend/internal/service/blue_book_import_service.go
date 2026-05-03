@@ -31,12 +31,13 @@ type blueBookImportProjectDraft struct {
 	bbCode                string
 	projectName           string
 	programTitleID        pgtype.UUID
-	bappenasPartnerID     pgtype.UUID
-	duration              *string
+	bappenasPartnerIDs    []string
+	duration              *int32
 	objective             *string
 	scopeOfWork           *string
 	outputs               *string
 	outcomes              *string
+	projectIdentityID     pgtype.UUID
 	executingAgencyIDs    []string
 	implementingAgencyIDs []string
 	locationIDs           []string
@@ -155,7 +156,7 @@ func (s *BlueBookService) processBlueBookProjectsWorkbook(ctx context.Context, b
 
 func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, blueBook queries.GetBlueBookRow, fileName string) (*model.MasterImportResponse, []string, error) {
 	inputResult := model.MasterImportSheetResult{Sheet: blueBookImportSheetInput}
-	projects, projectsByCode, err := s.parseBlueBookInputRows(ctx, qtx, workbook, lookups, &inputResult)
+	projects, projectsByCode, err := s.parseBlueBookInputRows(ctx, qtx, workbook, lookups, blueBook, &inputResult)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -200,13 +201,22 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 		case draft.failed():
 			addImportError(&inputResult, draft.row, strings.Join(draft.errors, "; "))
 		default:
+			isRevisionSnapshot := draft.projectIdentityID.Valid
+			identityID := draft.projectIdentityID
+			if !identityID.Valid {
+				identity, err := qtx.CreateProjectIdentity(ctx)
+				if err != nil {
+					return nil, nil, fromPg(err)
+				}
+				identityID = identity.ID
+			}
 			created, err := qtx.CreateBBProject(ctx, queries.CreateBBProjectParams{
 				BlueBookID:        blueBook.ID,
+				ProjectIdentityID: identityID,
 				ProgramTitleID:    draft.programTitleID,
-				BappenasPartnerID: draft.bappenasPartnerID,
 				BbCode:            draft.bbCode,
 				ProjectName:       draft.projectName,
-				Duration:          nullableTextPtr(draft.duration),
+				Duration:          int4Ptr(draft.duration),
 				Objective:         nullableTextPtr(draft.objective),
 				ScopeOfWork:       nullableTextPtr(draft.scopeOfWork),
 				Outputs:           nullableTextPtr(draft.outputs),
@@ -218,6 +228,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 			req := model.CreateBBProjectRequest{
 				ExecutingAgencyIDs:    draft.executingAgencyIDs,
 				ImplementingAgencyIDs: draft.implementingAgencyIDs,
+				BappenasPartnerIDs:    draft.bappenasPartnerIDs,
 				LocationIDs:           draft.locationIDs,
 				NationalPriorityIDs:   draft.nationalPriorityIDs,
 				ProjectCosts:          draft.projectCosts,
@@ -227,7 +238,11 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 				return nil, nil, err
 			}
 			createdIDs = append(createdIDs, model.UUIDToString(created.ID))
-			addImportCreated(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.bbCode, draft.projectName))
+			message := "Created new logical BB Project"
+			if isRevisionSnapshot {
+				message = "Created revision snapshot for existing logical BB Project"
+			}
+			addImportCreatedWithMessage(&inputResult, draft.row, fmt.Sprintf("%s - %s", draft.bbCode, draft.projectName), message)
 		}
 	}
 
@@ -265,7 +280,7 @@ func (s *BlueBookService) buildBlueBookImportPreview(ctx context.Context, qtx *q
 	return response, createdIDs, nil
 }
 
-func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, result *model.MasterImportSheetResult) ([]*blueBookImportProjectDraft, map[string]*blueBookImportProjectDraft, error) {
+func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, blueBook queries.GetBlueBookRow, result *model.MasterImportSheetResult) ([]*blueBookImportProjectDraft, map[string]*blueBookImportProjectDraft, error) {
 	rows, ok := workbook.importRows(blueBookImportSheetInput, []string{"program_title", "bb_code", "project_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")
@@ -284,12 +299,16 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 			row:         row.number,
 			bbCode:      strings.TrimSpace(row.value("bb_code")),
 			projectName: strings.TrimSpace(row.value("project_name")),
-			duration:    row.optionalString("duration"),
 			objective:   row.optionalString("objective"),
 			scopeOfWork: row.optionalString("scope_of_work"),
 			outputs:     row.optionalString("outputs"),
 			outcomes:    row.optionalString("outcomes"),
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		if draft.bbCode == "" {
@@ -304,13 +323,20 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 		seenCodes[codeKey] = struct{}{}
 		projectsByCode[codeKey] = draft
 
-		existing, err := qtx.GetBBProjectByCode(ctx, draft.bbCode)
+		existing, err := qtx.GetBBProjectByBlueBookAndCode(ctx, queries.GetBBProjectByBlueBookAndCodeParams{BlueBookID: blueBook.ID, Lower: draft.bbCode})
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, nil, apperrors.Internal("Gagal memeriksa BB Code")
 		}
 		if err == nil && existing.ID.Valid {
 			draft.skipExisting = true
 			continue
+		}
+		previous, err := qtx.FindPreviousBBProjectByCodeForBlueBook(ctx, queries.FindPreviousBBProjectByCodeForBlueBookParams{ID: blueBook.ID, Lower: draft.bbCode})
+		if err != nil && err != pgx.ErrNoRows {
+			return nil, nil, apperrors.Internal("Gagal memeriksa histori BB Code")
+		}
+		if err == nil && previous.ID.Valid {
+			draft.projectIdentityID = previous.ProjectIdentityID
 		}
 
 		if draft.projectName == "" {
@@ -326,13 +352,15 @@ func (s *BlueBookService) parseBlueBookInputRows(ctx context.Context, qtx *queri
 			draft.addError(fmt.Sprintf("Program Title %q belum ada di master data", programTitle))
 		}
 
-		partnerName := row.value("bappenas_partner")
+		partnerName := row.value("bappenas_partners")
 		if partnerName != "" {
-			partner, exists := lookups.bappenasPartnersByName[normalizeLookupKey(partnerName)]
-			if !exists {
-				draft.addError(fmt.Sprintf("Bappenas Partner %q belum ada di master data", partnerName))
-			} else {
-				draft.bappenasPartnerID = partner.ID
+			for _, name := range splitImportNames(partnerName) {
+				partner, exists := lookups.bappenasPartnersByName[normalizeLookupKey(name)]
+				if !exists {
+					draft.addError(fmt.Sprintf("Mitra Kerja Bappenas %q belum ada di master data", name))
+					continue
+				}
+				draft.bappenasPartnerIDs = append(draft.bappenasPartnerIDs, model.UUIDToString(partner.ID))
 			}
 		}
 	}
@@ -377,7 +405,14 @@ func (s *BlueBookService) parseBlueBookInstitutionRelation(workbook *xlsxWorkboo
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(name)]
+		institution, exists, ambiguous := lookups.lookupInstitutionReference(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", name)
@@ -626,7 +661,14 @@ func (s *BlueBookService) parseBlueBookLenderIndicationRelation(workbook *xlsxWo
 			relations = append(relations, relation)
 			continue
 		}
-		lender, exists := lookups.lendersByName[normalizeLookupKey(name)]
+		lender, exists, ambiguous := lookups.lookupLenderReference(name)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Lender %q ambigu karena cocok dengan lebih dari satu short_name di master data", name)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Lender %q belum ada di master data", name)
@@ -696,6 +738,20 @@ func parseImportFloat(value string) (float64, error) {
 	}
 	value = strings.ReplaceAll(value, ",", "")
 	return strconv.ParseFloat(value, 64)
+}
+
+func splitImportNames(value string) []string {
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func recalculateImportTotals(response *model.MasterImportResponse) {

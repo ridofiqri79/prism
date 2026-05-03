@@ -1,77 +1,86 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, watch } from 'vue'
 import Button from 'primevue/button'
-import DatePicker from 'primevue/datepicker'
+import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
-import { usePagination } from '@/composables/usePagination'
+import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { LoanAgreement } from '@/types/loan-agreement.types'
-import { formatDate, parseDateModel, toDateString } from './loan-agreement-page-utils'
+import type { LoanAgreement, LoanAgreementListParams } from '@/types/loan-agreement.types'
+import { formatDate } from './loan-agreement-page-utils'
 
 const loanAgreementStore = useLoanAgreementStore()
 const masterStore = useMasterStore()
 const { can } = usePermission()
-const pagination = usePagination()
+interface LAFilterState {
+  lender_id: string | null
+  is_extended: boolean | null
+  closing_date_before: string
+}
 
-const lenderId = ref<string | null>(null)
-const isExtended = ref<boolean | null>(null)
-const closingDateBefore = ref<Date | null>(null)
+const listControls = useListControls<LAFilterState>({
+  initialFilters: {
+    lender_id: null,
+    is_extended: null,
+    closing_date_before: '',
+  },
+  filterLabels: {
+    lender_id: 'Lender',
+    is_extended: 'Status Perpanjangan',
+    closing_date_before: 'Penutupan sebelum',
+  },
+  formatFilterValue: (key, value) => {
+    if (key === 'lender_id' && typeof value === 'string') {
+      return masterStore.lenders.find((lender) => lender.id === value)?.name ?? value
+    }
+    if (key === 'is_extended') {
+      return value ? 'Diperpanjang' : 'Tidak diperpanjang'
+    }
+    return String(value)
+  },
+})
+
 const isExtendedOptions = [
   { label: 'Semua', value: null },
   { label: 'Diperpanjang', value: true },
   { label: 'Tidak diperpanjang', value: false },
 ]
 const columns: ColumnDef[] = [
-  { field: 'loan_code', header: 'Kode Loan' },
+  { field: 'loan_code', header: 'Kode Pinjaman' },
   { field: 'lender', header: 'Lender' },
   { field: 'effective_date', header: 'Tanggal Efektif' },
-  { field: 'closing_date', header: 'Tanggal Closing' },
+  { field: 'closing_date', header: 'Tanggal Penutupan' },
   { field: 'currency', header: 'Mata Uang' },
   { field: 'amount_usd', header: 'Nilai USD' },
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
 
-const closingDateBeforeString = computed(() => toDateString(closingDateBefore.value))
-const filteredRows = computed(() => {
-  return loanAgreementStore.loanAgreements.filter((item) => {
-    if (lenderId.value && item.lender.id !== lenderId.value) return false
-    if (isExtended.value !== null && item.is_extended !== isExtended.value) return false
-    if (closingDateBeforeString.value && item.closing_date > closingDateBeforeString.value) return false
-    return true
-  })
-})
-
-async function loadData() {
-  await loanAgreementStore.fetchLoanAgreements({
-    page: pagination.page.value,
-    limit: 1000,
-    lender_id: lenderId.value || undefined,
-    is_extended: isExtended.value ?? undefined,
-    closing_date_before: closingDateBeforeString.value || undefined,
-  })
+function buildListParams(): LoanAgreementListParams {
+  return listControls.buildParams() as LoanAgreementListParams
 }
 
-function resetFilters() {
-  lenderId.value = null
-  isExtended.value = null
-  closingDateBefore.value = null
+async function loadData() {
+  await loanAgreementStore.fetchLoanAgreements(buildListParams())
 }
 
 watch(
-  [lenderId, isExtended, closingDateBefore],
+  [
+    listControls.page,
+    listControls.limit,
+    listControls.debouncedSearch,
+    () => JSON.stringify(listControls.appliedFilters),
+  ],
   () => {
-    pagination.resetPage()
     void loadData()
   },
-  { deep: true },
 )
 
 onMounted(() => {
@@ -87,51 +96,50 @@ onMounted(() => {
           v-if="can('loan_agreement', 'create')"
           as="router-link"
           :to="{ name: 'loan-agreement-create' }"
-          label="Buat LA"
+          label="Buat Loan Agreement"
           icon="pi pi-plus"
         />
       </template>
     </PageHeader>
 
-    <section class="rounded-lg border border-surface-200 bg-white p-4">
-      <div class="grid gap-4 md:grid-cols-4">
-        <label class="block space-y-2">
+    <SearchFilterBar
+      v-model:search="listControls.search.value"
+      search-placeholder="Cari kode pinjaman atau lender"
+      :active-filters="listControls.activeFilterPills.value"
+      :filter-count="listControls.activeFilterCount.value"
+      @apply="listControls.applyFilters"
+      @reset="listControls.resetFilters"
+      @remove="listControls.removeFilter"
+    >
+      <template #filters>
+        <label class="block space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Lender</span>
-          <LenderSelect v-model="lenderId" placeholder="Semua lender" />
+          <LenderSelect v-model="listControls.draftFilters.lender_id" placeholder="Semua lender" />
         </label>
-        <label class="block space-y-2">
+        <label class="block space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Status Perpanjangan</span>
           <Select
-            v-model="isExtended"
+            v-model="listControls.draftFilters.is_extended"
             :options="isExtendedOptions"
             option-label="label"
             option-value="value"
             class="w-full"
           />
         </label>
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Closing Sebelum Tanggal</span>
-          <DatePicker v-model="closingDateBefore" date-format="yy-mm-dd" show-icon class="w-full" />
+        <label class="block space-y-2 xl:col-span-2">
+          <span class="text-sm font-medium text-surface-700">Penutupan Sebelum Tanggal</span>
+          <InputText v-model="listControls.draftFilters.closing_date_before" type="date" class="w-full" />
         </label>
-        <div class="flex items-end gap-2">
-          <Button
-            :label="isExtended === true ? 'Hanya diperpanjang aktif' : 'Hanya diperpanjang'"
-            :severity="isExtended === true ? 'warn' : 'secondary'"
-            outlined
-            @click="isExtended = isExtended === true ? null : true"
-          />
-          <Button label="Reset" severity="secondary" outlined @click="resetFilters" />
-        </div>
-      </div>
-    </section>
+      </template>
+    </SearchFilterBar>
 
     <DataTable
-      v-model:page="pagination.page.value"
-      v-model:limit="pagination.limit.value"
-      :data="filteredRows as unknown as Record<string, unknown>[]"
+      v-model:page="listControls.page.value"
+      v-model:limit="listControls.limit.value"
+      :data="loanAgreementStore.loanAgreements as unknown as Record<string, unknown>[]"
       :columns="columns"
       :loading="loanAgreementStore.loading"
-      :total="filteredRows.length"
+      :total="loanAgreementStore.total"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'lender'">{{ (row as LoanAgreement).lender?.name || '-' }}</span>

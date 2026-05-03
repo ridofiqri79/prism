@@ -30,3 +30,14 @@ type LoanAgreementResponse struct {
 	CreatedAt           string     `json:"created_at,omitempty"`
 	UpdatedAt           string     `json:"updated_at,omitempty"`
 }
+
+type LoanAgreementSummary struct {
+	ID       string `json:"id"`
+	LoanCode string `json:"loan_code"`
+}
+
+type LoanAgreementListFilter struct {
+	LenderID          *string
+	IsExtended        *string
+	ClosingDateBefore *string
+}

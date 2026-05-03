@@ -32,13 +32,14 @@ export interface PermissionModule {
 }
 
 export const permissionModules: PermissionModule[] = [
-  { module: 'bb_project', label: 'BB Project' },
-  { module: 'gb_project', label: 'GB Project' },
+  { module: 'bb_project', label: 'Proyek Blue Book' },
+  { module: 'gb_project', label: 'Proyek Green Book' },
   { module: 'daftar_kegiatan', label: 'Daftar Kegiatan' },
   { module: 'loan_agreement', label: 'Loan Agreement' },
   { module: 'monitoring_disbursement', label: 'Monitoring Disbursement' },
   { module: 'institution', label: 'Instansi' },
   { module: 'lender', label: 'Lender' },
+  { module: 'currency', label: 'Currency' },
   { module: 'region', label: 'Wilayah' },
   { module: 'national_priority', label: 'Prioritas Nasional' },
   { module: 'program_title', label: 'Judul Program' },

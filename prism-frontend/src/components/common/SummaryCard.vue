@@ -7,10 +7,12 @@ const props = withDefaults(
     value: number | string
     unit?: string
     format?: 'number' | 'currency' | 'percent'
+    compact?: boolean
   }>(),
   {
     unit: '',
     format: 'number',
+    compact: true,
   },
 )
 
@@ -23,7 +25,7 @@ const formattedValue = computed(() => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      notation: 'compact',
+      notation: props.compact ? 'compact' : 'standard',
       maximumFractionDigits: 2,
     }).format(props.value)
   }

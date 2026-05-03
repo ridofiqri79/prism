@@ -3,11 +3,14 @@ import { defineStore } from 'pinia'
 import { GreenBookService } from '@/services/green-book.service'
 import type {
   GBProject,
+  GBProjectHistoryItem,
+  GBProjectListParams,
   GBProjectPayload,
   GreenBook,
+  GreenBookListParams,
   GreenBookPayload,
 } from '@/types/green-book.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const useGreenBookStore = defineStore('greenBook', () => {
   const greenBooks = ref<GreenBook[]>([])
@@ -15,7 +18,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
   const projects = ref<GBProject[]>([])
   const projectOptions = ref<GBProject[]>([])
   const currentProject = ref<GBProject | null>(null)
+  const projectHistory = ref<GBProjectHistoryItem[]>([])
   const loading = ref(false)
+  const historyLoading = ref(false)
   const templateDownloading = ref(false)
   const importPreviewing = ref(false)
   const importExecuting = ref(false)
@@ -31,7 +36,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     }
   }
 
-  async function fetchGreenBooks(params?: ListParams) {
+  async function fetchGreenBooks(params?: GreenBookListParams) {
     return withLoading(async () => {
       const response = await GreenBookService.getGreenBooks(params)
       greenBooks.value = response.data
@@ -61,7 +66,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     await GreenBookService.deleteGreenBook(id)
   }
 
-  async function fetchProjects(greenBookId: string, params?: ListParams) {
+  async function fetchProjects(greenBookId: string, params?: GBProjectListParams) {
     return withLoading(async () => {
       const response = await GreenBookService.getProjects(greenBookId, params)
       projects.value = response.data
@@ -86,6 +91,16 @@ export const useGreenBookStore = defineStore('greenBook', () => {
       currentProject.value = await GreenBookService.getProject(greenBookId, id)
       return currentProject.value
     })
+  }
+
+  async function fetchProjectHistory(id: string) {
+    historyLoading.value = true
+    try {
+      projectHistory.value = await GreenBookService.getGBProjectHistory(id)
+      return projectHistory.value
+    } finally {
+      historyLoading.value = false
+    }
   }
 
   async function createProject(greenBookId: string, data: GBProjectPayload) {
@@ -140,7 +155,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projects.value = []
     projectOptions.value = []
     currentProject.value = null
+    projectHistory.value = []
     loading.value = false
+    historyLoading.value = false
     templateDownloading.value = false
     importPreviewing.value = false
     importExecuting.value = false
@@ -154,7 +171,9 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projects,
     projectOptions,
     currentProject,
+    projectHistory,
     loading,
+    historyLoading,
     templateDownloading,
     importPreviewing,
     importExecuting,
@@ -168,6 +187,7 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     fetchProjects,
     fetchProjectOptions,
     fetchProject,
+    fetchProjectHistory,
     createProject,
     updateProject,
     deleteProject,

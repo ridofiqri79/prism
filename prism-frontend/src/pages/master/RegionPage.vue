@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import TreeTable from 'primevue/treetable'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -14,7 +14,8 @@ import { useToast } from '@/composables/useToast'
 import { regionSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Region, RegionPayload, RegionType } from '@/types/master.types'
-import { buildCodeTree, toFormErrors, type FormErrors } from './master-page-utils'
+import MasterTreeTable from './MasterTreeTable.vue'
+import { buildLazyCodeNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type RegionField = keyof RegionPayload
 
@@ -22,9 +23,13 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('type', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<Region | null>(null)
+const selectedTypes = ref<RegionType[]>([])
+const treeNodes = ref<AppTreeNode<Region>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<RegionPayload>({
   code: '',
   name: '',
@@ -34,14 +39,49 @@ const form = reactive<RegionPayload>({
 const errors = ref<FormErrors<RegionField>>({})
 const typeOptions: RegionType[] = ['COUNTRY', 'PROVINCE', 'CITY']
 const showParent = computed(() => form.type !== 'COUNTRY')
-const treeNodes = computed(() => buildCodeTree(masterStore.regions))
 const parentOptions = computed(() => {
   const allowedType: RegionType = form.type === 'CITY' ? 'PROVINCE' : 'COUNTRY'
   return masterStore.regions.filter((region) => region.type === allowedType && region.id !== editing.value?.id)
 })
 
 async function loadData() {
-  await masterStore.fetchRegions(true, { limit: 1000, sort: 'code', order: 'asc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchRegionTree(
+      controls.params({ type: selectedTypes.value }),
+    )
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyCodeNodes(response.data)
+    expandedKeys.value = {}
+  } finally {
+    controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchRegions(true, { limit: 10000, sort: 'type', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<Region>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchRegionTree(
+      controls.params({
+        type: selectedTypes.value,
+        parent_code: node.data.code,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyCodeNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
+  }
 }
 
 function openCreate() {
@@ -88,19 +128,27 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(region: Region) {
   confirm.confirmDelete(`region ${region.name}`, async () => {
     await masterStore.deleteRegion(region.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Wilayah berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
+})
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
+
+watch(selectedTypes, () => {
+  controls.resetAndLoad(loadData)
 })
 </script>
 
@@ -112,10 +160,45 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
-      <Column field="code" header="Kode" expander />
-      <Column field="name" header="Nama" />
-      <Column field="type" header="Tipe">
+    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Wilayah</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama wilayah" />
+        </span>
+      </label>
+
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Filter Level</span>
+        <MultiSelect
+          v-model="selectedTypes"
+          :options="typeOptions"
+          placeholder="Semua level"
+          display="chip"
+          :max-selected-labels="2"
+          class="w-full"
+        />
+      </label>
+    </div>
+
+    <MasterTreeTable
+      :value="treeNodes"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<Region>)"
+      @sort="(value) => controls.handleSort(value, loadData)"
+    >
+      <Column field="code" header="Kode" sortable expander />
+      <Column field="name" header="Nama" sortable />
+      <Column field="type" header="Tipe" sortable>
         <template #body="{ node }">
           <Tag :value="node.data.type" severity="info" rounded />
         </template>
@@ -143,7 +226,7 @@ onMounted(() => {
           </div>
         </template>
       </Column>
-    </TreeTable>
+    </MasterTreeTable>
 
     <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Wilayah' : 'Tambah Wilayah'" class="w-[36rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">

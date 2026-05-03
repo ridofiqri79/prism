@@ -51,6 +51,9 @@ prism-frontend/
 │   │       ├── daftar-kegiatan.routes.ts
 │   │       ├── loan-agreement.routes.ts
 │   │       ├── monitoring.routes.ts
+│   │       ├── dashboard.routes.ts
+│   │       ├── project.routes.ts
+│   │       ├── journey.routes.ts
 │   │       └── user.routes.ts
 │   │
 │   ├── stores/                        # Pinia stores
@@ -60,8 +63,10 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.store.ts
 │   │   ├── loan-agreement.store.ts
 │   │   ├── monitoring.store.ts
+│   │   ├── project.store.ts           # Project master list + filters
+│   │   ├── journey.store.ts           # Perjalanan Proyek, search, loading/error state
 │   │   ├── master.store.ts            # Lender, institution, region, dll (cached)
-│   │   └── notification.store.ts     # SSE events
+│   │   └── user.store.ts              # User + permission state
 │   │
 │   ├── services/                      # Axios API calls — satu file per modul
 │   │   ├── http.ts                    # Axios instance + interceptors
@@ -71,13 +76,16 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.service.ts
 │   │   ├── loan-agreement.service.ts
 │   │   ├── monitoring.service.ts
+│   │   ├── dashboard.service.ts
+│   │   ├── project.service.ts
 │   │   ├── master.service.ts
 │   │   └── user.service.ts
 │   │
 │   ├── composables/                   # Reusable logic (Composition API)
 │   │   ├── useAuth.ts                 # Login, logout, cek permission
 │   │   ├── usePermission.ts           # can('bb_project', 'create') helper
-│   │   ├── usePagination.ts           # Pagination state & handler
+│   │   ├── usePagination.ts           # Pagination sederhana untuk flow lama/non-list
+│   │   ├── useListControls.ts         # Search, filter draft/applied, pagination, sort, active pills untuk list server-side
 │   │   ├── useSSE.ts                  # Subscribe/unsubscribe SSE events
 │   │   ├── useToast.ts                # Wrapper PrimeVue toast
 │   │   ├── useConfirm.ts              # Wrapper dialog konfirmasi delete
@@ -97,7 +105,10 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.types.ts
 │   │   ├── loan-agreement.types.ts
 │   │   ├── monitoring.types.ts
-│   │   └── master.types.ts  # Country, Lender, Institution, Region, dll
+│   │   ├── dashboard.types.ts           # Dashboard + Perjalanan Proyek response types
+│   │   ├── project.types.ts             # Project master list/search types
+│   │   ├── user.types.ts
+│   │   └── master.types.ts              # Country, Currency, Lender, Institution, Region, dll
 │   │
 │   ├── schemas/                       # Zod validation schemas — satu file per modul
 │   │   ├── blue-book.schema.ts
@@ -147,6 +158,7 @@ prism-frontend/
 │   │   │   └── LAFormPage.vue
 │   │   │
 │   │   ├── monitoring/
+│   │   │   ├── MonitoringOverviewPage.vue
 │   │   │   ├── MonitoringListPage.vue
 │   │   │   └── MonitoringFormPage.vue
 │   │   │
@@ -155,6 +167,7 @@ prism-frontend/
 │   │   │
 │   │   ├── master/
 │   │   │   ├── LenderPage.vue
+│   │   │   ├── CurrencyPage.vue
 │   │   │   ├── InstitutionPage.vue
 │   │   │   ├── RegionPage.vue
 │   │   │   ├── ProgramTitlePage.vue
@@ -170,9 +183,11 @@ prism-frontend/
 │   └── components/                    # Reusable components
 │       ├── common/
 │       │   ├── DataTable.vue          # Wrapper PrimeVue DataTable dengan pagination
+│       │   ├── ListPaginationFooter.vue # Footer pagination reusable untuk DataTable dan tabel custom
+│       │   ├── SearchFilterBar.vue    # Search + filter drawer standar untuk halaman paginated
 │       │   ├── TableReloadShell.vue   # Shell animasi reload tabel yang mempertahankan data lama
 │       │   ├── PageHeader.vue         # Title + breadcrumb + action button
-│       │   ├── StatusBadge.vue        # Badge status active/deleted/extended
+│       │   ├── StatusBadge.vue        # Badge status reusable per modul
 │       │   ├── CurrencyDisplay.vue    # Format angka USD / IDR / mata uang lender
 │       │   ├── EmptyState.vue         # Empty state reusable
 │       │   └── ConfirmDialog.vue      # Dialog konfirmasi delete
@@ -181,6 +196,7 @@ prism-frontend/
 │       │   ├── LocationMultiSelect.vue    # Multi-select region dengan hierarki
 │       │   ├── InstitutionSelect.vue      # Select institution dengan filter level
 │       │   ├── LenderSelect.vue           # Select lender dengan filter type
+│       │   ├── CurrencySelect.vue         # Select currency dari Master Currency aktif
 │       │   ├── ProgramTitleSelect.vue     # Select program title (parent-child)
 │       │   ├── NationalPriorityMultiSelect.vue
 │       │   └── CurrencyInput.vue          # Input angka dengan format currency
@@ -194,7 +210,7 @@ prism-frontend/
 │       ├── green-book/
 │       │   ├── GBProjectCard.vue
 │       │   ├── ActivitiesTable.vue        # Tabel activities (editable, dengan sort_order)
-│       │   ├── FundingSourceTable.vue     # Tabel funding source cofinancing (editable)
+│       │   ├── FundingSourceTable.vue     # Tabel funding source cofinancing + currency/original/USD
 │       │   ├── DisbursementPlanTable.vue  # Tabel disbursement plan per tahun (editable)
 │       │   └── FundingAllocationTable.vue # Tabel alokasi per activity (editable)
 │       │
@@ -243,9 +259,24 @@ Component re-render via reactivity
 ## Pola Global Reload Tabel
 
 - Gunakan `src/components/common/DataTable.vue` untuk tabel list standar; komponen ini sudah mempertahankan data lama saat `loading` dan menampilkan animasi reload yang sama di semua halaman.
+- DataTable list standar harus meneruskan `page`, `limit`, `total`, `sort`, dan `order` dari API/store agar pagination server-side, sorting header, dan resize column tetap konsisten.
+- `DataTable.vue` wajib memakai `src/components/common/ListPaginationFooter.vue`. Tabel custom seperti Project dan detail Daftar Kegiatan juga memakai `ListPaginationFooter.vue`, bukan `Paginator` page-local.
 - Untuk tabel custom, bungkus markup tabel dengan `src/components/common/TableReloadShell.vue` dan kirim `refreshing` saat data sedang di-fetch ulang.
 - Skeleton hanya untuk load awal ketika data belum ada. Saat search/filter/pagination memicu fetch ulang, tabel lama tetap tampil dengan opacity transition dan indikator reload global.
 - Jika tabel custom perlu animasi baris, gunakan `<TransitionGroup name="prism-table-row-fade">` agar timing dan geraknya konsisten dengan tabel lain.
+
+## Pola Search, Filter, dan Pagination
+
+- Halaman yang memiliki tabel paginated dan filter wajib memakai `src/components/common/SearchFilterBar.vue` di atas `DataTable.vue` atau tabel custom paginated.
+- State list wajib memakai `src/composables/useListControls.ts` untuk `page`, `limit`, `sort`, `order`, `search`, draft filters, applied filters, active pills, debounce search, apply/reset/remove filter, dan build params.
+- Search bar tampil full-width sebagai kontrol utama, tanpa label visual terpisah. Gunakan placeholder yang eksplisit dan ikon `pi pi-search` terintegrasi, tetapi input box tetap mengikuti styling standar `InputText` PrimeVue seperti field lain.
+- Search auto-apply dengan debounce pendek. Saat search berubah, reset page ke `1` dan kirim parameter `search` ke endpoint list agar pagination tetap server-side.
+- Filter lanjutan dibuka lewat tombol `Filter` di dalam surface yang sama. Panel harus in-place, bukan modal/pop-up terpisah, agar konteks tabel tidak terputus.
+- Isi panel memakai grid responsif `xl:grid-cols-6`. Setiap field boleh memakai `xl:col-span-*` sesuai kompleksitas, tetapi layout harus tetap rapi dan tidak membuat card bersarang.
+- Nilai filter dropdown disiapkan sebagai draft. Terapkan filter hanya ketika user menekan `Terapkan`; tombol `Reset` membersihkan search, draft filter, applied filter, active pills, dan mengembalikan page ke `1`.
+- Filter dropdown yang sudah diterapkan wajib muncul sebagai pill aktif langsung di bawah search bar. Search cukup tetap terlihat di input, tidak perlu dibuat pill terpisah. Pill menampilkan nama filter dan ringkasan nilai, serta bisa diklik untuk menghapus filter tersebut lalu refetch page `1`.
+- Query parameter multi-value memakai salah satu format yang diterima API: repeated query (`ids=a&ids=b`), comma-separated (`ids=a,b`), atau array suffix (`ids[]=a&ids[]=b`). Jangan mengambil semua data lalu filter lokal jika endpoint sudah paginated.
+- Target list yang wajib mengikuti pola ini: Project (`/projects`), Blue Book list dan project detail, Green Book list dan project detail, Daftar Kegiatan list dan project detail, Loan Agreement list, dan Monitoring list.
 
 ---
 
@@ -670,7 +701,7 @@ export const gbProjectSchema = z.object({
   program_title_id:    z.string().uuid('Program Title wajib dipilih'),
   gb_code:             z.string().min(1, 'GB Code wajib diisi'),
   project_name:        z.string().min(1, 'Nama proyek wajib diisi'),
-  duration:            z.string().optional(),
+  duration:            z.number().int().positive().optional().nullable(),
   objective:           z.string().optional(),
   scope_of_project:    z.string().optional(),
   bb_project_ids:      z.array(z.string().uuid()).min(1, 'Minimal 1 BB Project'),
@@ -681,6 +712,8 @@ export const gbProjectSchema = z.object({
 
 export type GBProjectFormValues = z.infer<typeof gbProjectSchema>
 ```
+
+`LocationMultiSelect` wajib memuat seluruh level region (`COUNTRY`, `PROVINCE`, `CITY`) melalui `fetchAllRegionLevels()`, bukan hanya daftar default/paginated. Durasi proyek di form BB Project, GB Project, dan DK Project adalah angka bulan (`number | null`) dan dikirim sebagai integer. Currency mulai dicatat pada Funding Source Green Book dengan `CurrencySelect` dari Master Currency aktif; jika currency `USD`, form tidak meminta input USD terpisah dan payload menyamakan nilai USD dengan nilai original. Pada DK Project, picker `GB Project` ditempatkan paling atas dan perubahan pilihan memanggil autofill di `useDKProjectForm()` untuk mengisi field turunan dari GB Project terpilih, termasuk nama proyek Daftar Kegiatan dari nama proyek Green Book; hasilnya tetap editable sebelum submit.
 
 ---
 

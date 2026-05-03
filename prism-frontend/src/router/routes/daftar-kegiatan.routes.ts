@@ -27,7 +27,7 @@ export const daftarKegiatanRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/daftar-kegiatan/DKProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Tambah DK Project',
+        title: 'Tambah Proyek Daftar Kegiatan',
       permission: { module: 'daftar_kegiatan', action: 'create' },
     },
   },
@@ -37,7 +37,7 @@ export const daftarKegiatanRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/common/RoutePlaceholderPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Detail DK Project',
+        title: 'Detail Proyek Daftar Kegiatan',
       permission: { module: 'daftar_kegiatan', action: 'read' },
     },
   },
@@ -47,7 +47,7 @@ export const daftarKegiatanRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/daftar-kegiatan/DKProjectFormPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Edit DK Project',
+        title: 'Edit Proyek Daftar Kegiatan',
       permission: { module: 'daftar_kegiatan', action: 'update' },
     },
   },

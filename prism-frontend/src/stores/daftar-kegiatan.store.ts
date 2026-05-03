@@ -3,11 +3,13 @@ import { defineStore } from 'pinia'
 import { DaftarKegiatanService } from '@/services/daftar-kegiatan.service'
 import type {
   DaftarKegiatan,
+  DaftarKegiatanListParams,
   DaftarKegiatanPayload,
   DKProject,
+  DKProjectListParams,
   DKProjectPayload,
 } from '@/types/daftar-kegiatan.types'
-import type { ListParams, MasterImportSummary } from '@/types/master.types'
+import type { MasterImportSummary } from '@/types/master.types'
 
 export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
   const daftarKegiatan = ref<DaftarKegiatan[]>([])
@@ -30,7 +32,7 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     }
   }
 
-  async function fetchDaftarKegiatan(params?: ListParams) {
+  async function fetchDaftarKegiatan(params?: DaftarKegiatanListParams) {
     return withLoading(async () => {
       const response = await DaftarKegiatanService.getDaftarKegiatan(params)
       daftarKegiatan.value = response.data
@@ -90,7 +92,7 @@ export const useDaftarKegiatanStore = defineStore('daftarKegiatan', () => {
     }
   }
 
-  async function fetchProjects(dkId: string, params?: ListParams) {
+  async function fetchProjects(dkId: string, params?: DKProjectListParams) {
     return withLoading(async () => {
       const response = await DaftarKegiatanService.getProjects(dkId, params)
       projects.value = response.data

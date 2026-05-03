@@ -45,9 +45,10 @@ type dkImportProjectDraft struct {
 	header          *dkImportHeaderDraft
 	dkKey           string
 	projectKey      string
+	projectName     string
 	programTitleID  pgtype.UUID
 	institutionID   pgtype.UUID
-	duration        *string
+	duration        *int32
 	objectives      *string
 	gbProjectIDs    []string
 	gbProjectUUIDs  []pgtype.UUID
@@ -275,7 +276,8 @@ func (s *DKService) buildDaftarKegiatanImportPreview(ctx context.Context, qtx *q
 				DkID:           draft.header.createdID,
 				ProgramTitleID: draft.programTitleID,
 				InstitutionID:  draft.institutionID,
-				Duration:       nullableTextPtr(draft.duration),
+				ProjectName:    draft.projectName,
+				Duration:       int4Ptr(draft.duration),
 				Objectives:     nullableTextPtr(draft.objectives),
 			})
 			if err != nil {
@@ -284,6 +286,7 @@ func (s *DKService) buildDaftarKegiatanImportPreview(ctx context.Context, qtx *q
 			req := model.CreateDKProjectRequest{
 				ProgramTitleID:   stringPtrFromUUID(draft.programTitleID),
 				InstitutionID:    stringPtrFromUUID(draft.institutionID),
+				ProjectName:      draft.projectName,
 				Duration:         draft.duration,
 				Objectives:       draft.objectives,
 				GBProjectIDs:     draft.gbProjectIDs,
@@ -408,7 +411,7 @@ func (s *DKService) parseDKHeaderRows(ctx context.Context, qtx *queries.Queries,
 }
 
 func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *masterImportLookups, headersByKey map[string]*dkImportHeaderDraft, result *model.MasterImportSheetResult) ([]*dkImportProjectDraft, map[string]*dkImportProjectDraft, error) {
-	rows, ok := workbook.importRows(dkImportSheetInput, []string{"dk_key", "project_key", "executing_agency_name"})
+	rows, ok := workbook.importRows(dkImportSheetInput, []string{"dk_key", "project_key", "project_name", "executing_agency_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")
 		return nil, map[string]*dkImportProjectDraft{}, nil
@@ -426,10 +429,15 @@ func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *mas
 			row:             row.number,
 			dkKey:           row.value("dk_key"),
 			projectKey:      row.value("project_key"),
-			duration:        row.optionalString("duration"),
+			projectName:     strings.TrimSpace(row.value("project_name")),
 			objectives:      row.optionalString("objectives"),
 			activityNumbers: map[int32]struct{}{},
 		}
+		duration, err := parseImportOptionalPositiveInt32(row.value("duration"))
+		if err != nil {
+			draft.addError("Duration harus berupa jumlah bulan positif")
+		}
+		draft.duration = duration
 		projects = append(projects, draft)
 
 		header := headersByKey[normalizeLookupKey(draft.dkKey)]
@@ -463,6 +471,10 @@ func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *mas
 			continue
 		}
 
+		if draft.projectName == "" {
+			draft.addError("Project Name wajib diisi")
+		}
+
 		programTitle := row.value("program_title")
 		if programTitle != "" {
 			ref, exists := lookups.programTitlesByTitle[normalizeLookupKey(programTitle)]
@@ -476,10 +488,15 @@ func (s *DKService) parseDKProjectInputRows(workbook *xlsxWorkbook, lookups *mas
 		agencyName := row.value("executing_agency_name")
 		if agencyName == "" {
 			draft.addError("Executing Agency Name wajib diisi")
-		} else if institution, exists := lookups.institutionsByName[normalizeLookupKey(agencyName)]; exists {
-			draft.institutionID = institution.ID
 		} else {
-			draft.addError(fmt.Sprintf("Executing Agency %q belum ada di master institution", agencyName))
+			institution, exists, ambiguous := lookups.lookupInstitutionReference(agencyName)
+			if ambiguous {
+				draft.addError(fmt.Sprintf("Executing Agency %q ambigu karena ada lebih dari satu institution dengan nama sama", agencyName))
+			} else if exists {
+				draft.institutionID = institution.ID
+			} else {
+				draft.addError(fmt.Sprintf("Executing Agency %q belum ada di master institution", agencyName))
+			}
 		}
 	}
 
@@ -761,7 +778,14 @@ func (s *DKService) parseDKLoanAllocationRelation(workbook *xlsxWorkbook, lookup
 			relations = append(relations, relation)
 			continue
 		}
-		institution, exists := lookups.institutionsByName[normalizeLookupKey(institutionName)]
+		institution, exists, ambiguous := lookups.lookupInstitutionReference(institutionName)
+		if ambiguous {
+			relation.status = masterImportStatusFailed
+			relation.message = fmt.Sprintf("Institution %q ambigu karena ada lebih dari satu institution dengan nama sama", institutionName)
+			draft.addError(relation.message)
+			relations = append(relations, relation)
+			continue
+		}
 		if !exists {
 			relation.status = masterImportStatusFailed
 			relation.message = fmt.Sprintf("Institution %q belum ada di master data", institutionName)
@@ -1069,6 +1093,9 @@ func dkProjectLabel(draft *dkImportProjectDraft) string {
 	}
 	if draft.projectKey == "" {
 		return draft.dkKey
+	}
+	if draft.projectName != "" {
+		return fmt.Sprintf("%s/%s - %s", draft.dkKey, draft.projectKey, draft.projectName)
 	}
 	return fmt.Sprintf("%s/%s", draft.dkKey, draft.projectKey)
 }

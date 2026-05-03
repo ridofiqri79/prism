@@ -7,6 +7,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/ridofiqri79/prism-backend/internal/database/queries"
 )
 
 func TestBuildSimpleXLSXTemplateMetadata(t *testing.T) {
@@ -60,6 +62,47 @@ func TestBuildSimpleXLSXTemplateMetadata(t *testing.T) {
 	if len(rows) != 0 {
 		t.Fatalf("expected empty template data rows, got %d", len(rows))
 	}
+}
+
+func TestImportTemplateGuidesDocumentInstitutionFallback(t *testing.T) {
+	sheets := map[string]simpleXLSXSheet{
+		"master":     buildMasterGuideSheet(),
+		"blue_book":  buildBlueBookGuideSheet(queries.GetBlueBookRow{PeriodName: "2025-2029"}),
+		"green_book": buildGreenBookGuideSheet(queries.GreenBook{PublishYear: 2026, RevisionNumber: 1}),
+		"dk":         buildDKGuideSheet(),
+	}
+
+	expected := []string{
+		"Fallback Referensi Institution",
+		"Prioritas 1 - Path dropdown",
+		"Prioritas 2 - UUID",
+		"Prioritas 3 - Nama polos",
+		"Nama Child; Nama Parent; Nama Root;",
+		"Sekretariat Utama",
+		"Preview berstatus failed",
+	}
+	for name, sheet := range sheets {
+		text := guideSheetText(sheet)
+		for _, want := range expected {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%s guide missing %q:\n%s", name, want, text)
+			}
+		}
+	}
+}
+
+func guideSheetText(sheet simpleXLSXSheet) string {
+	var builder strings.Builder
+	for _, row := range sheet.Rows {
+		for _, cell := range row {
+			if cell.Value == "" {
+				continue
+			}
+			builder.WriteString(cell.Value)
+			builder.WriteByte('\n')
+		}
+	}
+	return builder.String()
 }
 
 func assertAllXMLPartsParse(t *testing.T, data []byte) {

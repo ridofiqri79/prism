@@ -1,13 +1,35 @@
 import http from '@/services/http'
 import { DaftarKegiatanService } from '@/services/daftar-kegiatan.service'
 import type { ApiResponse, PaginatedResponse } from '@/types/api.types'
-import type { DKProject } from '@/types/daftar-kegiatan.types'
+import type { DaftarKegiatan, DKProject } from '@/types/daftar-kegiatan.types'
 import type {
   DKProjectLoanOption,
   LoanAgreement,
   LoanAgreementListParams,
   LoanAgreementPayload,
 } from '@/types/loan-agreement.types'
+import type { MasterImportSummary } from '@/types/master.types'
+
+function toDKProjectLoanOption(dk: DaftarKegiatan, project: DKProject): DKProjectLoanOption {
+  const gbProjects = project.gb_projects ?? []
+  const labelParts = [
+    gbProjects.map((gb) => gb.gb_code).join(', '),
+    project.project_name || project.objectives || project.program_title?.title || dk.subject,
+  ].filter(Boolean)
+
+  return {
+    ...project,
+    dk: project.dk ?? dk,
+    dk_id: project.dk_id ?? dk.id,
+    daftar_kegiatan_subject: dk.subject,
+    gb_projects: gbProjects,
+    locations: project.locations ?? [],
+    financing_details: project.financing_details ?? [],
+    loan_allocations: project.loan_allocations ?? [],
+    activity_details: project.activity_details ?? [],
+    label: labelParts.join(' - ') || dk.subject,
+  }
+}
 
 export const LoanAgreementService = {
   async getLoanAgreements(params?: LoanAgreementListParams) {
@@ -36,31 +58,39 @@ export const LoanAgreementService = {
     await http.delete(`/loan-agreements/${id}`)
   },
 
+  async downloadImportTemplate() {
+    const response = await http.get<Blob>('/loan-agreements/import/template', {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  async previewImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/loan-agreements/import/preview',
+      formData,
+    )
+    return response.data.data
+  },
+
+  async executeImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/loan-agreements/import/execute',
+      formData,
+    )
+    return response.data.data
+  },
+
   async getDKProjectOptions(search?: string) {
     const dkResponse = await DaftarKegiatanService.getDaftarKegiatan({ limit: 1000 })
     const optionGroups = await Promise.all(
       dkResponse.data.map(async (dk) => {
         const projectsResponse = await DaftarKegiatanService.getProjects(dk.id, { limit: 1000 })
-        return projectsResponse.data.map((project): DKProjectLoanOption => {
-          const gbProjects = project.gb_projects ?? []
-          const labelParts = [
-            gbProjects.map((gb) => gb.gb_code).join(', '),
-            project.objectives || project.program_title?.title || dk.subject,
-          ].filter(Boolean)
-
-          return {
-            ...project,
-            dk: project.dk ?? dk,
-            dk_id: project.dk_id ?? dk.id,
-            daftar_kegiatan_subject: dk.subject,
-            gb_projects: gbProjects,
-            locations: project.locations ?? [],
-            financing_details: project.financing_details ?? [],
-            loan_allocations: project.loan_allocations ?? [],
-            activity_details: project.activity_details ?? [],
-            label: labelParts.join(' - ') || dk.subject,
-          }
-        })
+        return projectsResponse.data.map((project) => toDKProjectLoanOption(dk, project))
       }),
     )
     const options = optionGroups.flat()
@@ -71,6 +101,7 @@ export const LoanAgreementService = {
     return options.filter((project) =>
       [
         project.label,
+        project.project_name,
         project.objectives,
         project.program_title?.title,
         project.daftar_kegiatan_subject,
@@ -80,7 +111,16 @@ export const LoanAgreementService = {
         .join(' ')
         .toLowerCase()
         .includes(keyword),
-    )
+      )
+  },
+
+  async getDKProjectOption(dkId: string, projectId: string) {
+    const [dk, project] = await Promise.all([
+      DaftarKegiatanService.getDK(dkId),
+      DaftarKegiatanService.getProject(dkId, projectId),
+    ])
+
+    return toDKProjectLoanOption(dk, project)
   },
 
   getAllowedLenderIds(project?: DKProject | null) {

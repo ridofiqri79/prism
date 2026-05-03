@@ -54,6 +54,7 @@ func main() {
 	dashboardService := service.NewDashboardService(q)
 	journeyService := service.NewJourneyService(q)
 	projectService := service.NewProjectService(q)
+	spatialDistributionService := service.NewSpatialDistributionService(q, projectService)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -65,6 +66,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	journeyHandler := handler.NewJourneyHandler(journeyService)
 	projectHandler := handler.NewProjectHandler(projectService)
+	spatialDistributionHandler := handler.NewSpatialDistributionHandler(spatialDistributionService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -106,6 +108,12 @@ func main() {
 	master.PUT("/countries/:id", masterHandler.UpdateCountry, middleware.Require("country", "update"))
 	master.DELETE("/countries/:id", masterHandler.DeleteCountry, middleware.Require("country", "delete"))
 
+	master.GET("/currencies", masterHandler.ListCurrencies, middleware.Require("currency", "read"))
+	master.GET("/currencies/:id", masterHandler.GetCurrency, middleware.Require("currency", "read"))
+	master.POST("/currencies", masterHandler.CreateCurrency, middleware.Require("currency", "create"))
+	master.PUT("/currencies/:id", masterHandler.UpdateCurrency, middleware.Require("currency", "update"))
+	master.DELETE("/currencies/:id", masterHandler.DeleteCurrency, middleware.Require("currency", "delete"))
+
 	master.GET("/lenders", masterHandler.ListLenders, middleware.Require("lender", "read"))
 	master.GET("/lenders/:id", masterHandler.GetLender, middleware.Require("lender", "read"))
 	master.POST("/lenders", masterHandler.CreateLender, middleware.Require("lender", "create"))
@@ -113,24 +121,28 @@ func main() {
 	master.DELETE("/lenders/:id", masterHandler.DeleteLender, middleware.Require("lender", "delete"))
 
 	master.GET("/institutions", masterHandler.ListInstitutions, middleware.Require("institution", "read"))
+	master.GET("/institutions/lookup", masterHandler.LookupInstitutions, middleware.Require("institution", "read"))
 	master.GET("/institutions/:id", masterHandler.GetInstitution, middleware.Require("institution", "read"))
 	master.POST("/institutions", masterHandler.CreateInstitution, middleware.Require("institution", "create"))
 	master.PUT("/institutions/:id", masterHandler.UpdateInstitution, middleware.Require("institution", "update"))
 	master.DELETE("/institutions/:id", masterHandler.DeleteInstitution, middleware.Require("institution", "delete"))
 
 	master.GET("/regions", masterHandler.ListRegions, middleware.Require("region", "read"))
+	master.GET("/regions/lookup", masterHandler.LookupRegions, middleware.Require("region", "read"))
 	master.GET("/regions/:id", masterHandler.GetRegion, middleware.Require("region", "read"))
 	master.POST("/regions", masterHandler.CreateRegion, middleware.Require("region", "create"))
 	master.PUT("/regions/:id", masterHandler.UpdateRegion, middleware.Require("region", "update"))
 	master.DELETE("/regions/:id", masterHandler.DeleteRegion, middleware.Require("region", "delete"))
 
 	master.GET("/program-titles", masterHandler.ListProgramTitles, middleware.Require("program_title", "read"))
+	master.GET("/program-titles/lookup", masterHandler.LookupProgramTitles, middleware.Require("program_title", "read"))
 	master.GET("/program-titles/:id", masterHandler.GetProgramTitle, middleware.Require("program_title", "read"))
 	master.POST("/program-titles", masterHandler.CreateProgramTitle, middleware.Require("program_title", "create"))
 	master.PUT("/program-titles/:id", masterHandler.UpdateProgramTitle, middleware.Require("program_title", "update"))
 	master.DELETE("/program-titles/:id", masterHandler.DeleteProgramTitle, middleware.Require("program_title", "delete"))
 
 	master.GET("/bappenas-partners", masterHandler.ListBappenasPartners, middleware.Require("bappenas_partner", "read"))
+	master.GET("/bappenas-partners/lookup", masterHandler.LookupBappenasPartners, middleware.Require("bappenas_partner", "read"))
 	master.GET("/bappenas-partners/:id", masterHandler.GetBappenasPartner, middleware.Require("bappenas_partner", "read"))
 	master.POST("/bappenas-partners", masterHandler.CreateBappenasPartner, middleware.Require("bappenas_partner", "create"))
 	master.PUT("/bappenas-partners/:id", masterHandler.UpdateBappenasPartner, middleware.Require("bappenas_partner", "update"))
@@ -172,6 +184,7 @@ func main() {
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))
 	loi.POST("", blueBookHandler.CreateLoI, middleware.Require("bb_project", "update"))
 	loi.DELETE("/:id", blueBookHandler.DeleteLoI, middleware.Require("bb_project", "update"))
+	api.GET("/bb-projects/:bbProjectId/history", blueBookHandler.GetBBProjectHistory, middleware.Require("bb_project", "read"))
 
 	greenBooks := api.Group("/green-books")
 	greenBooks.GET("", greenBookHandler.ListGreenBooks, middleware.Require("green_book", "read"))
@@ -188,6 +201,7 @@ func main() {
 	greenBooks.POST("/:gbId/import-projects/preview", greenBookHandler.PreviewImportGBProjects, middleware.RequireAdmin())
 	greenBooks.POST("/:gbId/import-projects/execute", greenBookHandler.ImportGBProjects, middleware.RequireAdmin())
 	greenBooks.GET("/:gbId/import-projects/template", greenBookHandler.DownloadGBProjectImportTemplate, middleware.RequireAdmin())
+	api.GET("/gb-projects/:gbProjectId/history", greenBookHandler.GetGBProjectHistory, middleware.Require("gb_project", "read"))
 
 	dk := api.Group("/daftar-kegiatan")
 	dk.GET("", dkHandler.ListDK, middleware.Require("daftar_kegiatan", "read"))
@@ -208,9 +222,18 @@ func main() {
 	loanAgreements := api.Group("/loan-agreements")
 	loanAgreements.GET("", laHandler.ListLA, middleware.Require("loan_agreement", "read"))
 	loanAgreements.POST("", laHandler.CreateLA, middleware.Require("loan_agreement", "create"))
+	loanAgreements.GET("/import/template", laHandler.DownloadLAImportTemplate, middleware.RequireAdmin())
+	loanAgreements.POST("/import/preview", laHandler.PreviewImportLA, middleware.RequireAdmin())
+	loanAgreements.POST("/import/execute", laHandler.ImportLA, middleware.RequireAdmin())
 	loanAgreements.GET("/:id", laHandler.GetLA, middleware.Require("loan_agreement", "read"))
 	loanAgreements.PUT("/:id", laHandler.UpdateLA, middleware.Require("loan_agreement", "update"))
 	loanAgreements.DELETE("/:id", laHandler.DeleteLA, middleware.Require("loan_agreement", "delete"))
+
+	monitoringRoot := api.Group("/monitoring")
+	monitoringRoot.GET("/loan-agreements", monitoringHandler.ListLoanAgreementReferences, middleware.Require("monitoring_disbursement", "read"))
+	monitoringRoot.GET("/import/template", monitoringHandler.DownloadImportTemplate, middleware.RequireAdmin())
+	monitoringRoot.POST("/import/preview", monitoringHandler.PreviewImport, middleware.RequireAdmin())
+	monitoringRoot.POST("/import/execute", monitoringHandler.Import, middleware.RequireAdmin())
 
 	monitoring := api.Group("/loan-agreements/:laId/monitoring")
 	monitoring.GET("", monitoringHandler.List, middleware.Require("monitoring_disbursement", "read"))
@@ -221,10 +244,25 @@ func main() {
 
 	dashboard := api.Group("/dashboard")
 	dashboard.GET("/summary", dashboardHandler.Summary)
-	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringSummary)
+	dashboard.GET("/stage-funnel", dashboardHandler.StageFunnel)
+	dashboard.GET("/monitoring-rollup", dashboardHandler.MonitoringRollup)
+	dashboard.GET("/monitoring-summary", dashboardHandler.MonitoringRollup)
+	dashboard.GET("/filter-options", dashboardHandler.FilterOptions)
+	dashboard.GET("/executive-portfolio", dashboardHandler.ExecutivePortfolio)
+	dashboard.GET("/pipeline-bottleneck", dashboardHandler.PipelineBottleneck)
+	dashboard.GET("/green-book-readiness", dashboardHandler.GreenBookReadiness)
+	dashboard.GET("/lender-financing-mix", dashboardHandler.LenderFinancingMix)
+	dashboard.GET("/kl-portfolio-performance", dashboardHandler.KLPortfolioPerformance)
+	dashboard.GET("/la-disbursement", dashboardHandler.LADisbursement)
+	dashboard.GET("/data-quality-governance", dashboardHandler.DataQualityGovernance)
 
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
+	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
+
+	spatialDistribution := api.Group("/spatial-distribution", middleware.Require("bb_project", "read"))
+	spatialDistribution.GET("/choropleth", spatialDistributionHandler.Choropleth)
+	spatialDistribution.GET("/projects", spatialDistributionHandler.RegionProjects)
 
 	e.GET("/events", handler.SSEHandler(broker))
 

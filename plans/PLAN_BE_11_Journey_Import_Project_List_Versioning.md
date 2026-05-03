@@ -8,10 +8,10 @@
 
 ## Prasyarat
 
-- [ ] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
-- [ ] `PLAN_BE_09_Green_Book_Revision_Versioning.md` selesai.
-- [ ] `PLAN_BE_10_DK_LA_Frozen_Snapshot.md` selesai.
-- [ ] History endpoints BB/GB tersedia.
+- [x] `PLAN_BE_08_Blue_Book_Revision_Versioning.md` selesai.
+- [x] `PLAN_BE_09_Green_Book_Revision_Versioning.md` selesai.
+- [x] `PLAN_BE_10_DK_LA_Frozen_Snapshot.md` selesai.
+- [x] History endpoints BB/GB tersedia.
 
 ---
 
@@ -26,19 +26,19 @@ Files:
 
 Checklist:
 
-- [ ] Default project list hanya menampilkan latest BB Project snapshot per `project_identity_id`.
-- [ ] Tambahkan parameter eksplisit untuk melihat semua snapshot jika dibutuhkan, misalnya `include_history=true`.
-- [ ] Tambahkan field response:
-  - [ ] `project_identity_id`.
-  - [ ] `is_latest`.
-  - [ ] `has_newer_revision`.
-  - [ ] `blue_book_revision_label`.
-- [ ] Sorting/filter existing tetap bekerja.
-- [ ] Dashboard/list count tidak double count snapshot lama kecuali historical mode aktif.
+- [x] Default project list hanya menampilkan latest BB Project snapshot per `project_identity_id`.
+- [x] Tambahkan parameter eksplisit untuk melihat semua snapshot jika dibutuhkan, misalnya `include_history=true`.
+- [x] Tambahkan field response:
+  - [x] `project_identity_id`.
+  - [x] `is_latest`.
+  - [x] `has_newer_revision`.
+  - [x] `blue_book_revision_label`.
+- [x] Sorting/filter existing tetap bekerja.
+- [x] Dashboard/list count tidak double count snapshot lama kecuali historical mode aktif.
 
 Acceptance:
 
-- [ ] Project list default tidak membingungkan user dengan duplikasi revisi.
+- [x] Project list default tidak membingungkan user dengan duplikasi revisi.
 
 ---
 
@@ -52,20 +52,20 @@ Files:
 
 Checklist:
 
-- [ ] Journey tetap menerima concrete `bb_project_id` atau resolve entry point sesuai contract.
-- [ ] Journey menampilkan path historis berdasarkan concrete relation yang tersimpan.
-- [ ] Tambahkan identity metadata:
-  - [ ] `project_identity_id` untuk BB node.
-  - [ ] `gb_project_identity_id` untuk GB node.
-- [ ] Tambahkan indicator:
-  - [ ] BB node punya newer snapshot atau tidak.
-  - [ ] GB node punya newer snapshot atau tidak.
-- [ ] Jangan auto-ganti DK/LA path ke latest.
-- [ ] Jika entry point adalah old BB snapshot, response tetap valid dan bisa menunjukkan newer BB revision.
+- [x] Journey tetap menerima concrete `bb_project_id` atau resolve entry point sesuai contract.
+- [x] Journey menampilkan path historis berdasarkan concrete relation yang tersimpan.
+- [x] Tambahkan identity metadata:
+  - [x] `project_identity_id` untuk BB node.
+  - [x] `gb_project_identity_id` untuk GB node.
+- [x] Tambahkan indicator:
+  - [x] BB node punya newer snapshot atau tidak.
+  - [x] GB node punya newer snapshot atau tidak.
+- [x] Jangan auto-ganti DK/LA path ke latest.
+- [x] Jika entry point adalah old BB snapshot, response tetap valid dan bisa menunjukkan newer BB revision.
 
 Acceptance:
 
-- [ ] Journey bisa membedakan "versi yang dipakai" dan "ada revisi lebih baru".
+- [x] Journey bisa membedakan "versi yang dipakai" dan "ada revisi lebih baru".
 
 ---
 
@@ -78,21 +78,21 @@ Files:
 
 Checklist:
 
-- [ ] Blue Book import:
-  - [ ] Duplicate `BB Code` dalam workbook tetap error.
-  - [ ] Code yang ada pada revisi lama tidak di-skip global.
-  - [ ] Code yang cocok dengan source revisi reuse `project_identity_id`.
-  - [ ] Code baru create `project_identity`.
-- [ ] Green Book import:
-  - [ ] Duplicate `GB Code` dalam workbook tetap error.
-  - [ ] Code yang ada pada revisi lama tidak di-skip global.
-  - [ ] Code yang cocok dengan source revisi reuse `gb_project_identity_id`.
-  - [ ] BB relations di-resolve ke latest BB snapshot.
-- [ ] Import preview/summary memberi pesan yang membedakan snapshot revisi dan project logical baru.
+- [x] Blue Book import:
+  - [x] Duplicate `BB Code` dalam workbook tetap error.
+  - [x] Code yang ada pada revisi lama tidak di-skip global.
+  - [x] Code yang cocok dengan source revisi reuse `project_identity_id`.
+  - [x] Code baru create `project_identity`.
+- [x] Green Book import:
+  - [x] Duplicate `GB Code` dalam workbook tetap error.
+  - [x] Code yang ada pada revisi lama tidak di-skip global.
+  - [x] Code yang cocok dengan source revisi reuse `gb_project_identity_id`.
+  - [x] BB relations di-resolve ke latest BB snapshot.
+- [x] Import preview/summary memberi pesan yang membedakan snapshot revisi dan project logical baru.
 
 Acceptance:
 
-- [ ] Import tidak lagi bertentangan dengan behavior revisi.
+- [x] Import tidak lagi bertentangan dengan behavior revisi.
 
 ---
 
@@ -105,15 +105,15 @@ Files:
 
 Checklist:
 
-- [ ] `total_bb_projects` menghitung latest logical BB Project, bukan semua snapshot, kecuali contract meminta historical count.
-- [ ] `total_gb_projects` menghitung latest logical GB Project.
-- [ ] Monitoring/LA aggregates tetap berdasarkan concrete downstream records.
-- [ ] Tidak ada double count karena snapshot revisi lama.
-- [ ] Contract dashboard diperbarui jika ada field baru untuk historical counts.
+- [x] `total_bb_projects` menghitung latest logical BB Project, bukan semua snapshot, kecuali contract meminta historical count.
+- [x] `total_gb_projects` menghitung latest logical GB Project.
+- [x] Monitoring/LA aggregates tetap berdasarkan concrete downstream records.
+- [x] Tidak ada double count karena snapshot revisi lama.
+- [x] Contract dashboard diperbarui jika ada field baru untuk historical counts.
 
 Acceptance:
 
-- [ ] Dashboard summary tidak naik palsu hanya karena revisi dokumen.
+- [x] Dashboard summary tidak naik palsu hanya karena revisi dokumen.
 
 ---
 
@@ -121,25 +121,25 @@ Acceptance:
 
 Checklist:
 
-- [ ] Reset DB dev jika dibutuhkan karena data fresh diperbolehkan.
-- [ ] Jalankan backend dan DB.
-- [ ] Create BB original.
-- [ ] Create BB Project `BB-001`.
-- [ ] Create BB revision dan verify `BB-001` diclone dengan identity sama.
-- [ ] Create GB original dengan input BB old/latest.
-- [ ] Verify stored BB relation memakai latest BB snapshot saat GB dibuat.
-- [ ] Create GB revision dan verify `GB-001` identity sama.
-- [ ] Create DK dengan input GB old/latest.
-- [ ] Verify DK stored relation memakai latest GB saat DK dibuat.
-- [ ] Create revisi BB/GB baru setelah DK.
-- [ ] Verify DK/LA path tidak berubah.
-- [ ] Call BB history endpoint.
-- [ ] Call GB history endpoint.
-- [ ] Call journey endpoint dan verify newer indicator.
-- [ ] Run `go test ./...`.
+- [x] Reset DB dev jika dibutuhkan karena data fresh diperbolehkan.
+- [x] Jalankan backend dan DB.
+- [x] Create BB original.
+- [x] Create BB Project `BB-001`.
+- [x] Create BB revision dan verify `BB-001` diclone dengan identity sama.
+- [x] Create GB original dengan input BB old/latest.
+- [x] Verify stored BB relation memakai latest BB snapshot saat GB dibuat.
+- [x] Create GB revision dan verify `GB-001` identity sama.
+- [x] Create DK dengan input GB old/latest.
+- [x] Verify DK stored relation memakai latest GB saat DK dibuat.
+- [x] Create revisi BB/GB baru setelah DK.
+- [x] Verify DK/LA path tidak berubah.
+- [x] Call BB history endpoint.
+- [x] Call GB history endpoint.
+- [x] Call journey endpoint dan verify newer indicator.
+- [x] Run `go test ./...`.
 
 Done Criteria:
 
-- [ ] Backend versioning flow lulus dari schema sampai journey.
-- [ ] Tidak ada double count pada project list/dashboard default.
-- [ ] Import dan smoke flow selaras dengan business rules baru.
+- [x] Backend versioning flow lulus dari schema sampai journey.
+- [x] Tidak ada double count pada project list/dashboard default.
+- [x] Import dan smoke flow selaras dengan business rules baru.

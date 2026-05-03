@@ -84,7 +84,7 @@ export function usePermission() {
 - `v-model`: array region_id
 - Tampilkan TreeSelect atau MultiSelect PrimeVue dengan hierarki COUNTRY → PROVINCE → CITY
 - Jika COUNTRY dipilih: nonaktifkan semua PROVINCE/CITY, tampilkan "(Nasional)"
-- Load dari `masterStore.regions` (cached)
+- Load seluruh level via `masterStore.fetchAllRegionLevels()` agar pilihan COUNTRY, PROVINCE, dan CITY tersedia di form BB, GB, dan DK.
 
 **`src/components/forms/InstitutionSelect.vue`**
 - Props: `modelValue`, `multiple?: boolean`, `levelFilter?: string[]`

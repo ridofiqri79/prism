@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import TreeTable from 'primevue/treetable'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -14,7 +14,8 @@ import { useToast } from '@/composables/useToast'
 import { institutionSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
 import type { Institution, InstitutionLevel, InstitutionPayload } from '@/types/master.types'
-import { buildIdTree, toFormErrors, type FormErrors } from './master-page-utils'
+import MasterTreeTable from './MasterTreeTable.vue'
+import { buildLazyIdNodes, toFormErrors, useMasterListControls, type AppTreeNode, type FormErrors } from './master-page-utils'
 
 type InstitutionField = keyof InstitutionPayload
 
@@ -22,9 +23,13 @@ const masterStore = useMasterStore()
 const toast = useToast()
 const confirm = useConfirm()
 const { can } = usePermission()
+const controls = useMasterListControls('level', 'asc')
 
 const dialogVisible = ref(false)
 const editing = ref<Institution | null>(null)
+const selectedLevels = ref<InstitutionLevel[]>([])
+const treeNodes = ref<AppTreeNode<Institution>[]>([])
+const expandedKeys = ref<Record<string, boolean>>({})
 const form = reactive<InstitutionPayload>({
   name: '',
   short_name: '',
@@ -35,17 +40,54 @@ const errors = ref<FormErrors<InstitutionField>>({})
 const levelOptions: InstitutionLevel[] = [
   'Kementerian/Badan/Lembaga',
   'Eselon I',
+  'Eselon II',
   'BUMN',
-  'Pemerintah Daerah',
+  'Pemerintah Daerah Tk. I',
+  'Pemerintah Daerah Tk. II',
   'BUMD',
-  'Lainnya',
+  'Lainya',
 ]
-const treeNodes = computed(() => buildIdTree(masterStore.institutions))
 const parentOptions = computed(() => masterStore.institutions.filter((item) => item.id !== editing.value?.id))
 const showParent = computed(() => form.level !== 'Kementerian/Badan/Lembaga')
 
 async function loadData() {
-  await masterStore.fetchInstitutions(true, { limit: 1000, sort: 'name', order: 'asc' })
+  controls.loading.value = true
+  try {
+    const response = await masterStore.fetchInstitutionTree(
+      controls.params({ level: selectedLevels.value }),
+    )
+    controls.syncMeta(response.meta)
+    treeNodes.value = buildLazyIdNodes(response.data)
+    expandedKeys.value = {}
+  } finally {
+    controls.loading.value = false
+  }
+}
+
+async function loadLookupOptions() {
+  await masterStore.fetchInstitutions(true, { limit: 10000, sort: 'level', order: 'asc' })
+}
+
+async function loadChildren(node: AppTreeNode<Institution>) {
+  if (node.leaf || node.children) return
+
+  node.loading = true
+  treeNodes.value = [...treeNodes.value]
+  try {
+    const response = await masterStore.fetchInstitutionTree(
+      controls.params({
+        level: selectedLevels.value,
+        parent_id: node.data.id,
+        page: 1,
+        limit: 10000,
+      }),
+    )
+    node.children = buildLazyIdNodes(response.data)
+    node.leaf = node.children.length === 0
+  } finally {
+    node.loading = false
+    treeNodes.value = [...treeNodes.value]
+  }
 }
 
 function openCreate() {
@@ -98,36 +140,79 @@ async function save() {
   }
 
   dialogVisible.value = false
-  await loadData()
+  await Promise.all([loadData(), loadLookupOptions()])
 }
 
 function deleteItem(institution: Institution) {
   confirm.confirmDelete(`institution ${institution.name}`, async () => {
     await masterStore.deleteInstitution(institution.id)
-    await loadData()
+    await Promise.all([loadData(), loadLookupOptions()])
     toast.success('Berhasil', 'Instansi berhasil dihapus')
   })
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([loadData(), loadLookupOptions()])
+})
+
+watch(controls.search, () => {
+  controls.resetAndLoadDebounced(loadData)
+})
+
+watch(selectedLevels, () => {
+  controls.resetAndLoad(loadData)
 })
 </script>
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Instansi" subtitle="Hierarki instansi sampai 6 level referensi">
+    <PageHeader title="Instansi" subtitle="Hierarki instansi sampai 8 level referensi">
       <template #actions>
         <Button v-if="can('institution', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
       </template>
     </PageHeader>
 
-    <TreeTable :value="treeNodes" class="overflow-hidden rounded-lg border border-surface-200">
-      <Column field="name" header="Nama" expander />
-      <Column field="short_name" header="Nama Singkat">
+    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_18rem]">
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Cari Instansi</span>
+        <span class="relative block">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
+          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama atau nama singkat" />
+        </span>
+      </label>
+
+      <label class="block space-y-2">
+        <span class="text-sm font-medium text-surface-700">Filter Level</span>
+        <MultiSelect
+          v-model="selectedLevels"
+          :options="levelOptions"
+          placeholder="Semua level"
+          display="chip"
+          :max-selected-labels="2"
+          class="w-full"
+        />
+      </label>
+    </div>
+
+    <MasterTreeTable
+      :value="treeNodes"
+      :loading="controls.loading.value"
+      :total="controls.total.value"
+      :page="controls.pagination.page.value"
+      :limit="controls.pagination.limit.value"
+      :sort-field="controls.pagination.sort.value"
+      :sort-order="controls.pagination.order.value"
+      v-model:expanded-keys="expandedKeys"
+      @update:page="(value) => controls.handlePage(value, loadData)"
+      @update:limit="(value) => controls.handleLimit(value, loadData)"
+      @node-expand="(node) => loadChildren(node as AppTreeNode<Institution>)"
+      @sort="(value) => controls.handleSort(value, loadData)"
+    >
+      <Column field="name" header="Nama" sortable expander />
+      <Column field="short_name" header="Nama Singkat" sortable>
         <template #body="{ node }">{{ node.data.short_name || '-' }}</template>
       </Column>
-      <Column field="level" header="Level">
+      <Column field="level" header="Level" sortable>
         <template #body="{ node }">
           <Tag :value="node.data.level" severity="info" rounded />
         </template>
@@ -155,7 +240,7 @@ onMounted(() => {
           </div>
         </template>
       </Column>
-    </TreeTable>
+    </MasterTreeTable>
 
     <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Instansi' : 'Tambah Instansi'" class="w-[38rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">

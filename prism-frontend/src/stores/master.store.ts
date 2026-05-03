@@ -6,6 +6,8 @@ import type {
   BappenasPartnerPayload,
   Country,
   CountryPayload,
+  Currency,
+  CurrencyPayload,
   Institution,
   InstitutionPayload,
   Lender,
@@ -25,6 +27,7 @@ import type {
 
 type MasterKey =
   | 'countries'
+  | 'currencies'
   | 'lenders'
   | 'institutions'
   | 'regions'
@@ -35,6 +38,7 @@ type MasterKey =
 
 export const useMasterStore = defineStore('master', () => {
   const countries = ref<Country[]>([])
+  const currencies = ref<Currency[]>([])
   const lenders = ref<Lender[]>([])
   const institutions = ref<Institution[]>([])
   const regions = ref<Region[]>([])
@@ -49,71 +53,117 @@ export const useMasterStore = defineStore('master', () => {
 
   async function fetchCountries(force = false, params?: ListParams) {
     if (loaded.value.countries && !force) return
-    countries.value = (await MasterService.getCountries(params)).data
+    const response = await MasterService.getCountries(params)
+    countries.value = response.data
     loaded.value.countries = true
+    return response
+  }
+
+  async function fetchCurrencies(force = false, params?: ListParams) {
+    if (loaded.value.currencies && !force) return
+    const response = await MasterService.getCurrencies(params)
+    currencies.value = response.data
+    loaded.value.currencies = true
+    return response
   }
 
   async function fetchLenders(force = false, params?: ListParams) {
     if (loaded.value.lenders && !force) return
-    lenders.value = (await MasterService.getLenders(params)).data
+    const response = await MasterService.getLenders(params)
+    lenders.value = response.data
     loaded.value.lenders = true
+    return response
   }
 
   async function fetchInstitutions(force = false, params?: ListParams) {
     if (loaded.value.institutions && !force) return
-    institutions.value = (await MasterService.getInstitutions(params)).data
+    const response = await MasterService.lookupInstitutions(params)
+    institutions.value = response.data
     loaded.value.institutions = true
+    return response
+  }
+
+  async function fetchInstitutionTree(params?: ListParams) {
+    return MasterService.getInstitutions(params)
   }
 
   async function fetchRegions(force = false, params?: ListParams) {
     if (loaded.value.regions && !force) return
-    regions.value = (await MasterService.getRegions(params)).data
+    const response = await MasterService.lookupRegions(params)
+    regions.value = response.data
     loaded.value.regions = true
+    loaded.value.allRegionLevels = false
+    return response
   }
 
   async function fetchAllRegionLevels(force = false) {
-    if (loaded.value.regions && !force) return
+    if (loaded.value.allRegionLevels && !force) return
 
     const levels: RegionType[] = ['COUNTRY', 'PROVINCE', 'CITY']
     const responses = await Promise.all(
-      levels.map((type) => MasterService.getRegions({ type, limit: 10000, sort: 'name', order: 'asc' })),
+      levels.map((type) => MasterService.lookupRegions({ type, limit: 10000, sort: 'name', order: 'asc' })),
     )
 
     regions.value = responses.flatMap((response) => response.data)
     loaded.value.regions = true
+    loaded.value.allRegionLevels = true
+  }
+
+  async function fetchRegionTree(params?: ListParams) {
+    return MasterService.getRegions(params)
   }
 
   async function fetchProgramTitles(force = false, params?: ListParams) {
     if (loaded.value.programTitles && !force) return
-    programTitles.value = (await MasterService.getProgramTitles(params)).data
+    const response = await MasterService.lookupProgramTitles(params)
+    programTitles.value = response.data
     loaded.value.programTitles = true
+    return response
+  }
+
+  async function fetchProgramTitleTree(params?: ListParams) {
+    return MasterService.getProgramTitles(params)
   }
 
   async function fetchBappenasPartners(force = false, params?: ListParams) {
     if (loaded.value.bappenasPartners && !force) return
-    bappenasPartners.value = (await MasterService.getBappenasPartners(params)).data
+    const response = await MasterService.lookupBappenasPartners(params)
+    bappenasPartners.value = response.data
     loaded.value.bappenasPartners = true
+    return response
+  }
+
+  async function fetchBappenasPartnerTree(params?: ListParams) {
+    return MasterService.getBappenasPartners(params)
   }
 
   async function fetchPeriods(force = false, params?: ListParams) {
     if (loaded.value.periods && !force) return
-    periods.value = (await MasterService.getPeriods(params)).data
+    const response = await MasterService.getPeriods(params)
+    periods.value = response.data
     loaded.value.periods = true
+    return response
   }
 
   async function fetchNationalPriorities(force = false, params?: ListParams) {
     if (loaded.value.nationalPriorities && !force) return
-    nationalPriorities.value = (await MasterService.getNationalPriorities(params)).data
+    const response = await MasterService.getNationalPriorities(params)
+    nationalPriorities.value = response.data
     loaded.value.nationalPriorities = true
+    return response
   }
 
   function invalidate(key: MasterKey) {
     loaded.value[key] = false
+    if (key === 'regions') {
+      loaded.value.allRegionLevels = false
+    }
   }
 
   function invalidateAll() {
     const keys: MasterKey[] = [
       'countries',
+      'currencies',
       'lenders',
       'institutions',
       'regions',
@@ -172,6 +222,23 @@ export const useMasterStore = defineStore('master', () => {
   async function deleteCountry(id: string) {
     await MasterService.deleteCountry(id)
     invalidate('countries')
+  }
+
+  async function createCurrency(data: CurrencyPayload) {
+    const result = await MasterService.createCurrency(data)
+    invalidate('currencies')
+    return result
+  }
+
+  async function updateCurrency(id: string, data: Partial<CurrencyPayload>) {
+    const result = await MasterService.updateCurrency(id, data)
+    invalidate('currencies')
+    return result
+  }
+
+  async function deleteCurrency(id: string) {
+    await MasterService.deleteCurrency(id)
+    invalidate('currencies')
   }
 
   async function createLender(data: LenderPayload) {
@@ -295,6 +362,7 @@ export const useMasterStore = defineStore('master', () => {
 
   function $reset() {
     countries.value = []
+    currencies.value = []
     lenders.value = []
     institutions.value = []
     regions.value = []
@@ -310,6 +378,7 @@ export const useMasterStore = defineStore('master', () => {
 
   return {
     countries,
+    currencies,
     lenders,
     institutions,
     regions,
@@ -322,12 +391,17 @@ export const useMasterStore = defineStore('master', () => {
     previewing,
     importing,
     fetchCountries,
+    fetchCurrencies,
     fetchLenders,
     fetchInstitutions,
+    fetchInstitutionTree,
     fetchRegions,
     fetchAllRegionLevels,
+    fetchRegionTree,
     fetchProgramTitles,
+    fetchProgramTitleTree,
     fetchBappenasPartners,
+    fetchBappenasPartnerTree,
     fetchPeriods,
     fetchNationalPriorities,
     downloadImportTemplate,
@@ -336,6 +410,9 @@ export const useMasterStore = defineStore('master', () => {
     createCountry,
     updateCountry,
     deleteCountry,
+    createCurrency,
+    updateCurrency,
+    deleteCurrency,
     createLender,
     updateLender,
     deleteLender,
