@@ -39,6 +39,9 @@ services:
     build:
       context: ./prism-frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_APP_NAME=${VITE_APP_NAME}
     container_name: prism_frontend
     restart: unless-stopped
     expose:
