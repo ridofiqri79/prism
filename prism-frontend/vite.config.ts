@@ -13,6 +13,18 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: 'vue-vendor',
+              test: /node_modules[\\/](vue|@vue|pinia|vue-router)[\\/]/,
+              maxSize: 420 * 1024,
+              priority: 30,
+            },
+            {
+              name: 'prime-vendor',
+              test: /node_modules[\\/](primevue|@primeuix|primeicons)[\\/]/,
+              maxSize: 420 * 1024,
+              priority: 20,
+            },
+            {
               name: 'chart-vendor',
               test: /node_modules[\\/](echarts|zrender|vue-echarts)[\\/]/,
               maxSize: 420 * 1024,
