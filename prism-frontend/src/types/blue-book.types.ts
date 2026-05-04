@@ -77,6 +77,8 @@ export interface BBProject {
 export interface BBProjectRevisionSourceOption extends BBProject {
   source_blue_book_id: string
   source_blue_book_label: string
+  disabled?: boolean
+  unavailable_reason?: string
 }
 
 export interface BBProjectListParams extends ListParams {

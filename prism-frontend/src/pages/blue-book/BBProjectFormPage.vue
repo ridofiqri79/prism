@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
-import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
@@ -34,7 +33,6 @@ const pageTitle = computed(() =>
 )
 
 const form = useBBProjectForm()
-const selectedRevisionSourceProjectId = ref('')
 
 const bappenasPartnerOptions = computed(() =>
   masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
@@ -50,23 +48,6 @@ const selectedPartnerParents = computed(() => {
     .filter((name) => name !== '-')
   return [...new Set(parents)].join(', ') || '-'
 })
-const currentBlueBook = computed(() => blueBookStore.currentBlueBook)
-const isRevisionBlueBook = computed(() =>
-  Boolean(currentBlueBook.value?.replaces_blue_book_id) ||
-  Number(currentBlueBook.value?.revision_number ?? 0) > 0,
-)
-const showRevisionSourcePicker = computed(() => !isEditMode.value && isRevisionBlueBook.value)
-const selectedRevisionSourceProject = computed(() =>
-  blueBookStore.revisionSourceProjectOptions.find(
-    (project) => project.id === selectedRevisionSourceProjectId.value,
-  ),
-)
-const revisionSourceProjectOptions = computed(() =>
-  blueBookStore.revisionSourceProjectOptions.map((project) => ({
-    ...project,
-    label: revisionSourceOptionLabel(project),
-  })),
-)
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
   return (
@@ -77,10 +58,7 @@ function findPartnerParent(partner?: BappenasPartner) {
 }
 
 async function loadData() {
-  selectedRevisionSourceProjectId.value = ''
-  delete form.errors.project_identity_id
-
-  const [blueBook] = await Promise.all([
+  await Promise.all([
     blueBookStore.fetchBlueBook(blueBookId.value),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
@@ -93,30 +71,7 @@ async function loadData() {
   if (isEditMode.value) {
     const project = await blueBookStore.fetchProject(blueBookId.value, projectId.value)
     form.applyProject(project)
-    blueBookStore.clearRevisionSourceProjectOptions()
-    return
   }
-
-  if (isRevisionBlueBook.value) {
-    await blueBookStore.fetchRevisionSourceProjectOptions(blueBook)
-  } else {
-    blueBookStore.clearRevisionSourceProjectOptions()
-  }
-}
-
-function revisionSourceOptionLabel(project: { bb_code: string; project_name: string }) {
-  return `${project.bb_code} - ${project.project_name}`
-}
-
-function normalizeProjectCode(code: string) {
-  return code.trim().toLowerCase()
-}
-
-function findRevisionSourceProjectByCode(code: string) {
-  const normalizedCode = normalizeProjectCode(code)
-  return blueBookStore.revisionSourceProjectOptions.find(
-    (project) => normalizeProjectCode(project.bb_code) === normalizedCode,
-  )
 }
 
 const onSubmit = form.submit(async (values) => {
@@ -130,22 +85,6 @@ const onSubmit = form.submit(async (values) => {
     return
   }
 
-  if (showRevisionSourcePicker.value && !values.project_identity_id) {
-    const sourceProject = findRevisionSourceProjectByCode(values.bb_code)
-
-    if (sourceProject) {
-      selectedRevisionSourceProjectId.value = sourceProject.id
-      form.applyProject(sourceProject)
-      form.errors.project_identity_id =
-        'Kode Blue Book ditemukan di revisi sebelumnya. Pilih proyek eksisting untuk melanjutkan histori.'
-      toast.warn(
-        'Pilih Proyek Eksisting',
-        'Data proyek dari revisi sebelumnya sudah diambil. Periksa data form lalu simpan kembali.',
-      )
-      return
-    }
-  }
-
   const created = await blueBookStore.createProject(blueBookId.value, values)
   toast.success('Berhasil', 'Proyek Blue Book berhasil dibuat')
   await router.push({
@@ -156,19 +95,6 @@ const onSubmit = form.submit(async (values) => {
 
 onMounted(() => {
   void loadData()
-})
-
-watch(selectedRevisionSourceProjectId, () => {
-  if (!selectedRevisionSourceProjectId.value) {
-    form.reset()
-    delete form.errors.project_identity_id
-    return
-  }
-
-  if (selectedRevisionSourceProject.value) {
-    delete form.errors.project_identity_id
-    form.applyProject(selectedRevisionSourceProject.value)
-  }
 })
 </script>
 
@@ -186,54 +112,6 @@ watch(selectedRevisionSourceProjectId, () => {
     </PageHeader>
 
     <form class="space-y-6" @submit.prevent="onSubmit">
-      <section
-        v-if="showRevisionSourcePicker"
-        class="space-y-4 rounded-lg border border-surface-200 bg-white p-5"
-      >
-        <div>
-          <h2 class="mt-1 text-lg font-semibold text-surface-950">
-            Ambil dari Proyek Blue Book Eksisting
-          </h2>
-        </div>
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Proyek dari Revisi Sebelumnya</span>
-          <Select
-            v-model="selectedRevisionSourceProjectId"
-            :options="revisionSourceProjectOptions"
-            option-label="label"
-            option-value="id"
-            placeholder="Pilih proyek Blue Book eksisting"
-            filter
-            show-clear
-            class="w-full"
-            :loading="blueBookStore.revisionSourceProjectLoading"
-          >
-            <template #option="{ option }">
-              <div class="space-y-1">
-                <p class="font-medium text-surface-950">
-                  {{ option.bb_code }} - {{ option.project_name }}
-                </p>
-                <p class="text-xs text-surface-500">{{ option.source_blue_book_label }}</p>
-              </div>
-            </template>
-          </Select>
-          <small v-if="form.errors.project_identity_id" class="text-red-600">
-            {{ form.errors.project_identity_id }}
-          </small>
-        </label>
-        <div
-          v-if="selectedRevisionSourceProject"
-          class="rounded-lg border border-primary-100 bg-primary-50 p-3 text-sm text-primary-900"
-        >
-          Proyek ini akan disimpan sebagai revisi dari
-          <strong>
-            {{ selectedRevisionSourceProject.bb_code }} -
-            {{ selectedRevisionSourceProject.project_name }}
-          </strong>
-          dan data form tetap bisa diedit sebelum disimpan.
-        </div>
-      </section>
-
       <section class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <div>
           <h2 class="mt-1 text-lg font-semibold text-surface-950">Informasi Umum</h2>
