@@ -30,7 +30,6 @@ export const blueBookSchema = z.object({
   revision_number: z.number().int().min(0, 'Revisi minimal 0'),
   revision_year: optionalNumber,
   status: z.enum(['active', 'superseded']),
-  carry_over_project_ids: z.array(z.string().uuid('Project Blue Book tidak valid')).optional(),
 })
 
 export const importBBProjectsFromBlueBookSchema = z.object({

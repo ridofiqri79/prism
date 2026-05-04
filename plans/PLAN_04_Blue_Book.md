@@ -5,6 +5,7 @@
 > **Referensi:** docs/PRISM_API_Contract.md (Blue Book), docs/PRISM_Business_Rules.md (bagian 3)
 > **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. BB Project perlu `project_identity_id`, indikator latest/newer revision, dan section histori revisi.
 > **Carry-over update:** Setelah Blue Book revisi dibuat, user memakai tombol "Impor Proyek dari Blue Book Lain" di detail Blue Book untuk memilih Project Blue Book dari Blue Book sumber periode yang sama dan meng-clone sebagai snapshot baru.
+> **Create update:** Create Blue Book baru selalu kosong; tidak ada carry-over otomatis dari Blue Book sebelumnya.
 
 ---
 
@@ -13,7 +14,7 @@
 **`src/types/blue-book.types.ts`:**
 ```typescript
 export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded'; project_count: number }
-export interface BlueBookPayload { period_id: string; replaces_blue_book_id?: string | null; publish_date: string; revision_number: number; revision_year?: number | null; status: 'active' | 'superseded'; carry_over_project_ids?: string[] }
+export interface BlueBookPayload { period_id: string; replaces_blue_book_id?: string | null; publish_date: string; revision_number: number; revision_year?: number | null; status: 'active' | 'superseded' }
 export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' }
 export interface LenderIndication { id: string; lender: Lender; remarks?: string }
 export interface LoI { id: string; lender: Lender; subject: string; date: string; letter_number?: string }
@@ -32,7 +33,6 @@ export const blueBookSchema = z.object({
   revision_number: z.number().int().min(0),
   revision_year: z.number().int().optional(),
   status: z.enum(['active', 'superseded']),
-  carry_over_project_ids: z.array(z.string().uuid()).optional(),
 })
 
 export const bbProjectSchema = z.object({
@@ -77,6 +77,7 @@ export const loiSchema = z.object({
 - Filter: period dropdown, status
 - Delete Blue Book hanya tersedia jika `project_count = 0`; backend tetap menolak jika masih punya Project Blue Book.
 - Flow impor proyek revisi tidak berada di dialog create. Gunakan tombol "Impor Proyek dari Blue Book Lain" pada detail Blue Book.
+- Create Blue Book baru selalu kosong.
 
 ---
 

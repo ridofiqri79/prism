@@ -112,7 +112,6 @@ async function save() {
     ...form,
     revision_year: form.revision_year ?? undefined,
     replaces_blue_book_id: undefined,
-    carry_over_project_ids: undefined,
   })
 
   if (!parsed.success) {

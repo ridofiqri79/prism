@@ -34,7 +34,6 @@ export interface BlueBookPayload {
   revision_number: number
   revision_year?: number | null
   status: BlueBookStatus
-  carry_over_project_ids?: string[]
 }
 
 export interface ImportBBProjectsFromBlueBookPayload {

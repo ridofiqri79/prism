@@ -556,13 +556,12 @@ Response list Blue Book menyertakan `project_count` pada tiap item untuk menentu
   "publish_date": "2025-01-15",
   "revision_number": 0,
   "revision_year": null,
-  "status": "active",
-  "carry_over_project_ids": ["uuid-bb-project-sumber"]
+  "status": "active"
 }
 ```
 
 Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Blue Book lain menjadi `superseded` ketika Blue Book baru dibuat.
-Jika `replaces_blue_book_id` diisi, `carry_over_project_ids` dapat dikirim untuk memilih Project Blue Book sumber yang akan di-clone ke Blue Book baru. Field ini opsional; jika tidak dikirim, backend mempertahankan perilaku clone seluruh Project Blue Book dari sumber revisi.
+Create Blue Book baru selalu dimulai kosong. Jika user ingin membawa Project Blue Book dari dokumen lain, gunakan endpoint import di detail Blue Book melalui tombol `Impor Proyek dari Blue Book Lain`.
 
 **`GET /blue-books/:id` Response `200`:**
 ```json

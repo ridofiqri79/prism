@@ -94,24 +94,10 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 	if err != nil {
 		return nil, err
 	}
-	carryOverProjectIDs, carryOverProjectIDsProvided, err := parseOptionalUUIDArray(req.CarryOverProjectIDs, "carry_over_project_ids")
-	if err != nil {
-		return nil, err
-	}
 	var created queries.BlueBook
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		sourceID := replacesID
-		if !sourceID.Valid && req.RevisionNumber > 0 {
-			active, err := qtx.GetActiveBlueBookByPeriod(ctx, periodID)
-			if err != nil && err != pgx.ErrNoRows {
-				return err
-			}
-			if err == nil {
-				sourceID = active.ID
-			}
-		}
-		if sourceID.Valid {
-			sourceBlueBook, err := qtx.GetBlueBook(ctx, sourceID)
+		if replacesID.Valid {
+			sourceBlueBook, err := qtx.GetBlueBook(ctx, replacesID)
 			if err != nil {
 				return mapNotFound(err, "Blue Book sumber revisi tidak ditemukan")
 			}
@@ -119,15 +105,12 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 				return validation("replaces_blue_book_id", "harus berasal dari periode yang sama")
 			}
 		}
-		if !sourceID.Valid && carryOverProjectIDsProvided && len(carryOverProjectIDs) > 0 {
-			return validation("replaces_blue_book_id", "wajib dipilih untuk membawa Project Blue Book")
-		}
 		if err := s.ensureBlueBookVersionAvailable(ctx, qtx, periodID, req.RevisionNumber, revisionYear, pgtype.UUID{}); err != nil {
 			return err
 		}
 		row, err := qtx.CreateBlueBook(ctx, queries.CreateBlueBookParams{
 			PeriodID:           periodID,
-			ReplacesBlueBookID: sourceID,
+			ReplacesBlueBookID: replacesID,
 			PublishDate:        publishDate,
 			RevisionNumber:     req.RevisionNumber,
 			RevisionYear:       revisionYear,
@@ -135,11 +118,6 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 		})
 		if err != nil {
 			return err
-		}
-		if sourceID.Valid {
-			if err := s.cloneBlueBookProjects(ctx, qtx, sourceID, row.ID, carryOverProjectIDs, carryOverProjectIDsProvided); err != nil {
-				return err
-			}
 		}
 		created = row
 		return nil
@@ -581,33 +559,6 @@ func (s *BlueBookService) GetBBProjectHistoryWithAudit(ctx context.Context, id p
 	return items, nil
 }
 
-func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *queries.Queries, sourceBlueBookID, targetBlueBookID pgtype.UUID, selectedProjectIDs []pgtype.UUID, selectedProvided bool) error {
-	sourceProjects := make([]queries.BbProject, 0)
-	var err error
-	if selectedProvided {
-		if len(selectedProjectIDs) == 0 {
-			return nil
-		}
-		sourceProjects, err = qtx.ListBBProjectsForCloneByIDs(ctx, queries.ListBBProjectsForCloneByIDsParams{
-			BlueBookID: sourceBlueBookID,
-			ProjectIds: selectedProjectIDs,
-		})
-		if err != nil {
-			return err
-		}
-		if len(sourceProjects) != len(selectedProjectIDs) {
-			return validation("carry_over_project_ids", "harus berasal dari Blue Book sumber")
-		}
-	} else {
-		sourceProjects, err = qtx.ListBBProjectsForClone(ctx, sourceBlueBookID)
-		if err != nil {
-			return err
-		}
-	}
-	_, err = s.cloneBBProjectSnapshots(ctx, qtx, targetBlueBookID, sourceProjects)
-	return err
-}
-
 func (s *BlueBookService) cloneBBProjectSnapshots(ctx context.Context, qtx *queries.Queries, targetBlueBookID pgtype.UUID, sourceProjects []queries.BbProject) ([]queries.BbProject, error) {
 	clonedProjects := make([]queries.BbProject, 0, len(sourceProjects))
 	for _, source := range sourceProjects {
@@ -677,17 +628,6 @@ func ensureBBProjectCloneTargetAvailable(sourceProjects, targetProjects []querie
 
 func normalizeProjectCode(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
-}
-
-func parseOptionalUUIDArray(values *[]string, field string) ([]pgtype.UUID, bool, error) {
-	if values == nil {
-		return nil, false, nil
-	}
-	ids, err := uuidArray(*values, field)
-	if err != nil {
-		return nil, true, err
-	}
-	return ids, true, nil
 }
 
 func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, req model.CreateBBProjectRequest) error {

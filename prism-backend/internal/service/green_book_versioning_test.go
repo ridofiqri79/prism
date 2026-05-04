@@ -350,14 +350,8 @@ func (env *blueBookVersioningTestEnv) createBBRevisionPair(t *testing.T) (*model
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
 	revision := env.createBlueBook(t, 1, &original.ID)
-	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
-	if err != nil {
-		t.Fatalf("ListBBProjects(BB revision) error = %v", err)
-	}
-	if len(projects.Data) != 1 {
-		t.Fatalf("BB revision projects = %d, want 1", len(projects.Data))
-	}
-	return original, sourceProject, &projects.Data[0]
+	latestProject := env.importBBProjectFromBlueBook(t, revision.ID, original.ID, sourceProject.ID)
+	return original, sourceProject, latestProject
 }
 
 func (env *blueBookVersioningTestEnv) createGreenBook(t *testing.T, service *GreenBookService, revisionNumber int32, replacesID *string) *model.GreenBookResponse {

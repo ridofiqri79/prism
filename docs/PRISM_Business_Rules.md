@@ -43,6 +43,7 @@
 - BB Project adalah snapshot di dalam satu Blue Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi harus dihubungkan dengan logical identity.
 - `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
+- Create Blue Book baru selalu kosong. Project dari Blue Book lain hanya boleh dibawa lewat aksi impor di detail Blue Book.
 - Pada Blue Book detail untuk revisi, user dapat memakai tombol `Impor Proyek dari Blue Book Lain` untuk memilih Project Blue Book dari Blue Book sumber periode yang sama dan membawanya ke Blue Book tujuan.
 - Project Blue Book yang dibawa dari revisi sebelumnya di-clone sebagai snapshot baru dengan `project_identity_id` yang sama.
 - Mitra Kerja Bappenas bersifat opsional dan boleh lebih dari satu. Simpan Eselon II saja; Eselon I diturunkan dari `parent_id`.
