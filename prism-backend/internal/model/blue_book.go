@@ -1,11 +1,18 @@
 package model
 
 type BlueBookRequest struct {
-	PeriodID           string  `json:"period_id" validate:"required"`
-	ReplacesBlueBookID *string `json:"replaces_blue_book_id"`
-	PublishDate        string  `json:"publish_date" validate:"required"`
-	RevisionNumber     int32   `json:"revision_number"`
-	RevisionYear       *int32  `json:"revision_year"`
+	PeriodID            string    `json:"period_id" validate:"required"`
+	ReplacesBlueBookID  *string   `json:"replaces_blue_book_id"`
+	PublishDate         string    `json:"publish_date" validate:"required"`
+	RevisionNumber      int32     `json:"revision_number"`
+	RevisionYear        *int32    `json:"revision_year"`
+	Status              string    `json:"status"`
+	CarryOverProjectIDs *[]string `json:"carry_over_project_ids"`
+}
+
+type ImportBBProjectsFromBlueBookRequest struct {
+	SourceBlueBookID string   `json:"source_blue_book_id" validate:"required"`
+	ProjectIDs       []string `json:"project_ids" validate:"required,min=1"`
 }
 
 type PeriodInfo struct {
@@ -23,6 +30,7 @@ type BlueBookResponse struct {
 	RevisionNumber     int32      `json:"revision_number"`
 	RevisionYear       *int32     `json:"revision_year"`
 	Status             string     `json:"status"`
+	ProjectCount       int64      `json:"project_count"`
 	CreatedAt          string     `json:"created_at,omitempty"`
 	UpdatedAt          string     `json:"updated_at,omitempty"`
 }

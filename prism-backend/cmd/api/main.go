@@ -179,6 +179,7 @@ func main() {
 	blueBooks.POST("/:bbId/import-projects/preview", blueBookHandler.PreviewImportBBProjects, middleware.RequireAdmin())
 	blueBooks.POST("/:bbId/import-projects/execute", blueBookHandler.ImportBBProjects, middleware.RequireAdmin())
 	blueBooks.GET("/:bbId/import-projects/template", blueBookHandler.DownloadBBProjectImportTemplate, middleware.RequireAdmin())
+	blueBooks.POST("/:bbId/import-projects/from-blue-book", blueBookHandler.ImportBBProjectsFromBlueBook, middleware.Require("bb_project", "create"))
 
 	loi := api.Group("/bb-projects/:bbProjectId/loi")
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))

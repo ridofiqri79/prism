@@ -536,13 +536,17 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `PUT` | `/blue-books/:id` | update: `blue_book` |
 | `DELETE` | `/blue-books/:id` | delete: `blue_book` |
 
+`DELETE /blue-books/:id` melakukan hard delete hanya jika Blue Book belum memiliki Project Blue Book dan tidak dipakai sebagai sumber revisi Blue Book lain. Jika masih memiliki Project Blue Book, backend mengembalikan `409 CONFLICT` dengan pesan aman agar user menghapus Project Blue Book terlebih dahulu.
+
 **`GET /blue-books` Query Params tambahan:**
 
 | Param | Format | Keterangan |
 |-------|--------|------------|
 | `search` | string | Cari berdasarkan nama periode, tanggal terbit, tahun revisi, atau status |
 | `period_id` | multi-value UUID | Filter periode Blue Book |
-| `status` | multi-value enum | `active`, `superseded` |
+| `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+
+Response list Blue Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
 **`POST /blue-books` Request:**
 ```json
@@ -551,9 +555,14 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
   "replaces_blue_book_id": "uuid-blue-book-sebelumnya",
   "publish_date": "2025-01-15",
   "revision_number": 0,
-  "revision_year": null
+  "revision_year": null,
+  "status": "active",
+  "carry_over_project_ids": ["uuid-bb-project-sumber"]
 }
 ```
+
+Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Blue Book lain menjadi `superseded` ketika Blue Book baru dibuat.
+Jika `replaces_blue_book_id` diisi, `carry_over_project_ids` dapat dikirim untuk memilih Project Blue Book sumber yang akan di-clone ke Blue Book baru. Field ini opsional; jika tidak dikirim, backend mempertahankan perilaku clone seluruh Project Blue Book dari sumber revisi.
 
 **`GET /blue-books/:id` Response `200`:**
 ```json
@@ -566,6 +575,7 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
     "revision_number": 0,
     "revision_year": null,
     "status": "active",
+    "project_count": 0,
     "created_at": "2025-01-15T08:00:00Z",
     "updated_at": "2025-01-15T08:00:00Z"
   }
@@ -581,8 +591,19 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `GET` | `/blue-books/:bb_id/import-projects/template` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/execute` | ADMIN only |
+| `POST` | `/blue-books/:bb_id/import-projects/from-blue-book` | create: `bb_project` |
 
-**Content-Type:** `multipart/form-data`
+**Import dari Blue Book lain:**
+```json
+{
+  "source_blue_book_id": "uuid-blue-book-sumber",
+  "project_ids": ["uuid-bb-project-sumber"]
+}
+```
+
+Endpoint `POST /blue-books/:bb_id/import-projects/from-blue-book` meng-clone Project Blue Book terpilih dari Blue Book sumber ke Blue Book target. Blue Book sumber harus berbeda dari target dan berada pada periode yang sama. Backend menolak import jika salah satu project tidak berasal dari Blue Book sumber, `BB Code` sudah ada di target, atau logical project yang sama sudah ada di target. Relasi anak ikut di-clone sebagai snapshot baru: institution, Mitra Kerja Bappenas, lokasi, national priority, project cost, lender indication, dan LoI.
+
+**Import workbook Content-Type:** `multipart/form-data`
 
 **Form field:**
 

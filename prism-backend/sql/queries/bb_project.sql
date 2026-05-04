@@ -13,7 +13,12 @@ SELECT
     bb.updated_at,
     p.name AS period_name,
     p.year_start,
-    p.year_end
+    p.year_end,
+    (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    )::BIGINT AS project_count
 FROM blue_book bb
 JOIN period p ON p.id = bb.period_id
 WHERE (
@@ -65,14 +70,19 @@ SELECT
     bb.updated_at,
     p.name AS period_name,
     p.year_start,
-    p.year_end
+    p.year_end,
+    (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    )::BIGINT AS project_count
 FROM blue_book bb
 JOIN period p ON p.id = bb.period_id
 WHERE bb.id = $1;
 
 -- name: CreateBlueBook :one
 INSERT INTO blue_book (period_id, replaces_blue_book_id, publish_date, revision_number, revision_year, status)
-VALUES ($1, $2, $3, $4, $5, 'active')
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateBlueBook :one
@@ -80,16 +90,10 @@ UPDATE blue_book
 SET publish_date = $2,
     revision_number = $3,
     revision_year = $4,
+    status = $5,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
-
--- name: SupersedeBlueBooksByPeriod :exec
-UPDATE blue_book
-SET status = 'superseded',
-    updated_at = NOW()
-WHERE period_id = $1
-  AND status = 'active';
 
 -- name: GetActiveBlueBookByPeriod :one
 SELECT *
@@ -120,11 +124,29 @@ WHERE period_id = sqlc.arg('period_id')
   )
   AND id <> sqlc.arg('id');
 
--- name: SupersedeBlueBook :one
-UPDATE blue_book
-SET status = 'superseded',
-    updated_at = NOW()
-WHERE id = $1
+-- name: CountAnyBBProjectsByBlueBook :one
+SELECT COUNT(*)
+FROM bb_project
+WHERE blue_book_id = $1;
+
+-- name: CountBlueBookRevisionsReplacing :one
+SELECT COUNT(*)
+FROM blue_book
+WHERE replaces_blue_book_id = $1;
+
+-- name: HardDeleteBlueBook :one
+DELETE FROM blue_book
+WHERE blue_book.id = $1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM bb_project bp
+      WHERE bp.blue_book_id = blue_book.id
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM blue_book child
+      WHERE child.replaces_blue_book_id = blue_book.id
+  )
 RETURNING *;
 
 -- ===== BB PROJECT =====
@@ -283,6 +305,14 @@ SELECT *
 FROM bb_project
 WHERE blue_book_id = $1
   AND status = 'active'
+ORDER BY bb_code ASC;
+
+-- name: ListBBProjectsForCloneByIDs :many
+SELECT *
+FROM bb_project
+WHERE blue_book_id = $1
+  AND status = 'active'
+  AND id = ANY(sqlc.arg('project_ids')::uuid[])
 ORDER BY bb_code ASC;
 
 -- name: GetLatestBBProjectByIdentity :one

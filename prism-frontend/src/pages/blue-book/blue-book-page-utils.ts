@@ -20,7 +20,12 @@ export function formatRevision(revisionNumber: number, revisionYear?: number | n
   return `Revisi ke-${revisionNumber}${revisionYear ? ` (${revisionYear})` : ''}`
 }
 
+export function formatBlueBookStatus(status: string) {
+  if (status === 'active') return 'Berlaku'
+  if (status === 'superseded') return 'Tidak Berlaku'
+  return status
+}
+
 export function joinNames(items: { name?: string; title?: string }[]) {
   return items.map((item) => item.name ?? item.title).filter(Boolean).join(', ') || '-'
 }
-

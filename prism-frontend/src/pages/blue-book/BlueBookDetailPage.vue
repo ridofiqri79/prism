@@ -16,16 +16,25 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
-import { blueBookSchema } from '@/schemas/blue-book.schema'
+import { blueBookSchema, importBBProjectsFromBlueBookSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { BBProject, BBProjectListParams, BlueBookPayload } from '@/types/blue-book.types'
+import type {
+  BBProject,
+  BBProjectListParams,
+  BBProjectRevisionSourceOption,
+  BlueBook,
+  BlueBookPayload,
+  BlueBookStatus,
+  ImportBBProjectsFromBlueBookPayload,
+} from '@/types/blue-book.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatApiError } from '@/utils/api-error'
-import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import { formatBlueBookStatus, formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type BlueBookField = keyof BlueBookPayload
+type ImportFromBlueBookField = keyof ImportBBProjectsFromBlueBookPayload
 interface ProjectFilterState {
   executing_agency_ids: string[]
   location_ids: string[]
@@ -42,6 +51,7 @@ const { can } = usePermission()
 
 const blueBookId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
+const importDialogVisible = ref(false)
 const gbCreateDialogVisible = ref(false)
 const selectedBBProject = ref<BBProject | null>(null)
 const projectControls = useListControls<ProjectFilterState>({
@@ -68,13 +78,23 @@ const form = reactive<BlueBookPayload>({
   publish_date: '',
   revision_number: 0,
   revision_year: null,
+  status: 'active',
 })
 const projectFilters = projectControls.draftFilters
 const gbCreateForm = reactive({
   greenBookId: '',
   useBBData: false,
 })
+const importForm = reactive<ImportBBProjectsFromBlueBookPayload>({
+  source_blue_book_id: '',
+  project_ids: [],
+})
 const errors = ref<FormErrors<BlueBookField>>({})
+const importErrors = ref<FormErrors<ImportFromBlueBookField>>({})
+const importSourceBlueBookOptions = ref<BlueBook[]>([])
+const importSourceBlueBookLoading = ref(false)
+const importProjectOptions = ref<BBProjectRevisionSourceOption[]>([])
+const importProjectLoading = ref(false)
 const columns: ColumnDef[] = [
   { field: 'bb_code', header: 'Kode Blue Book', width: '11rem' },
   { field: 'project_name', header: 'Nama Proyek', width: '32%' },
@@ -82,6 +102,20 @@ const columns: ColumnDef[] = [
   { field: 'location', header: 'Location', width: '21%' },
   { field: 'actions', header: 'Aksi', align: 'right', width: '12rem' },
 ]
+const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [
+  { label: 'Berlaku', value: 'active' },
+  { label: 'Tidak Berlaku', value: 'superseded' },
+]
+const canDeleteCurrentBlueBook = computed(
+  () => can('blue_book', 'delete') && (blueBookStore.currentBlueBook?.project_count ?? 0) === 0,
+)
+const isRevisionBlueBook = computed(() =>
+  Boolean(blueBookStore.currentBlueBook?.replaces_blue_book_id) ||
+  Number(blueBookStore.currentBlueBook?.revision_number ?? 0) > 0,
+)
+const canImportProjectsFromBlueBook = computed(
+  () => can('bb_project', 'create') && isRevisionBlueBook.value,
+)
 
 const selectedCountryCodes = computed(() => {
   const selected = new Set(projectControls.draftFilters.location_ids)
@@ -126,6 +160,86 @@ async function loadProjects() {
   await blueBookStore.fetchProjects(blueBookId.value, buildProjectParams())
 }
 
+function clearImportProjects() {
+  importProjectOptions.value = []
+  importForm.project_ids = []
+}
+
+function clearImportSource() {
+  importSourceBlueBookOptions.value = []
+  importForm.source_blue_book_id = ''
+  clearImportProjects()
+}
+
+async function loadImportSourceBlueBooks() {
+  const current = blueBookStore.currentBlueBook
+  if (!current || !isRevisionBlueBook.value) {
+    clearImportSource()
+    return
+  }
+
+  importSourceBlueBookLoading.value = true
+  try {
+    const samePeriodBlueBooks = await blueBookStore.getBlueBooksByPeriod(current.period.id)
+    importSourceBlueBookOptions.value = samePeriodBlueBooks
+      .filter((blueBook) => isSourceBlueBook(blueBook, current))
+      .sort(compareBlueBookVersionDesc)
+
+    const currentSourceStillAvailable = importSourceBlueBookOptions.value.some(
+      (blueBook) => blueBook.id === importForm.source_blue_book_id,
+    )
+    if (!currentSourceStillAvailable) {
+      importForm.source_blue_book_id = importSourceBlueBookOptions.value[0]?.id ?? ''
+      if (!importForm.source_blue_book_id) {
+        clearImportProjects()
+        return
+      }
+    }
+
+    await loadImportProjects(importForm.source_blue_book_id)
+  } finally {
+    importSourceBlueBookLoading.value = false
+  }
+}
+
+async function loadImportProjects(sourceBlueBookId?: string) {
+  if (!sourceBlueBookId) {
+    clearImportProjects()
+    return
+  }
+
+  const current = blueBookStore.currentBlueBook
+  if (!current) {
+    clearImportProjects()
+    return
+  }
+
+  importProjectLoading.value = true
+  try {
+    const [sourceProjects, currentProjects] = await Promise.all([
+      blueBookStore.getProjectsByBlueBook(sourceBlueBookId),
+      blueBookStore.getProjectsByBlueBook(current.id),
+    ])
+    const sourceBlueBook = importSourceBlueBookOptions.value.find(
+      (blueBook) => blueBook.id === sourceBlueBookId,
+    )
+    const usedIdentityIds = new Set(currentProjects.map((project) => project.project_identity_id))
+    const usedCodes = new Set(currentProjects.map((project) => normalizeProjectCode(project.bb_code)))
+
+    importProjectOptions.value = sourceProjects
+      .filter((project) => !usedIdentityIds.has(project.project_identity_id))
+      .filter((project) => !usedCodes.has(normalizeProjectCode(project.bb_code)))
+      .map((project) => ({
+        ...project,
+        source_blue_book_id: sourceBlueBookId,
+        source_blue_book_label: sourceBlueBook ? sourceBlueBookLabel(sourceBlueBook) : '',
+      }))
+    importForm.project_ids = importProjectOptions.value.map((project) => project.id)
+  } finally {
+    importProjectLoading.value = false
+  }
+}
+
 function buildProjectParams(): BBProjectListParams {
   const params = projectControls.buildParams() as BBProjectListParams
   const locationIDs = expandLocationFilterIds(projectControls.appliedFilters.location_ids)
@@ -144,6 +258,65 @@ const greenBookOptions = computed(() =>
       label: `Green Book ${greenBook.publish_year} Rev ${greenBook.revision_number}`,
     })),
 )
+const importSourceBlueBookSelectOptions = computed(() =>
+  importSourceBlueBookOptions.value.map((blueBook) => ({
+    ...blueBook,
+    label: sourceBlueBookLabel(blueBook),
+  })),
+)
+const importProjectSelectOptions = computed(() =>
+  importProjectOptions.value.map((project) => ({
+    ...project,
+    label: carryOverProjectLabel(project),
+  })),
+)
+
+function compareBlueBookVersionDesc(left: BlueBook, right: BlueBook) {
+  if (left.revision_number !== right.revision_number) {
+    return right.revision_number - left.revision_number
+  }
+
+  const leftYear = left.revision_year ?? 0
+  const rightYear = right.revision_year ?? 0
+  if (leftYear !== rightYear) {
+    return rightYear - leftYear
+  }
+
+  return String(right.created_at ?? '').localeCompare(String(left.created_at ?? ''))
+}
+
+function isSourceBlueBook(blueBook: BlueBook, targetBlueBook: BlueBook) {
+  if (blueBook.id === targetBlueBook.id || blueBook.period.id !== targetBlueBook.period.id) {
+    return false
+  }
+
+  if (blueBook.id === targetBlueBook.replaces_blue_book_id) {
+    return true
+  }
+
+  if (blueBook.revision_number < targetBlueBook.revision_number) {
+    return true
+  }
+
+  return (
+    blueBook.revision_number === targetBlueBook.revision_number &&
+    Boolean(blueBook.created_at) &&
+    Boolean(targetBlueBook.created_at) &&
+    String(blueBook.created_at) < String(targetBlueBook.created_at)
+  )
+}
+
+function sourceBlueBookLabel(blueBook: BlueBook) {
+  return `${blueBook.period.name} - ${formatRevision(blueBook.revision_number, blueBook.revision_year)} (${formatBlueBookStatus(blueBook.status)})`
+}
+
+function carryOverProjectLabel(project: { bb_code: string; project_name: string }) {
+  return `${project.bb_code} - ${project.project_name}`
+}
+
+function normalizeProjectCode(code: string) {
+  return code.trim().toLowerCase()
+}
 
 function formatInstitution(institution: Institution) {
   return institution.short_name ? `${institution.name} (${institution.short_name})` : institution.name
@@ -244,6 +417,7 @@ function openEdit() {
     publish_date: current.publish_date,
     revision_number: current.revision_number,
     revision_year: current.revision_year ?? null,
+    status: current.status,
   })
   errors.value = {}
   dialogVisible.value = true
@@ -260,6 +434,7 @@ async function save() {
       'publish_date',
       'revision_number',
       'revision_year',
+      'status',
     ])
     return
   }
@@ -271,6 +446,29 @@ async function save() {
   toast.success('Berhasil', 'Blue Book berhasil diperbarui')
   dialogVisible.value = false
   await loadData()
+}
+
+function deleteBlueBook() {
+  const current = blueBookStore.currentBlueBook
+  if (!current) return
+  if (current.project_count > 0) {
+    toast.warn('Tidak Bisa Menghapus', 'Blue Book masih memiliki Project Blue Book.')
+    return
+  }
+
+  confirm.confirmDelete(`Blue Book ${current.period.name}`, async () => {
+    try {
+      await blueBookStore.deleteBlueBook(current.id)
+      toast.success('Berhasil', 'Blue Book berhasil dihapus permanen')
+      await router.push({ name: 'blue-books' })
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Blue Book masih memiliki Project Blue Book'),
+        12000,
+      )
+    }
+  })
 }
 
 function deleteProject(project: BBProject) {
@@ -298,6 +496,27 @@ function openGBCreateDialog(project: BBProject) {
   gbCreateForm.greenBookId = greenBookOptions.value[0]?.id ?? ''
   gbCreateForm.useBBData = false
   gbCreateDialogVisible.value = true
+}
+
+function openImportFromBlueBookDialog() {
+  importErrors.value = {}
+  importForm.source_blue_book_id = ''
+  importForm.project_ids = []
+  importDialogVisible.value = true
+  void loadImportSourceBlueBooks()
+}
+
+async function saveImportFromBlueBook() {
+  const parsed = importBBProjectsFromBlueBookSchema.safeParse(importForm)
+  if (!parsed.success) {
+    importErrors.value = toFormErrors(parsed.error, ['source_blue_book_id', 'project_ids'])
+    return
+  }
+
+  await blueBookStore.importProjectsFromBlueBook(blueBookId.value, parsed.data)
+  toast.success('Berhasil', 'Proyek Blue Book berhasil diimpor')
+  importDialogVisible.value = false
+  await Promise.all([blueBookStore.fetchBlueBook(blueBookId.value), loadProjects()])
 }
 
 async function createGBProjectFromBB() {
@@ -346,6 +565,21 @@ watch(
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'blue-books' })" />
         <Button v-if="can('blue_book', 'update')" label="Edit Blue Book" icon="pi pi-pencil" outlined @click="openEdit" />
         <Button
+          v-if="canDeleteCurrentBlueBook"
+          label="Hapus Blue Book"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          @click="deleteBlueBook"
+        />
+        <Button
+          v-if="canImportProjectsFromBlueBook"
+          label="Impor Proyek dari Blue Book Lain"
+          icon="pi pi-file-import"
+          outlined
+          @click="openImportFromBlueBookDialog"
+        />
+        <Button
           v-if="can('bb_project', 'create')"
           as="router-link"
           :to="{ name: 'bb-project-create', params: { bbId: blueBookId } }"
@@ -372,7 +606,10 @@ watch(
       </div>
       <div>
         <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
-        <StatusBadge :status="blueBookStore.currentBlueBook.status" />
+        <StatusBadge
+          :status="blueBookStore.currentBlueBook.status"
+          :label="formatBlueBookStatus(blueBookStore.currentBlueBook.status)"
+        />
       </div>
     </div>
 
@@ -512,9 +749,100 @@ watch(
             <InputNumber v-model="form.revision_year" :use-grouping="false" class="w-full" />
           </label>
         </div>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Status</span>
+          <Select
+            v-model="form.status"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Pilih status"
+            class="w-full"
+            :invalid="Boolean(errors.status)"
+          />
+          <small v-if="errors.status" class="text-red-600">{{ errors.status }}</small>
+        </label>
         <div class="flex justify-end gap-2 border-t border-surface-200 pt-4">
           <Button label="Batal" severity="secondary" outlined @click="dialogVisible = false" />
           <Button type="submit" label="Simpan" icon="pi pi-save" />
+        </div>
+      </form>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="importDialogVisible"
+      modal
+      header="Impor Proyek dari Blue Book Lain"
+      class="w-[44rem] max-w-[95vw]"
+    >
+      <form class="space-y-4" @submit.prevent="saveImportFromBlueBook">
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Blue Book Sumber</span>
+          <Select
+            v-model="importForm.source_blue_book_id"
+            :options="importSourceBlueBookSelectOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Blue Book sumber"
+            filter
+            class="w-full"
+            :loading="importSourceBlueBookLoading"
+            :invalid="Boolean(importErrors.source_blue_book_id)"
+            @change="loadImportProjects(importForm.source_blue_book_id)"
+          />
+          <small v-if="importErrors.source_blue_book_id" class="text-red-600">
+            {{ importErrors.source_blue_book_id }}
+          </small>
+          <small
+            v-else-if="!importSourceBlueBookLoading && importSourceBlueBookOptions.length === 0"
+            class="text-surface-500"
+          >
+            Belum ada Blue Book sumber pada periode ini.
+          </small>
+        </label>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Project Blue Book yang Diimpor</span>
+          <MultiSelect
+            v-model="importForm.project_ids"
+            :options="importProjectSelectOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Project Blue Book"
+            filter
+            class="w-full"
+            :max-selected-labels="2"
+            selected-items-label="{0} Project Blue Book dipilih"
+            :loading="importProjectLoading"
+            :invalid="Boolean(importErrors.project_ids)"
+            :disabled="!importForm.source_blue_book_id"
+          >
+            <template #option="{ option }">
+              <div class="space-y-1">
+                <p class="font-medium text-surface-950">
+                  {{ option.bb_code }} - {{ option.project_name }}
+                </p>
+                <p class="text-xs text-surface-500">{{ option.source_blue_book_label }}</p>
+              </div>
+            </template>
+          </MultiSelect>
+          <small v-if="importErrors.project_ids" class="text-red-600">
+            {{ importErrors.project_ids }}
+          </small>
+          <small
+            v-else-if="importForm.source_blue_book_id && !importProjectLoading && importProjectOptions.length === 0"
+            class="text-surface-500"
+          >
+            Tidak ada Project Blue Book yang bisa diimpor dari sumber ini.
+          </small>
+        </label>
+        <div class="flex justify-end gap-2 border-t border-surface-200 pt-4">
+          <Button label="Batal" severity="secondary" outlined @click="importDialogVisible = false" />
+          <Button
+            type="submit"
+            label="Impor"
+            icon="pi pi-file-import"
+            :disabled="!importForm.source_blue_book_id || importForm.project_ids.length === 0"
+          />
         </div>
       </form>
     </Dialog>

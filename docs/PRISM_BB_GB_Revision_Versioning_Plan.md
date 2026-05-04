@@ -128,7 +128,7 @@ replaces_blue_book_id UUID REFERENCES blue_book(id)
 replaces_green_book_id UUID REFERENCES green_book(id)
 ```
 
-Jika field ini tidak ditambahkan, source revisi tetap bisa ditentukan dari header active terakhir pada period/publish_year yang sama sebelum supersede.
+Jika field ini tidak ditambahkan, source revisi tetap bisa ditentukan dari header `Berlaku` terakhir pada period/publish_year yang sama.
 
 ---
 
@@ -176,9 +176,9 @@ Tasks:
    - Jika tidak, create `project_identity` baru.
    - Validasi duplicate hanya dalam `blue_book_id` yang sama.
 2. Create Blue Book revision:
-   - Supersede header lama pada period yang sama.
-   - Create header baru.
-   - Clone project dari source Blue Book.
+   - Create header baru dengan status eksplisit pilihan user (`Berlaku`/`Tidak Berlaku`).
+   - Tidak mengubah status header lama secara otomatis.
+   - Clone project pilihan user dari source Blue Book periode yang sama.
    - Clone children: institutions, locations, national priorities, project costs, lender indications, dan LoI.
    - Setiap clone memakai `project_identity_id` yang sama dengan snapshot asal.
 3. Tambah endpoint/history service:

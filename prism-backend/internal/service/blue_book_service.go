@@ -86,11 +86,15 @@ func (s *BlueBookService) GetBlueBook(ctx context.Context, id pgtype.UUID) (*mod
 }
 
 func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBookRequest) (*model.BlueBookResponse, error) {
-	periodID, publishDate, revisionYear, err := parseBlueBookRequest(req)
+	periodID, publishDate, revisionYear, status, err := parseBlueBookRequest(req)
 	if err != nil {
 		return nil, err
 	}
 	replacesID, err := parseOptionalUUID(req.ReplacesBlueBookID, "replaces_blue_book_id")
+	if err != nil {
+		return nil, err
+	}
+	carryOverProjectIDs, carryOverProjectIDsProvided, err := parseOptionalUUIDArray(req.CarryOverProjectIDs, "carry_over_project_ids")
 	if err != nil {
 		return nil, err
 	}
@@ -107,14 +111,18 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 			}
 		}
 		if sourceID.Valid {
-			if _, err := qtx.GetBlueBook(ctx, sourceID); err != nil {
+			sourceBlueBook, err := qtx.GetBlueBook(ctx, sourceID)
+			if err != nil {
 				return mapNotFound(err, "Blue Book sumber revisi tidak ditemukan")
 			}
+			if model.UUIDToString(sourceBlueBook.PeriodID) != model.UUIDToString(periodID) {
+				return validation("replaces_blue_book_id", "harus berasal dari periode yang sama")
+			}
+		}
+		if !sourceID.Valid && carryOverProjectIDsProvided && len(carryOverProjectIDs) > 0 {
+			return validation("replaces_blue_book_id", "wajib dipilih untuk membawa Project Blue Book")
 		}
 		if err := s.ensureBlueBookVersionAvailable(ctx, qtx, periodID, req.RevisionNumber, revisionYear, pgtype.UUID{}); err != nil {
-			return err
-		}
-		if err := qtx.SupersedeBlueBooksByPeriod(ctx, periodID); err != nil {
 			return err
 		}
 		row, err := qtx.CreateBlueBook(ctx, queries.CreateBlueBookParams{
@@ -123,12 +131,13 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 			PublishDate:        publishDate,
 			RevisionNumber:     req.RevisionNumber,
 			RevisionYear:       revisionYear,
+			Status:             status,
 		})
 		if err != nil {
 			return err
 		}
 		if sourceID.Valid {
-			if err := s.cloneBlueBookProjects(ctx, qtx, sourceID, row.ID); err != nil {
+			if err := s.cloneBlueBookProjects(ctx, qtx, sourceID, row.ID, carryOverProjectIDs, carryOverProjectIDsProvided); err != nil {
 				return err
 			}
 		}
@@ -140,8 +149,85 @@ func (s *BlueBookService) CreateBlueBook(ctx context.Context, req model.BlueBook
 	return s.GetBlueBook(ctx, created.ID)
 }
 
+func (s *BlueBookService) ImportBBProjectsFromBlueBook(ctx context.Context, targetBlueBookID pgtype.UUID, req model.ImportBBProjectsFromBlueBookRequest) ([]model.BBProjectResponse, error) {
+	if strings.TrimSpace(req.SourceBlueBookID) == "" {
+		return nil, validation("source_blue_book_id", "wajib dipilih")
+	}
+	sourceBlueBookID, err := model.ParseUUID(req.SourceBlueBookID)
+	if err != nil {
+		return nil, validation("source_blue_book_id", "UUID tidak valid")
+	}
+	projectIDs, err := uuidArray(req.ProjectIDs, "project_ids")
+	if err != nil {
+		return nil, err
+	}
+	if len(projectIDs) == 0 {
+		return nil, validation("project_ids", "minimal satu Project Blue Book harus dipilih")
+	}
+
+	var clonedProjects []queries.BbProject
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		targetBlueBook, err := qtx.GetBlueBook(ctx, targetBlueBookID)
+		if err != nil {
+			return mapNotFound(err, "Blue Book tidak ditemukan")
+		}
+		sourceBlueBook, err := qtx.GetBlueBook(ctx, sourceBlueBookID)
+		if err != nil {
+			return mapNotFound(err, "Blue Book sumber tidak ditemukan")
+		}
+		if model.UUIDToString(sourceBlueBook.ID) == model.UUIDToString(targetBlueBook.ID) {
+			return validation("source_blue_book_id", "harus berbeda dengan Blue Book tujuan")
+		}
+		if model.UUIDToString(sourceBlueBook.PeriodID) != model.UUIDToString(targetBlueBook.PeriodID) {
+			return validation("source_blue_book_id", "harus berasal dari periode yang sama")
+		}
+
+		sourceProjects, err := qtx.ListBBProjectsForCloneByIDs(ctx, queries.ListBBProjectsForCloneByIDsParams{
+			BlueBookID: sourceBlueBookID,
+			ProjectIds: projectIDs,
+		})
+		if err != nil {
+			return err
+		}
+		if len(sourceProjects) != len(projectIDs) {
+			return validation("project_ids", "harus berasal dari Blue Book sumber")
+		}
+
+		targetProjects, err := qtx.ListBBProjectsForClone(ctx, targetBlueBookID)
+		if err != nil {
+			return err
+		}
+		if err := ensureBBProjectCloneTargetAvailable(sourceProjects, targetProjects); err != nil {
+			return err
+		}
+
+		clonedProjects, err = s.cloneBBProjectSnapshots(ctx, qtx, targetBlueBookID, sourceProjects)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	responses := make([]model.BBProjectResponse, 0, len(clonedProjects))
+	for _, cloned := range clonedProjects {
+		response, err := s.buildBBProjectResponse(ctx, cloned)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, *response)
+	}
+	if s.broker != nil {
+		for _, cloned := range clonedProjects {
+			s.broker.Publish("bb_project.created", map[string]string{"id": model.UUIDToString(cloned.ID)})
+		}
+	}
+	return responses, nil
+}
+
 func (s *BlueBookService) UpdateBlueBook(ctx context.Context, id pgtype.UUID, req model.BlueBookRequest) (*model.BlueBookResponse, error) {
-	_, publishDate, revisionYear, err := parseBlueBookRequest(req)
+	_, publishDate, revisionYear, status, err := parseBlueBookRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +245,7 @@ func (s *BlueBookService) UpdateBlueBook(ctx context.Context, id pgtype.UUID, re
 			PublishDate:    publishDate,
 			RevisionNumber: req.RevisionNumber,
 			RevisionYear:   revisionYear,
+			Status:         status,
 		})
 		if err != nil {
 			return mapNotFound(err, "Blue Book tidak ditemukan")
@@ -172,12 +259,38 @@ func (s *BlueBookService) UpdateBlueBook(ctx context.Context, id pgtype.UUID, re
 }
 
 func (s *BlueBookService) DeleteBlueBook(ctx context.Context, id pgtype.UUID) error {
-	return s.withTx(ctx, func(qtx *queries.Queries) error {
-		if _, err := qtx.SupersedeBlueBook(ctx, id); err != nil {
+	var deleted queries.BlueBook
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		if _, err := qtx.GetBlueBook(ctx, id); err != nil {
 			return mapNotFound(err, "Blue Book tidak ditemukan")
 		}
+		projectCount, err := qtx.CountAnyBBProjectsByBlueBook(ctx, id)
+		if err != nil {
+			return apperrors.Internal("Gagal memeriksa Project Blue Book")
+		}
+		if projectCount > 0 {
+			return apperrors.Conflict("Blue Book tidak bisa dihapus karena masih memiliki Project Blue Book. Hapus Project Blue Book terlebih dahulu.")
+		}
+		revisionCount, err := qtx.CountBlueBookRevisionsReplacing(ctx, id)
+		if err != nil {
+			return apperrors.Internal("Gagal memeriksa relasi revisi Blue Book")
+		}
+		if revisionCount > 0 {
+			return apperrors.Conflict("Blue Book tidak bisa dihapus karena masih dipakai sebagai sumber revisi Blue Book lain.")
+		}
+		row, err := qtx.HardDeleteBlueBook(ctx, id)
+		if err != nil {
+			return mapNotFound(err, "Blue Book tidak ditemukan")
+		}
+		deleted = row
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	if s.broker != nil {
+		s.broker.Publish("blue_book.deleted", map[string]string{"id": model.UUIDToString(deleted.ID)})
+	}
+	return nil
 }
 
 func (s *BlueBookService) ListBBProjects(ctx context.Context, bbID pgtype.UUID, filter model.BBProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.BBProjectResponse], error) {
@@ -468,11 +581,35 @@ func (s *BlueBookService) GetBBProjectHistoryWithAudit(ctx context.Context, id p
 	return items, nil
 }
 
-func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *queries.Queries, sourceBlueBookID, targetBlueBookID pgtype.UUID) error {
-	sourceProjects, err := qtx.ListBBProjectsForClone(ctx, sourceBlueBookID)
-	if err != nil {
-		return err
+func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *queries.Queries, sourceBlueBookID, targetBlueBookID pgtype.UUID, selectedProjectIDs []pgtype.UUID, selectedProvided bool) error {
+	sourceProjects := make([]queries.BbProject, 0)
+	var err error
+	if selectedProvided {
+		if len(selectedProjectIDs) == 0 {
+			return nil
+		}
+		sourceProjects, err = qtx.ListBBProjectsForCloneByIDs(ctx, queries.ListBBProjectsForCloneByIDsParams{
+			BlueBookID: sourceBlueBookID,
+			ProjectIds: selectedProjectIDs,
+		})
+		if err != nil {
+			return err
+		}
+		if len(sourceProjects) != len(selectedProjectIDs) {
+			return validation("carry_over_project_ids", "harus berasal dari Blue Book sumber")
+		}
+	} else {
+		sourceProjects, err = qtx.ListBBProjectsForClone(ctx, sourceBlueBookID)
+		if err != nil {
+			return err
+		}
 	}
+	_, err = s.cloneBBProjectSnapshots(ctx, qtx, targetBlueBookID, sourceProjects)
+	return err
+}
+
+func (s *BlueBookService) cloneBBProjectSnapshots(ctx context.Context, qtx *queries.Queries, targetBlueBookID pgtype.UUID, sourceProjects []queries.BbProject) ([]queries.BbProject, error) {
+	clonedProjects := make([]queries.BbProject, 0, len(sourceProjects))
 	for _, source := range sourceProjects {
 		cloned, err := qtx.CreateBBProject(ctx, queries.CreateBBProjectParams{
 			BlueBookID:        targetBlueBookID,
@@ -487,31 +624,70 @@ func (s *BlueBookService) cloneBlueBookProjects(ctx context.Context, qtx *querie
 			Outcomes:          source.Outcomes,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneBBProjectInstitutions(ctx, queries.CloneBBProjectInstitutionsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneBBProjectBappenasPartners(ctx, queries.CloneBBProjectBappenasPartnersParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneBBProjectLocations(ctx, queries.CloneBBProjectLocationsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneBBProjectNationalPriorities(ctx, queries.CloneBBProjectNationalPrioritiesParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneBBProjectCosts(ctx, queries.CloneBBProjectCostsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneLenderIndications(ctx, queries.CloneLenderIndicationsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneLoIs(ctx, queries.CloneLoIsParams{BbProjectID: source.ID, BbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
+		}
+		clonedProjects = append(clonedProjects, cloned)
+	}
+	return clonedProjects, nil
+}
+
+func ensureBBProjectCloneTargetAvailable(sourceProjects, targetProjects []queries.BbProject) error {
+	if len(sourceProjects) == 0 {
+		return validation("project_ids", "minimal satu Project Blue Book harus dipilih")
+	}
+	targetIdentity := map[string]struct{}{}
+	targetCode := map[string]struct{}{}
+	for _, project := range targetProjects {
+		targetIdentity[model.UUIDToString(project.ProjectIdentityID)] = struct{}{}
+		targetCode[normalizeProjectCode(project.BbCode)] = struct{}{}
+	}
+	for _, project := range sourceProjects {
+		identity := model.UUIDToString(project.ProjectIdentityID)
+		code := normalizeProjectCode(project.BbCode)
+		if _, exists := targetIdentity[identity]; exists {
+			return validation("project_ids", "salah satu project sudah ada di Blue Book tujuan")
+		}
+		if _, exists := targetCode[code]; exists {
+			return validation("project_ids", "BB Code sudah ada di Blue Book tujuan")
 		}
 	}
 	return nil
+}
+
+func normalizeProjectCode(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func parseOptionalUUIDArray(values *[]string, field string) ([]pgtype.UUID, bool, error) {
+	if values == nil {
+		return nil, false, nil
+	}
+	ids, err := uuidArray(*values, field)
+	if err != nil {
+		return nil, true, err
+	}
+	return ids, true, nil
 }
 
 func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, req model.CreateBBProjectRequest) error {
@@ -823,19 +999,26 @@ func addProjectBappenasPartners(ctx context.Context, qtx *queries.Queries, field
 	return nil
 }
 
-func parseBlueBookRequest(req model.BlueBookRequest) (pgtype.UUID, pgtype.Date, pgtype.Int4, error) {
+func parseBlueBookRequest(req model.BlueBookRequest) (pgtype.UUID, pgtype.Date, pgtype.Int4, string, error) {
 	if strings.TrimSpace(req.PeriodID) == "" {
-		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, validation("period_id", "wajib diisi")
+		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, "", validation("period_id", "wajib diisi")
 	}
 	periodID, err := model.ParseUUID(req.PeriodID)
 	if err != nil {
-		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, validation("period_id", "UUID tidak valid")
+		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, "", validation("period_id", "UUID tidak valid")
 	}
 	publishDate, err := parseDate(req.PublishDate, "publish_date")
 	if err != nil {
-		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, err
+		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, "", err
 	}
-	return periodID, publishDate, int4Ptr(req.RevisionYear), nil
+	status := strings.ToLower(strings.TrimSpace(req.Status))
+	if status == "" {
+		status = "active"
+	}
+	if status != "active" && status != "superseded" {
+		return pgtype.UUID{}, pgtype.Date{}, pgtype.Int4{}, "", validation("status", "harus active atau superseded")
+	}
+	return periodID, publishDate, int4Ptr(req.RevisionYear), status, nil
 }
 
 func parseLoIRequest(req model.LoIRequest) (pgtype.UUID, pgtype.Date, error) {
@@ -883,11 +1066,11 @@ func (s *BlueBookService) withTx(ctx context.Context, fn func(*queries.Queries) 
 }
 
 func blueBookFromListRow(row queries.ListBlueBooksRow) model.BlueBookResponse {
-	return model.BlueBookResponse{ID: model.UUIDToString(row.ID), Period: model.PeriodInfo{ID: model.UUIDToString(row.PeriodID), Name: row.PeriodName, YearStart: row.YearStart, YearEnd: row.YearEnd}, ReplacesBlueBookID: stringPtrFromUUID(row.ReplacesBlueBookID), PublishDate: dateString(row.PublishDate), RevisionNumber: row.RevisionNumber, RevisionYear: int32PtrFromInt4(row.RevisionYear), Status: row.Status, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+	return model.BlueBookResponse{ID: model.UUIDToString(row.ID), Period: model.PeriodInfo{ID: model.UUIDToString(row.PeriodID), Name: row.PeriodName, YearStart: row.YearStart, YearEnd: row.YearEnd}, ReplacesBlueBookID: stringPtrFromUUID(row.ReplacesBlueBookID), PublishDate: dateString(row.PublishDate), RevisionNumber: row.RevisionNumber, RevisionYear: int32PtrFromInt4(row.RevisionYear), Status: row.Status, ProjectCount: row.ProjectCount, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func blueBookFromGetRow(row queries.GetBlueBookRow) model.BlueBookResponse {
-	return model.BlueBookResponse{ID: model.UUIDToString(row.ID), Period: model.PeriodInfo{ID: model.UUIDToString(row.PeriodID), Name: row.PeriodName, YearStart: row.YearStart, YearEnd: row.YearEnd}, ReplacesBlueBookID: stringPtrFromUUID(row.ReplacesBlueBookID), PublishDate: dateString(row.PublishDate), RevisionNumber: row.RevisionNumber, RevisionYear: int32PtrFromInt4(row.RevisionYear), Status: row.Status, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+	return model.BlueBookResponse{ID: model.UUIDToString(row.ID), Period: model.PeriodInfo{ID: model.UUIDToString(row.PeriodID), Name: row.PeriodName, YearStart: row.YearStart, YearEnd: row.YearEnd}, ReplacesBlueBookID: stringPtrFromUUID(row.ReplacesBlueBookID), PublishDate: dateString(row.PublishDate), RevisionNumber: row.RevisionNumber, RevisionYear: int32PtrFromInt4(row.RevisionYear), Status: row.Status, ProjectCount: row.ProjectCount, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func lenderIndicationResponses(rows []queries.GetLenderIndicationsRow) []model.LenderIndicationResponse {

@@ -19,7 +19,7 @@ import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import type { BappenasPartner } from '@/types/master.types'
-import { joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import { formatBlueBookStatus, joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
 
@@ -236,7 +236,12 @@ onMounted(() => {
               <tr v-for="item in blueBookStore.projectHistory" :key="item.id">
                 <td class="px-4 py-3 font-medium text-surface-900">{{ historyLabel(item) }}</td>
                 <td class="px-4 py-3 text-surface-700">{{ item.bb_code }}</td>
-                <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
+                <td class="px-4 py-3">
+                  <StatusBadge
+                    :status="item.book_status"
+                    :label="formatBlueBookStatus(item.book_status)"
+                  />
+                </td>
                 <td class="px-4 py-3">
                   <Tag
                     :value="item.is_latest ? 'Terbaru' : 'Historis'"
