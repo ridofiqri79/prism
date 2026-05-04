@@ -835,20 +835,26 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 
 | Param | Format | Keterangan |
 |-------|--------|------------|
-| `search` | string | Cari berdasarkan tahun terbit, nomor revisi, atau status |
+| `search` | string | Cari berdasarkan tahun terbit, nomor revisi, status teknis, atau label status |
 | `publish_year` | multi-value number | Filter tahun terbit Green Book |
-| `status` | multi-value enum | `active`, `superseded` |
+| `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+
+Response list dan detail Green Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
 **`POST /green-books` Request:**
 ```json
 {
   "publish_year": 2025,
   "replaces_green_book_id": "uuid-green-book-sebelumnya",
-  "revision_number": 0
+  "revision_number": 0,
+  "status": "active"
 }
 ```
 
 Validasi: kombinasi `publish_year` + `revision_number` harus unik. Jika sudah ada, backend mengembalikan `409 CONFLICT`.
+Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Green Book lain menjadi `superseded` ketika Green Book baru dibuat. Green Book baru selalu dimulai kosong; Project Green Book dari dokumen/revisi lain hanya dibuat jika user membuatnya manual atau menjalankan import.
+
+`DELETE /green-books/:id` melakukan hard delete. Backend menolak penghapusan jika Green Book masih memiliki Project Green Book atau masih dipakai sebagai sumber revisi Green Book lain.
 
 ---
 
@@ -993,6 +999,8 @@ Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book
     "id": "uuid-gb-project-snapshot",
     "gb_project_identity_id": "uuid-logical-gb-project",
     "green_book_id": "uuid",
+    "program_title_id": "uuid-program-title",
+    "program_title": { "id": "uuid-program-title", "title": "Infrastruktur Transportasi" },
     "gb_code": "GB-2025-001",
     "is_latest": true,
     "has_newer_revision": false,
@@ -1134,6 +1142,10 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `search` | string | Cari berdasarkan `subject`, `letter_number`, atau tanggal surat |
 | `date_from` | date `YYYY-MM-DD` | Batas awal tanggal surat |
 | `date_to` | date `YYYY-MM-DD` | Batas akhir tanggal surat |
+
+Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menentukan apakah tombol hapus boleh ditampilkan.
+
+`DELETE /daftar-kegiatan/:id` melakukan hard delete hanya jika Daftar Kegiatan belum memiliki Project di Daftar Kegiatan. Jika masih memiliki proyek, backend mengembalikan `409 CONFLICT` dengan pesan aman agar user menghapus Project Daftar Kegiatan terlebih dahulu.
 
 **`POST /daftar-kegiatan` Request:**
 ```json

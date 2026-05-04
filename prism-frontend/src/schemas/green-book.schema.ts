@@ -15,6 +15,7 @@ const optionalDurationMonths = z
 export const greenBookSchema = z.object({
   publish_year: z.number().int().min(1900, 'Tahun terbit wajib diisi'),
   revision_number: z.number().int().min(0, 'Revisi minimal 0'),
+  status: z.enum(['active', 'superseded']),
 })
 
 export const gbProjectSchema = z.object({

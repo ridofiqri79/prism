@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -34,14 +34,34 @@ const pageTitle = computed(() =>
 
 const form = useBBProjectForm()
 const currentProject = computed(() => blueBookStore.currentProject)
+const bappenasPartnerLookupOptions = ref<BappenasPartner[]>([])
+const bappenasPartnerParentOptions = ref<BappenasPartner[]>([])
+
+const bappenasPartnerParentMap = computed(() => {
+  const byId = new Map<string, BappenasPartner>()
+
+  for (const partner of uniquePartners([
+    ...bappenasPartnerParentOptions.value,
+    ...masterStore.bappenasPartners.filter((item) => item.level === 'Eselon I'),
+    ...bappenasPartnerLookupOptions.value.flatMap((item) => (item.parent ? [item.parent] : [])),
+    ...(currentProject.value?.bappenas_partners ?? []).flatMap((item) =>
+      item.parent ? [item.parent] : [],
+    ),
+  ])) {
+    byId.set(partner.id, partner)
+  }
+
+  return byId
+})
 
 const bappenasPartnerOptions = computed(() => {
   const byId = new Map<string, BappenasPartner>()
 
-  for (const partner of [
+  for (const partner of uniquePartners([
+    ...bappenasPartnerLookupOptions.value,
     ...masterStore.bappenasPartners,
     ...(currentProject.value?.bappenas_partners ?? []),
-  ]) {
+  ])) {
     if (partner.level === 'Eselon II') {
       byId.set(partner.id, partner)
     }
@@ -56,35 +76,97 @@ const selectedPartners = computed(() =>
 )
 const selectedPartnerParents = computed(() => {
   const parents = selectedPartners.value
-    .map((partner) => findPartnerParent(partner))
+    .map((partner) => findPartnerParentName(partner))
     .filter((name) => name !== '-')
   return [...new Set(parents)].join(', ') || '-'
 })
-function findPartnerParent(partner?: BappenasPartner) {
+const selectedPartnerParentGroups = computed(() => {
+  const groups = new Map<string, string[]>()
+
+  for (const partner of selectedPartners.value) {
+    const parentName = findPartnerParentName(partner)
+
+    if (parentName === '-') {
+      continue
+    }
+
+    groups.set(parentName, [...(groups.get(parentName) ?? []), partner.name])
+  }
+
+  return [...groups.entries()].map(([parentName, partnerNames]) => ({
+    parentName,
+    partnerNames,
+  }))
+})
+
+function uniquePartners(partners: BappenasPartner[]) {
+  const byId = new Map<string, BappenasPartner>()
+
+  for (const partner of partners) {
+    byId.set(partner.id, partner)
+  }
+
+  return [...byId.values()]
+}
+
+function findPartnerParentName(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
   return (
-    bappenasPartnerOptions.value.find((item) => item.id === partner.parent_id)?.name ??
-    masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
+    bappenasPartnerParentMap.value.get(partner.parent_id)?.name ??
     partner.parent?.name ??
     '-'
   )
 }
 
+function optionName(option: Record<string, unknown>) {
+  return String(option.name ?? '')
+}
+
+function optionParentName(option: Record<string, unknown>) {
+  return findPartnerParentName(option as unknown as BappenasPartner)
+}
+
 function bappenasPartnerParams(search?: string) {
   return {
     limit: 50,
+    level: ['Eselon II'],
     search: search?.trim() || undefined,
     sort: 'name',
     order: 'asc' as const,
   }
 }
 
-function loadBappenasPartnerOptions(search?: string, force = true) {
-  void masterStore.fetchBappenasPartners(force, bappenasPartnerParams(search))
+function bappenasPartnerParentParams() {
+  return {
+    limit: 200,
+    level: ['Eselon I'],
+    sort: 'name',
+    order: 'asc' as const,
+  }
+}
+
+async function loadBappenasPartnerOptions(search?: string, force = true) {
+  const response = await masterStore.fetchBappenasPartners(force, bappenasPartnerParams(search))
+
+  if (response?.data) {
+    bappenasPartnerLookupOptions.value = uniquePartners([
+      ...bappenasPartnerLookupOptions.value,
+      ...response.data,
+    ])
+  }
+}
+
+async function loadBappenasPartnerParents() {
+  const response = await masterStore.fetchBappenasPartnerTree(bappenasPartnerParentParams())
+  bappenasPartnerParentOptions.value = response.data
 }
 
 async function loadData() {
-  await Promise.all([blueBookStore.fetchBlueBook(blueBookId.value), masterStore.fetchBappenasPartners(false, bappenasPartnerParams())])
+  await Promise.all([
+    blueBookStore.fetchBlueBook(blueBookId.value),
+    loadBappenasPartnerOptions(undefined, true),
+    loadBappenasPartnerParents(),
+  ])
 
   if (isEditMode.value) {
     const project = await blueBookStore.fetchProject(blueBookId.value, projectId.value)
@@ -157,20 +239,40 @@ onMounted(() => {
               placeholder="Pilih mitra kerja Bappenas"
               filter
               display="chip"
-              append-to="self"
+              append-to="body"
               :overlay-style="{ minWidth: '100%' }"
               class="w-full"
               @filter="loadBappenasPartnerOptions($event.value)"
-            />
+            >
+              <template #option="{ option }">
+                <span class="block truncate font-medium">{{ optionName(option) }}</span>
+                <span class="mt-0.5 block truncate text-xs text-surface-500">
+                  Induk Eselon I: {{ optionParentName(option) }}
+                </span>
+              </template>
+            </MultiSelect>
             <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
               {{ form.errors.bappenas_partner_ids }}
             </small>
           </label>
         </div>
-        <div
-          class="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700"
-        >
-          Induk Eselon I: <strong>{{ selectedPartnerParents }}</strong>
+        <div class="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">
+          <div class="flex flex-col gap-2 md:flex-row md:items-start">
+            <span class="shrink-0 font-medium text-surface-700">Induk Eselon I</span>
+            <div class="min-w-0 flex-1">
+              <div v-if="selectedPartnerParentGroups.length" class="flex flex-wrap gap-2">
+                <span
+                  v-for="group in selectedPartnerParentGroups"
+                  :key="group.parentName"
+                  class="inline-flex max-w-full items-center rounded-md border border-primary-100 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700"
+                  :title="group.partnerNames.join(', ')"
+                >
+                  <span class="truncate">{{ group.parentName }}</span>
+                </span>
+              </div>
+              <span v-else class="text-surface-500">{{ selectedPartnerParents }}</span>
+            </div>
+          </div>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
@@ -199,25 +301,25 @@ onMounted(() => {
           </label>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
-          <label class="block space-y-2">
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <RichTextEditor v-model="form.values.objective" placeholder="Tulis tujuan proyek" />
-          </label>
-          <label class="block space-y-2">
+          </div>
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Lingkup Pekerjaan</span>
             <RichTextEditor
               v-model="form.values.scope_of_work"
               placeholder="Tulis lingkup pekerjaan"
             />
-          </label>
-          <label class="block space-y-2">
+          </div>
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Outputs</span>
             <RichTextEditor v-model="form.values.outputs" placeholder="Tulis outputs proyek" />
-          </label>
-          <label class="block space-y-2">
+          </div>
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Outcomes</span>
             <RichTextEditor v-model="form.values.outcomes" placeholder="Tulis outcomes proyek" />
-          </label>
+          </div>
         </div>
       </section>
 

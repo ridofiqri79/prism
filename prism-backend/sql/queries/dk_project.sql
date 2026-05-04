@@ -1,17 +1,28 @@
 -- ===== DAFTAR KEGIATAN =====
 
 -- name: ListDaftarKegiatan :many
-SELECT *
-FROM daftar_kegiatan
+SELECT
+    dk.id,
+    dk.letter_number,
+    dk.subject,
+    dk.date,
+    dk.created_at,
+    dk.updated_at,
+    (
+        SELECT COUNT(*)
+        FROM dk_project dkp
+        WHERE dkp.dk_id = dk.id
+    )::BIGINT AS project_count
+FROM daftar_kegiatan dk
 WHERE (
     sqlc.narg('search')::text IS NULL
-    OR subject ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR COALESCE(letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR date::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR dk.subject ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR dk.date::text ILIKE '%' || sqlc.narg('search')::text || '%'
 )
-AND (sqlc.narg('date_from')::date IS NULL OR date >= sqlc.narg('date_from')::date)
-AND (sqlc.narg('date_to')::date IS NULL OR date <= sqlc.narg('date_to')::date)
-ORDER BY date DESC, created_at DESC
+AND (sqlc.narg('date_from')::date IS NULL OR dk.date >= sqlc.narg('date_from')::date)
+AND (sqlc.narg('date_to')::date IS NULL OR dk.date <= sqlc.narg('date_to')::date)
+ORDER BY dk.date DESC, dk.created_at DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountDaftarKegiatan :one
@@ -27,9 +38,20 @@ AND (sqlc.narg('date_from')::date IS NULL OR date >= sqlc.narg('date_from')::dat
 AND (sqlc.narg('date_to')::date IS NULL OR date <= sqlc.narg('date_to')::date);
 
 -- name: GetDaftarKegiatan :one
-SELECT *
-FROM daftar_kegiatan
-WHERE id = $1;
+SELECT
+    dk.id,
+    dk.letter_number,
+    dk.subject,
+    dk.date,
+    dk.created_at,
+    dk.updated_at,
+    (
+        SELECT COUNT(*)
+        FROM dk_project dkp
+        WHERE dkp.dk_id = dk.id
+    )::BIGINT AS project_count
+FROM daftar_kegiatan dk
+WHERE dk.id = $1;
 
 -- name: GetDaftarKegiatanByLetterNumber :one
 SELECT *
@@ -51,9 +73,20 @@ SET letter_number = $2,
 WHERE id = $1
 RETURNING *;
 
--- name: DeleteDaftarKegiatan :exec
+-- name: CountAnyDKProjectsByDaftarKegiatan :one
+SELECT COUNT(*)
+FROM dk_project
+WHERE dk_id = $1;
+
+-- name: HardDeleteDaftarKegiatan :one
 DELETE FROM daftar_kegiatan
-WHERE id = $1;
+WHERE daftar_kegiatan.id = $1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM dk_project dkp
+      WHERE dkp.dk_id = daftar_kegiatan.id
+  )
+RETURNING *;
 
 -- ===== DK PROJECT =====
 

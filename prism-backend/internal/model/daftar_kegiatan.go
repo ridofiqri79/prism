@@ -12,6 +12,7 @@ type DaftarKegiatanResponse struct {
 	LetterNumber *string `json:"letter_number,omitempty"`
 	Subject      string  `json:"subject"`
 	Date         string  `json:"date"`
+	ProjectCount int64   `json:"project_count"`
 	CreatedAt    string  `json:"created_at,omitempty"`
 	UpdatedAt    string  `json:"updated_at,omitempty"`
 }

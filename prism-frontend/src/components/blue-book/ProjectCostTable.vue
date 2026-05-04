@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
-import Select from 'primevue/select'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
+import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
 import CurrencyInput from '@/components/forms/CurrencyInput.vue'
 import { categoriesForFundingType } from '@/composables/forms/useBBProjectForm'
 import type { FundingType, ProjectCostPayload } from '@/types/blue-book.types'
@@ -36,10 +36,18 @@ function updateRow(index: number, patch: Partial<ProjectCostPayload>) {
 
   emit('update:rows', next)
 }
+
+function updateFundingType(index: number, value: unknown) {
+  updateRow(index, { funding_type: value as FundingType })
+}
+
+function updateFundingCategory(index: number, value: unknown) {
+  updateRow(index, { funding_category: String(value ?? '') })
+}
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+  <div class="overflow-visible rounded-lg border border-surface-200 bg-white">
     <table class="w-full min-w-[48rem] text-left text-sm">
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>
@@ -52,22 +60,24 @@ function updateRow(index: number, patch: Partial<ProjectCostPayload>) {
       <tbody class="divide-y divide-surface-100">
         <tr v-for="(row, index) in rows" :key="index">
           <td class="px-4 py-3">
-            <Select
+            <SingleSelectDropdown
               v-if="editable"
               :model-value="row.funding_type"
               :options="fundingTypes"
+              :show-clear="false"
               class="w-full"
-              @update:model-value="updateRow(index, { funding_type: $event })"
+              @update:model-value="updateFundingType(index, $event)"
             />
             <span v-else>{{ row.funding_type }}</span>
           </td>
           <td class="px-4 py-3">
-            <Select
+            <SingleSelectDropdown
               v-if="editable"
               :model-value="row.funding_category"
               :options="categoriesForFundingType(row.funding_type)"
+              :show-clear="false"
               class="w-full"
-              @update:model-value="updateRow(index, { funding_category: $event })"
+              @update:model-value="updateFundingCategory(index, $event)"
             />
             <span v-else>{{ row.funding_category }}</span>
           </td>

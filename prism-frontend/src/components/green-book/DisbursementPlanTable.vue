@@ -9,10 +9,12 @@ import type { GBDisbursementPlan, GBDisbursementPlanPayload } from '@/types/gree
 const props = withDefaults(
   defineProps<{
     rows: GBDisbursementPlanPayload[] | GBDisbursementPlan[]
+    selectedCurrency?: string
     error?: string
     editable?: boolean
   }>(),
   {
+    selectedCurrency: 'USD',
     error: '',
     editable: true,
   },
@@ -26,6 +28,7 @@ const emit = defineEmits<{
 }>()
 
 const newYear = ref(new Date().getFullYear())
+const displayCurrency = computed(() => (props.selectedCurrency || 'USD').trim().toUpperCase())
 const total = computed(() => props.rows.reduce((sum, row) => sum + row.amount_usd, 0))
 
 function toPayload(row: GBDisbursementPlanPayload | GBDisbursementPlan): GBDisbursementPlanPayload {
@@ -55,12 +58,12 @@ function updateAmount(index: number, amount: number) {
       <small v-if="error" class="text-red-600">{{ error }}</small>
     </div>
 
-    <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+    <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
       <table class="w-full min-w-[32rem] text-left text-sm">
         <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
           <tr>
             <th class="px-4 py-3">Tahun</th>
-            <th class="px-4 py-3">Nilai USD</th>
+            <th class="px-4 py-3">Nilai ({{ displayCurrency }})</th>
             <th v-if="editable" class="w-24 px-4 py-3"></th>
           </tr>
         </thead>
@@ -80,9 +83,10 @@ function updateAmount(index: number, amount: number) {
               <CurrencyInput
                 v-if="editable"
                 :model-value="row.amount_usd"
+                :currency="displayCurrency"
                 @update:model-value="updateAmount(index, $event)"
               />
-              <CurrencyDisplay v-else :amount="row.amount_usd" />
+              <CurrencyDisplay v-else :amount="row.amount_usd" :currency="displayCurrency" />
             </td>
             <td v-if="editable" class="px-4 py-3 text-right">
               <Button
@@ -104,7 +108,7 @@ function updateAmount(index: number, amount: number) {
         <tfoot class="border-t border-surface-200 bg-surface-50 font-semibold">
           <tr>
             <td class="px-4 py-3">Grand Total</td>
-            <td class="px-4 py-3"><CurrencyDisplay :amount="total" /></td>
+            <td class="px-4 py-3"><CurrencyDisplay :amount="total" :currency="displayCurrency" /></td>
             <td v-if="editable"></td>
           </tr>
         </tfoot>

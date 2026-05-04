@@ -14,20 +14,26 @@ import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
+import ValueChipList from '@/components/common/ValueChipList.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
+import { useToast } from '@/composables/useToast'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { DKProject, DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
 import type { Institution, Region } from '@/types/master.types'
-import { formatDate, joinNames } from './daftar-kegiatan-page-utils'
+import { formatApiError } from '@/utils/api-error'
+import { formatDate } from './daftar-kegiatan-page-utils'
 
 const route = useRoute()
 const router = useRouter()
 const dkStore = useDaftarKegiatanStore()
 const greenBookStore = useGreenBookStore()
 const masterStore = useMasterStore()
+const toast = useToast()
+const confirm = useConfirm()
 const { can } = usePermission()
 interface DKProjectFilterState {
   gb_project_ids: string[]
@@ -99,6 +105,9 @@ const locationFilterOptions = computed(() =>
 )
 const initialProjectsLoading = computed(() => dkStore.loading && dkStore.projects.length === 0)
 const refreshingProjects = computed(() => dkStore.loading && dkStore.projects.length > 0)
+const canDeleteCurrentDK = computed(
+  () => can('daftar_kegiatan', 'delete') && (dkStore.currentDK?.project_count ?? 0) === 0,
+)
 
 function buildProjectParams(): DKProjectListParams {
   const params = projectControls.buildParams() as DKProjectListParams
@@ -128,6 +137,16 @@ function gbProjectRoute(project: GBProjectSummary) {
   return project.green_book_id
     ? { name: 'gb-project-detail', params: { gbId: project.green_book_id, id: project.id } }
     : { name: 'green-books' }
+}
+
+function toNameList(items?: { name?: string; title?: string }[]) {
+  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
+}
+
+function executingAgencyNames(project: DKProject) {
+  if (project.institution?.name) return [project.institution.name]
+  if (project.institution_id) return [project.institution_id]
+  return []
 }
 
 function loanAgreementRoute(project: DKProject) {
@@ -181,6 +200,28 @@ function loanAgreementActionTitle(project: DKProject) {
 function goToLoanAgreement(project: DKProject) {
   if (isLoanAgreementActionDisabled(project)) return
   void router.push(loanAgreementRoute(project))
+}
+
+function deleteDaftarKegiatan() {
+  const current = dkStore.currentDK
+  if (!current || (current.project_count ?? 0) > 0) {
+    toast.warn('Tidak Bisa Menghapus', 'Daftar Kegiatan masih memiliki Project di Daftar Kegiatan.')
+    return
+  }
+
+  confirm.confirmDelete(`Daftar Kegiatan ${current.letter_number || current.subject}`, async () => {
+    try {
+      await dkStore.deleteDK(current.id)
+      toast.success('Berhasil', 'Daftar Kegiatan berhasil dihapus permanen')
+      await router.push({ name: 'daftar-kegiatan' })
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Daftar Kegiatan masih memiliki Project di Daftar Kegiatan'),
+        12000,
+      )
+    }
+  })
 }
 
 function formatInstitution(institution: Institution) {
@@ -299,6 +340,14 @@ watch(
           @click="router.push({ name: 'daftar-kegiatan' })"
         />
         <Button
+          v-if="canDeleteCurrentDK"
+          label="Hapus Daftar Kegiatan"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          @click="deleteDaftarKegiatan"
+        />
+        <Button
           v-if="can('daftar_kegiatan', 'create')"
           as="router-link"
           :to="{ name: 'dk-project-create', params: { dkId } }"
@@ -310,7 +359,7 @@ watch(
 
     <div
       v-if="dkStore.currentDK"
-      class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3"
+      class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4"
     >
       <div>
         <p class="text-xs uppercase tracking-wide text-surface-500">Perihal</p>
@@ -323,6 +372,10 @@ watch(
       <div>
         <p class="text-xs uppercase tracking-wide text-surface-500">Nomor Surat</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.letter_number || '-' }}</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wide text-surface-500">Jumlah Proyek</p>
+        <p class="font-semibold text-surface-950">{{ dkStore.currentDK.project_count ?? 0 }}</p>
       </div>
     </div>
 
@@ -433,21 +486,21 @@ watch(
                 </p>
                 <p class="font-medium text-surface-900">{{ project.project_name }}</p>
               </div>
-              <div>
-                <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-                <p class="font-medium text-surface-900">
-                  {{ project.institution?.name ?? project.institution_id ?? '-' }}
+              <div class="min-w-0 space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                  Executing Agency
                 </p>
+                <ValueChipList :items="executingAgencyNames(project)" />
               </div>
-              <div>
-                <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
-                <p class="font-medium text-surface-900">{{ joinNames(project.locations) }}</p>
+              <div class="min-w-0 space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
+                <ValueChipList :items="toNameList(project.locations)" />
               </div>
-              <div class="md:col-span-2">
-                <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
-                <p class="font-medium text-surface-900">
-                  {{ joinNames(project.bappenas_partners) }}
+              <div class="min-w-0 space-y-2 md:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                  Mitra Kerja Bappenas
                 </p>
+                <ValueChipList :items="toNameList(project.bappenas_partners)" />
               </div>
               <div class="md:col-span-2">
                 <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>

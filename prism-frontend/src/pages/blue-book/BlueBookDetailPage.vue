@@ -910,7 +910,7 @@ watch(
             option-value="id"
             placeholder="Pilih Blue Book sumber"
             filter
-            append-to="self"
+            append-to="body"
             class="w-full"
             :loading="importSourceBlueBookLoading"
             :invalid="Boolean(importErrors.source_blue_book_id)"

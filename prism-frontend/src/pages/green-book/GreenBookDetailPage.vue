@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
@@ -17,10 +18,21 @@ import { useBlueBookStore } from '@/stores/blue-book.store'
 import { greenBookSchema } from '@/schemas/green-book.schema'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { GBProject, GBProjectListParams, GreenBookPayload } from '@/types/green-book.types'
+import type {
+  GBProject,
+  GBProjectListParams,
+  GreenBookPayload,
+  GreenBookStatus,
+} from '@/types/green-book.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatApiError } from '@/utils/api-error'
-import { formatGBRevision, joinNames, toFormErrors, type FormErrors } from './green-book-page-utils'
+import {
+  formatGBRevision,
+  formatGreenBookStatus,
+  joinNames,
+  toFormErrors,
+  type FormErrors,
+} from './green-book-page-utils'
 
 type GreenBookField = keyof GreenBookPayload
 
@@ -61,6 +73,7 @@ const dialogVisible = ref(false)
 const form = reactive<GreenBookPayload>({
   publish_year: new Date().getFullYear(),
   revision_number: 0,
+  status: 'active',
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
@@ -69,6 +82,10 @@ const columns: ColumnDef[] = [
   { field: 'bb_projects', header: 'Proyek Blue Book' },
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
+]
+const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
+  { label: 'Berlaku', value: 'active' },
+  { label: 'Tidak Berlaku', value: 'superseded' },
 ]
 const selectedCountryCodes = computed(() => {
   const selected = new Set(projectControls.draftFilters.location_ids)
@@ -102,6 +119,9 @@ const locationFilterOptions = computed(() =>
       isCoveredBySelectedCountry(region),
   })),
 )
+const canDeleteCurrentGreenBook = computed(
+  () => can('green_book', 'delete') && (greenBookStore.currentGreenBook?.project_count ?? 0) === 0,
+)
 
 function buildProjectParams(): GBProjectListParams {
   const params = projectControls.buildParams() as GBProjectListParams
@@ -132,6 +152,7 @@ function openEdit() {
   Object.assign(form, {
     publish_year: current.publish_year,
     revision_number: current.revision_number,
+    status: current.status,
   })
   errors.value = {}
   dialogVisible.value = true
@@ -140,7 +161,7 @@ function openEdit() {
 async function save() {
   const parsed = greenBookSchema.safeParse(form)
   if (!parsed.success) {
-    errors.value = toFormErrors(parsed.error, ['publish_year', 'revision_number'])
+    errors.value = toFormErrors(parsed.error, ['publish_year', 'revision_number', 'status'])
     return
   }
 
@@ -148,6 +169,28 @@ async function save() {
   toast.success('Berhasil', 'Green Book berhasil diperbarui')
   dialogVisible.value = false
   await loadData()
+}
+
+function deleteGreenBook() {
+  const current = greenBookStore.currentGreenBook
+  if (!current || current.project_count > 0) {
+    toast.warn('Tidak Bisa Menghapus', 'Green Book masih memiliki Project Green Book.')
+    return
+  }
+
+  confirm.confirmDelete(`Green Book ${current.publish_year}`, async () => {
+    try {
+      await greenBookStore.deleteGreenBook(current.id)
+      toast.success('Berhasil', 'Green Book berhasil dihapus permanen')
+      await router.push({ name: 'green-books' })
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Green Book masih memiliki Project Green Book'),
+        12000,
+      )
+    }
+  })
 }
 
 function deleteProject(project: GBProject) {
@@ -273,6 +316,14 @@ watch(
         <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push({ name: 'green-books' })" />
         <Button v-if="can('green_book', 'update')" label="Edit Green Book" icon="pi pi-pencil" outlined @click="openEdit" />
         <Button
+          v-if="canDeleteCurrentGreenBook"
+          icon="pi pi-trash"
+          label="Hapus Green Book"
+          severity="danger"
+          outlined
+          @click="deleteGreenBook"
+        />
+        <Button
           v-if="can('gb_project', 'create')"
           as="router-link"
           :to="{ name: 'gb-project-create', params: { gbId: greenBookId } }"
@@ -293,7 +344,10 @@ watch(
       </div>
       <div>
         <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
-        <StatusBadge :status="greenBookStore.currentGreenBook.status" />
+        <StatusBadge
+          :status="greenBookStore.currentGreenBook.status"
+          :label="formatGreenBookStatus(greenBookStore.currentGreenBook.status)"
+        />
       </div>
     </div>
 
@@ -360,7 +414,11 @@ watch(
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'bb_projects'">{{ joinNames((row as GBProject).bb_projects) }}</span>
-        <StatusBadge v-else-if="column.field === 'status'" :status="String(row.status)" />
+        <StatusBadge
+          v-else-if="column.field === 'status'"
+          :status="String(row.status)"
+          :label="formatGreenBookStatus(String(row.status))"
+        />
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             as="router-link"
@@ -404,6 +462,19 @@ watch(
           <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
           <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           <small v-if="errors.revision_number" class="text-red-600">{{ errors.revision_number }}</small>
+        </label>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Status</span>
+          <SingleSelectDropdown
+            v-model="form.status"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Pilih status"
+            class="w-full"
+            :invalid="Boolean(errors.status)"
+          />
+          <small v-if="errors.status" class="text-red-600">{{ errors.status }}</small>
         </label>
         <div class="flex justify-end gap-2 border-t border-surface-200 pt-4">
           <Button label="Batal" severity="secondary" outlined @click="dialogVisible = false" />

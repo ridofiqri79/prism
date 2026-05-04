@@ -10,20 +10,22 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
-import Textarea from 'primevue/textarea'
 import ActivitiesTable from '@/components/green-book/ActivitiesTable.vue'
 import DisbursementPlanTable from '@/components/green-book/DisbursementPlanTable.vue'
 import FundingAllocationTable from '@/components/green-book/FundingAllocationTable.vue'
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import CurrencySelect from '@/components/forms/CurrencySelect.vue'
 import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
 import LocationMultiSelect from '@/components/forms/LocationMultiSelect.vue'
 import ProgramTitleSelect from '@/components/forms/ProgramTitleSelect.vue'
+import RichTextEditor from '@/components/forms/RichTextEditor.vue'
 import { useGBProjectForm, type GBProjectSourceMode } from '@/composables/forms/useGBProjectForm'
 import { useToast } from '@/composables/useToast'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
+import type { ProgramTitle } from '@/types/master.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,10 +41,28 @@ const sourceBBProjectId = computed(() => String(route.query.source_bb_project_id
 const sourceMode = computed<GBProjectSourceMode>(() =>
   route.query.source_mode === 'existing' ? 'existing' : 'new',
 )
+const selectedSourceBBProject = computed(() =>
+  blueBookStore.projectOptions.find((project) => project.id === sourceBBProjectId.value),
+)
 const pageTitle = computed(() =>
   isEditMode.value ? 'Edit Proyek Green Book' : 'Tambah Proyek Green Book',
 )
 const form = useGBProjectForm()
+const selectedCurrency = computed(() => form.selectedCurrency.value)
+const programTitleExtraOptions = computed<ProgramTitle[]>(() => {
+  const options: ProgramTitle[] = []
+
+  if (greenBookStore.currentProject?.program_title) {
+    options.push(greenBookStore.currentProject.program_title)
+  }
+  if (selectedSourceBBProject.value?.program_title) {
+    options.push(selectedSourceBBProject.value.program_title)
+  }
+
+  return options
+})
+const executingAgencyExtraOptions = computed(() => greenBookStore.currentProject?.executing_agencies ?? [])
+const implementingAgencyExtraOptions = computed(() => greenBookStore.currentProject?.implementing_agencies ?? [])
 
 const bbProjectOptions = computed(() =>
   blueBookStore.projectOptions
@@ -60,7 +80,6 @@ async function loadData() {
   await Promise.all([
     greenBookStore.fetchGreenBook(greenBookId.value),
     blueBookStore.fetchProjectOptions(),
-    masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchInstitutions(true, { limit: 1000 }),
     masterStore.fetchAllRegionLevels(true),
@@ -141,7 +160,10 @@ onMounted(() => {
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Judul Program</span>
-                  <ProgramTitleSelect v-model="form.values.program_title_id" />
+                  <ProgramTitleSelect
+                    v-model="form.values.program_title_id"
+                    :extra-options="programTitleExtraOptions"
+                  />
                   <small v-if="form.errors.program_title_id" class="text-red-600">
                     {{ form.errors.program_title_id }}
                   </small>
@@ -210,17 +232,34 @@ onMounted(() => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
+                <label class="block space-y-2 md:col-span-2">
+                  <span class="text-sm font-medium text-surface-700">Mata Uang</span>
+                  <CurrencySelect
+                    :model-value="selectedCurrency"
+                    @update:model-value="form.setSelectedCurrency"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Tujuan</span>
-                  <Textarea v-model="form.values.objective" auto-resize rows="3" class="w-full" />
+                  <RichTextEditor
+                    v-model="form.values.objective"
+                    placeholder="Tulis tujuan proyek"
+                    min-height="10rem"
+                    max-height="22rem"
+                    resizable
+                  />
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Lingkup Proyek</span>
-                  <Textarea
+                  <RichTextEditor
                     v-model="form.values.scope_of_project"
-                    auto-resize
-                    rows="3"
-                    class="w-full"
+                    placeholder="Tulis lingkup proyek"
+                    min-height="10rem"
+                    max-height="22rem"
+                    resizable
                   />
                 </label>
               </div>
@@ -228,14 +267,22 @@ onMounted(() => {
               <div class="grid gap-4 md:grid-cols-3">
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Executing Agency</span>
-                  <InstitutionSelect v-model="form.values.executing_agency_ids" multiple />
+                  <InstitutionSelect
+                    v-model="form.values.executing_agency_ids"
+                    multiple
+                    :extra-options="executingAgencyExtraOptions"
+                  />
                   <small v-if="form.errors.executing_agency_ids" class="text-red-600">
                     {{ form.errors.executing_agency_ids }}
                   </small>
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Implementing Agency</span>
-                  <InstitutionSelect v-model="form.values.implementing_agency_ids" multiple />
+                  <InstitutionSelect
+                    v-model="form.values.implementing_agency_ids"
+                    multiple
+                    :extra-options="implementingAgencyExtraOptions"
+                  />
                   <small v-if="form.errors.implementing_agency_ids" class="text-red-600">
                     {{ form.errors.implementing_agency_ids }}
                   </small>
@@ -266,6 +313,7 @@ onMounted(() => {
             <div class="space-y-3 p-3">
               <FundingSourceTable
                 v-model:rows="form.fundingSources.value"
+                :selected-currency="selectedCurrency"
                 @add="form.addFundingSource"
                 @remove="form.removeFundingSource"
               />
@@ -276,6 +324,7 @@ onMounted(() => {
             <div class="space-y-3 p-3">
               <DisbursementPlanTable
                 v-model:rows="form.disbursementPlan.value"
+                :selected-currency="selectedCurrency"
                 :error="form.disbursementError.value"
                 @add-year="form.addDisbursementYear"
                 @update-year="form.updateDisbursementYear"
@@ -295,6 +344,7 @@ onMounted(() => {
               <FundingAllocationTable
                 :activities="form.activities.value"
                 v-model:rows="form.allocationValues.value"
+                :selected-currency="selectedCurrency"
               />
             </div>
           </TabPanel>

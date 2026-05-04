@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import Select from 'primevue/select'
 import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
 import { useMasterStore } from '@/stores/master.store'
 import type { Institution } from '@/types/master.types'
 
@@ -73,9 +73,18 @@ function loadOptions(search?: string, force = true) {
 }
 
 function formatInstitutionLabel(institution: Institution) {
-  return institution.short_name
+  const baseLabel = institution.short_name
     ? `${institution.name} (${institution.short_name})`
     : institution.name
+  const parent = mergedOptions.value.find((item) => item.id === institution.parent_id)
+
+  if (!parent) {
+    return baseLabel
+  }
+
+  const parentLabel = parent.short_name ? `${parent.name} (${parent.short_name})` : parent.name
+
+  return `${parentLabel} / ${baseLabel}`
 }
 
 onMounted(() => {
@@ -94,12 +103,12 @@ onMounted(() => {
     :disabled="disabled"
     filter
     display="chip"
-    append-to="self"
+    append-to="body"
     :overlay-style="{ minWidth: '100%' }"
     class="w-full"
     @filter="loadOptions($event.value)"
   />
-  <Select
+  <SingleSelectDropdown
     v-else
     v-model="selectedValue"
     :options="options"
@@ -108,8 +117,7 @@ onMounted(() => {
     :placeholder="placeholder"
     :disabled="disabled"
     filter
-    show-clear
-    append-to="self"
+    append-to="body"
     :overlay-style="{ minWidth: '100%' }"
     class="w-full"
     @filter="loadOptions($event.value)"

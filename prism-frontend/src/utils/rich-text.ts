@@ -11,6 +11,23 @@ function escapeHtml(value: string) {
     .replace(/\r?\n/g, '<br>')
 }
 
+function textNodeToFragment(text: string) {
+  const fragment = document.createDocumentFragment()
+  const lines = text.split(/\r?\n/)
+
+  lines.forEach((line, index) => {
+    if (index > 0) {
+      fragment.appendChild(document.createElement('br'))
+    }
+
+    if (line) {
+      fragment.appendChild(document.createTextNode(line))
+    }
+  })
+
+  return fragment
+}
+
 export function sanitizeRichText(value?: string | null) {
   if (!value) return ''
 
@@ -23,7 +40,12 @@ export function sanitizeRichText(value?: string | null) {
 
   function sanitizeNode(node: Node): Node | null {
     if (node.nodeType === Node.TEXT_NODE) {
-      return document.createTextNode(node.textContent ?? '')
+      const text = node.textContent ?? ''
+      if (text.includes('\n')) {
+        return textNodeToFragment(text)
+      }
+
+      return document.createTextNode(text)
     }
 
     if (node.nodeType !== Node.ELEMENT_NODE) {

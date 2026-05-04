@@ -110,6 +110,11 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
   })
   const errors = reactive<GBProjectFormErrors>({})
   const disbursementError = ref('')
+  const selectedCurrency = ref(
+    initialData && 'id' in initialData
+      ? normalizeCurrency(initialData.funding_sources[0]?.currency)
+      : 'USD',
+  )
 
   const activities = ref<GBActivityPayload[]>(
     initialData && 'id' in initialData
@@ -203,7 +208,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     fundingSources.value.push({
       lender_id: '',
       institution_id: null,
-      currency: 'USD',
+      currency: selectedCurrency.value,
       loan_original: 0,
       grant_original: 0,
       local_original: 0,
@@ -215,6 +220,22 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
 
   function removeFundingSource(index: number) {
     fundingSources.value.splice(index, 1)
+  }
+
+  function setSelectedCurrency(currency: string) {
+    const normalized = normalizeCurrency(currency)
+    selectedCurrency.value = normalized
+    fundingSources.value = fundingSources.value.map((row) => {
+      const next = { ...row, currency: normalized }
+
+      if (normalized === 'USD') {
+        next.loan_usd = next.loan_original
+        next.grant_usd = next.grant_original
+        next.local_usd = next.local_original
+      }
+
+      return next
+    })
   }
 
   function addDisbursementYear(year: number) {
@@ -268,13 +289,13 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
       funding_sources: fundingSources.value.map((item) => ({
         lender_id: item.lender_id,
         institution_id: item.institution_id || null,
-        currency: normalizeCurrency(item.currency),
+        currency: normalizeCurrency(selectedCurrency.value),
         loan_original: item.loan_original ?? item.loan_usd,
         grant_original: item.grant_original ?? item.grant_usd,
         local_original: item.local_original ?? item.local_usd,
-        loan_usd: normalizeUSDAmount(item.currency, item.loan_original, item.loan_usd),
-        grant_usd: normalizeUSDAmount(item.currency, item.grant_original, item.grant_usd),
-        local_usd: normalizeUSDAmount(item.currency, item.local_original, item.local_usd),
+        loan_usd: normalizeUSDAmount(selectedCurrency.value, item.loan_original, item.loan_usd),
+        grant_usd: normalizeUSDAmount(selectedCurrency.value, item.grant_original, item.grant_usd),
+        local_usd: normalizeUSDAmount(selectedCurrency.value, item.local_original, item.local_usd),
       })),
       disbursement_plan: disbursementPlan.value,
       funding_allocations: activities.value.map((_, index) => ({
@@ -301,6 +322,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
 
   function applyProject(project: GBProject) {
     Object.assign(values, { ...defaultValues(), ...fromProject(project) })
+    selectedCurrency.value = normalizeCurrency(project.funding_sources[0]?.currency)
     activities.value = project.activities.map((item, index) => ({
       activity_name: item.activity_name,
       implementation_location: item.implementation_location ?? '',
@@ -310,7 +332,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     fundingSources.value = project.funding_sources.map((item) => ({
       lender_id: item.lender.id,
       institution_id: item.institution?.id ?? null,
-      currency: normalizeCurrency(item.currency),
+      currency: normalizeCurrency(item.currency || selectedCurrency.value),
       loan_original: item.loan_original,
       grant_original: item.grant_original,
       local_original: item.local_original,
@@ -365,6 +387,8 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     values,
     errors,
     disbursementError,
+    selectedCurrency,
+    setSelectedCurrency,
     activities,
     addActivity,
     removeActivity,

@@ -170,7 +170,7 @@ func (s *GreenBookService) processGreenBookProjectsWorkbook(ctx context.Context,
 	return response, nil
 }
 
-func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, fileName string) (*model.MasterImportResponse, []string, error) {
+func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GetGreenBookRow, fileName string) (*model.MasterImportResponse, []string, error) {
 	inputResult := model.MasterImportSheetResult{Sheet: greenBookImportSheetInput}
 	projects, projectsByCode, err := s.parseGreenBookInputRows(ctx, qtx, workbook, lookups, greenBook, &inputResult)
 	if err != nil {
@@ -304,7 +304,7 @@ func (s *GreenBookService) buildGreenBookImportPreview(ctx context.Context, qtx 
 	return response, createdIDs, nil
 }
 
-func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GreenBook, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
+func (s *GreenBookService) parseGreenBookInputRows(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, greenBook queries.GetGreenBookRow, result *model.MasterImportSheetResult) ([]*greenBookImportProjectDraft, map[string]*greenBookImportProjectDraft, error) {
 	rows, ok := workbook.importRows(greenBookImportSheetInput, []string{"program_title", "gb_code", "project_name"})
 	if !ok {
 		addImportError(result, 0, "Sheet Input Data tidak ditemukan")

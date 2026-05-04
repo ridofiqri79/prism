@@ -53,13 +53,16 @@
 
 ## 4. Aturan Green Book
 
-- Hanya satu GB berstatus `active` per `publish_year`.
+- Status Green Book yang tampil ke user adalah `Berlaku` dan `Tidak Berlaku`.
+- Status Green Book dipilih user saat create/edit, tidak lagi diubah otomatis saat Green Book baru dibuat.
 - Format revisi: `GB 2025 Revisi ke-1`.
 - Kombinasi `publish_year` + `revision_number` harus unik; Green Book dengan Publish Year dan Revision number yang sama tidak boleh dibuat dua kali.
 - GB Project adalah snapshot di dalam satu Green Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
-- Revisi Green Book boleh menyalin GB Project yang sama persis dari revisi sebelumnya.
+- Green Book baru selalu dimulai kosong. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
+- Saat user membuat GB Project baru dengan `gb_code` yang sama pada revisi Green Book berikutnya, backend menyambungkan snapshot tersebut ke logical identity sebelumnya.
+- Green Book boleh dihapus permanen hanya jika belum memiliki Project Green Book dan tidak menjadi sumber revisi Green Book lain.
 - GB Project wajib mereferensikan minimal 1 BB Project.
 - GB Project boleh menggabungkan lebih dari satu BB Project hanya jika seluruh BB Project berasal dari header Blue Book yang sama (Period, revision number, dan revision year sama). Backend menolak relasi dari header Blue Book berbeda.
 - Satu BB Project boleh dipakai oleh lebih dari satu GB Project dalam header Green Book yang sama untuk mendukung pemecahan satu proyek BB menjadi beberapa proyek GB.
@@ -78,6 +81,7 @@
 - Setelah DK/LA dibuat, downstream tetap menunjuk ke snapshot GB/BB yang dicantumkan saat DK dibuat; tidak auto-pindah ketika ada revisi BB/GB baru.
 - Nama proyek pada DK Project dicatat ulang sebagai snapshot Daftar Kegiatan dan boleh berbeda dari nama proyek Green Book; default frontend diisi dari GB Project terpilih lalu tetap dapat diedit sebelum disimpan.
 - Mitra Kerja Bappenas pada DK Project bersifat opsional, boleh lebih dari satu, dapat diisi otomatis dari GB Project terpilih, dan tetap dapat diedit sebelum disimpan.
+- Daftar Kegiatan boleh dihapus permanen hanya jika belum memiliki Project di Daftar Kegiatan.
 - Activity Details diinput bebas — tidak ada relasi teknis ke Activities GB.
 
 ---

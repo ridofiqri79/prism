@@ -15,29 +15,28 @@ import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import ValueChipList from '@/components/common/ValueChipList.vue'
 import { usePermission } from '@/composables/usePermission'
-import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
-import { useMasterStore } from '@/stores/master.store'
 import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
-import { joinNames } from './green-book-page-utils'
+import { formatGreenBookStatus } from './green-book-page-utils'
 
 const route = useRoute()
 const router = useRouter()
 const greenBookStore = useGreenBookStore()
-const blueBookStore = useBlueBookStore()
-const masterStore = useMasterStore()
 const { can } = usePermission()
 
 const greenBookId = computed(() => String(route.params.gbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const isRevisionHistoryOpen = ref(false)
 const project = computed(() => greenBookStore.currentProject)
+const executingAgencyNames = computed(() => toNameList(project.value?.executing_agencies))
+const implementingAgencyNames = computed(() => toNameList(project.value?.implementing_agencies))
+const locationNames = computed(() => toNameList(project.value?.locations))
+const bappenasPartnerNames = computed(() => toNameList(project.value?.bappenas_partners))
+const selectedCurrency = computed(() => project.value?.funding_sources[0]?.currency ?? 'USD')
 const programTitleName = computed(
-  () =>
-    project.value?.program_title?.title ??
-    masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
-    '-',
+  () => project.value?.program_title?.title ?? '-',
 )
 const auditRailItems = computed(() =>
   greenBookStore.projectHistory.flatMap((item) =>
@@ -49,19 +48,14 @@ const auditRailItems = computed(() =>
 )
 const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
-function bbProjectBlueBookId(project: BBProjectSummary) {
-  return (
-    project.blue_book_id ??
-    blueBookStore.projectOptions.find((item) => item.id === project.id)?.blue_book_id
-  )
+function toNameList(items?: { name?: string; title?: string }[]) {
+  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
 }
 
 async function loadData() {
   await Promise.all([
     greenBookStore.fetchProject(greenBookId.value, projectId.value),
     greenBookStore.fetchProjectHistory(projectId.value),
-    blueBookStore.fetchProjectOptions(),
-    masterStore.fetchProgramTitles(true, { limit: 1000 }),
   ])
 }
 
@@ -81,7 +75,7 @@ function formatDateTime(value?: string) {
 }
 
 function bbProjectRoute(bbProject: BBProjectSummary) {
-  const bbId = bbProjectBlueBookId(bbProject)
+  const bbId = bbProject.blue_book_id
   return bbId
     ? { name: 'bb-project-detail', params: { bbId, id: bbProject.id } }
     : { name: 'blue-books' }
@@ -117,49 +111,62 @@ onMounted(() => {
     </PageHeader>
 
     <div v-if="project" class="space-y-6">
-      <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
-          <div class="mt-1 flex flex-wrap items-center gap-2">
-            <StatusBadge :status="project.status" />
-            <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
-            <Tag
-              v-else-if="project.has_newer_revision"
-              value="Ada revisi lebih baru"
-              severity="warn"
-              rounded
-            />
+      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="grid gap-5 p-5 md:grid-cols-3">
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</p>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+              <StatusBadge :status="project.status" :label="formatGreenBookStatus(project.status)" />
+              <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
+              <Tag
+                v-else-if="project.has_newer_revision"
+                value="Ada revisi lebih baru"
+                severity="warn"
+                rounded
+              />
+            </div>
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Judul Program
+            </p>
+            <p class="text-sm font-semibold text-surface-950">{{ programTitleName }}</p>
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
+            <p class="text-sm font-semibold text-surface-950">
+              {{ project.duration ? `${project.duration} bulan` : '-' }}
+            </p>
           </div>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Judul Program</p>
-          <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
+        <div class="border-t border-surface-100 px-5 py-4">
+          <h2 class="text-lg font-semibold text-surface-950">Profil Kelembagaan</h2>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
-          <p class="font-semibold text-surface-950">
-            {{ project.duration ? `${project.duration} bulan` : '-' }}
-          </p>
+        <div class="grid gap-x-8 gap-y-5 px-5 pb-5 md:grid-cols-2">
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Executing Agency
+            </p>
+            <ValueChipList :items="executingAgencyNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Implementing Agency
+            </p>
+            <ValueChipList :items="implementingAgencyNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
+            <ValueChipList :items="locationNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Mitra Kerja Bappenas
+            </p>
+            <ValueChipList :items="bappenasPartnerNames" />
+          </div>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-          <p class="font-semibold text-surface-950">{{ joinNames(project.executing_agencies) }}</p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="font-semibold text-surface-950">
-            {{ joinNames(project.implementing_agencies) }}
-          </p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
-          <p class="font-semibold text-surface-950">{{ joinNames(project.locations) }}</p>
-        </div>
-        <div class="md:col-span-3">
-          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
-          <p class="font-semibold text-surface-950">{{ joinNames(project.bappenas_partners) }}</p>
-        </div>
-      </div>
+      </section>
 
       <div class="rounded-lg border border-surface-200 bg-white p-5">
         <p class="text-xs uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
@@ -222,7 +229,12 @@ onMounted(() => {
               <tr v-for="item in greenBookStore.projectHistory" :key="item.id">
                 <td class="px-4 py-3 font-medium text-surface-900">{{ item.book_label }}</td>
                 <td class="px-4 py-3 text-surface-700">{{ item.gb_code }}</td>
-                <td class="px-4 py-3"><StatusBadge :status="item.book_status" /></td>
+                <td class="px-4 py-3">
+                  <StatusBadge
+                    :status="item.book_status"
+                    :label="formatGreenBookStatus(item.book_status)"
+                  />
+                </td>
                 <td class="px-4 py-3">
                   <Tag
                     :value="item.is_latest ? 'Terbaru' : 'Historis'"
@@ -282,12 +294,20 @@ onMounted(() => {
           </TabPanel>
           <TabPanel value="1">
             <div class="p-3">
-              <FundingSourceTable :rows="project.funding_sources" :editable="false" />
+              <FundingSourceTable
+                :rows="project.funding_sources"
+                :selected-currency="selectedCurrency"
+                :editable="false"
+              />
             </div>
           </TabPanel>
           <TabPanel value="2">
             <div class="p-3">
-              <DisbursementPlanTable :rows="project.disbursement_plan" :editable="false" />
+              <DisbursementPlanTable
+                :rows="project.disbursement_plan"
+                :selected-currency="selectedCurrency"
+                :editable="false"
+              />
             </div>
           </TabPanel>
           <TabPanel value="3">
@@ -295,6 +315,7 @@ onMounted(() => {
               <FundingAllocationTable
                 :activities="project.activities"
                 :rows="project.funding_allocations"
+                :selected-currency="selectedCurrency"
                 :editable="false"
               />
             </div>

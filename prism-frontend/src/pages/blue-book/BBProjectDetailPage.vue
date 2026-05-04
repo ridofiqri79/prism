@@ -12,13 +12,14 @@ import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import ValueChipList from '@/components/common/ValueChipList.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
-import { formatBlueBookStatus, joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import { formatBlueBookStatus, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
 
@@ -42,7 +43,11 @@ const errors = ref<FormErrors<LoIField>>({})
 
 const project = computed(() => blueBookStore.currentProject)
 const programTitleName = computed(() => project.value?.program_title?.title ?? '-')
-const bappenasPartnerNames = computed(() => joinNames(project.value?.bappenas_partners ?? []))
+const executingAgencyNames = computed(() => toNameList(project.value?.executing_agencies))
+const implementingAgencyNames = computed(() => toNameList(project.value?.implementing_agencies))
+const bappenasPartnerNames = computed(() => toNameList(project.value?.bappenas_partners))
+const locationNames = computed(() => toNameList(project.value?.locations))
+const nationalPriorityNames = computed(() => toNameList(project.value?.national_priorities))
 const allowedLenderIds = computed(
   () => project.value?.lender_indications.map((item) => item.lender.id) ?? [],
 )
@@ -62,7 +67,6 @@ const auditRailItems = computed(() =>
     })),
   ),
 )
-const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
 async function loadData() {
   await Promise.all([
@@ -79,6 +83,23 @@ function historyRoute(item: BBProjectHistoryItem) {
 function historyLabel(item: BBProjectHistoryItem) {
   const year = item.revision_year ? ` / ${item.revision_year}` : ''
   return `${item.book_label} - Rev ${item.revision_number}${year}`
+}
+
+function formatProjectStatus(status: string) {
+  if (status === 'active') return 'Berlaku'
+  return status
+}
+
+function revisionSnapshotLabel(item: BBProjectHistoryItem) {
+  return item.is_latest ? 'Versi terbaru' : 'Historis'
+}
+
+function revisionChangeMeta(item: BBProjectHistoryItem) {
+  const parts = []
+  if (item.last_changed_by) parts.push(item.last_changed_by)
+  if (item.last_changed_at) parts.push(formatDateTime(item.last_changed_at))
+
+  return parts.join(' - ') || 'Belum ada catatan perubahan'
 }
 
 function formatDateTime(value?: string) {
@@ -98,6 +119,10 @@ function hasRichText(value?: string | null) {
 
 function richTextHtml(value?: string | null) {
   return sanitizeRichText(value)
+}
+
+function toNameList(items?: { name?: string; title?: string }[]) {
+  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
 }
 
 function openLoIDialog() {
@@ -165,12 +190,16 @@ onMounted(() => {
 
     <div v-if="project" class="space-y-6">
       <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="space-y-2">
-            <p class="text-sm text-surface-500">Status</p>
-            <div class="flex flex-wrap items-center gap-2">
-              <StatusBadge :status="project.status" />
-              <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div class="min-w-0 space-y-1.5">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Judul Program</p>
+            <p class="truncate text-base font-semibold text-surface-950">{{ programTitleName }}</p>
+          </div>
+          <div class="flex flex-col gap-2 lg:items-end">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status Snapshot</p>
+            <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+              <StatusBadge :status="project.status" :label="formatProjectStatus(project.status)" />
+              <Tag v-if="project.is_latest" value="Versi terbaru" severity="success" rounded />
               <Tag
                 v-else-if="project.has_newer_revision"
                 value="Ada revisi lebih baru"
@@ -178,10 +207,6 @@ onMounted(() => {
                 rounded
               />
             </div>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-surface-500">Judul Program</p>
-            <p class="font-semibold text-surface-950">{{ programTitleName }}</p>
           </div>
         </div>
       </div>
@@ -205,148 +230,164 @@ onMounted(() => {
             @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
           />
         </div>
-        <div
+        <ol
           v-if="isRevisionHistoryOpen"
-          class="overflow-auto rounded-lg border border-surface-200"
+          class="mt-4 overflow-hidden rounded-lg border border-surface-200 bg-surface-0"
         >
-          <table class="w-full min-w-[56rem] text-left text-sm">
-            <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-              <tr>
-                <th class="px-4 py-3">Blue Book</th>
-                <th class="px-4 py-3">Kode</th>
-                <th class="px-4 py-3">Status Dokumen</th>
-                <th class="px-4 py-3">Snapshot</th>
-                <th class="px-4 py-3">Downstream</th>
-                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
-                <th class="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-100">
-              <tr v-for="item in blueBookStore.projectHistory" :key="item.id">
-                <td class="px-4 py-3 font-medium text-surface-900">{{ historyLabel(item) }}</td>
-                <td class="px-4 py-3 text-surface-700">{{ item.bb_code }}</td>
-                <td class="px-4 py-3">
-                  <StatusBadge
-                    :status="item.book_status"
-                    :label="formatBlueBookStatus(item.book_status)"
-                  />
-                </td>
-                <td class="px-4 py-3">
-                  <Tag
-                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
-                    :severity="item.is_latest ? 'success' : 'secondary'"
-                    rounded
-                  />
-                </td>
-                <td class="px-4 py-3">
-                  <Tag
-                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
-                    :severity="item.used_by_downstream ? 'info' : 'secondary'"
-                    rounded
-                  />
-                </td>
-                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
-                  <div v-if="item.last_change_summary">
-                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
-                    <p class="text-xs text-surface-500">
-                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
-                    </p>
-                  </div>
-                  <span v-else>-</span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <Button
-                    as="router-link"
-                    :to="historyRoute(item)"
-                    icon="pi pi-eye"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Lihat snapshot"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <li
+            v-for="item in blueBookStore.projectHistory"
+            :key="item.id"
+            class="grid gap-4 border-b border-surface-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_auto]"
+          >
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="min-w-0 font-semibold text-surface-950">{{ historyLabel(item) }}</p>
+                <span
+                  class="rounded border border-surface-200 bg-surface-50 px-2 py-0.5 font-mono text-xs font-semibold text-surface-700"
+                >
+                  {{ item.bb_code }}
+                </span>
+                <StatusBadge
+                  :status="item.book_status"
+                  :label="formatBlueBookStatus(item.book_status)"
+                />
+                <Tag
+                  :value="revisionSnapshotLabel(item)"
+                  :severity="item.is_latest ? 'success' : 'secondary'"
+                  rounded
+                />
+              </div>
+
+              <div class="mt-3 space-y-1.5">
+                <p v-if="item.last_change_summary" class="text-sm font-medium text-surface-900">
+                  {{ item.last_change_summary }}
+                </p>
+                <p v-else class="text-sm text-surface-500">Belum ada catatan perubahan terakhir.</p>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-surface-500">
+                  <span
+                    class="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium"
+                    :class="
+                      item.used_by_downstream
+                        ? 'border-primary-100 bg-primary-50 text-primary-700'
+                        : 'border-surface-200 bg-surface-50 text-surface-600'
+                    "
+                  >
+                    <i class="pi pi-link text-[0.7rem]" />
+                    {{ item.used_by_downstream ? 'Dipakai tahap berikutnya' : 'Belum dipakai downstream' }}
+                  </span>
+                  <span>{{ revisionChangeMeta(item) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-start justify-end">
+              <Button
+                v-tooltip.top="'Lihat detail snapshot'"
+                as="router-link"
+                :to="historyRoute(item)"
+                icon="pi pi-eye"
+                severity="secondary"
+                size="small"
+                outlined
+                rounded
+                aria-label="Lihat detail snapshot"
+              />
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="border-b border-surface-100 px-5 py-4">
+          <h2 class="text-lg font-semibold text-surface-950">Profil Kelembagaan</h2>
+        </div>
+        <div class="grid gap-x-8 gap-y-5 p-5 md:grid-cols-2">
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Executing Agency
+            </p>
+            <ValueChipList :items="executingAgencyNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Implementing Agency
+            </p>
+            <ValueChipList :items="implementingAgencyNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Mitra Kerja Bappenas
+            </p>
+            <ValueChipList :items="bappenasPartnerNames" />
+          </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
+            <ValueChipList :items="locationNames" />
+          </div>
+          <div class="min-w-0 space-y-2 md:col-span-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Prioritas Nasional
+            </p>
+            <ValueChipList :items="nationalPriorityNames" />
+          </div>
         </div>
       </section>
 
-      <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Executing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">
-            {{ joinNames(project.executing_agencies) }}
-          </p>
+      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="border-b border-surface-100 px-5 py-4">
+          <h2 class="text-lg font-semibold text-surface-950">Rincian Proyek</h2>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Implementing Agency</p>
-          <p class="mt-1 font-medium text-surface-950">
-            {{ joinNames(project.implementing_agencies) }}
-          </p>
+        <div class="border-b border-surface-100 px-5 py-4">
+          <div class="grid gap-2 sm:grid-cols-[11rem_minmax(0,1fr)]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
+            <p class="text-sm font-semibold text-surface-950">
+              {{ project.duration ? `${project.duration} bulan` : '-' }}
+            </p>
+          </div>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Mitra Kerja Bappenas</p>
-          <p class="mt-1 font-medium text-surface-950">
-            {{ bappenasPartnerNames }}
-          </p>
+        <div class="divide-y divide-surface-100">
+          <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Objective
+            </p>
+            <div
+              v-if="hasRichText(project.objective)"
+              class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
+              v-html="richTextHtml(project.objective)"
+            />
+            <p v-else class="text-sm text-surface-400">-</p>
+          </div>
+          <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Scope of Work
+            </p>
+            <div
+              v-if="hasRichText(project.scope_of_work)"
+              class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
+              v-html="richTextHtml(project.scope_of_work)"
+            />
+            <p v-else class="text-sm text-surface-400">-</p>
+          </div>
+          <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Outputs</p>
+            <div
+              v-if="hasRichText(project.outputs)"
+              class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
+              v-html="richTextHtml(project.outputs)"
+            />
+            <p v-else class="text-sm text-surface-400">-</p>
+          </div>
+          <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Outcomes</p>
+            <div
+              v-if="hasRichText(project.outcomes)"
+              class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
+              v-html="richTextHtml(project.outcomes)"
+            />
+            <p v-else class="text-sm text-surface-400">-</p>
+          </div>
         </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Lokasi</p>
-          <p class="mt-1 font-medium text-surface-950">{{ joinNames(project.locations) }}</p>
-        </div>
-        <div class="md:col-span-2">
-          <p class="text-xs uppercase tracking-wide text-surface-500">Prioritas Nasional</p>
-          <p class="mt-1 font-medium text-surface-950">
-            {{ joinNames(project.national_priorities) }}
-          </p>
-        </div>
-      </div>
-
-      <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-2">
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Durasi</p>
-          <p class="mt-1 text-surface-950">
-            {{ project.duration ? `${project.duration} bulan` : '-' }}
-          </p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Objective</p>
-          <div
-            v-if="hasRichText(project.objective)"
-            class="rich-text-display mt-1 text-surface-950"
-            v-html="richTextHtml(project.objective)"
-          />
-          <p v-else class="mt-1 text-surface-950">-</p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Scope of Work</p>
-          <div
-            v-if="hasRichText(project.scope_of_work)"
-            class="rich-text-display mt-1 text-surface-950"
-            v-html="richTextHtml(project.scope_of_work)"
-          />
-          <p v-else class="mt-1 text-surface-950">-</p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Outputs</p>
-          <div
-            v-if="hasRichText(project.outputs)"
-            class="rich-text-display mt-1 text-surface-950"
-            v-html="richTextHtml(project.outputs)"
-          />
-          <p v-else class="mt-1 text-surface-950">-</p>
-        </div>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Outcomes</p>
-          <div
-            v-if="hasRichText(project.outcomes)"
-            class="rich-text-display mt-1 text-surface-950"
-            v-html="richTextHtml(project.outcomes)"
-          />
-          <p v-else class="mt-1 text-surface-950">-</p>
-        </div>
-      </div>
+      </section>
 
       <section class="space-y-3">
         <h2 class="text-lg font-semibold text-surface-950">Biaya Proyek</h2>
@@ -383,7 +424,7 @@ onMounted(() => {
             option-value="id"
             placeholder="Pilih lender dari indication proyek"
             filter
-            append-to="self"
+            append-to="body"
             :overlay-style="{ minWidth: '100%' }"
             class="w-full"
           >

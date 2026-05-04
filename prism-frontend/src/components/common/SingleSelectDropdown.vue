@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import InputText from 'primevue/inputtext'
 
-type MultiSelectOption = Record<string, unknown>
+type SingleSelectOption = Record<string, unknown>
 type SelectValue = unknown
 
 type FilterEvent = {
@@ -12,25 +12,22 @@ type FilterEvent = {
 
 type ChangeEvent = {
   originalEvent: Event | null
-  value: SelectValue[]
+  value: SelectValue | null
 }
 
 const props = withDefaults(
   defineProps<{
-    modelValue?: SelectValue[] | null
+    modelValue?: SelectValue | null
     options?: SelectValue[]
     optionLabel?: string
     optionValue?: string
     optionDisabled?: string
     placeholder?: string
     disabled?: boolean
+    invalid?: boolean
     filter?: boolean
     filterPlaceholder?: string
-    display?: 'chip' | 'comma'
     showClear?: boolean
-    maxSelectedLabels?: number | null
-    selectionLimit?: number | null
-    showToggleAll?: boolean
     loading?: boolean
     emptyMessage?: string
     emptyFilterMessage?: string
@@ -45,20 +42,16 @@ const props = withDefaults(
     ariaLabelledby?: string | null
   }>(),
   {
-    modelValue: () => [],
     options: () => [],
     optionLabel: 'label',
     optionValue: 'value',
     optionDisabled: undefined,
     placeholder: 'Pilih opsi',
     disabled: false,
+    invalid: false,
     filter: false,
     filterPlaceholder: undefined,
-    display: 'chip',
     showClear: true,
-    maxSelectedLabels: null,
-    selectionLimit: null,
-    showToggleAll: true,
     loading: false,
     emptyMessage: 'Tidak ada opsi',
     emptyFilterMessage: 'Tidak ada hasil',
@@ -75,7 +68,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:modelValue': [value: SelectValue[]]
+  'update:modelValue': [value: SelectValue | null]
   change: [event: ChangeEvent]
   filter: [event: FilterEvent]
   show: []
@@ -83,8 +76,12 @@ const emit = defineEmits<{
 }>()
 
 defineSlots<{
-  value?(props: { value: SelectValue[]; placeholder: string }): unknown
-  option?(props: { option: MultiSelectOption; selected: boolean; index: number }): unknown
+  value?(props: {
+    value: SelectValue | null
+    placeholder: string
+    selectedOption: SelectedOption | null
+  }): unknown
+  option?(props: { option: SingleSelectOption; selected: boolean; index: number }): unknown
 }>()
 
 type SelectedOption = {
@@ -100,34 +97,34 @@ const filterText = ref('')
 const floatingOverlayStyle = ref<Record<string, string | number>>({})
 let hasFloatingListeners = false
 
-const normalizedValue = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []))
+const normalizedValue = computed(() => (props.modelValue === undefined ? null : props.modelValue))
 
-const selectedIds = computed(() => new Set(normalizedValue.value.map((value) => stableKey(value))))
-
-const selectedOptions = computed<SelectedOption[]>(() =>
-  normalizedValue.value.map((value) => {
-    const option = props.options.find((item) => isSameValue(getOptionValue(item), value))
-
-    return {
-      value,
-      label: option ? getOptionLabel(option) : String(value ?? ''),
-    }
-  }),
+const hasSelectedValue = computed(
+  () =>
+    normalizedValue.value !== null &&
+    normalizedValue.value !== undefined &&
+    normalizedValue.value !== '',
 )
 
-const displayedSelectedOptions = computed(() => {
-  if (!props.maxSelectedLabels || props.maxSelectedLabels <= 0) {
-    return selectedOptions.value
+const selectedOption = computed<SelectedOption | null>(() => {
+  if (!hasSelectedValue.value) {
+    return null
   }
 
-  return selectedOptions.value.slice(0, props.maxSelectedLabels)
+  const option = props.options.find((item) =>
+    isSameValue(getOptionValue(item), normalizedValue.value),
+  )
+
+  return option
+    ? {
+        value: normalizedValue.value,
+        label: getOptionLabel(option),
+      }
+    : {
+        value: normalizedValue.value,
+        label: String(normalizedValue.value ?? ''),
+      }
 })
-
-const hiddenSelectedCount = computed(() =>
-  Math.max(0, selectedOptions.value.length - displayedSelectedOptions.value.length),
-)
-
-const commaValueLabel = computed(() => selectedOptions.value.map((option) => option.label).join(', '))
 
 const searchPlaceholder = computed(() => props.filterPlaceholder ?? `Cari ${props.placeholder}`)
 
@@ -156,8 +153,18 @@ const teleportTarget = computed(() =>
   props.appendTo === 'self' ? 'body' : props.appendTo,
 )
 
-function toOptionRecord(option: SelectValue): MultiSelectOption {
-  return option && typeof option === 'object' ? (option as MultiSelectOption) : { value: option }
+const controlClass = computed(() =>
+  [
+    'flex min-h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-left text-sm text-surface-800 transition',
+    props.invalid
+      ? 'border-red-400 hover:border-red-500 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100'
+      : 'border-surface-300 hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100',
+    props.disabled ? 'cursor-not-allowed bg-surface-100 text-surface-400' : '',
+  ].join(' '),
+)
+
+function toOptionRecord(option: SelectValue): SingleSelectOption {
+  return option && typeof option === 'object' ? (option as SingleSelectOption) : { value: option }
 }
 
 function resolveField(option: SelectValue, field?: string) {
@@ -207,20 +214,11 @@ function isSameValue(left: SelectValue, right: SelectValue) {
 }
 
 function isSelected(option: SelectValue) {
-  return selectedIds.value.has(stableKey(getOptionValue(option)))
-}
+  if (!hasSelectedValue.value) {
+    return false
+  }
 
-function isSelectionLimitReached(option: SelectValue) {
-  return (
-    props.selectionLimit !== null &&
-    props.selectionLimit > 0 &&
-    normalizedValue.value.length >= props.selectionLimit &&
-    !isSelected(option)
-  )
-}
-
-function isOptionDisabled(option: SelectValue) {
-  return (getOptionDisabled(option) || isSelectionLimitReached(option)) && !isSelected(option)
+  return isSameValue(getOptionValue(option), normalizedValue.value)
 }
 
 function openPanel() {
@@ -260,31 +258,25 @@ function togglePanel() {
   openPanel()
 }
 
-function updateSelected(value: SelectValue[], originalEvent: Event | null) {
-  const deduped = value.filter(
-    (item, index, items) => items.findIndex((candidate) => isSameValue(candidate, item)) === index,
-  )
-
-  emit('update:modelValue', deduped)
-  emit('change', { originalEvent, value: deduped })
+function updateSelected(value: SelectValue | null, originalEvent: Event | null) {
+  emit('update:modelValue', value)
+  emit('change', { originalEvent, value })
 }
 
-function toggleOption(option: SelectValue, event: Event) {
-  if (props.disabled || isOptionDisabled(option)) {
+function chooseOption(option: SelectValue, event: Event) {
+  if (props.disabled || getOptionDisabled(option)) {
     return
   }
 
   const value = getOptionValue(option)
 
   if (isSelected(option)) {
-    updateSelected(
-      normalizedValue.value.filter((item) => !isSameValue(item, value)),
-      event,
-    )
+    closePanel()
     return
   }
 
-  updateSelected([...normalizedValue.value, value], event)
+  updateSelected(value, event)
+  closePanel()
 }
 
 function clearSelection(event: Event) {
@@ -292,7 +284,7 @@ function clearSelection(event: Event) {
     return
   }
 
-  updateSelected([], event)
+  updateSelected(null, event)
 }
 
 function handleFilterInput(event: Event) {
@@ -372,44 +364,39 @@ onBeforeUnmount(() => {
       role="combobox"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
+      :aria-invalid="invalid || undefined"
       :aria-label="ariaLabel ?? undefined"
       :aria-labelledby="ariaLabelledby ?? undefined"
       :tabindex="disabled ? -1 : 0"
-      class="flex min-h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-surface-300 bg-white px-3 py-2 text-left text-sm text-surface-800 transition hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-      :class="{ 'cursor-not-allowed bg-surface-100 text-surface-400': disabled }"
+      :class="controlClass"
       @click.prevent="togglePanel"
       @keydown.enter.prevent="togglePanel"
       @keydown.space.prevent="togglePanel"
       @keydown.down.prevent="openPanel"
     >
-      <slot name="value" :value="normalizedValue" :placeholder="placeholder">
-        <div v-if="selectedOptions.length" class="min-w-0 flex-1 pr-1">
-          <div v-if="display === 'chip'" class="flex min-w-0 flex-wrap gap-1.5">
-            <span
-              v-for="option in displayedSelectedOptions"
-              :key="stableKey(option.value)"
-              class="inline-flex max-w-full items-center rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700"
-              :title="option.label"
-            >
-              <span class="max-w-72 truncate">{{ option.label }}</span>
-            </span>
-            <span
-              v-if="hiddenSelectedCount"
-              class="inline-flex items-center rounded-md border border-surface-200 bg-surface-50 px-2 py-1 text-xs font-medium text-surface-600"
-            >
-              +{{ hiddenSelectedCount }} lainnya
-            </span>
-          </div>
-          <span v-else class="block truncate">{{ commaValueLabel }}</span>
+      <slot
+        name="value"
+        :value="normalizedValue"
+        :placeholder="placeholder"
+        :selected-option="selectedOption"
+      >
+        <div v-if="selectedOption" class="min-w-0 flex-1 pr-1">
+          <span
+            class="inline-flex max-w-full items-center rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700"
+            :title="selectedOption.label"
+          >
+            <span class="max-w-72 truncate">{{ selectedOption.label }}</span>
+          </span>
         </div>
         <span v-else class="min-w-0 flex-1 truncate text-surface-400">{{ placeholder }}</span>
       </slot>
+
       <div class="flex shrink-0 items-center gap-1 pl-1">
         <button
-          v-if="showClear && selectedOptions.length && !disabled"
+          v-if="showClear && selectedOption && !disabled"
           type="button"
           class="inline-flex h-6 w-6 items-center justify-center rounded-full text-surface-500 transition hover:bg-surface-100 hover:text-surface-700"
-          aria-label="Hapus semua pilihan"
+          :aria-label="`Hapus ${selectedOption.label}`"
           @click.stop.prevent="clearSelection"
         >
           <span class="pi pi-times text-xs" aria-hidden="true" />
@@ -450,7 +437,6 @@ onBeforeUnmount(() => {
 
         <div
           role="listbox"
-          aria-multiselectable="true"
           class="space-y-1 overflow-y-auto pr-1"
           :class="{ 'mt-3': filter }"
           :style="{ maxHeight: scrollHeight }"
@@ -461,27 +447,17 @@ onBeforeUnmount(() => {
             type="button"
             role="option"
             :aria-selected="isSelected(option)"
-            :disabled="isOptionDisabled(option)"
-            class="flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition"
+            :disabled="disabled || getOptionDisabled(option)"
+            class="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition"
             :class="
               isSelected(option)
                 ? 'border-primary-200 bg-primary-50 text-primary-800'
-                : isOptionDisabled(option)
+                : getOptionDisabled(option)
                   ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400'
                   : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'
             "
-            @click="toggleOption(option, $event)"
+            @click="chooseOption(option, $event)"
           >
-            <span
-              class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border"
-              :class="
-                isSelected(option)
-                  ? 'border-primary-500 bg-primary-500 text-white'
-                  : 'border-surface-300 bg-white text-transparent'
-              "
-            >
-              <span class="pi pi-check text-[0.65rem]" aria-hidden="true" />
-            </span>
             <div class="min-w-0 flex-1">
               <slot
                 name="option"
@@ -492,12 +468,14 @@ onBeforeUnmount(() => {
                 <span class="block truncate font-medium">{{ getOptionLabel(option) }}</span>
               </slot>
             </div>
+            <span
+              v-if="isSelected(option)"
+              class="pi pi-check shrink-0 text-sm text-primary-600"
+              aria-hidden="true"
+            />
           </button>
 
-          <p
-            v-if="loading"
-            class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500"
-          >
+          <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
             Memuat data
           </p>
           <p
@@ -506,20 +484,6 @@ onBeforeUnmount(() => {
           >
             {{ filterText ? emptyFilterMessage : emptyMessage }}
           </p>
-        </div>
-
-        <div
-          v-if="selectedOptions.length"
-          class="mt-3 flex items-center justify-between border-t border-surface-100 pt-3 text-xs text-surface-500"
-        >
-          <span>{{ selectedOptions.length }} dipilih</span>
-          <button
-            type="button"
-            class="cursor-pointer font-medium text-primary-600 hover:text-primary-700"
-            @click="clearSelection"
-          >
-            Hapus semua
-          </button>
         </div>
       </div>
     </Teleport>
@@ -552,7 +516,6 @@ onBeforeUnmount(() => {
 
       <div
         role="listbox"
-        aria-multiselectable="true"
         class="space-y-1 overflow-y-auto pr-1"
         :class="{ 'mt-3': filter }"
         :style="{ maxHeight: scrollHeight }"
@@ -563,27 +526,17 @@ onBeforeUnmount(() => {
           type="button"
           role="option"
           :aria-selected="isSelected(option)"
-          :disabled="isOptionDisabled(option)"
-          class="flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition"
+          :disabled="disabled || getOptionDisabled(option)"
+          class="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition"
           :class="
             isSelected(option)
               ? 'border-primary-200 bg-primary-50 text-primary-800'
-              : isOptionDisabled(option)
+              : getOptionDisabled(option)
                 ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400'
                 : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'
           "
-          @click="toggleOption(option, $event)"
+          @click="chooseOption(option, $event)"
         >
-          <span
-            class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border"
-            :class="
-              isSelected(option)
-                ? 'border-primary-500 bg-primary-500 text-white'
-                : 'border-surface-300 bg-white text-transparent'
-            "
-          >
-            <span class="pi pi-check text-[0.65rem]" aria-hidden="true" />
-          </span>
           <div class="min-w-0 flex-1">
             <slot
               name="option"
@@ -594,12 +547,14 @@ onBeforeUnmount(() => {
               <span class="block truncate font-medium">{{ getOptionLabel(option) }}</span>
             </slot>
           </div>
+          <span
+            v-if="isSelected(option)"
+            class="pi pi-check shrink-0 text-sm text-primary-600"
+            aria-hidden="true"
+          />
         </button>
 
-        <p
-          v-if="loading"
-          class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500"
-        >
+        <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
           Memuat data
         </p>
         <p
@@ -608,20 +563,6 @@ onBeforeUnmount(() => {
         >
           {{ filterText ? emptyFilterMessage : emptyMessage }}
         </p>
-      </div>
-
-      <div
-        v-if="selectedOptions.length"
-        class="mt-3 flex items-center justify-between border-t border-surface-100 pt-3 text-xs text-surface-500"
-      >
-        <span>{{ selectedOptions.length }} dipilih</span>
-        <button
-          type="button"
-          class="cursor-pointer font-medium text-primary-600 hover:text-primary-700"
-          @click="clearSelection"
-        >
-          Hapus semua
-        </button>
       </div>
     </div>
   </div>

@@ -8,12 +8,16 @@ const props = withDefaults(
     modelValue?: string | null
     placeholder?: string
     minHeight?: string
+    maxHeight?: string
+    resizable?: boolean
     disabled?: boolean
   }>(),
   {
     modelValue: '',
     placeholder: '',
     minHeight: '9rem',
+    maxHeight: 'none',
+    resizable: true,
     disabled: false,
   },
 )
@@ -40,7 +44,9 @@ function emitValue() {
   emit('update:modelValue', isRichTextEmpty(html) ? '' : html)
 }
 
-function runCommand(command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList') {
+function runCommand(
+  command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList',
+) {
   if (props.disabled) return
 
   editorRef.value?.focus()
@@ -66,8 +72,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-    <div class="flex items-center gap-1 border-b border-surface-200 bg-surface-50 px-2 py-1.5">
+  <div class="rounded-lg border border-surface-200 bg-white">
+    <div class="flex items-center gap-1 rounded-t-lg border-b border-surface-200 bg-surface-50 px-2 py-1.5">
       <Button
         type="button"
         label="B"
@@ -130,11 +136,14 @@ onMounted(() => {
     </div>
     <div
       ref="editorRef"
-      class="rich-text-editor__content px-3 py-2 text-sm leading-6 text-surface-950 outline-none"
-      :class="{ 'bg-surface-100 text-surface-500': disabled }"
+      class="rich-text-editor__content rounded-b-lg px-3 py-2 text-sm leading-6 text-surface-950 outline-none"
+      :class="{
+        'bg-surface-100 text-surface-500': disabled,
+        'rich-text-editor__content--resizable': resizable && !disabled,
+      }"
       :contenteditable="!disabled"
       :data-placeholder="placeholder"
-      :style="{ minHeight }"
+      :style="{ minHeight, maxHeight }"
       role="textbox"
       aria-multiline="true"
       @input="emitValue"
@@ -160,6 +169,15 @@ onMounted(() => {
 .rich-text-editor__content:empty::before {
   color: var(--p-surface-400);
   content: attr(data-placeholder);
+}
+
+.rich-text-editor__content {
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.rich-text-editor__content--resizable {
+  resize: vertical;
 }
 
 .rich-text-editor__content :deep(p) {

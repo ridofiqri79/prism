@@ -18,7 +18,7 @@ func TestGreenBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDo
 
 	_, sourceBBProject, latestBBProject := env.createBBRevisionPair(t)
 	greenBook := env.createGreenBook(t, gbService, 0, nil)
-	env.createGBProject(t, gbService, greenBook.ID, sourceBBProject.ID, "GB-001", "Flood Control GB")
+	sourceGBProject := env.createGBProject(t, gbService, greenBook.ID, sourceBBProject.ID, "GB-001", "Flood Control GB")
 
 	_, err := gbService.CreateGBProject(env.ctx, mustParseUUID(t, greenBook.ID), env.gbProjectRequest(sourceBBProject.ID, "GB-001", "Duplicate GB"))
 	assertAppErrorCode(t, err, "CONFLICT")
@@ -28,14 +28,16 @@ func TestGreenBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDo
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}
-	if len(projects.Data) != 1 {
-		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	if len(projects.Data) != 0 {
+		t.Fatalf("revision projects = %d, want 0 before manual project create", len(projects.Data))
 	}
-	if projects.Data[0].GBCode != "GB-001" {
-		t.Fatalf("cloned GB code = %q, want GB-001", projects.Data[0].GBCode)
+
+	revisionProject := env.createGBProject(t, gbService, revision.ID, sourceBBProject.ID, "GB-001", "Flood Control GB Revision")
+	if revisionProject.GBProjectIdentityID != sourceGBProject.GBProjectIdentityID {
+		t.Fatalf("revision identity = %s, want %s", revisionProject.GBProjectIdentityID, sourceGBProject.GBProjectIdentityID)
 	}
-	if len(projects.Data[0].BBProjects) != 1 || projects.Data[0].BBProjects[0].ID != latestBBProject.ID {
-		t.Fatalf("cloned BB relation = %+v, want latest BB %s", projects.Data[0].BBProjects, latestBBProject.ID)
+	if len(revisionProject.BBProjects) != 1 || revisionProject.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("revision BB relation = %+v, want latest BB %s", revisionProject.BBProjects, latestBBProject.ID)
 	}
 
 	_, err = gbService.CreateGBProject(env.ctx, mustParseUUID(t, revision.ID), env.gbProjectRequest(sourceBBProject.ID, "GB-001", "Duplicate in revision"))
@@ -90,7 +92,7 @@ func TestCreateGBProjectResolvesOldBBInputToLatestBBSnapshot(t *testing.T) {
 	}
 }
 
-func TestGreenBookRevisionClonePreservesIdentityAndUsesLatestBB(t *testing.T) {
+func TestCreateGBProjectInRevisionPreservesIdentityAndUsesLatestBB(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 	gbService := NewGreenBookService(env.pool, env.queries, nil)
 
@@ -103,25 +105,25 @@ func TestGreenBookRevisionClonePreservesIdentityAndUsesLatestBB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}
-	if len(projects.Data) != 1 {
-		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	if len(projects.Data) != 0 {
+		t.Fatalf("revision projects = %d, want 0 before manual project create", len(projects.Data))
 	}
 
-	cloned := projects.Data[0]
-	if cloned.ID == sourceGBProject.ID {
-		t.Fatal("cloned GB Project reused source snapshot id")
+	revisionProject := env.createGBProject(t, gbService, revision.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision")
+	if revisionProject.ID == sourceGBProject.ID {
+		t.Fatal("revision GB Project reused source snapshot id")
 	}
-	if cloned.GBProjectIdentityID != sourceGBProject.GBProjectIdentityID {
-		t.Fatalf("cloned GB identity = %s, want %s", cloned.GBProjectIdentityID, sourceGBProject.GBProjectIdentityID)
+	if revisionProject.GBProjectIdentityID != sourceGBProject.GBProjectIdentityID {
+		t.Fatalf("revision GB identity = %s, want %s", revisionProject.GBProjectIdentityID, sourceGBProject.GBProjectIdentityID)
 	}
-	if len(cloned.BBProjects) != 1 || cloned.BBProjects[0].ID != latestBBProject.ID {
-		t.Fatalf("cloned BB relation = %+v, want latest BB %s", cloned.BBProjects, latestBBProject.ID)
+	if len(revisionProject.BBProjects) != 1 || revisionProject.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("revision BB relation = %+v, want latest BB %s", revisionProject.BBProjects, latestBBProject.ID)
 	}
-	if len(cloned.ExecutingAgencies) != 1 || len(cloned.ImplementingAgencies) != 1 || len(cloned.Locations) != 1 {
-		t.Fatalf("cloned relations lengths EA=%d IA=%d locations=%d, want 1 each", len(cloned.ExecutingAgencies), len(cloned.ImplementingAgencies), len(cloned.Locations))
+	if len(revisionProject.ExecutingAgencies) != 1 || len(revisionProject.ImplementingAgencies) != 1 || len(revisionProject.Locations) != 1 {
+		t.Fatalf("revision relations lengths EA=%d IA=%d locations=%d, want 1 each", len(revisionProject.ExecutingAgencies), len(revisionProject.ImplementingAgencies), len(revisionProject.Locations))
 	}
-	if !cloned.IsLatest || cloned.HasNewerRevision {
-		t.Fatalf("cloned latest flags = is_latest:%v has_newer:%v, want latest without newer", cloned.IsLatest, cloned.HasNewerRevision)
+	if !revisionProject.IsLatest || revisionProject.HasNewerRevision {
+		t.Fatalf("revision latest flags = is_latest:%v has_newer:%v, want latest without newer", revisionProject.IsLatest, revisionProject.HasNewerRevision)
 	}
 
 	sourceAfterRevision, err := gbService.GetGBProject(env.ctx, mustParseUUID(t, greenBook.ID), mustParseUUID(t, sourceGBProject.ID))
@@ -174,7 +176,7 @@ func TestDeleteGBProjectRejectsDKDownstreamAndShowsRelations(t *testing.T) {
 	assertAppErrorHasDetailField(t, err, "daftar_kegiatan_project")
 }
 
-func TestGreenBookRevisionCloneMapsFundingAllocationToClonedActivity(t *testing.T) {
+func TestCreateGBProjectInRevisionMapsFundingAllocationToNewActivity(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 	gbService := NewGreenBookService(env.pool, env.queries, nil)
 
@@ -187,21 +189,24 @@ func TestGreenBookRevisionCloneMapsFundingAllocationToClonedActivity(t *testing.
 	if err != nil {
 		t.Fatalf("ListGBProjects(revision) error = %v", err)
 	}
-	cloned := projects.Data[0]
+	if len(projects.Data) != 0 {
+		t.Fatalf("revision projects = %d, want 0 before manual project create", len(projects.Data))
+	}
+	revisionProject := env.createGBProject(t, gbService, revision.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision")
 	if len(sourceGBProject.Activities) != 2 || len(sourceGBProject.FundingAllocations) != 2 {
 		t.Fatalf("source activities/allocations = %d/%d, want 2/2", len(sourceGBProject.Activities), len(sourceGBProject.FundingAllocations))
 	}
-	if len(cloned.Activities) != 2 || len(cloned.FundingAllocations) != 2 {
-		t.Fatalf("cloned activities/allocations = %d/%d, want 2/2", len(cloned.Activities), len(cloned.FundingAllocations))
+	if len(revisionProject.Activities) != 2 || len(revisionProject.FundingAllocations) != 2 {
+		t.Fatalf("revision activities/allocations = %d/%d, want 2/2", len(revisionProject.Activities), len(revisionProject.FundingAllocations))
 	}
 
 	sourceActivityIDs := map[string]struct{}{}
 	for _, activity := range sourceGBProject.Activities {
 		sourceActivityIDs[activity.ID] = struct{}{}
 	}
-	for _, allocation := range cloned.FundingAllocations {
+	for _, allocation := range revisionProject.FundingAllocations {
 		if _, exists := sourceActivityIDs[allocation.GBActivityID]; exists {
-			t.Fatalf("cloned allocation points to source activity id %s", allocation.GBActivityID)
+			t.Fatalf("revision allocation points to source activity id %s", allocation.GBActivityID)
 		}
 		if allocation.ActivityName == "Design" && allocation.Services != 10 {
 			t.Fatalf("Design services = %.2f, want 10", allocation.Services)
@@ -219,7 +224,8 @@ func TestGetGBProjectHistoryReturnsOrderedSnapshotsAndConcreteBBRelations(t *tes
 	_, oldBBProject, latestBBProject := env.createBBRevisionPair(t)
 	greenBook := env.createGreenBook(t, gbService, 0, nil)
 	sourceGBProject := env.createGBProject(t, gbService, greenBook.ID, oldBBProject.ID, "GB-001", "Flood Control GB")
-	env.createGreenBook(t, gbService, 1, &greenBook.ID)
+	revision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
+	revisionProject := env.createGBProject(t, gbService, revision.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision")
 
 	history, err := gbService.GetGBProjectHistory(env.ctx, mustParseUUID(t, sourceGBProject.ID))
 	if err != nil {
@@ -231,8 +237,11 @@ func TestGetGBProjectHistoryReturnsOrderedSnapshotsAndConcreteBBRelations(t *tes
 	if history[0].ID != sourceGBProject.ID {
 		t.Fatalf("history[0].ID = %s, want source %s", history[0].ID, sourceGBProject.ID)
 	}
-	if history[0].BookStatus != "superseded" || history[0].IsLatest {
-		t.Fatalf("history[0] status/latest = %s/%v, want superseded/not latest", history[0].BookStatus, history[0].IsLatest)
+	if history[0].BookStatus != "active" || history[0].IsLatest {
+		t.Fatalf("history[0] status/latest = %s/%v, want active/not latest", history[0].BookStatus, history[0].IsLatest)
+	}
+	if history[1].ID != revisionProject.ID {
+		t.Fatalf("history[1].ID = %s, want revision %s", history[1].ID, revisionProject.ID)
 	}
 	if history[1].BookStatus != "active" || !history[1].IsLatest {
 		t.Fatalf("history[1] status/latest = %s/%v, want active/latest", history[1].BookStatus, history[1].IsLatest)
@@ -258,6 +267,7 @@ func TestGreenBookImportReusesPreviousIdentityResolvesLatestBBAndScopedInstituti
 		PublishYear:         2026,
 		ReplacesGreenBookID: mustParseUUID(t, sourceGreenBook.ID),
 		RevisionNumber:      1,
+		Status:              "active",
 	})
 	if err != nil {
 		t.Fatalf("CreateGreenBook(target revision) error = %v", err)

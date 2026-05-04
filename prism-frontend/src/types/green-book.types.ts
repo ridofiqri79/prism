@@ -18,6 +18,7 @@ export interface GreenBook {
   replaces_green_book_id?: string | null
   revision_number: number
   status: GreenBookStatus
+  project_count: number
   created_at?: string
   updated_at?: string
 }
@@ -26,6 +27,7 @@ export interface GreenBookPayload {
   publish_year: number
   replaces_green_book_id?: string | null
   revision_number: number
+  status: GreenBookStatus
 }
 
 export interface GreenBookListParams extends ListParams {
