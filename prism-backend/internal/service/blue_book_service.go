@@ -386,29 +386,34 @@ func (s *BlueBookService) UpdateBBProject(ctx context.Context, bbID, id pgtype.U
 
 	var updated queries.BbProject
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		if _, err := qtx.GetActiveBBProjectByBlueBook(ctx, queries.GetActiveBBProjectByBlueBookParams{BlueBookID: bbID, ID: id}); err != nil {
+		current, err := qtx.GetActiveBBProjectByBlueBook(ctx, queries.GetActiveBBProjectByBlueBookParams{BlueBookID: bbID, ID: id})
+		if err != nil {
 			return mapNotFound(err, "BB Project tidak ditemukan")
 		}
 		if err := s.validateNationalPriorities(ctx, qtx, req.NationalPriorityIDs); err != nil {
 			return err
 		}
-		project, err := qtx.UpdateBBProject(ctx, queries.UpdateBBProjectParams{
-			ID:             id,
-			ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
-			ProjectName:    strings.TrimSpace(req.ProjectName),
-			Duration:       int4Ptr(req.Duration),
-			Objective:      nullableTextPtr(req.Objective),
-			ScopeOfWork:    nullableTextPtr(req.ScopeOfWork),
-			Outputs:        nullableTextPtr(req.Outputs),
-			Outcomes:       nullableTextPtr(req.Outcomes),
-		})
-		if err != nil {
-			return mapNotFound(err, "BB Project tidak ditemukan")
+		if bbProjectCoreChanged(current, req) {
+			project, err := qtx.UpdateBBProject(ctx, queries.UpdateBBProjectParams{
+				ID:             id,
+				ProgramTitleID: uuidOrInvalid(req.ProgramTitleID),
+				ProjectName:    strings.TrimSpace(req.ProjectName),
+				Duration:       int4Ptr(req.Duration),
+				Objective:      nullableTextPtr(req.Objective),
+				ScopeOfWork:    nullableTextPtr(req.ScopeOfWork),
+				Outputs:        nullableTextPtr(req.Outputs),
+				Outcomes:       nullableTextPtr(req.Outcomes),
+			})
+			if err != nil {
+				return mapNotFound(err, "BB Project tidak ditemukan")
+			}
+			updated = project
+		} else {
+			updated = current
 		}
-		if err := s.replaceBBProjectChildren(ctx, qtx, id, req); err != nil {
+		if err := s.syncBBProjectChildren(ctx, qtx, id, req); err != nil {
 			return err
 		}
-		updated = project
 		return nil
 	}); err != nil {
 		return nil, err
@@ -717,6 +722,546 @@ func (s *BlueBookService) replaceBBProjectChildren(ctx context.Context, qtx *que
 	return nil
 }
 
+type parsedLenderIndicationItem struct {
+	LenderID pgtype.UUID
+	Remarks  pgtype.Text
+}
+
+func (s *BlueBookService) syncBBProjectChildren(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, req model.CreateBBProjectRequest) error {
+	executingAgencyIDs, err := parseUUIDList(req.ExecutingAgencyIDs, "executing_agency_ids")
+	if err != nil {
+		return err
+	}
+	implementingAgencyIDs, err := parseUUIDList(req.ImplementingAgencyIDs, "implementing_agency_ids")
+	if err != nil {
+		return err
+	}
+	bappenasPartnerIDs, err := s.parseValidBappenasPartnerIDs(ctx, qtx, req.BappenasPartnerIDs)
+	if err != nil {
+		return err
+	}
+	locationIDs, err := parseUUIDList(req.LocationIDs, "location_ids")
+	if err != nil {
+		return err
+	}
+	nationalPriorityIDs, err := parseUUIDList(req.NationalPriorityIDs, "national_priority_ids")
+	if err != nil {
+		return err
+	}
+
+	institutionRows, err := qtx.GetBBProjectInstitutions(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if err := syncUUIDRelation(
+		institutionIDsByRole(institutionRows, roleExecutingAgency),
+		executingAgencyIDs,
+		func(id pgtype.UUID) error {
+			return qtx.AddBBProjectInstitution(ctx, queries.AddBBProjectInstitutionParams{BbProjectID: projectID, InstitutionID: id, Role: roleExecutingAgency})
+		},
+		func(id pgtype.UUID) error {
+			return qtx.DeleteBBProjectInstitution(ctx, queries.DeleteBBProjectInstitutionParams{BbProjectID: projectID, InstitutionID: id, Role: roleExecutingAgency})
+		},
+	); err != nil {
+		return err
+	}
+	if err := syncUUIDRelation(
+		institutionIDsByRole(institutionRows, roleImplementingAgency),
+		implementingAgencyIDs,
+		func(id pgtype.UUID) error {
+			return qtx.AddBBProjectInstitution(ctx, queries.AddBBProjectInstitutionParams{BbProjectID: projectID, InstitutionID: id, Role: roleImplementingAgency})
+		},
+		func(id pgtype.UUID) error {
+			return qtx.DeleteBBProjectInstitution(ctx, queries.DeleteBBProjectInstitutionParams{BbProjectID: projectID, InstitutionID: id, Role: roleImplementingAgency})
+		},
+	); err != nil {
+		return err
+	}
+
+	partnerRows, err := qtx.GetBBProjectBappenasPartners(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if err := syncUUIDRelation(
+		bappenasPartnerIDsFromRows(partnerRows),
+		bappenasPartnerIDs,
+		func(id pgtype.UUID) error {
+			return qtx.AddBBProjectBappenasPartner(ctx, queries.AddBBProjectBappenasPartnerParams{BbProjectID: projectID, BappenasPartnerID: id})
+		},
+		func(id pgtype.UUID) error {
+			return qtx.DeleteBBProjectBappenasPartner(ctx, queries.DeleteBBProjectBappenasPartnerParams{BbProjectID: projectID, BappenasPartnerID: id})
+		},
+	); err != nil {
+		return err
+	}
+
+	locationRows, err := qtx.GetBBProjectLocations(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if err := syncUUIDRelation(
+		locationIDsFromRows(locationRows),
+		locationIDs,
+		func(id pgtype.UUID) error {
+			return qtx.AddBBProjectLocation(ctx, queries.AddBBProjectLocationParams{BbProjectID: projectID, RegionID: id})
+		},
+		func(id pgtype.UUID) error {
+			return qtx.DeleteBBProjectLocation(ctx, queries.DeleteBBProjectLocationParams{BbProjectID: projectID, RegionID: id})
+		},
+	); err != nil {
+		return err
+	}
+
+	priorityRows, err := qtx.GetBBProjectNationalPriorities(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if err := syncUUIDRelation(
+		nationalPriorityIDsFromRows(priorityRows),
+		nationalPriorityIDs,
+		func(id pgtype.UUID) error {
+			return qtx.AddBBProjectNationalPriority(ctx, queries.AddBBProjectNationalPriorityParams{BbProjectID: projectID, NationalPriorityID: id})
+		},
+		func(id pgtype.UUID) error {
+			return qtx.DeleteBBProjectNationalPriority(ctx, queries.DeleteBBProjectNationalPriorityParams{BbProjectID: projectID, NationalPriorityID: id})
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := s.syncBBProjectCosts(ctx, qtx, projectID, req.ProjectCosts); err != nil {
+		return err
+	}
+	if err := s.syncLenderIndications(ctx, qtx, projectID, req.LenderIndications); err != nil {
+		return err
+	}
+	return nil
+}
+
+func parseUUIDList(values []string, field string) ([]pgtype.UUID, error) {
+	seen := map[string]struct{}{}
+	result := make([]pgtype.UUID, 0, len(values))
+	for _, value := range values {
+		parsed, err := model.ParseUUID(value)
+		if err != nil {
+			return nil, validation(field, "UUID tidak valid")
+		}
+		key := model.UUIDToString(parsed)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, parsed)
+	}
+	return result, nil
+}
+
+func (s *BlueBookService) parseValidBappenasPartnerIDs(ctx context.Context, qtx *queries.Queries, ids []string) ([]pgtype.UUID, error) {
+	partnerIDs, err := parseUUIDList(ids, "bappenas_partner_ids")
+	if err != nil {
+		return nil, err
+	}
+	for _, partnerID := range partnerIDs {
+		partner, err := qtx.GetBappenasPartner(ctx, partnerID)
+		if err != nil {
+			return nil, mapNotFound(err, "Mitra Bappenas tidak ditemukan")
+		}
+		if partner.Level != "Eselon II" {
+			return nil, validation("bappenas_partner_ids", "hanya boleh memilih Mitra Bappenas Eselon II")
+		}
+	}
+	return partnerIDs, nil
+}
+
+func parseLenderIndicationItems(items []model.LenderIndicationItem) ([]parsedLenderIndicationItem, error) {
+	result := make([]parsedLenderIndicationItem, 0, len(items))
+	for _, item := range items {
+		lenderID, err := model.ParseUUID(item.LenderID)
+		if err != nil {
+			return nil, validation("lender_indications.lender_id", "UUID tidak valid")
+		}
+		result = append(result, parsedLenderIndicationItem{
+			LenderID: lenderID,
+			Remarks:  nullableTextPtr(item.Remarks),
+		})
+	}
+	return result, nil
+}
+
+func syncUUIDRelation(
+	current []pgtype.UUID,
+	requested []pgtype.UUID,
+	add func(pgtype.UUID) error,
+	remove func(pgtype.UUID) error,
+) error {
+	currentByKey := uniqueUUIDMap(current)
+	requestedByKey := uniqueUUIDMap(requested)
+
+	for key, currentID := range currentByKey {
+		if _, exists := requestedByKey[key]; !exists {
+			if err := remove(currentID); err != nil {
+				return err
+			}
+		}
+	}
+
+	for key, requestedID := range requestedByKey {
+		if _, exists := currentByKey[key]; !exists {
+			if err := add(requestedID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func uniqueUUIDMap(values []pgtype.UUID) map[string]pgtype.UUID {
+	result := make(map[string]pgtype.UUID, len(values))
+	for _, value := range values {
+		if !value.Valid {
+			continue
+		}
+		result[model.UUIDToString(value)] = value
+	}
+	return result
+}
+
+func institutionIDsByRole(rows []queries.GetBBProjectInstitutionsRow, role string) []pgtype.UUID {
+	result := make([]pgtype.UUID, 0, len(rows))
+	for _, row := range rows {
+		if row.Role == role {
+			result = append(result, row.ID)
+		}
+	}
+	return result
+}
+
+func bappenasPartnerIDsFromRows(rows []queries.BappenasPartner) []pgtype.UUID {
+	result := make([]pgtype.UUID, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, row.ID)
+	}
+	return result
+}
+
+func locationIDsFromRows(rows []queries.Region) []pgtype.UUID {
+	result := make([]pgtype.UUID, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, row.ID)
+	}
+	return result
+}
+
+func nationalPriorityIDsFromRows(rows []queries.NationalPriority) []pgtype.UUID {
+	result := make([]pgtype.UUID, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, row.ID)
+	}
+	return result
+}
+
+func costNaturalKeysUnique(existing []queries.BbProjectCost, requested []model.ProjectCostItem) bool {
+	return len(uniqueCostKeySetExisting(existing)) == len(existing) && len(uniqueCostKeySetRequested(requested)) == len(requested)
+}
+
+func uniqueCostKeySetExisting(rows []queries.BbProjectCost) map[string]struct{} {
+	result := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		result[bbProjectCostKey(row.FundingType, row.FundingCategory)] = struct{}{}
+	}
+	return result
+}
+
+func uniqueCostKeySetRequested(items []model.ProjectCostItem) map[string]struct{} {
+	result := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		result[bbProjectCostKey(item.FundingType, item.FundingCategory)] = struct{}{}
+	}
+	return result
+}
+
+func bbProjectCostsEquivalent(existing []queries.BbProjectCost, requested []model.ProjectCostItem) bool {
+	if len(existing) != len(requested) {
+		return false
+	}
+	existingCounts := map[string]int{}
+	for _, row := range existing {
+		existingCounts[bbProjectCostSignature(row.FundingType, row.FundingCategory, floatFromNumeric(row.AmountUsd))]++
+	}
+	for _, item := range requested {
+		key := bbProjectCostSignature(item.FundingType, item.FundingCategory, item.AmountUSD)
+		if existingCounts[key] == 0 {
+			return false
+		}
+		existingCounts[key]--
+	}
+	for _, count := range existingCounts {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func bbProjectCostKey(fundingType, fundingCategory string) string {
+	return fundingType + "|" + strings.TrimSpace(fundingCategory)
+}
+
+func bbProjectCostSignature(fundingType, fundingCategory string, amount float64) string {
+	return bbProjectCostKey(fundingType, fundingCategory) + "|" + amountKey(amount)
+}
+
+func amountKey(amount float64) string {
+	return fmt.Sprintf("%.2f", amount)
+}
+
+func lenderIndicationKeysUnique(existing []queries.GetLenderIndicationsRow, requested []parsedLenderIndicationItem) bool {
+	return len(uniqueLenderKeySetExisting(existing)) == len(existing) && len(uniqueLenderKeySetRequested(requested)) == len(requested)
+}
+
+func uniqueLenderKeySetExisting(rows []queries.GetLenderIndicationsRow) map[string]struct{} {
+	result := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		result[model.UUIDToString(row.LenderID)] = struct{}{}
+	}
+	return result
+}
+
+func uniqueLenderKeySetRequested(items []parsedLenderIndicationItem) map[string]struct{} {
+	result := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		result[model.UUIDToString(item.LenderID)] = struct{}{}
+	}
+	return result
+}
+
+func lenderIndicationsEquivalent(existing []queries.GetLenderIndicationsRow, requested []parsedLenderIndicationItem) bool {
+	if len(existing) != len(requested) {
+		return false
+	}
+	existingCounts := map[string]int{}
+	for _, row := range existing {
+		existingCounts[lenderIndicationSignature(row.LenderID, row.Remarks)]++
+	}
+	for _, item := range requested {
+		key := lenderIndicationSignature(item.LenderID, item.Remarks)
+		if existingCounts[key] == 0 {
+			return false
+		}
+		existingCounts[key]--
+	}
+	for _, count := range existingCounts {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func lenderIndicationSignature(lenderID pgtype.UUID, remarks pgtype.Text) string {
+	return model.UUIDToString(lenderID) + "|" + normalizeOptionalText(remarks)
+}
+
+func normalizeOptionalText(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+	return strings.TrimSpace(value.String)
+}
+
+func pgTextEqual(left, right pgtype.Text) bool {
+	return normalizeOptionalText(left) == normalizeOptionalText(right)
+}
+
+func pgUUIDEqual(left, right pgtype.UUID) bool {
+	if !left.Valid && !right.Valid {
+		return true
+	}
+	if left.Valid != right.Valid {
+		return false
+	}
+	return model.UUIDToString(left) == model.UUIDToString(right)
+}
+
+func pgInt4Equal(left pgtype.Int4, right *int32) bool {
+	if right == nil {
+		return !left.Valid
+	}
+	return left.Valid && left.Int32 == *right
+}
+
+func bbProjectCoreChanged(current queries.BbProject, req model.CreateBBProjectRequest) bool {
+	if !pgUUIDEqual(current.ProgramTitleID, uuidOrInvalid(req.ProgramTitleID)) {
+		return true
+	}
+	if strings.TrimSpace(current.ProjectName) != strings.TrimSpace(req.ProjectName) {
+		return true
+	}
+	if !pgInt4Equal(current.Duration, req.Duration) {
+		return true
+	}
+	if !pgTextEqual(current.Objective, nullableTextPtr(req.Objective)) {
+		return true
+	}
+	if !pgTextEqual(current.ScopeOfWork, nullableTextPtr(req.ScopeOfWork)) {
+		return true
+	}
+	if !pgTextEqual(current.Outputs, nullableTextPtr(req.Outputs)) {
+		return true
+	}
+	if !pgTextEqual(current.Outcomes, nullableTextPtr(req.Outcomes)) {
+		return true
+	}
+	return false
+}
+
+func (s *BlueBookService) syncBBProjectCosts(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, requested []model.ProjectCostItem) error {
+	existing, err := qtx.GetBBProjectCosts(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if !costNaturalKeysUnique(existing, requested) {
+		if bbProjectCostsEquivalent(existing, requested) {
+			return nil
+		}
+		return s.replaceBBProjectCosts(ctx, qtx, projectID, requested)
+	}
+
+	existingByKey := make(map[string]queries.BbProjectCost, len(existing))
+	for _, item := range existing {
+		existingByKey[bbProjectCostKey(item.FundingType, item.FundingCategory)] = item
+	}
+	requestedByKey := make(map[string]model.ProjectCostItem, len(requested))
+	for _, item := range requested {
+		requestedByKey[bbProjectCostKey(item.FundingType, item.FundingCategory)] = item
+	}
+
+	for key, item := range existingByKey {
+		if _, ok := requestedByKey[key]; !ok {
+			if err := qtx.DeleteBBProjectCost(ctx, queries.DeleteBBProjectCostParams{ID: item.ID, BbProjectID: projectID}); err != nil {
+				return err
+			}
+		}
+	}
+	for key, item := range requestedByKey {
+		existingItem, ok := existingByKey[key]
+		if !ok {
+			if _, err := qtx.CreateBBProjectCost(ctx, queries.CreateBBProjectCostParams{
+				BbProjectID:     projectID,
+				FundingType:     item.FundingType,
+				FundingCategory: item.FundingCategory,
+				AmountUsd:       numericFromFloat(item.AmountUSD),
+			}); err != nil {
+				return err
+			}
+			continue
+		}
+		if amountKey(floatFromNumeric(existingItem.AmountUsd)) != amountKey(item.AmountUSD) {
+			if _, err := qtx.UpdateBBProjectCost(ctx, queries.UpdateBBProjectCostParams{
+				ID:              existingItem.ID,
+				BbProjectID:     projectID,
+				FundingType:     item.FundingType,
+				FundingCategory: item.FundingCategory,
+				AmountUsd:       numericFromFloat(item.AmountUSD),
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *BlueBookService) replaceBBProjectCosts(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, items []model.ProjectCostItem) error {
+	if err := qtx.DeleteBBProjectCosts(ctx, projectID); err != nil {
+		return err
+	}
+	for _, item := range items {
+		if _, err := qtx.CreateBBProjectCost(ctx, queries.CreateBBProjectCostParams{
+			BbProjectID:     projectID,
+			FundingType:     item.FundingType,
+			FundingCategory: item.FundingCategory,
+			AmountUsd:       numericFromFloat(item.AmountUSD),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *BlueBookService) syncLenderIndications(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, requested []model.LenderIndicationItem) error {
+	existing, err := qtx.GetLenderIndications(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	parsedRequested, err := parseLenderIndicationItems(requested)
+	if err != nil {
+		return err
+	}
+	if !lenderIndicationKeysUnique(existing, parsedRequested) {
+		if lenderIndicationsEquivalent(existing, parsedRequested) {
+			return nil
+		}
+		return s.replaceLenderIndications(ctx, qtx, projectID, parsedRequested)
+	}
+
+	existingByKey := make(map[string]queries.GetLenderIndicationsRow, len(existing))
+	for _, item := range existing {
+		existingByKey[model.UUIDToString(item.LenderID)] = item
+	}
+	requestedByKey := make(map[string]parsedLenderIndicationItem, len(parsedRequested))
+	for _, item := range parsedRequested {
+		requestedByKey[model.UUIDToString(item.LenderID)] = item
+	}
+
+	for key, item := range existingByKey {
+		if _, ok := requestedByKey[key]; !ok {
+			if err := qtx.DeleteLenderIndication(ctx, queries.DeleteLenderIndicationParams{ID: item.ID, BbProjectID: projectID}); err != nil {
+				return err
+			}
+		}
+	}
+	for key, item := range requestedByKey {
+		existingItem, ok := existingByKey[key]
+		if !ok {
+			if _, err := qtx.CreateLenderIndication(ctx, queries.CreateLenderIndicationParams{
+				BbProjectID: projectID,
+				LenderID:    item.LenderID,
+				Remarks:     item.Remarks,
+			}); err != nil {
+				return err
+			}
+			continue
+		}
+		if !pgTextEqual(existingItem.Remarks, item.Remarks) {
+			if _, err := qtx.UpdateLenderIndication(ctx, queries.UpdateLenderIndicationParams{
+				ID:          existingItem.ID,
+				BbProjectID: projectID,
+				LenderID:    item.LenderID,
+				Remarks:     item.Remarks,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *BlueBookService) replaceLenderIndications(ctx context.Context, qtx *queries.Queries, projectID pgtype.UUID, items []parsedLenderIndicationItem) error {
+	if err := qtx.DeleteLenderIndications(ctx, projectID); err != nil {
+		return err
+	}
+	for _, item := range items {
+		if _, err := qtx.CreateLenderIndication(ctx, queries.CreateLenderIndicationParams{
+			BbProjectID: projectID,
+			LenderID:    item.LenderID,
+			Remarks:     item.Remarks,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *BlueBookService) validateNationalPriorities(ctx context.Context, qtx *queries.Queries, ids []string) error {
 	if len(ids) == 0 {
 		return nil
@@ -857,6 +1402,14 @@ func (s *BlueBookService) buildBBProjectResponse(ctx context.Context, row querie
 		Status:             row.Status,
 		CreatedAt:          formatMasterTime(row.CreatedAt),
 		UpdatedAt:          formatMasterTime(row.UpdatedAt),
+	}
+	if row.ProgramTitleID.Valid {
+		programTitle, err := s.queries.GetProgramTitle(ctx, row.ProgramTitleID)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil program title BB Project")
+		}
+		pt := toProgramTitleResponse(programTitle)
+		res.ProgramTitle = &pt
 	}
 	latest, err := s.queries.GetLatestBBProjectByIdentity(ctx, row.ProjectIdentityID)
 	if err == nil {

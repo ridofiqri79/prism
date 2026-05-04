@@ -81,6 +81,7 @@ type BBProjectResponse struct {
 	BlueBookID           string                     `json:"blue_book_id"`
 	ProjectIdentityID    string                     `json:"project_identity_id"`
 	ProgramTitleID       *string                    `json:"program_title_id,omitempty"`
+	ProgramTitle         *ProgramTitleResponse      `json:"program_title,omitempty"`
 	BappenasPartners     []BappenasPartnerResponse  `json:"bappenas_partners"`
 	BBCode               string                     `json:"bb_code"`
 	ProjectName          string                     `json:"project_name"`

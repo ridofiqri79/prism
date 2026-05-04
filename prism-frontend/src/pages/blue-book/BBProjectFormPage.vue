@@ -4,8 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from 'primevue/multiselect'
-import Textarea from 'primevue/textarea'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -13,6 +12,7 @@ import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
 import LocationMultiSelect from '@/components/forms/LocationMultiSelect.vue'
 import NationalPriorityMultiSelect from '@/components/forms/NationalPriorityMultiSelect.vue'
 import ProgramTitleSelect from '@/components/forms/ProgramTitleSelect.vue'
+import RichTextEditor from '@/components/forms/RichTextEditor.vue'
 import { useBBProjectForm } from '@/composables/forms/useBBProjectForm'
 import { useToast } from '@/composables/useToast'
 import { useBlueBookStore } from '@/stores/blue-book.store'
@@ -33,13 +33,25 @@ const pageTitle = computed(() =>
 )
 
 const form = useBBProjectForm()
+const currentProject = computed(() => blueBookStore.currentProject)
 
-const bappenasPartnerOptions = computed(() =>
-  masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
-)
+const bappenasPartnerOptions = computed(() => {
+  const byId = new Map<string, BappenasPartner>()
+
+  for (const partner of [
+    ...masterStore.bappenasPartners,
+    ...(currentProject.value?.bappenas_partners ?? []),
+  ]) {
+    if (partner.level === 'Eselon II') {
+      byId.set(partner.id, partner)
+    }
+  }
+
+  return [...byId.values()]
+})
 const selectedPartners = computed(() =>
   form.values.bappenas_partner_ids
-    .map((id) => masterStore.bappenasPartners.find((partner) => partner.id === id))
+    .map((id) => bappenasPartnerOptions.value.find((partner) => partner.id === id))
     .filter((partner): partner is BappenasPartner => Boolean(partner)),
 )
 const selectedPartnerParents = computed(() => {
@@ -51,22 +63,28 @@ const selectedPartnerParents = computed(() => {
 function findPartnerParent(partner?: BappenasPartner) {
   if (!partner?.parent_id) return partner?.parent?.name ?? '-'
   return (
+    bappenasPartnerOptions.value.find((item) => item.id === partner.parent_id)?.name ??
     masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
     partner.parent?.name ??
     '-'
   )
 }
 
+function bappenasPartnerParams(search?: string) {
+  return {
+    limit: 50,
+    search: search?.trim() || undefined,
+    sort: 'name',
+    order: 'asc' as const,
+  }
+}
+
+function loadBappenasPartnerOptions(search?: string, force = true) {
+  void masterStore.fetchBappenasPartners(force, bappenasPartnerParams(search))
+}
+
 async function loadData() {
-  await Promise.all([
-    blueBookStore.fetchBlueBook(blueBookId.value),
-    masterStore.fetchProgramTitles(true, { limit: 1000 }),
-    masterStore.fetchBappenasPartners(true, { limit: 1000 }),
-    masterStore.fetchInstitutions(true, { limit: 1000 }),
-    masterStore.fetchAllRegionLevels(true),
-    masterStore.fetchNationalPriorities(true, { limit: 1000 }),
-    masterStore.fetchLenders(true, { limit: 1000 }),
-  ])
+  await Promise.all([blueBookStore.fetchBlueBook(blueBookId.value), masterStore.fetchBappenasPartners(false, bappenasPartnerParams())])
 
   if (isEditMode.value) {
     const project = await blueBookStore.fetchProject(blueBookId.value, projectId.value)
@@ -119,7 +137,10 @@ onMounted(() => {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Judul Program</span>
-            <ProgramTitleSelect v-model="form.values.program_title_id" />
+            <ProgramTitleSelect
+              v-model="form.values.program_title_id"
+              :extra-options="currentProject?.program_title ? [currentProject.program_title] : []"
+            />
             <small v-if="form.errors.program_title_id" class="text-red-600">
               {{ form.errors.program_title_id }}
             </small>
@@ -136,7 +157,10 @@ onMounted(() => {
               placeholder="Pilih mitra kerja Bappenas"
               filter
               display="chip"
+              append-to="self"
+              :overlay-style="{ minWidth: '100%' }"
               class="w-full"
+              @filter="loadBappenasPartnerOptions($event.value)"
             />
             <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
               {{ form.errors.bappenas_partner_ids }}
@@ -177,19 +201,22 @@ onMounted(() => {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
-            <Textarea v-model="form.values.objective" auto-resize rows="3" class="w-full" />
+            <RichTextEditor v-model="form.values.objective" placeholder="Tulis tujuan proyek" />
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Lingkup Pekerjaan</span>
-            <Textarea v-model="form.values.scope_of_work" auto-resize rows="3" class="w-full" />
+            <RichTextEditor
+              v-model="form.values.scope_of_work"
+              placeholder="Tulis lingkup pekerjaan"
+            />
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Outputs</span>
-            <Textarea v-model="form.values.outputs" auto-resize rows="3" class="w-full" />
+            <RichTextEditor v-model="form.values.outputs" placeholder="Tulis outputs proyek" />
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Outcomes</span>
-            <Textarea v-model="form.values.outcomes" auto-resize rows="3" class="w-full" />
+            <RichTextEditor v-model="form.values.outcomes" placeholder="Tulis outcomes proyek" />
           </label>
         </div>
       </section>
@@ -201,14 +228,22 @@ onMounted(() => {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Executing Agency</span>
-            <InstitutionSelect v-model="form.values.executing_agency_ids" multiple />
+            <InstitutionSelect
+              v-model="form.values.executing_agency_ids"
+              :extra-options="currentProject?.executing_agencies ?? []"
+              multiple
+            />
             <small v-if="form.errors.executing_agency_ids" class="text-red-600">
               {{ form.errors.executing_agency_ids }}
             </small>
           </label>
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Implementing Agency</span>
-            <InstitutionSelect v-model="form.values.implementing_agency_ids" multiple />
+            <InstitutionSelect
+              v-model="form.values.implementing_agency_ids"
+              :extra-options="currentProject?.implementing_agencies ?? []"
+              multiple
+            />
             <small v-if="form.errors.implementing_agency_ids" class="text-red-600">
               {{ form.errors.implementing_agency_ids }}
             </small>
@@ -221,17 +256,20 @@ onMounted(() => {
           <h2 class="mt-1 text-lg font-semibold text-surface-950">Lokasi & Prioritas</h2>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
-          <label class="block space-y-2">
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Lokasi</span>
             <LocationMultiSelect v-model="form.values.location_ids" />
             <small v-if="form.errors.location_ids" class="text-red-600">{{
               form.errors.location_ids
             }}</small>
-          </label>
-          <label class="block space-y-2">
+          </div>
+          <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Prioritas Nasional</span>
-            <NationalPriorityMultiSelect v-model="form.values.national_priority_ids" />
-          </label>
+            <NationalPriorityMultiSelect
+              v-model="form.values.national_priority_ids"
+              :extra-options="currentProject?.national_priorities ?? []"
+            />
+          </div>
         </div>
       </section>
 
@@ -252,6 +290,7 @@ onMounted(() => {
         </div>
         <LenderIndicationTable
           v-model:rows="form.lenderIndications.value"
+          :extra-lender-options="currentProject?.lender_indications.map((item) => item.lender) ?? []"
           @add="form.addIndication"
           @remove="form.removeIndication"
         />

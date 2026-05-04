@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from 'primevue/multiselect'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -240,13 +240,13 @@ onMounted(() => {
                     {{ form.errors.implementing_agency_ids }}
                   </small>
                 </label>
-                <label class="block space-y-2">
+                <div class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Lokasi</span>
                   <LocationMultiSelect v-model="form.values.location_ids" />
                   <small v-if="form.errors.location_ids" class="text-red-600">{{
                     form.errors.location_ids
                   }}</small>
-                </label>
+                </div>
               </div>
             </div>
           </TabPanel>

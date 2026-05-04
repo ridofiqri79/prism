@@ -63,15 +63,19 @@ function formatDateTime(value?: string) {
               {{ item.snapshot_label }} oleh {{ item.changed_by_username }}
             </p>
           </div>
-          <div v-if="item.changed_field_labels.length" class="flex flex-wrap gap-1.5">
+          <div
+            v-if="(item.changed_field_labels?.length ?? 0) > 0"
+            class="flex flex-wrap gap-1.5"
+          >
             <span
-              v-for="field in item.changed_field_labels"
+              v-for="field in item.changed_field_labels ?? []"
               :key="`${item.id}-${field}`"
               class="rounded-md bg-surface-100 px-2 py-1 text-xs font-medium text-surface-700"
             >
               {{ field }}
             </span>
           </div>
+          <p v-else class="text-xs text-surface-500">Tidak ada field yang berubah.</p>
         </div>
       </li>
     </ol>

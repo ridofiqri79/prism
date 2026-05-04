@@ -306,12 +306,14 @@ export const useBlueBookStore = defineStore('blueBook', () => {
   async function createLoI(projectId: string, data: LoIPayload) {
     const result = await BlueBookService.createLoI(projectId, data)
     await fetchLoI(projectId)
+    await fetchProjectHistory(projectId)
     return result
   }
 
   async function deleteLoI(projectId: string, id: string) {
     await BlueBookService.deleteLoI(projectId, id)
     await fetchLoI(projectId)
+    await fetchProjectHistory(projectId)
   }
 
   function $reset() {

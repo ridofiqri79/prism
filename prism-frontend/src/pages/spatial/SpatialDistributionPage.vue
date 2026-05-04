@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
-import MultiSelect from 'primevue/multiselect'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'

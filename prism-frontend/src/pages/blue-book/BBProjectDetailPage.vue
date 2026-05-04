@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import LoITable from '@/components/blue-book/LoITable.vue'
@@ -11,14 +12,12 @@ import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
-import LenderSelect from '@/components/forms/LenderSelect.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
-import { useMasterStore } from '@/stores/master.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
-import type { BappenasPartner } from '@/types/master.types'
+import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
 import { formatBlueBookStatus, joinNames, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
@@ -26,7 +25,6 @@ type LoIField = keyof LoIPayload
 const route = useRoute()
 const router = useRouter()
 const blueBookStore = useBlueBookStore()
-const masterStore = useMasterStore()
 const toast = useToast()
 const { can } = usePermission()
 
@@ -43,23 +41,18 @@ const loiForm = reactive<LoIPayload>({
 const errors = ref<FormErrors<LoIField>>({})
 
 const project = computed(() => blueBookStore.currentProject)
-const programTitleName = computed(
-  () =>
-    project.value?.program_title?.title ??
-    masterStore.programTitles.find((item) => item.id === project.value?.program_title_id)?.title ??
-    '-',
-)
-const bappenasPartnerNames = computed(
-  () =>
-    project.value?.bappenas_partners
-      .map((partner) => {
-        const parent = findPartnerParent(partner)
-        return parent === '-' ? partner.name : `${partner.name} / ${parent}`
-      })
-      .join(', ') || '-',
-)
+const programTitleName = computed(() => project.value?.program_title?.title ?? '-')
+const bappenasPartnerNames = computed(() => joinNames(project.value?.bappenas_partners ?? []))
 const allowedLenderIds = computed(
   () => project.value?.lender_indications.map((item) => item.lender.id) ?? [],
+)
+const allowedLenderOptions = computed(
+  () =>
+    project.value?.lender_indications.map((item) => ({
+      id: item.lender.id,
+      label: item.lender.short_name ? `${item.lender.name} (${item.lender.short_name})` : item.lender.name,
+      type: item.lender.type,
+    })) ?? [],
 )
 const auditRailItems = computed(() =>
   blueBookStore.projectHistory.flatMap((item) =>
@@ -71,23 +64,11 @@ const auditRailItems = computed(() =>
 )
 const hasAuditRail = computed(() => auditRailItems.value.length > 0)
 
-function findPartnerParent(partner?: BappenasPartner) {
-  if (!partner?.parent_id) return partner?.parent?.name ?? '-'
-  return (
-    masterStore.bappenasPartners.find((item) => item.id === partner.parent_id)?.name ??
-    partner.parent?.name ??
-    '-'
-  )
-}
-
 async function loadData() {
   await Promise.all([
     blueBookStore.fetchProject(blueBookId.value, projectId.value),
     blueBookStore.fetchProjectHistory(projectId.value),
     blueBookStore.fetchLoI(projectId.value),
-    masterStore.fetchProgramTitles(true, { limit: 1000 }),
-    masterStore.fetchBappenasPartners(true, { limit: 1000 }),
-    masterStore.fetchLenders(true, { limit: 1000 }),
   ])
 }
 
@@ -109,6 +90,14 @@ function formatDateTime(value?: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function hasRichText(value?: string | null) {
+  return !isRichTextEmpty(value)
+}
+
+function richTextHtml(value?: string | null) {
+  return sanitizeRichText(value)
 }
 
 function openLoIDialog() {
@@ -323,17 +312,39 @@ onMounted(() => {
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Objective</p>
-          <p class="mt-1 text-surface-950">{{ project.objective || '-' }}</p>
+          <div
+            v-if="hasRichText(project.objective)"
+            class="rich-text-display mt-1 text-surface-950"
+            v-html="richTextHtml(project.objective)"
+          />
+          <p v-else class="mt-1 text-surface-950">-</p>
         </div>
         <div>
           <p class="text-xs uppercase tracking-wide text-surface-500">Scope of Work</p>
-          <p class="mt-1 text-surface-950">{{ project.scope_of_work || '-' }}</p>
+          <div
+            v-if="hasRichText(project.scope_of_work)"
+            class="rich-text-display mt-1 text-surface-950"
+            v-html="richTextHtml(project.scope_of_work)"
+          />
+          <p v-else class="mt-1 text-surface-950">-</p>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Outputs / Outcomes</p>
-          <p class="mt-1 text-surface-950">
-            {{ project.outputs || '-' }} / {{ project.outcomes || '-' }}
-          </p>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Outputs</p>
+          <div
+            v-if="hasRichText(project.outputs)"
+            class="rich-text-display mt-1 text-surface-950"
+            v-html="richTextHtml(project.outputs)"
+          />
+          <p v-else class="mt-1 text-surface-950">-</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-surface-500">Outcomes</p>
+          <div
+            v-if="hasRichText(project.outcomes)"
+            class="rich-text-display mt-1 text-surface-950"
+            v-html="richTextHtml(project.outcomes)"
+          />
+          <p v-else class="mt-1 text-surface-950">-</p>
         </div>
       </div>
 
@@ -365,11 +376,24 @@ onMounted(() => {
       <form class="space-y-4" @submit.prevent="saveLoI">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Lender</span>
-          <LenderSelect
+          <Select
             v-model="loiForm.lender_id"
-            :allowed-ids="allowedLenderIds"
+            :options="allowedLenderOptions"
+            option-label="label"
+            option-value="id"
             placeholder="Pilih lender dari indication proyek"
-          />
+            filter
+            append-to="self"
+            :overlay-style="{ minWidth: '100%' }"
+            class="w-full"
+          >
+            <template #option="{ option }">
+              <div class="flex w-full items-center justify-between gap-3">
+                <span>{{ option.label }}</span>
+                <Tag :value="option.type" severity="info" rounded />
+              </div>
+            </template>
+          </Select>
           <small v-if="errors.lender_id" class="text-red-600">{{ errors.lender_id }}</small>
         </label>
         <label class="block space-y-2">
@@ -399,3 +423,19 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+.rich-text-display :deep(p) {
+  margin: 0 0 0.5rem;
+}
+
+.rich-text-display :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.rich-text-display :deep(ol),
+.rich-text-display :deep(ul) {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+</style>
