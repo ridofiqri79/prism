@@ -6,6 +6,7 @@ import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocompl
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
+import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectJourneyFlow from '@/components/journey/ProjectJourneyFlow.vue'
@@ -223,16 +224,17 @@ onMounted(async () => {
       v-else-if="loading && !journeyData"
       class="rounded-lg border border-surface-200 bg-white p-5"
     >
-      <div class="animate-pulse space-y-4">
-        <div class="h-4 w-48 rounded bg-surface-100" />
+      <div class="space-y-4">
+        <Skeleton width="12rem" height="1rem" />
         <div class="grid gap-3 md:grid-cols-5">
-          <div
+          <Skeleton
             v-for="stage in emptyJourneyStages"
             :key="stage.label"
-            class="h-20 rounded-lg bg-surface-100"
+            height="5rem"
+            border-radius="0.5rem"
           />
         </div>
-        <div class="h-32 rounded-lg bg-surface-100" />
+        <Skeleton height="8rem" border-radius="0.5rem" />
       </div>
     </section>
 

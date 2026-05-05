@@ -3,6 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePermission } from '@/composables/usePermission'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 
 interface NavigationItem {
   label: string
@@ -284,17 +287,16 @@ function toggleGroup(group: NavigationGroup) {
     <div v-if="!isCollapsed" class="px-4 py-3">
       <label class="sr-only" for="sidebar-search">Cari menu</label>
       <div class="relative">
-        <i
-          class="prism-sidebar-search-icon pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs"
-        />
-        <input
-          id="sidebar-search"
-          ref="searchInput"
-          v-model="searchQuery"
-          type="search"
-          class="prism-sidebar-search-input h-9 w-full rounded-lg border px-9 pr-16 text-sm outline-none transition"
-          placeholder="Cari menu..."
-        />
+        <IconField iconPosition="left">
+          <InputIcon class="pi pi-search text-xs" />
+          <InputText
+            id="sidebar-search"
+            ref="searchInput"
+            v-model="searchQuery"
+            placeholder="Cari menu..."
+            class="h-9 w-full pr-16 text-sm"
+          />
+        </IconField>
         <span
           class="prism-sidebar-kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]"
         >
