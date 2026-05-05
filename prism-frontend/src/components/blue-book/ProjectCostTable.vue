@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import Select from 'primevue/select'
 import CurrencyInput from '@/components/forms/CurrencyInput.vue'
 import { categoriesForFundingType } from '@/composables/forms/useBBProjectForm'
 import type { FundingType, ProjectCostPayload } from '@/types/blue-book.types'
@@ -60,7 +60,7 @@ function updateFundingCategory(index: number, value: unknown) {
       <tbody class="divide-y divide-surface-100">
         <tr v-for="(row, index) in rows" :key="index">
           <td class="px-4 py-3">
-            <SingleSelectDropdown
+            <Select
               v-if="editable"
               :model-value="row.funding_type"
               :options="fundingTypes"
@@ -71,7 +71,7 @@ function updateFundingCategory(index: number, value: unknown) {
             <span v-else>{{ row.funding_type }}</span>
           </td>
           <td class="px-4 py-3">
-            <SingleSelectDropdown
+            <Select
               v-if="editable"
               :model-value="row.funding_category"
               :options="categoriesForFundingType(row.funding_type)"

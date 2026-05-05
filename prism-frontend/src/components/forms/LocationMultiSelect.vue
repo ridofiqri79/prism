@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import MultiSelectDropdown from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import { useMasterStore } from '@/stores/master.store'
 import type { Region } from '@/types/master.types'
 
@@ -87,7 +87,7 @@ function isCoveredBySelectedCountry(region: Region) {
 </script>
 
 <template>
-  <MultiSelectDropdown
+  <MultiSelect
     v-model="selectedValues"
     :options="regionOptions"
     option-label="label"
@@ -99,6 +99,7 @@ function isCoveredBySelectedCountry(region: Region) {
     filter-placeholder="Cari wilayah"
     display="chip"
     scroll-height="18rem"
+    class="w-full"
     @show="void masterStore.fetchAllRegionLevels()"
   >
     <template #option="{ option }">
@@ -112,5 +113,5 @@ function isCoveredBySelectedCountry(region: Region) {
         </span>
       </span>
     </template>
-  </MultiSelectDropdown>
+  </MultiSelect>
 </template>

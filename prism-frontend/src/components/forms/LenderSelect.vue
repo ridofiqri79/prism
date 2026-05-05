@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { useMasterStore } from '@/stores/master.store'
 import type { Lender } from '@/types/master.types'
@@ -86,7 +86,6 @@ onMounted(() => {
     filter
     display="chip"
     append-to="body"
-    :overlay-style="{ minWidth: '100%' }"
     class="w-full"
     @filter="loadOptions($event.value)"
   >
@@ -98,7 +97,7 @@ onMounted(() => {
     </template>
   </MultiSelect>
 
-  <SingleSelectDropdown
+  <Select
     v-else
     v-model="selectedValue"
     :options="options"
@@ -108,7 +107,6 @@ onMounted(() => {
     :disabled="disabled"
     filter
     append-to="body"
-    :overlay-style="{ minWidth: '100%' }"
     class="w-full"
     @filter="loadOptions($event.value)"
   >
@@ -118,5 +116,5 @@ onMounted(() => {
         <Tag :value="option.type" severity="info" rounded />
       </div>
     </template>
-  </SingleSelectDropdown>
+  </Select>
 </template>

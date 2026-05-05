@@ -6,8 +6,8 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
@@ -755,7 +755,7 @@ watch(
       <form class="flex flex-col gap-5" @submit.prevent="saveImportFromGreenBook">
         <label class="grid gap-2">
           <span class="text-sm font-medium text-surface-700">Green Book Sumber</span>
-          <SingleSelectDropdown
+          <Select
             v-model="importForm.source_green_book_id"
             :options="importSourceGreenBookSelectOptions"
             option-label="label"
@@ -961,7 +961,7 @@ watch(
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Status</span>
-          <SingleSelectDropdown
+          <Select
             v-model="form.status"
             :options="statusOptions"
             option-label="label"

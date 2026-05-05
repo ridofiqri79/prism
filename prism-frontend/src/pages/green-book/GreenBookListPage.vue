@@ -3,8 +3,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
@@ -256,7 +256,7 @@ onMounted(() => {
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Status</span>
-          <SingleSelectDropdown
+          <Select
             v-model="form.status"
             :options="statusOptions"
             option-label="label"
