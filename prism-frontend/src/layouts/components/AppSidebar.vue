@@ -65,10 +65,9 @@ function filterNavigation(items: NavigationItem[]) {
 
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
-    { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-chart-bar' },
-    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
     { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
+    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
   ]),
 )
 
@@ -172,7 +171,6 @@ const visibleNavigationGroups = computed<NavigationGroup[]>(() => {
 })
 
 function isActive(path: string) {
-  if (path === '/dashboard') return route.path === path
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 

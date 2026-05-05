@@ -302,7 +302,7 @@ function updateFloatingOverlayStyle() {
   const rect = rootRef.value.getBoundingClientRect()
 
   floatingOverlayStyle.value = {
-    ...(props.overlayStyle ?? {}),
+    ...props.overlayStyle,
     position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.bottom + 8}px`,

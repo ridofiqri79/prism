@@ -10,6 +10,7 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { loginSchema, type LoginFormValues } from '@/schemas/auth.schema'
 import { useAuthStore } from '@/stores/auth.store'
+import { resolveDefaultAuthenticatedRoute } from '@/utils/default-route'
 
 const route = useRoute()
 const router = useRouter()
@@ -237,7 +238,13 @@ const onSubmit = handleSubmit(async (values) => {
 
   try {
     await auth.login(values)
-    await router.push(safeRedirectTarget.value ?? { name: 'dashboard' })
+    await router.push(
+      safeRedirectTarget.value ??
+        resolveDefaultAuthenticatedRoute({
+          user: auth.user,
+          permissions: auth.permissions,
+        }),
+    )
   } catch (err) {
     if (isAxiosError(err) && err.response?.status === 401) {
       loginError.value = 'Username atau password salah'

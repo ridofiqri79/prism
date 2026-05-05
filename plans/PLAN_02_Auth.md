@@ -36,7 +36,7 @@ export const AuthService = {
 - Card centered: logo PRISM + form login
 - Field: username, password (type=password dengan toggle show/hide)
 - Validasi via `useForm({ validationSchema: toTypedSchema(loginSchema) })`
-- Submit: `auth.login(values)` → success: push `/dashboard` → error: tampilkan error inline
+- Submit: `auth.login(values)` → success: push ke halaman utama pertama yang boleh diakses → error: tampilkan error inline
 - Loading state di tombol submit
 - Pesan error 401: "Username atau password salah"
 
@@ -123,11 +123,11 @@ Halaman set permission per user (ADMIN only):
 
 **`src/pages/common/ForbiddenPage.vue`:**
 - Icon + text "403 — Anda tidak memiliki izin mengakses halaman ini"
-- Tombol "Kembali ke Dashboard"
+- Tombol "Kembali ke Halaman Utama"
 
 **`src/pages/common/NotFoundPage.vue`:**
 - Icon + text "404 — Halaman tidak ditemukan"
-- Tombol "Kembali ke Dashboard"
+- Tombol "Kembali ke Halaman Utama"
 
 ---
 
@@ -147,6 +147,6 @@ Halaman set permission per user (ADMIN only):
 
 Catatan verifikasi 2026-04-27:
 - `POST http://localhost:8080/api/v1/auth/login` dengan `admin/admin123` mengembalikan JWT.
-- Login dari `http://localhost:5173/login` berhasil dan redirect ke `/dashboard`.
+- Login dari `http://localhost:5173/login` berhasil dan redirect ke halaman utama pertama yang boleh diakses user.
 - Link `/users` tersedia untuk akun ADMIN.
 - `/users/1/permissions` menampilkan permission matrix dengan checkbox untuk seluruh modul.

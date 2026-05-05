@@ -12,7 +12,7 @@ import ProjectJourneyFlow from '@/components/journey/ProjectJourneyFlow.vue'
 import ProjectJourneySummary from '@/components/journey/ProjectJourneySummary.vue'
 import ProjectTimeline from '@/components/journey/ProjectTimeline.vue'
 import { useJourneyStore } from '@/stores/journey.store'
-import type { JourneyResponse } from '@/types/dashboard.types'
+import type { JourneyResponse } from '@/types/journey.types'
 import type { ProjectMasterRow } from '@/types/project.types'
 
 type ProjectJourneyOption = Pick<

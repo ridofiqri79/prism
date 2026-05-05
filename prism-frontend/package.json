@@ -21,7 +21,6 @@
     "axios": "^1.15.2",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
-    "funnel-graph-js": "^1.4.2",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",

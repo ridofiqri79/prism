@@ -11,7 +11,7 @@ import type {
   JourneyLoI,
   JourneyResponse,
   LAJourney,
-} from '@/types/dashboard.types'
+} from '@/types/journey.types'
 
 const props = defineProps<{
   journey: JourneyResponse

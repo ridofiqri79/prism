@@ -8,7 +8,7 @@
 Pengelolaan pinjaman dan hibah luar negeri saat ini menghadapi beberapa tantangan utama:
 
 - **Tidak adanya single source of truth** — data perencanaan pinjaman dan hibah luar negeri tersebar di berbagai unit dan tidak terpusat.
-- **Tidak ada dashboard berkualitas** — tidak tersedia visualisasi yang memadai untuk memantau progres dan monitoring pinjaman luar negeri secara real-time.
+- **Visualisasi progres terbatas** — belum tersedia tampilan yang memadai untuk memantau progres dan monitoring pinjaman luar negeri secara real-time.
 - **Inefisiensi pengumpulan data** — setiap kali diperlukan analisis, data harus dikumpulkan ulang dari berbagai sumber, memakan waktu dan berpotensi menimbulkan inkonsistensi.
 
 **PRISM** hadir sebagai solusi terpadu untuk menjawab kebutuhan tersebut melalui sistem monitoring dan perencanaan pinjaman luar negeri yang terintegrasi, andal, dan berbasis data.
@@ -247,7 +247,7 @@ Setiap entri monitoring terdiri dari dua level:
 - **Input Data** — Staff menginput data per tahapan (Blue Book, Green Book, Daftar Kegiatan, Loan Agreement, Monitoring Disbursement).
 - **Tampilan Tabel** — Data dapat dilihat dalam format tabel yang terstruktur.
 - **Visualisasi Timeline / Journey** — Alur proyek dari Blue Book → Green Book → DK → LA → Monitoring ditampilkan secara visual.
-- **Dashboard & Insight** — Monitoring progres dan realisasi disbursement pinjaman luar negeri secara agregat.
+- **Visualisasi Timeline / Journey** — Monitoring progres dan realisasi disbursement pinjaman luar negeri melalui alur proyek yang konkret.
 
 ---
 

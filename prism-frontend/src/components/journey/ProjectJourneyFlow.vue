@@ -16,7 +16,7 @@ import type {
   JourneyResponse,
   JourneyStageState,
   LAJourney,
-} from '@/types/dashboard.types'
+} from '@/types/journey.types'
 
 use([SankeyChart, TooltipComponent, LabelLayout, CanvasRenderer])
 

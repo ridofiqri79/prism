@@ -21,10 +21,10 @@ Files:
 - `prism-frontend/src/types/blue-book.types.ts`
 - `prism-frontend/src/types/green-book.types.ts`
 - `prism-frontend/src/types/daftar-kegiatan.types.ts`
-- `prism-frontend/src/types/dashboard.types.ts`
+- `prism-frontend/src/types/journey.types.ts`
 - `prism-frontend/src/services/blue-book.service.ts`
 - `prism-frontend/src/services/green-book.service.ts`
-- `prism-frontend/src/services/dashboard.service.ts`
+- `prism-frontend/src/services/journey.service.ts`
 
 Checklist:
 
@@ -56,7 +56,7 @@ Files:
 - `prism-frontend/src/stores/blue-book.store.ts`
 - `prism-frontend/src/stores/green-book.store.ts`
 - `prism-frontend/src/stores/daftar-kegiatan.store.ts`
-- store dashboard/journey jika ada.
+- store journey jika ada.
 
 Checklist:
 
@@ -148,8 +148,8 @@ Acceptance:
 
 Files:
 
-- `prism-frontend/src/pages/dashboard/ProjectJourneyPage.vue`
-- `prism-frontend/src/components/dashboard/ProjectTimeline.vue`
+- `prism-frontend/src/pages/journey/ProjectJourneyPage.vue`
+- `prism-frontend/src/components/journey/ProjectTimeline.vue`
 - Project list page jika ada.
 
 Checklist:

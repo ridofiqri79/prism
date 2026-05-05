@@ -133,7 +133,7 @@ Navigation guard:
 
 Buat file route terpisah di `src/router/routes/`:
 - `auth.routes.ts` → `/login` (AuthLayout, tidak requiresAuth)
-- `dashboard.routes.ts` → `/` redirect `/dashboard`, `/dashboard` (requiresAuth)
+- `home.routes.ts` → `/` redirect ke halaman utama pertama yang boleh diakses user (requiresAuth)
 - `master.routes.ts` → `/master/countries`, `/master/lenders`, `/master/institutions`, `/master/regions`, `/master/program-titles`, `/master/bappenas-partners`, `/master/periods`, `/master/national-priorities`
 - `blue-book.routes.ts` → `/blue-books`, `/blue-books/:id`, `/blue-books/:bbId/projects/new`, `/blue-books/:bbId/projects/:id`, `/blue-books/:bbId/projects/:id/edit`
 - `green-book.routes.ts` → pola sama dengan blue book
@@ -188,7 +188,7 @@ Semua halaman pakai komponen placeholder `defineComponent({ template: '<div clas
 
 Buat halaman berikut (bisa minimal, hanya scaffold):
 - `src/pages/auth/LoginPage.vue` — form login placeholder (akan dilengkapi Plan 02)
-- `src/pages/dashboard/DashboardPage.vue` — text "Dashboard"
+- `src/pages/common/HomeRedirectPage.vue` — text "Mengalihkan..."
 - `src/pages/common/ForbiddenPage.vue` — text "403 Forbidden"
 - `src/pages/common/NotFoundPage.vue` — text "404 Not Found"
 
@@ -201,7 +201,7 @@ docker compose -f docker-compose.dev.yml up --build
 ```
 
 - `http://localhost:5173` terbuka, redirect ke `/login`
-- Navigasi ke `/dashboard` redirect ke `/login`
+- Navigasi ke `/` redirect ke `/login`
 - PrimeVue `<Button label="Test" />` bisa dirender
 - `bg-primary` dan `text-surface-500` bekerja di elemen apapun
 

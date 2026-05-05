@@ -16,7 +16,7 @@
 | HTTP Client | `axios` | Interceptor untuk JWT inject & token refresh |
 | Form Validation | `VeeValidate` + `Zod` | Schema-based, sinergi dengan API contract |
 | Table Kompleks | `TanStack Table v8` | Untuk tabel dengan nested editing (Funding Source, Activities) |
-| Charts | `vue-echarts` + `echarts` | Terbaik untuk dashboard monitoring disbursement |
+| Charts | `vue-echarts` + `echarts` | Dipakai untuk visualisasi data seperti alur journey berbasis sankey |
 | SSE Client | Native `EventSource` | Built-in browser, tidak butuh library tambahan |
 | Date | `date-fns` | Ringan, tree-shakeable |
 | CSS | `Tailwind CSS v4` | Utility-first via Vite plugin — tidak perlu PostCSS |
@@ -51,7 +51,7 @@ prism-frontend/
 │   │       ├── daftar-kegiatan.routes.ts
 │   │       ├── loan-agreement.routes.ts
 │   │       ├── monitoring.routes.ts
-│   │       ├── dashboard.routes.ts
+│   │       ├── home.routes.ts
 │   │       ├── project.routes.ts
 │   │       ├── journey.routes.ts
 │   │       └── user.routes.ts
@@ -76,7 +76,7 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.service.ts
 │   │   ├── loan-agreement.service.ts
 │   │   ├── monitoring.service.ts
-│   │   ├── dashboard.service.ts
+│   │   ├── journey.service.ts
 │   │   ├── project.service.ts
 │   │   ├── master.service.ts
 │   │   └── user.service.ts
@@ -105,7 +105,7 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.types.ts
 │   │   ├── loan-agreement.types.ts
 │   │   ├── monitoring.types.ts
-│   │   ├── dashboard.types.ts           # Dashboard + Perjalanan Proyek response types
+│   │   ├── journey.types.ts             # Response types untuk perjalanan proyek
 │   │   ├── project.types.ts             # Project master list/search types
 │   │   ├── user.types.ts
 │   │   └── master.types.ts              # Country, Currency, Lender, Institution, Region, dll
@@ -129,9 +129,6 @@ prism-frontend/
 │   ├── pages/                         # Halaman — satu folder per modul
 │   │   ├── auth/
 │   │   │   └── LoginPage.vue
-│   │   │
-│   │   ├── dashboard/
-│   │   │   └── DashboardPage.vue
 │   │   │
 │   │   ├── blue-book/
 │   │   │   ├── BlueBookListPage.vue
