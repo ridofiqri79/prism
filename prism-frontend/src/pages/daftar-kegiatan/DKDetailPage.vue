@@ -369,19 +369,19 @@ watch(
       class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4"
     >
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Perihal</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Perihal</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.subject }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Tanggal</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal</p>
         <p class="font-semibold text-surface-950">{{ formatDate(dkStore.currentDK.date) }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Nomor Surat</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nomor Surat</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.letter_number || '-' }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Jumlah Proyek</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Jumlah Proyek</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.project_count ?? 0 }}</p>
       </div>
     </div>
@@ -423,7 +423,7 @@ watch(
           />
         </label>
         <label class="block space-y-2 xl:col-span-1">
-          <span class="text-sm font-medium text-surface-700">Location</span>
+          <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectControls.draftFilters.location_ids"
             :options="locationFilterOptions"

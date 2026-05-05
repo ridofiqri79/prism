@@ -278,7 +278,6 @@ onMounted(() => {
             size="small"
             severity="danger"
             outlined
-            rounded
             aria-label="Hapus Blue Book"
             @click="deleteBlueBook(row as BlueBook)"
           />
@@ -309,11 +308,11 @@ onMounted(() => {
         </label>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Revision Number</span>
+            <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
             <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           </label>
           <label class="block space-y-2">
-            <span class="text-sm font-medium text-surface-700">Revision Year</span>
+            <span class="text-sm font-medium text-surface-700">Tahun Revisi</span>
             <InputNumber v-model="form.revision_year" :use-grouping="false" class="w-full" />
           </label>
         </div>

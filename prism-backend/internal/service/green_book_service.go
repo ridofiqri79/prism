@@ -503,7 +503,7 @@ func (s *GreenBookService) GetGBProjectHistoryWithAudit(ctx context.Context, id 
 			if err != nil {
 				return nil, apperrors.Internal("Gagal mengambil audit GB Project")
 			}
-			item.AuditEntries = gbProjectAuditResponses(auditRows)
+			item.AuditEntries = gbProjectAuditResponses(ctx, s.queries, auditRows)
 			applyLatestAuditSummary(&item.LastChangedBy, &item.LastChangedAt, &item.LastChangeSummary, item.AuditEntries)
 		}
 		items = append(items, item)

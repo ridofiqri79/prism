@@ -24,6 +24,8 @@ SELECT
     al.table_name,
     al.record_id,
     al.action,
+    al.old_data,
+    al.new_data,
     al.changed_by,
     COALESCE(u.username, 'Sistem')::text AS changed_by_username,
     al.changed_at,
@@ -84,6 +86,8 @@ SELECT
     al.table_name,
     al.record_id,
     al.action,
+    al.old_data,
+    al.new_data,
     al.changed_by,
     COALESCE(u.username, 'Sistem')::text AS changed_by_username,
     al.changed_at,
@@ -101,3 +105,19 @@ LEFT JOIN LATERAL (
 ) diff ON TRUE
 ORDER BY al.changed_at DESC, al.id DESC
 LIMIT 200;
+
+-- name: ResolveAuditNames :many
+-- Batch lookup: given a list of UUIDs, return id -> display_name from all relevant master tables.
+SELECT id::text AS id, name AS display_name FROM institution        WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, name                          FROM region            WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, name                          FROM program_title     WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, name                          FROM bappenas_partner  WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, name                          FROM national_priority  WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, COALESCE(short_name, name)    FROM lender            WHERE id = ANY(sqlc.arg('ids')::uuid[])
+UNION ALL
+SELECT id::text, activity_name                 FROM gb_activity       WHERE id = ANY(sqlc.arg('ids')::uuid[]);

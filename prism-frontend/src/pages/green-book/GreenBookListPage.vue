@@ -64,8 +64,8 @@ const form = reactive<GreenBookPayload>({
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'publish_year', header: 'Publish Year' },
-  { field: 'revision', header: 'Revision' },
+  { field: 'publish_year', header: 'Tahun Terbit' },
+  { field: 'revision', header: 'Revisi' },
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
@@ -234,7 +234,6 @@ onMounted(() => {
             size="small"
             severity="danger"
             outlined
-            rounded
             aria-label="Hapus Green Book"
             @click="deleteGreenBook(row as GreenBook)"
           />
@@ -246,12 +245,12 @@ onMounted(() => {
     <Dialog v-model:visible="dialogVisible" modal header="Buat Green Book" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Publish Year</span>
+          <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
           <InputNumber v-model="form.publish_year" :use-grouping="false" class="w-full" />
           <small v-if="errors.publish_year" class="text-red-600">{{ errors.publish_year }}</small>
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Revision Number</span>
+          <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
           <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           <small v-if="errors.revision_number" class="text-red-600">{{ errors.revision_number }}</small>
         </label>

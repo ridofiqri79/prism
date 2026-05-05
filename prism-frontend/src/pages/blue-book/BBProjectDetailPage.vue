@@ -289,9 +289,9 @@ onMounted(() => {
 
       <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
         <div class="border-b border-surface-100 px-5 py-4">
-          <h2 class="text-lg font-semibold text-surface-950">Profil Kelembagaan</h2>
+          <h2 class="text-lg font-semibold text-surface-950">Rincian Proyek</h2>
         </div>
-        <div class="grid gap-x-8 gap-y-5 p-5 md:grid-cols-2">
+        <div class="grid gap-x-8 gap-y-5 border-b border-surface-100 p-5 md:grid-cols-2">
           <div class="min-w-0 space-y-2">
             <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
               Executing Agency
@@ -314,25 +314,17 @@ onMounted(() => {
             <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
             <ValueChipList :items="locationNames" />
           </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
+            <p class="text-sm font-semibold text-surface-950">
+              {{ project.duration ? `${project.duration} bulan` : '-' }}
+            </p>
+          </div>
           <div class="min-w-0 space-y-2 md:col-span-2">
             <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
               Prioritas Nasional
             </p>
             <ValueChipList :items="nationalPriorityNames" />
-          </div>
-        </div>
-      </section>
-
-      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-        <div class="border-b border-surface-100 px-5 py-4">
-          <h2 class="text-lg font-semibold text-surface-950">Rincian Proyek</h2>
-        </div>
-        <div class="border-b border-surface-100 px-5 py-4">
-          <div class="grid gap-2 sm:grid-cols-[11rem_minmax(0,1fr)]">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
-            <p class="text-sm font-semibold text-surface-950">
-              {{ project.duration ? `${project.duration} bulan` : '-' }}
-            </p>
           </div>
         </div>
         <div class="divide-y divide-surface-100">
@@ -379,14 +371,22 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-surface-950">Biaya Proyek</h2>
-        <ProjectCostTable :rows="project.project_costs" :editable="false" />
+      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="border-b border-surface-100 px-5 py-4">
+          <h2 class="text-lg font-semibold text-surface-950">Biaya Proyek</h2>
+        </div>
+        <div class="p-5">
+          <ProjectCostTable :rows="project.project_costs" :editable="false" />
+        </div>
       </section>
 
-      <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-surface-950">Indikasi Lender</h2>
-        <LenderIndicationTable :rows="project.lender_indications" :editable="false" />
+      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="border-b border-surface-100 px-5 py-4">
+          <h2 class="text-lg font-semibold text-surface-950">Indikasi Lender</h2>
+        </div>
+        <div class="p-5">
+          <LenderIndicationTable :rows="project.lender_indications" :editable="false" />
+        </div>
       </section>
 
       <LoITable
@@ -428,7 +428,7 @@ onMounted(() => {
           <small v-if="errors.lender_id" class="text-red-600">{{ errors.lender_id }}</small>
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Subject</span>
+          <span class="text-sm font-medium text-surface-700">Perihal</span>
           <InputText v-model="loiForm.subject" class="w-full" :invalid="Boolean(errors.subject)" />
           <small v-if="errors.subject" class="text-red-600">{{ errors.subject }}</small>
         </label>

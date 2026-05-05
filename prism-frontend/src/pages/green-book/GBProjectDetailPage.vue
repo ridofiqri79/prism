@@ -101,38 +101,37 @@ onMounted(() => {
     </PageHeader>
 
     <div v-if="project" class="space-y-6">
-      <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-        <div class="grid gap-5 p-5 md:grid-cols-3">
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</p>
-            <div class="mt-1 flex flex-wrap items-center gap-2">
-              <StatusBadge :status="project.status" :label="formatGreenBookStatus(project.status)" />
-              <Tag v-if="project.is_latest" value="Terbaru" severity="success" rounded />
-              <Tag
-                v-else-if="project.has_newer_revision"
-                value="Ada revisi lebih baru"
-                severity="warn"
-                rounded
-              />
+      <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+        <div class="p-5">
+          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div class="min-w-0 space-y-3">
+              <div class="space-y-1.5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Judul Program</p>
+                <p class="truncate text-base font-semibold text-surface-950">{{ programTitleName }}</p>
+              </div>
+              <div class="space-y-1.5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
+                <p class="text-sm font-semibold text-surface-950">
+                  {{ project.duration ? `${project.duration} bulan` : '-' }}
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2 lg:items-end">
+              <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status Snapshot</p>
+              <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                <StatusBadge :status="project.status" :label="formatGreenBookStatus(project.status)" />
+                <Tag v-if="project.is_latest" value="Versi terbaru" severity="success" rounded />
+                <Tag
+                  v-else-if="project.has_newer_revision"
+                  value="Ada revisi lebih baru"
+                  severity="warn"
+                  rounded
+                />
+              </div>
             </div>
           </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Judul Program
-            </p>
-            <p class="text-sm font-semibold text-surface-950">{{ programTitleName }}</p>
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
-            <p class="text-sm font-semibold text-surface-950">
-              {{ project.duration ? `${project.duration} bulan` : '-' }}
-            </p>
-          </div>
         </div>
-        <div class="border-t border-surface-100 px-5 py-4">
-          <h2 class="text-lg font-semibold text-surface-950">Profil Kelembagaan</h2>
-        </div>
-        <div class="grid gap-x-8 gap-y-5 px-5 pb-5 md:grid-cols-2">
+        <div class="grid gap-x-8 gap-y-5 border-t border-surface-100 p-5 md:grid-cols-2">
           <div class="min-w-0 space-y-2">
             <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
               Executing Agency
@@ -146,20 +145,20 @@ onMounted(() => {
             <ValueChipList :items="implementingAgencyNames" />
           </div>
           <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
-            <ValueChipList :items="locationNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
             <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
               Mitra Kerja Bappenas
             </p>
             <ValueChipList :items="bappenasPartnerNames" />
           </div>
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
+            <ValueChipList :items="locationNames" />
+          </div>
         </div>
-      </section>
+      </div>
 
       <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <p class="text-xs uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <RouterLink
             v-for="bbProject in project.bb_projects"
@@ -253,6 +252,7 @@ onMounted(() => {
                 </td>
                 <td class="px-4 py-3 text-right">
                   <Button
+                    v-tooltip.top="'Lihat detail snapshot'"
                     as="router-link"
                     :to="historyRoute(item)"
                     icon="pi pi-eye"
@@ -260,7 +260,7 @@ onMounted(() => {
                     size="small"
                     outlined
                     rounded
-                    aria-label="Lihat snapshot"
+                    aria-label="Lihat detail snapshot"
                   />
                 </td>
               </tr>

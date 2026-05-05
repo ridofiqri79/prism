@@ -82,33 +82,33 @@ onMounted(() => {
           </div>
           <dl class="grid gap-4 md:grid-cols-2">
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Kode Pinjaman</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Kode Pinjaman</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.loan_code }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Lender</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lender</dt>
               <dd class="mt-1 font-medium text-surface-900">{{ loanAgreement.lender.name }}</dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Perjanjian</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal Perjanjian</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.agreement_date) }}
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Efektif</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal Efektif</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.effective_date) }}
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Penutupan Awal</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal Penutupan Awal</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.original_closing_date) }}
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">Tanggal Penutupan</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal Penutupan</dt>
               <dd class="mt-1 font-medium text-surface-900">
                 {{ formatDate(loanAgreement.closing_date) }}
               </dd>
@@ -120,7 +120,7 @@ onMounted(() => {
           <h2 class="mb-4 text-lg font-semibold text-surface-950">Nilai Pinjaman</h2>
           <dl class="grid gap-4 md:grid-cols-2">
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">
                 {{ loanAgreement.currency }}
               </dt>
               <dd class="mt-1 text-xl font-semibold text-surface-950">
@@ -131,13 +131,13 @@ onMounted(() => {
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">USD</dt>
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">USD</dt>
               <dd class="mt-1 text-xl font-semibold text-surface-950">
                 <CurrencyDisplay :amount="loanAgreement.amount_usd" currency="USD" />
               </dd>
             </div>
             <div>
-              <dt class="text-xs uppercase tracking-wide text-surface-500">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-surface-500">
                 Cumulative Disbursement ({{ loanAgreement.currency }})
               </dt>
               <dd class="mt-1 text-xl font-semibold text-surface-950">
@@ -154,7 +154,7 @@ onMounted(() => {
       <aside class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <h2 class="text-lg font-semibold text-surface-950">Relasi Alur Kerja</h2>
         <div>
-          <p class="text-xs uppercase tracking-wide text-surface-500">Proyek Daftar Kegiatan</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Proyek Daftar Kegiatan</p>
           <p class="mt-1 font-medium text-surface-900">{{ formatDKProjectLabel(dkProject) }}</p>
         </div>
         <Button

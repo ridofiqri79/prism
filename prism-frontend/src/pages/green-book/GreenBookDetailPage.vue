@@ -98,7 +98,7 @@ const columns: ColumnDef[] = [
   { field: 'project_name', header: 'Nama Proyek' },
   { field: 'bb_projects', header: 'Proyek Blue Book' },
   { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Aksi' },
+  { field: 'actions', header: 'Aksi', align: 'right' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
   { label: 'Berlaku', value: 'active' },
@@ -624,15 +624,15 @@ watch(
 
     <div v-if="greenBookStore.currentGreenBook" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Tahun Terbit</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tahun Terbit</p>
         <p class="font-semibold text-surface-950">{{ greenBookStore.currentGreenBook.publish_year }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Revisi</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Revisi</p>
         <p class="font-semibold text-surface-950">{{ formatGBRevision(greenBookStore.currentGreenBook.revision_number) }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</p>
         <StatusBadge
           :status="greenBookStore.currentGreenBook.status"
           :label="formatGreenBookStatus(greenBookStore.currentGreenBook.status)"
@@ -677,7 +677,7 @@ watch(
           />
         </label>
         <label class="block space-y-2 xl:col-span-1">
-          <span class="text-sm font-medium text-surface-700">Location</span>
+          <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectControls.draftFilters.location_ids"
             :options="locationFilterOptions"
@@ -708,31 +708,37 @@ watch(
           :status="String(row.status)"
           :label="formatGreenBookStatus(String(row.status))"
         />
-        <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
+        <div v-else-if="column.field === 'actions'" class="flex flex-wrap justify-end gap-1.5">
           <Button
+            v-tooltip.top="'Lihat proyek'"
             as="router-link"
             :to="{ name: 'gb-project-detail', params: { gbId: greenBookId, id: row.id } }"
             icon="pi pi-eye"
-            label="Lihat"
             size="small"
             outlined
+            rounded
+            aria-label="Lihat proyek"
           />
           <Button
             v-if="can('gb_project', 'update')"
+            v-tooltip.top="'Edit proyek'"
             as="router-link"
             :to="{ name: 'gb-project-edit', params: { gbId: greenBookId, id: row.id } }"
             icon="pi pi-pencil"
-            label="Edit"
             size="small"
             outlined
+            rounded
+            aria-label="Edit proyek"
           />
           <Button
             v-if="can('gb_project', 'delete')"
+            v-tooltip.top="'Hapus proyek'"
             icon="pi pi-trash"
-            label="Hapus"
             size="small"
             severity="danger"
             outlined
+            rounded
+            aria-label="Hapus proyek"
             @click="deleteProject(row as GBProject)"
           />
         </div>

@@ -87,7 +87,7 @@ const columns: ColumnDef[] = [
   { field: 'bb_code', header: 'Kode Blue Book', width: '11rem' },
   { field: 'project_name', header: 'Nama Proyek', width: '32%' },
   { field: 'executing_agency', header: 'Executing Agency', width: '24%' },
-  { field: 'location', header: 'Location', width: '21%' },
+  { field: 'location', header: 'Lokasi', width: '21%' },
   { field: 'actions', header: 'Aksi', align: 'right', width: '12rem' },
 ]
 const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [
@@ -428,21 +428,21 @@ watch(
 
     <div v-if="blueBookStore.currentBlueBook" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Periode</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Periode</p>
         <p class="font-semibold text-surface-950">{{ blueBookStore.currentBlueBook.period.name }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Tanggal Terbit</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal Terbit</p>
         <p class="font-semibold text-surface-950">{{ blueBookStore.currentBlueBook.publish_date }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Revisi</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Revisi</p>
         <p class="font-semibold text-surface-950">
           {{ formatRevision(blueBookStore.currentBlueBook.revision_number, blueBookStore.currentBlueBook.revision_year) }}
         </p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</p>
         <StatusBadge
           :status="blueBookStore.currentBlueBook.status"
           :label="formatBlueBookStatus(blueBookStore.currentBlueBook.status)"
@@ -475,7 +475,7 @@ watch(
           />
         </label>
         <label class="block space-y-2 xl:col-span-3">
-          <span class="text-sm font-medium text-surface-700">Location</span>
+          <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectFilters.location_ids"
             :options="locationFilterOptions"
