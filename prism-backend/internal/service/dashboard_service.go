@@ -31,15 +31,15 @@ func (s *DashboardService) GetSummary(ctx context.Context, filter model.Dashboar
 		return nil, apperrors.Internal("Gagal mengambil ringkasan dashboard")
 	}
 	summary := &model.DashboardSummary{
-		TotalBBProjects:         int(row.TotalBbProjects),
-		TotalGBProjects:         int(row.TotalGbProjects),
-		TotalLoanAgreements:     int(row.TotalLoanAgreements),
-		BBPipelineUSD:           floatFromNumeric(row.BbPipelineUsd),
-		GBPipelineUSD:           floatFromNumeric(row.GbPipelineUsd),
-		GBLocalUSD:              floatFromNumeric(row.GbLocalUsd),
-		DKFinancingUSD:          floatFromNumeric(row.DkFinancingUsd),
-		DKCounterpartUSD:        floatFromNumeric(row.DkCounterpartUsd),
-		LACommitmentUSD:         floatFromNumeric(row.LaCommitmentUsd),
+		TotalBBProjects:     int(row.TotalBbProjects),
+		TotalGBProjects:     int(row.TotalGbProjects),
+		TotalLoanAgreements: int(row.TotalLoanAgreements),
+		BBPipelineUSD:       floatFromNumeric(row.BbPipelineUsd),
+		GBPipelineUSD:       floatFromNumeric(row.GbPipelineUsd),
+		GBLocalUSD:          floatFromNumeric(row.GbLocalUsd),
+		DKFinancingUSD:      floatFromNumeric(row.DkFinancingUsd),
+		DKCounterpartUSD:    floatFromNumeric(row.DkCounterpartUsd),
+		LACommitmentUSD:     floatFromNumeric(row.LaCommitmentUsd),
 	}
 	summary.Metrics = dashboardMetricCards(summary)
 	return summary, nil
@@ -111,6 +111,10 @@ func (s *DashboardService) GetExecutivePortfolio(ctx context.Context, filter mod
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil funnel executive portfolio")
 	}
+	programFunnelRows, err := s.queries.GetDashboardExecutiveFunnelByProgramTitle(ctx, queries.GetDashboardExecutiveFunnelByProgramTitleParams(funnelParams))
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil funnel program title executive portfolio")
+	}
 
 	rollupParams, err := dashboardExecutiveRollupParams(filter)
 	if err != nil {
@@ -133,12 +137,13 @@ func (s *DashboardService) GetExecutivePortfolio(ctx context.Context, filter mod
 	funnel := executiveFunnelMetrics(funnelRows)
 	risks := executiveRiskItems(riskRows)
 	return &model.ExecutivePortfolioDashboard{
-		Cards:           executiveMetricCards(summary),
-		Funnel:          funnel,
-		TopInstitutions: executiveInstitutionBreakdown(institutionRows),
-		TopLenders:      executiveLenderBreakdown(lenderRows),
-		RiskItems:       risks,
-		Insights:        executiveInsights(summary, funnel, risks),
+		Cards:                executiveMetricCards(summary),
+		Funnel:               funnel,
+		FunnelByProgramTitle: executiveFunnelGroups(programFunnelRows),
+		TopInstitutions:      executiveInstitutionBreakdown(institutionRows),
+		TopLenders:           executiveLenderBreakdown(lenderRows),
+		RiskItems:            risks,
+		Insights:             executiveInsights(summary, funnel, risks),
 	}, nil
 }
 
@@ -942,18 +947,18 @@ func auditRecentActivity(rows []queries.ListDashboardAuditRecentActivityRow) []m
 }
 
 var dataQualityIssueTypes = map[string]struct{}{
-	"BB_WITHOUT_BAPPENAS_PARTNER":               {},
-	"BB_INDICATION_WITHOUT_LOI":                 {},
-	"LOI_WITHOUT_GB":                            {},
-	"GB_WITHOUT_BB_REFERENCE":                   {},
-	"GB_WITHOUT_FUNDING_SOURCE":                 {},
-	"GB_WITHOUT_DISBURSEMENT_PLAN":              {},
-	"GB_WITHOUT_ACTIVITY":                       {},
-	"DK_WITHOUT_FINANCING_DETAIL":               {},
-	"DK_WITHOUT_ACTIVITY_DETAIL":                {},
-	"DK_WITHOUT_LA":                             {},
-	"LA_NOT_EFFECTIVE":                          {},
-	"CURRENCY_USD_MISMATCH":                     {},
+	"BB_WITHOUT_BAPPENAS_PARTNER":  {},
+	"BB_INDICATION_WITHOUT_LOI":    {},
+	"LOI_WITHOUT_GB":               {},
+	"GB_WITHOUT_BB_REFERENCE":      {},
+	"GB_WITHOUT_FUNDING_SOURCE":    {},
+	"GB_WITHOUT_DISBURSEMENT_PLAN": {},
+	"GB_WITHOUT_ACTIVITY":          {},
+	"DK_WITHOUT_FINANCING_DETAIL":  {},
+	"DK_WITHOUT_ACTIVITY_DETAIL":   {},
+	"DK_WITHOUT_LA":                {},
+	"LA_NOT_EFFECTIVE":             {},
+	"CURRENCY_USD_MISMATCH":        {},
 }
 
 var pipelineStageLabels = map[string]string{
@@ -1026,15 +1031,70 @@ func executiveFunnelMetrics(rows []queries.GetDashboardExecutiveFunnelRow) []mod
 	return metrics
 }
 
+func executiveFunnelGroups(rows []queries.GetDashboardExecutiveFunnelByProgramTitleRow) []model.StageFunnelGroup {
+	type funnelGroup struct {
+		id     string
+		title  string
+		stages map[string]model.StageMetric
+	}
+
+	indexByKey := make(map[string]int, len(rows))
+	groups := make([]funnelGroup, 0)
+	for _, row := range rows {
+		key := row.ProgramTitleID
+		if key == "" {
+			key = "__unassigned__:" + row.ProgramTitle
+		}
+		groupIndex, ok := indexByKey[key]
+		if !ok {
+			groupIndex = len(groups)
+			indexByKey[key] = groupIndex
+			groups = append(groups, funnelGroup{
+				id:     row.ProgramTitleID,
+				title:  row.ProgramTitle,
+				stages: make(map[string]model.StageMetric, 4),
+			})
+		}
+		groups[groupIndex].stages[row.Stage] = model.StageMetric{
+			Stage:        row.Stage,
+			Label:        stageLabel(row.Stage),
+			ProjectCount: int(row.ProjectCount),
+			AmountUSD:    floatFromNumeric(row.AmountUsd),
+		}
+	}
+
+	order := []string{"BB", "GB", "DK", "LA"}
+	result := make([]model.StageFunnelGroup, 0, len(groups))
+	for _, group := range groups {
+		stages := make([]model.StageMetric, 0, len(order))
+		for _, stage := range order {
+			if metric, ok := group.stages[stage]; ok {
+				stages = append(stages, metric)
+				continue
+			}
+			stages = append(stages, model.StageMetric{
+				Stage: stage,
+				Label: stageLabel(stage),
+			})
+		}
+		result = append(result, model.StageFunnelGroup{
+			ProgramTitleID: group.id,
+			ProgramTitle:   group.title,
+			Stages:         stages,
+		})
+	}
+	return result
+}
+
 func executiveInstitutionBreakdown(rows []queries.GetDashboardExecutiveTopInstitutionsRow) []model.BreakdownItem {
 	items := make([]model.BreakdownItem, 0, len(rows))
 	for _, row := range rows {
 		id := optionalUUIDString(row.ID)
 		items = append(items, model.BreakdownItem{
-			ID:          id,
-			Label:       row.Label,
-			ItemCount:   int(row.ItemCount),
-			AmountUSD:   floatFromNumeric(row.AmountUsd),
+			ID:        id,
+			Label:     row.Label,
+			ItemCount: int(row.ItemCount),
+			AmountUSD: floatFromNumeric(row.AmountUsd),
 		})
 	}
 	return items
@@ -1045,10 +1105,10 @@ func executiveLenderBreakdown(rows []queries.GetDashboardExecutiveTopLendersRow)
 	for _, row := range rows {
 		id := optionalUUIDString(row.ID)
 		items = append(items, model.BreakdownItem{
-			ID:          id,
-			Label:       row.Label,
-			ItemCount:   int(row.ItemCount),
-			AmountUSD:   floatFromNumeric(row.AmountUsd),
+			ID:        id,
+			Label:     row.Label,
+			ItemCount: int(row.ItemCount),
+			AmountUSD: floatFromNumeric(row.AmountUsd),
 		})
 	}
 	return items

@@ -18,6 +18,7 @@ export interface MetricCard {
   value: number
   unit?: 'USD' | 'percent' | 'project' | string
   category?: string
+  hint?: string
 }
 
 export interface StageMetric {

@@ -1645,7 +1645,7 @@ Mengembalikan opsi filter analytics seperti `period`, `publish_year`, `lender`, 
 
 **Permission:** Authenticated
 
-Ringkasan eksekutif: KPI pipeline/commitment, funnel BB → GB → DK → LA, top K/L, top lender, risk item pipeline, dan insight otomatis. Risk item tidak memakai absorption.
+Ringkasan eksekutif: KPI pipeline/commitment, funnel BB → GB → DK → LA, breakdown funnel per `Program Title`, top K/L, top lender, risk item pipeline, dan insight otomatis. Risk item tidak memakai absorption.
 
 ---
 

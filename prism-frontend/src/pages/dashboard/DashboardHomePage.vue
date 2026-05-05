@@ -23,21 +23,21 @@ const dashboardTabs = [
     shortLabel: 'Eksekutif',
     icon: 'pi pi-briefcase',
     component: markRaw(ExecutivePortfolioDashboardPage),
-    caption: 'Kesehatan portfolio dan risk item',
-    question: 'Apakah portfolio pinjaman luar negeri sedang sehat dari pipeline sampai komitmen legal?',
-    scope: 'Portfolio nasional, funnel tahap, top K/L, lender utama, dan risk item lintas workflow.',
-    outcomes: ['Baca kesehatan portfolio', 'Identifikasi risiko utama', 'Lihat eksposur terbesar'],
+    caption: 'Kesehatan portofolio dan risiko utama',
+    question: 'Apakah portofolio pinjaman luar negeri sedang sehat dari Blue Book sampai Loan Agreement?',
+    scope: 'Portofolio nasional, funnel tahap, K/L teratas, lender utama, dan risiko lintas alur kerja.',
+    outcomes: ['Baca kesehatan portofolio', 'Identifikasi risiko utama', 'Lihat eksposur terbesar'],
   },
   {
     key: 'pipeline',
-    label: 'Pipeline Perencanaan',
-    shortLabel: 'Pipeline',
+    label: 'Alur Perencanaan',
+    shortLabel: 'Alur',
     icon: 'pi pi-sort-amount-down',
     component: markRaw(PipelineBottleneckDashboardPage),
-    caption: 'Bottleneck sebelum komitmen legal',
+    caption: 'Hambatan sebelum komitmen legal',
     question: 'Di tahap mana proyek tertahan sebelum menjadi komitmen legal?',
     scope: 'Blue Book, Letter of Intent, Green Book, Daftar Kegiatan, dan Loan Agreement.',
-    outcomes: ['Cari bottleneck per tahap', 'Prioritaskan usia tertahan', 'Buka journey proyek'],
+    outcomes: ['Cari hambatan per tahap', 'Prioritaskan usia tertahan', 'Buka perjalanan proyek'],
   },
   {
     key: 'readiness',
@@ -45,10 +45,10 @@ const dashboardTabs = [
     shortLabel: 'Green Book',
     icon: 'pi pi-check-square',
     component: markRaw(GreenBookReadinessDashboardPage),
-    caption: 'Readiness proyek Green Book',
+    caption: 'Kesiapan proyek Green Book',
     question: 'Proyek Green Book mana yang siap masuk Daftar Kegiatan?',
-    scope: 'Funding source, activities, disbursement plan, funding allocation, dan cofinancing.',
-    outcomes: ['Ukur readiness score', 'Temukan field kosong', 'Validasi struktur pendanaan'],
+    scope: 'Sumber pendanaan, aktivitas, rencana penarikan, alokasi pendanaan, dan pendanaan bersama.',
+    outcomes: ['Ukur skor kesiapan', 'Temukan isian kosong', 'Validasi struktur pendanaan'],
   },
   {
     key: 'financing',
@@ -56,10 +56,10 @@ const dashboardTabs = [
     shortLabel: 'Lender',
     icon: 'pi pi-building-columns',
     component: markRaw(LenderFinancingMixDashboardPage),
-    caption: 'Conversion lender dan currency',
+    caption: 'Konversi lender dan mata uang',
     question: 'Seberapa kuat kepastian lender dari indikasi sampai Loan Agreement?',
-    scope: 'Lender Indication, Letter of Intent, funding source, Daftar Kegiatan, Loan Agreement, dan currency.',
-    outcomes: ['Pantau conversion lender', 'Baca currency exposure', 'Cek cofinancing'],
+    scope: 'Indikasi lender, Letter of Intent, sumber pendanaan Green Book, Daftar Kegiatan, Loan Agreement, dan mata uang.',
+    outcomes: ['Pantau konversi lender', 'Baca eksposur mata uang', 'Cek pendanaan bersama'],
   },
   {
     key: 'institution',
@@ -67,21 +67,21 @@ const dashboardTabs = [
     shortLabel: 'K/L',
     icon: 'pi pi-sitemap',
     component: markRaw(KLPortfolioPerformanceDashboardPage),
-    caption: 'Eksposur dan risk K/L',
+    caption: 'Eksposur dan risiko K/L',
     question: 'Kementerian/Lembaga mana yang memegang eksposur dan risiko terbesar?',
-    scope: 'Roll-up K/L, role executing/implementing, nilai pipeline, komitmen legal, dan risk count.',
-    outcomes: ['Bandingkan performa K/L', 'Urutkan eksposur', 'Lihat risiko portfolio'],
+    scope: 'Agregasi K/L, peran Executing Agency/Implementing Agency, nilai alur perencanaan, komitmen legal, dan jumlah risiko.',
+    outcomes: ['Bandingkan kinerja K/L', 'Urutkan eksposur', 'Lihat risiko portofolio'],
   },
   {
     key: 'quality',
     label: 'Kualitas Data',
-    shortLabel: 'Data Quality',
+    shortLabel: 'Data',
     icon: 'pi pi-shield',
     component: markRaw(DataQualityGovernanceDashboardPage),
-    caption: 'Issue data dan audit',
-    question: 'Data mana yang menghambat workflow, analitik, atau kepatuhan aturan bisnis?',
-    scope: 'Missing relation, business-rule consistency, integritas data, dan audit summary untuk ADMIN.',
-    outcomes: ['Tindaklanjuti issue', 'Validasi relasi data', 'Review aktivitas audit'],
+    caption: 'Isu data dan audit',
+    question: 'Data mana yang menghambat alur kerja, analitik, atau kepatuhan aturan bisnis?',
+    scope: 'Relasi kosong, konsistensi aturan bisnis, integritas data, dan ringkasan audit untuk ADMIN.',
+    outcomes: ['Tindaklanjuti isu', 'Validasi relasi data', 'Tinjau aktivitas audit'],
   },
 ] as const
 
@@ -106,34 +106,45 @@ const activeTab = computed(
   () => dashboardTabs.find((tab) => tab.key === activeTabKey.value) ?? dashboardTabs[0],
 )
 
+const activeComponentProps = computed(() => ({
+  embedded: true,
+  ...(activeTabKey.value === 'executive' ? { autoload: false } : {}),
+}))
+
+const projectStageMetrics = computed(() => dashboard.executivePortfolio?.funnel ?? [])
+
+function projectStageCount(stage: string, fallback = 0) {
+  return projectStageMetrics.value.find((item) => item.stage === stage)?.project_count ?? fallback
+}
+
 const overviewMetrics = computed(() => [
   {
     key: 'bb',
-    label: 'Blue Book Projects',
-    value: dashboard.summary?.total_bb_projects ?? 0,
+    label: 'Proyek Blue Book',
+    value: projectStageCount('BB', dashboard.summary?.total_bb_projects ?? 0),
     unit: 'project',
     hint: 'Total proyek di tahap Blue Book',
   },
   {
     key: 'gb',
-    label: 'Green Book Projects',
-    value: dashboard.summary?.total_gb_projects ?? 0,
+    label: 'Proyek Green Book',
+    value: projectStageCount('GB', dashboard.summary?.total_gb_projects ?? 0),
     unit: 'project',
     hint: 'Total proyek di tahap Green Book',
   },
   {
-    key: 'la',
-    label: 'Loan Agreements',
-    value: dashboard.summary?.total_loan_agreements ?? 0,
+    key: 'dk',
+    label: 'Proyek Daftar Kegiatan',
+    value: projectStageCount('DK'),
     unit: 'project',
-    hint: 'Total komitmen legal aktif',
+    hint: 'Total proyek yang sudah masuk Daftar Kegiatan',
   },
   {
-    key: 'amount',
-    label: 'Total Amount',
-    value: dashboard.summary?.total_amount_usd ?? 0,
-    unit: 'USD',
-    hint: 'Eksposur total berbasis USD',
+    key: 'la',
+    label: 'Proyek Loan Agreement',
+    value: projectStageCount('LA', dashboard.summary?.total_loan_agreements ?? 0),
+    unit: 'project',
+    hint: 'Total proyek yang sudah memiliki Loan Agreement',
   },
 ])
 
@@ -169,18 +180,22 @@ function tabButtonClass(tabKey: DashboardTabKey) {
 }
 
 onMounted(() => {
-  void dashboard.fetchSummary()
+  void Promise.all([
+    dashboard.fetchSummary(),
+    dashboard.fetchFilterOptions(),
+    dashboard.fetchExecutivePortfolio(),
+  ])
 })
 </script>
 
 <template>
   <section class="space-y-5">
     <PageHeader
-      title="Dashboard"
-      subtitle="Satu workspace untuk membaca portfolio, bottleneck, kesiapan, pembiayaan, kinerja K/L, dan kualitas data."
+      title="Dasbor"
+      subtitle="Satu ruang kerja untuk membaca portofolio, hambatan, kesiapan, pembiayaan, kinerja K/L, dan kualitas data."
     >
       <template #actions>
-        <Tag value="Analitik read-only" severity="secondary" />
+        <Tag value="Analitik baca-saja" severity="secondary" />
       </template>
     </PageHeader>
 
@@ -205,13 +220,13 @@ onMounted(() => {
 
       <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase text-primary">Flow bisnis dashboard</p>
+          <p class="text-xs font-semibold uppercase text-primary">Alur bisnis dashboard</p>
           <h2 class="mt-1 text-xl font-semibold text-surface-950">{{ activeTab.label }}</h2>
           <p class="mt-1 max-w-3xl text-sm leading-6 text-surface-600">{{ activeTab.question }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2">
-          <Tag value="Blue Book -> Loan Agreement" severity="info" />
-          <Tag value="Latest snapshot" severity="secondary" />
+          <Tag value="Blue Book -> Green Book -> Daftar Kegiatan -> Loan Agreement" severity="info" />
+          <Tag value="Snapshot terbaru" severity="secondary" />
         </div>
       </div>
 
@@ -261,7 +276,7 @@ onMounted(() => {
     </section>
 
     <KeepAlive>
-      <component :is="activeTab.component" :key="activeTab.key" embedded />
+      <component :is="activeTab.component" :key="activeTab.key" v-bind="activeComponentProps" />
     </KeepAlive>
   </section>
 </template>

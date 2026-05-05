@@ -19,7 +19,7 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
   <section class="rounded-lg border border-surface-200 bg-white p-4">
     <div class="mb-3">
       <h2 class="text-lg font-semibold text-surface-950">{{ title }}</h2>
-      <p class="text-sm text-surface-500">Top 10 berdasarkan eksposur USD.</p>
+      <p class="text-sm text-surface-500">10 teratas berdasarkan eksposur USD.</p>
     </div>
     <DataTable :value="items" size="small" scrollable scroll-height="28rem">
       <Column field="label" header="Nama" />
@@ -28,7 +28,7 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
           {{ data.item_count ?? 0 }}
         </template>
       </Column>
-      <Column field="amount_usd" header="Commitment" class="w-40">
+      <Column field="amount_usd" header="Komitmen" class="w-40">
         <template #body="{ data }">
           {{ usdFormatter.format(data.amount_usd ?? 0) }}
         </template>

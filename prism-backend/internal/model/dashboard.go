@@ -23,13 +23,19 @@ type StageMetric struct {
 	AmountUSD    float64 `json:"amount_usd"`
 }
 
+type StageFunnelGroup struct {
+	ProgramTitleID string        `json:"program_title_id,omitempty"`
+	ProgramTitle   string        `json:"program_title"`
+	Stages         []StageMetric `json:"stages"`
+}
+
 type BreakdownItem struct {
-	ID          *string  `json:"id,omitempty"`
-	Key         string   `json:"key,omitempty"`
-	Label       string   `json:"label"`
-	ItemCount   int      `json:"item_count,omitempty"`
-	AmountUSD   float64  `json:"amount_usd,omitempty"`
-	Percentage  *float64 `json:"percentage,omitempty"`
+	ID         *string  `json:"id,omitempty"`
+	Key        string   `json:"key,omitempty"`
+	Label      string   `json:"label"`
+	ItemCount  int      `json:"item_count,omitempty"`
+	AmountUSD  float64  `json:"amount_usd,omitempty"`
+	Percentage *float64 `json:"percentage,omitempty"`
 }
 
 type RiskItem struct {
@@ -48,27 +54,28 @@ type RiskItem struct {
 }
 
 type DashboardSummary struct {
-	TotalBBProjects         int          `json:"total_bb_projects"`
-	TotalGBProjects         int          `json:"total_gb_projects"`
-	TotalLoanAgreements     int          `json:"total_loan_agreements"`
-	BBPipelineUSD           float64      `json:"bb_pipeline_usd"`
-	GBPipelineUSD           float64      `json:"gb_pipeline_usd"`
-	GBLocalUSD              float64      `json:"gb_local_usd"`
-	DKFinancingUSD          float64      `json:"dk_financing_usd"`
-	DKCounterpartUSD        float64      `json:"dk_counterpart_usd"`
-	LACommitmentUSD         float64      `json:"la_commitment_usd"`
-	Metrics                 []MetricCard `json:"metrics"`
+	TotalBBProjects     int          `json:"total_bb_projects"`
+	TotalGBProjects     int          `json:"total_gb_projects"`
+	TotalLoanAgreements int          `json:"total_loan_agreements"`
+	BBPipelineUSD       float64      `json:"bb_pipeline_usd"`
+	GBPipelineUSD       float64      `json:"gb_pipeline_usd"`
+	GBLocalUSD          float64      `json:"gb_local_usd"`
+	DKFinancingUSD      float64      `json:"dk_financing_usd"`
+	DKCounterpartUSD    float64      `json:"dk_counterpart_usd"`
+	LACommitmentUSD     float64      `json:"la_commitment_usd"`
+	Metrics             []MetricCard `json:"metrics"`
 }
 
 type DashboardFilterOptions map[string][]BreakdownItem
 
 type ExecutivePortfolioDashboard struct {
-	Cards           []MetricCard    `json:"cards"`
-	Funnel          []StageMetric   `json:"funnel"`
-	TopInstitutions []BreakdownItem `json:"top_institutions"`
-	TopLenders      []BreakdownItem `json:"top_lenders"`
-	RiskItems       []RiskItem      `json:"risk_items"`
-	Insights        []string        `json:"insights"`
+	Cards                []MetricCard       `json:"cards"`
+	Funnel               []StageMetric      `json:"funnel"`
+	FunnelByProgramTitle []StageFunnelGroup `json:"funnel_by_program_title"`
+	TopInstitutions      []BreakdownItem    `json:"top_institutions"`
+	TopLenders           []BreakdownItem    `json:"top_lenders"`
+	RiskItems            []RiskItem         `json:"risk_items"`
+	Insights             []string           `json:"insights"`
 }
 
 type PipelineBottleneckFilterRequest struct {

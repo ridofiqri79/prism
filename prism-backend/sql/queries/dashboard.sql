@@ -175,54 +175,73 @@ selected_bb AS (
     FROM ranked_bb
     WHERE sqlc.arg('include_history')::boolean OR rn = 1
 ),
-stage_source AS (
+ranked_gb AS (
     SELECT
-        sb.id,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'LA'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'DK'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'GB'
-            WHEN EXISTS (
-                SELECT 1
-                FROM loi
-                WHERE loi.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'BB_WITH_LOI'
-            WHEN EXISTS (
-                SELECT 1
-                FROM lender_indication li
-                WHERE li.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'BB_WITH_LENDER_INDICATION'
-            ELSE 'BB_ONLY'
-        END::text AS stage
-    FROM selected_bb sb
+        gp.id,
+        ROW_NUMBER() OVER (
+            PARTITION BY gp.gb_project_identity_id
+            ORDER BY gb.revision_number DESC, gb.created_at DESC, gp.created_at DESC
+        ) AS rn
+    FROM gb_project gp
+    JOIN green_book gb ON gb.id = gp.green_book_id
+    WHERE gp.status = 'active'
+      AND (
+          sqlc.narg('period_id')::uuid IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_bb_project gbp
+              JOIN bb_project bp ON bp.id = gbp.bb_project_id
+              JOIN blue_book bb ON bb.id = bp.blue_book_id
+              WHERE gbp.gb_project_id = gp.id
+                AND bb.period_id = sqlc.narg('period_id')::uuid
+          )
+      )
+),
+selected_gb AS (
+    SELECT id
+    FROM ranked_gb
+    WHERE sqlc.arg('include_history')::boolean OR rn = 1
+),
+selected_dk AS (
+    SELECT DISTINCT dp.id
+    FROM dk_project dp
+    WHERE (
+        sqlc.narg('period_id')::uuid IS NULL
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = sqlc.narg('period_id')::uuid
+        )
+    )
+),
+selected_la AS (
+    SELECT la.id
+    FROM loan_agreement la
+    JOIN dk_project dp ON dp.id = la.dk_project_id
+    WHERE (
+        sqlc.narg('period_id')::uuid IS NULL
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = sqlc.narg('period_id')::uuid
+        )
+    )
 )
-SELECT stage, COUNT(*)::bigint AS project_count
-FROM stage_source
-GROUP BY stage
-ORDER BY CASE stage
-    WHEN 'BB_ONLY' THEN 1
-    WHEN 'BB_WITH_LENDER_INDICATION' THEN 2
-    WHEN 'BB_WITH_LOI' THEN 3
-    WHEN 'GB' THEN 4
-    WHEN 'DK' THEN 5
-    WHEN 'LA' THEN 6
-    ELSE 99
-END;
+SELECT 'BB'::text AS stage, COUNT(*)::bigint AS project_count FROM selected_bb
+UNION ALL
+SELECT 'GB'::text AS stage, COUNT(*)::bigint AS project_count FROM selected_gb
+UNION ALL
+SELECT 'DK'::text AS stage, COUNT(*)::bigint AS project_count FROM selected_dk
+UNION ALL
+SELECT 'LA'::text AS stage, COUNT(*)::bigint AS project_count FROM selected_la;
 
 -- name: GetDashboardStageAmounts :many
 WITH ranked_bb AS (
@@ -243,80 +262,80 @@ selected_bb AS (
     FROM ranked_bb
     WHERE sqlc.arg('include_history')::boolean OR rn = 1
 ),
-stage_source AS (
+ranked_gb AS (
     SELECT
-        sb.id,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'LA'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'DK'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'GB'
-            WHEN EXISTS (
-                SELECT 1
-                FROM loi
-                WHERE loi.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'BB_WITH_LOI'
-            WHEN EXISTS (
-                SELECT 1
-                FROM lender_indication li
-                WHERE li.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-            ) THEN 'BB_WITH_LENDER_INDICATION'
-            ELSE 'BB_ONLY'
-        END::text AS stage
-    FROM selected_bb sb
+        gp.id,
+        ROW_NUMBER() OVER (
+            PARTITION BY gp.gb_project_identity_id
+            ORDER BY gb.revision_number DESC, gb.created_at DESC, gp.created_at DESC
+        ) AS rn
+    FROM gb_project gp
+    JOIN green_book gb ON gb.id = gp.green_book_id
+    WHERE gp.status = 'active'
+      AND (
+          sqlc.narg('period_id')::uuid IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_bb_project gbp
+              JOIN bb_project bp ON bp.id = gbp.bb_project_id
+              JOIN blue_book bb ON bb.id = bp.blue_book_id
+              WHERE gbp.gb_project_id = gp.id
+                AND bb.period_id = sqlc.narg('period_id')::uuid
+          )
+      )
 ),
-stage_amount AS (
-    SELECT
-        ss.stage,
-        COALESCE(
-            (SELECT SUM(la.amount_usd)
-             FROM gb_project_bb_project gbp
-             JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-             JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-             WHERE gbp.bb_project_id = ss.id),
-            (SELECT SUM(dfd.amount_usd + dfd.grant_usd)
-             FROM gb_project_bb_project gbp
-             JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-             JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
-             WHERE gbp.bb_project_id = ss.id),
-            (SELECT SUM(gfs.loan_usd + gfs.grant_usd)
-             FROM gb_project_bb_project gbp
-             JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
-             WHERE gbp.bb_project_id = ss.id),
-            (SELECT SUM(bpc.amount_usd)
-             FROM bb_project_cost bpc
-             WHERE bpc.bb_project_id = ss.id
-               AND bpc.funding_type = 'Foreign'),
-            0
-        )::numeric AS amount_usd
-    FROM stage_source ss
+selected_gb AS (
+    SELECT id
+    FROM ranked_gb
+    WHERE sqlc.arg('include_history')::boolean OR rn = 1
+),
+selected_dk AS (
+    SELECT DISTINCT dp.id
+    FROM dk_project dp
+    WHERE (
+        sqlc.narg('period_id')::uuid IS NULL
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = sqlc.narg('period_id')::uuid
+        )
+    )
+),
+selected_la AS (
+    SELECT la.id, la.amount_usd
+    FROM loan_agreement la
+    JOIN dk_project dp ON dp.id = la.dk_project_id
+    WHERE (
+        sqlc.narg('period_id')::uuid IS NULL
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = sqlc.narg('period_id')::uuid
+        )
+    )
 )
-SELECT stage, COALESCE(SUM(amount_usd), 0)::numeric AS amount_usd
-FROM stage_amount
-GROUP BY stage
-ORDER BY CASE stage
-    WHEN 'BB_ONLY' THEN 1
-    WHEN 'BB_WITH_LENDER_INDICATION' THEN 2
-    WHEN 'BB_WITH_LOI' THEN 3
-    WHEN 'GB' THEN 4
-    WHEN 'DK' THEN 5
-    WHEN 'LA' THEN 6
-    ELSE 99
-END;
+SELECT 'BB'::text AS stage, COALESCE(SUM(bpc.amount_usd), 0)::numeric AS amount_usd
+FROM selected_bb sb
+LEFT JOIN bb_project_cost bpc ON bpc.bb_project_id = sb.id AND bpc.funding_type = 'Foreign'
+UNION ALL
+SELECT 'GB'::text AS stage, COALESCE(SUM(gfs.loan_usd + gfs.grant_usd), 0)::numeric AS amount_usd
+FROM selected_gb sg
+LEFT JOIN gb_funding_source gfs ON gfs.gb_project_id = sg.id
+UNION ALL
+SELECT 'DK'::text AS stage, COALESCE(SUM(dfd.amount_usd + dfd.grant_usd), 0)::numeric AS amount_usd
+FROM selected_dk sd
+LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = sd.id
+UNION ALL
+SELECT 'LA'::text AS stage, COALESCE(SUM(amount_usd), 0)::numeric AS amount_usd
+FROM selected_la;
 
 -- name: ListDashboardFilterOptions :many
 SELECT 'period'::text AS option_type, p.id::text AS value, p.name::text AS label
@@ -390,53 +409,208 @@ selected_gb AS (
     FROM ranked_gb
     WHERE sqlc.arg('include_history')::boolean OR rn = 1
 ),
-bb_stage AS (
-    SELECT sb.id
-    FROM selected_bb sb
-    WHERE NOT EXISTS (
-        SELECT 1
-        FROM bb_project bp_any
-        JOIN gb_project_bb_project gbp ON gbp.bb_project_id = bp_any.id
-        WHERE bp_any.project_identity_id = sb.project_identity_id
-    )
-),
-gb_stage AS (
-    SELECT sg.id
-    FROM selected_gb sg
-    WHERE NOT EXISTS (SELECT 1 FROM dk_project_gb_project dpg WHERE dpg.gb_project_id = sg.id)
-),
-dk_stage AS (
+selected_dk AS (
     SELECT DISTINCT dp.id
     FROM dk_project dp
-    JOIN dk_project_gb_project dpg ON dpg.dk_project_id = dp.id
-    JOIN selected_gb sg ON sg.id = dpg.gb_project_id
-    WHERE NOT EXISTS (SELECT 1 FROM loan_agreement la WHERE la.dk_project_id = dp.id)
-),
-la_stage AS (
-    SELECT la.id, la.amount_usd
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
     WHERE EXISTS (
         SELECT 1
         FROM dk_project_gb_project dpg
         JOIN selected_gb sg ON sg.id = dpg.gb_project_id
         WHERE dpg.dk_project_id = dp.id
     )
+),
+selected_la AS (
+    SELECT la.id, la.amount_usd
+    FROM loan_agreement la
+    WHERE EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dpg
+        JOIN selected_gb sg ON sg.id = dpg.gb_project_id
+        WHERE dpg.dk_project_id = la.dk_project_id
+    )
 )
-SELECT 'BB'::text AS stage, COUNT(DISTINCT bs.id)::bigint AS project_count, COALESCE(SUM(bpc.amount_usd), 0)::numeric AS amount_usd
-FROM bb_stage bs
-LEFT JOIN bb_project_cost bpc ON bpc.bb_project_id = bs.id AND bpc.funding_type = 'Foreign'
+SELECT 'BB'::text AS stage, COUNT(DISTINCT sb.id)::bigint AS project_count, COALESCE(SUM(bpc.amount_usd), 0)::numeric AS amount_usd
+FROM selected_bb sb
+LEFT JOIN bb_project_cost bpc ON bpc.bb_project_id = sb.id AND bpc.funding_type = 'Foreign'
 UNION ALL
-SELECT 'GB'::text AS stage, COUNT(DISTINCT gs.id)::bigint AS project_count, COALESCE(SUM(gfs.loan_usd + gfs.grant_usd), 0)::numeric AS amount_usd
-FROM gb_stage gs
-LEFT JOIN gb_funding_source gfs ON gfs.gb_project_id = gs.id
+SELECT 'GB'::text AS stage, COUNT(DISTINCT sg.id)::bigint AS project_count, COALESCE(SUM(gfs.loan_usd + gfs.grant_usd), 0)::numeric AS amount_usd
+FROM selected_gb sg
+LEFT JOIN gb_funding_source gfs ON gfs.gb_project_id = sg.id
 UNION ALL
-SELECT 'DK'::text AS stage, COUNT(DISTINCT ds.id)::bigint AS project_count, COALESCE(SUM(dfd.amount_usd + dfd.grant_usd), 0)::numeric AS amount_usd
-FROM dk_stage ds
-LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = ds.id
+SELECT 'DK'::text AS stage, COUNT(DISTINCT sd.id)::bigint AS project_count, COALESCE(SUM(dfd.amount_usd + dfd.grant_usd), 0)::numeric AS amount_usd
+FROM selected_dk sd
+LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = sd.id
 UNION ALL
 SELECT 'LA'::text AS stage, COUNT(*)::bigint AS project_count, COALESCE(SUM(amount_usd), 0)::numeric AS amount_usd
-FROM la_stage;
+FROM selected_la;
+
+-- name: GetDashboardExecutiveFunnelByProgramTitle :many
+WITH ranked_bb AS (
+    SELECT
+        bp.id,
+        bp.project_identity_id,
+        bp.program_title_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY bp.project_identity_id
+            ORDER BY bb.revision_number DESC, COALESCE(bb.revision_year, 0) DESC, bb.created_at DESC, bp.created_at DESC
+        ) AS rn
+    FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
+    WHERE bp.status = 'active'
+      AND (sqlc.narg('period_id')::uuid IS NULL OR bb.period_id = sqlc.narg('period_id')::uuid)
+),
+selected_bb AS (
+    SELECT id, project_identity_id, program_title_id
+    FROM ranked_bb
+    WHERE sqlc.arg('include_history')::boolean OR rn = 1
+),
+ranked_gb AS (
+    SELECT
+        gp.id,
+        gp.program_title_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY gp.gb_project_identity_id
+            ORDER BY gb.revision_number DESC, gb.created_at DESC, gp.created_at DESC
+        ) AS rn
+    FROM gb_project gp
+    JOIN green_book gb ON gb.id = gp.green_book_id
+    WHERE gp.status = 'active'
+      AND (sqlc.narg('publish_year')::int IS NULL OR gb.publish_year = sqlc.narg('publish_year')::int)
+      AND (
+          sqlc.narg('period_id')::uuid IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_bb_project gbp
+              JOIN bb_project bp ON bp.id = gbp.bb_project_id
+              JOIN blue_book bb ON bb.id = bp.blue_book_id
+              WHERE gbp.gb_project_id = gp.id
+                AND bb.period_id = sqlc.narg('period_id')::uuid
+          )
+      )
+),
+selected_gb AS (
+    SELECT
+        rg.id,
+        COALESCE(
+            rg.program_title_id,
+            (
+                SELECT bp.program_title_id
+                FROM gb_project_bb_project gbp
+                JOIN bb_project bp ON bp.id = gbp.bb_project_id
+                WHERE gbp.gb_project_id = rg.id
+                  AND bp.program_title_id IS NOT NULL
+                ORDER BY bp.created_at DESC
+                LIMIT 1
+            )
+        ) AS program_title_id
+    FROM ranked_gb rg
+    WHERE sqlc.arg('include_history')::boolean OR rn = 1
+),
+selected_dk AS (
+    SELECT DISTINCT
+        dp.id,
+        COALESCE(
+            dp.program_title_id,
+            (
+                SELECT sg.program_title_id
+                FROM dk_project_gb_project dpg
+                JOIN selected_gb sg ON sg.id = dpg.gb_project_id
+                WHERE dpg.dk_project_id = dp.id
+                  AND sg.program_title_id IS NOT NULL
+                ORDER BY sg.id
+                LIMIT 1
+            )
+        ) AS program_title_id
+    FROM dk_project dp
+    WHERE EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dpg
+        JOIN selected_gb sg ON sg.id = dpg.gb_project_id
+        WHERE dpg.dk_project_id = dp.id
+    )
+),
+selected_la AS (
+    SELECT
+        la.id,
+        la.amount_usd,
+        COALESCE(
+            dp.program_title_id,
+            (
+                SELECT sg.program_title_id
+                FROM dk_project_gb_project dpg
+                JOIN selected_gb sg ON sg.id = dpg.gb_project_id
+                WHERE dpg.dk_project_id = dp.id
+                  AND sg.program_title_id IS NOT NULL
+                ORDER BY sg.id
+                LIMIT 1
+            )
+        ) AS program_title_id
+    FROM loan_agreement la
+    JOIN dk_project dp ON dp.id = la.dk_project_id
+    WHERE EXISTS (
+        SELECT 1
+        FROM dk_project_gb_project dpg
+        JOIN selected_gb sg ON sg.id = dpg.gb_project_id
+        WHERE dpg.dk_project_id = la.dk_project_id
+    )
+),
+stage_rows AS (
+    SELECT
+        'BB'::text AS stage,
+        COALESCE(pt.id::text, '')::text AS program_title_id,
+        COALESCE(pt.title, 'Tanpa Program Title')::text AS program_title,
+        COUNT(DISTINCT sb.id)::bigint AS project_count,
+        COALESCE(SUM(bpc.amount_usd), 0)::numeric AS amount_usd
+    FROM selected_bb sb
+    LEFT JOIN program_title pt ON pt.id = sb.program_title_id
+    LEFT JOIN bb_project_cost bpc ON bpc.bb_project_id = sb.id AND bpc.funding_type = 'Foreign'
+    GROUP BY COALESCE(pt.id::text, ''), COALESCE(pt.title, 'Tanpa Program Title')
+
+    UNION ALL
+    SELECT
+        'GB'::text AS stage,
+        COALESCE(pt.id::text, '')::text AS program_title_id,
+        COALESCE(pt.title, 'Tanpa Program Title')::text AS program_title,
+        COUNT(DISTINCT sg.id)::bigint AS project_count,
+        COALESCE(SUM(gfs.loan_usd + gfs.grant_usd), 0)::numeric AS amount_usd
+    FROM selected_gb sg
+    LEFT JOIN program_title pt ON pt.id = sg.program_title_id
+    LEFT JOIN gb_funding_source gfs ON gfs.gb_project_id = sg.id
+    GROUP BY COALESCE(pt.id::text, ''), COALESCE(pt.title, 'Tanpa Program Title')
+
+    UNION ALL
+    SELECT
+        'DK'::text AS stage,
+        COALESCE(pt.id::text, '')::text AS program_title_id,
+        COALESCE(pt.title, 'Tanpa Program Title')::text AS program_title,
+        COUNT(DISTINCT sd.id)::bigint AS project_count,
+        COALESCE(SUM(dfd.amount_usd + dfd.grant_usd), 0)::numeric AS amount_usd
+    FROM selected_dk sd
+    LEFT JOIN program_title pt ON pt.id = sd.program_title_id
+    LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = sd.id
+    GROUP BY COALESCE(pt.id::text, ''), COALESCE(pt.title, 'Tanpa Program Title')
+
+    UNION ALL
+    SELECT
+        'LA'::text AS stage,
+        COALESCE(pt.id::text, '')::text AS program_title_id,
+        COALESCE(pt.title, 'Tanpa Program Title')::text AS program_title,
+        COUNT(DISTINCT sl.id)::bigint AS project_count,
+        COALESCE(SUM(sl.amount_usd), 0)::numeric AS amount_usd
+    FROM selected_la sl
+    LEFT JOIN program_title pt ON pt.id = sl.program_title_id
+    GROUP BY COALESCE(pt.id::text, ''), COALESCE(pt.title, 'Tanpa Program Title')
+)
+SELECT
+    stage,
+    program_title_id,
+    program_title,
+    project_count,
+    amount_usd
+FROM stage_rows
+ORDER BY
+    program_title ASC,
+    CASE stage WHEN 'BB' THEN 1 WHEN 'GB' THEN 2 WHEN 'DK' THEN 3 ELSE 4 END ASC;
 
 -- name: GetDashboardExecutiveTopInstitutions :many
 WITH RECURSIVE institution_ancestors AS (
