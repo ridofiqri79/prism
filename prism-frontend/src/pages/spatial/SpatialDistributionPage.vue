@@ -26,6 +26,7 @@ import type {
   SpatialDistributionParams,
   SpatialDistributionRegionMetric,
 } from '@/types/spatial-distribution.types'
+import { getPipelineStatusLabel, getPipelineStatusSeverity } from '@/utils/status-labels'
 
 type FilterOption<T extends string> = {
   label: string
@@ -101,14 +102,6 @@ const loanTypeOptions: Array<FilterOption<LenderType>> = [
   { label: 'Multilateral', value: 'Multilateral' },
   { label: 'KSA', value: 'KSA' },
 ]
-
-const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
-  BB: 'Blue Book',
-  GB: 'Green Book',
-  DK: 'Daftar Kegiatan',
-  LA: 'Loan Agreement',
-  Monitoring: 'Monitoring Disbursement',
-}
 
 const numberFormatter = new Intl.NumberFormat('id-ID')
 const compactUsdFormatter = new Intl.NumberFormat('en-US', {
@@ -515,13 +508,11 @@ function ensureLoanTypeSelection() {
 }
 
 function pipelineStatusLabel(status: ProjectPipelineStatus) {
-  return pipelineStatusLabels[status]
+  return getPipelineStatusLabel(status)
 }
 
 function statusSeverity(status: ProjectPipelineStatus) {
-  if (status === 'Monitoring') return 'success'
-  if (status === 'LA' || status === 'DK') return 'info'
-  return 'warning'
+  return getPipelineStatusSeverity(status)
 }
 
 function goToProjectDetail(projectID: string) {

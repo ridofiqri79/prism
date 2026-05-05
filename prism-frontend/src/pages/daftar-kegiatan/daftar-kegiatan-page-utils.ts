@@ -1,25 +1,10 @@
-import type { ZodError } from 'zod'
+import { formatDate } from '@/utils/formatters'
+import { toFormErrors } from '@/utils/form-errors'
 
-export type FormErrors<T extends string> = Partial<Record<T, string>>
+export type { FormErrors } from '@/utils/form-errors'
 
-export function toFormErrors<T extends string>(error: ZodError, allowedFields: T[]) {
-  const allowed = new Set<string>(allowedFields)
-  const errors: FormErrors<T> = {}
-
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as T
-    if (allowed.has(field) && !errors[field]) {
-      errors[field] = issue.message
-    }
-  }
-
-  return errors
-}
-
-export function formatDate(date?: string | null) {
-  if (!date) return '-'
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(date))
-}
+// Re-export shared utilities for backward compatibility
+export { formatDate, toFormErrors }
 
 export function joinNames(items?: { name?: string; title?: string; project_name?: string; gb_code?: string }[]) {
   if (!items?.length) return '-'

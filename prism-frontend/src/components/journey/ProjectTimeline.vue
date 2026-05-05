@@ -4,6 +4,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import AbsorptionBar from '@/components/monitoring/AbsorptionBar.vue'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
+import { formatDate } from '@/utils/formatters'
 import type {
   DKProjectJourney,
   GBProjectJourney,
@@ -41,12 +42,7 @@ function nodeClass(state: 'completed' | 'pending' | 'extended') {
   return 'text-surface-400'
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
-}
+
 
 function lenderLabel(lender?: JourneyFundingSource['lender']) {
   return lender?.short_name || lender?.name || 'Lender'

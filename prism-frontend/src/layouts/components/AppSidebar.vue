@@ -21,6 +21,20 @@ interface NavigationGroup {
 
 const SIDEBAR_COLLAPSED_KEY = 'prism-sidebar-collapsed'
 
+const props = withDefaults(
+  defineProps<{
+    /** Controls the mobile drawer open state (managed by AppLayout) */
+    isMobileOpen?: boolean
+  }>(),
+  {
+    isMobileOpen: false,
+  },
+)
+
+const emit = defineEmits<{
+  close: []
+}>()
+
 const route = useRoute()
 const auth = useAuthStore()
 const { can } = usePermission()
@@ -45,12 +59,24 @@ watch(isCollapsed, (value) => {
   window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(value))
 })
 
+// Close drawer on Escape key
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && props.isMobileOpen) {
+    emit('close')
+    return
+  }
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
+  event.preventDefault()
+  isCollapsed.value = false
+  window.setTimeout(() => searchInput.value?.focus(), 0)
+}
+
 onMounted(() => {
-  window.addEventListener('keydown', handleSearchShortcut)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleSearchShortcut)
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 function canAccessItem(item: NavigationItem) {
@@ -202,20 +228,24 @@ function toggleGroup(group: NavigationGroup) {
     [group.label]: !isGroupExpanded(group),
   }
 }
-
-function handleSearchShortcut(event: KeyboardEvent) {
-  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
-
-  event.preventDefault()
-  isCollapsed.value = false
-  window.setTimeout(() => searchInput.value?.focus(), 0)
-}
 </script>
 
 <template>
+  <!--
+    Desktop (lg+): static sidebar with collapse/expand toggle — unchanged from before.
+    Mobile/tablet (< lg): fixed overlay drawer controlled by isMobileOpen prop from AppLayout.
+  -->
   <aside
-    class="prism-sidebar hidden shrink-0 border-r transition-[width] duration-200 lg:flex lg:flex-col"
-    :class="isCollapsed ? 'w-[68px]' : 'w-[288px]'"
+    class="prism-sidebar shrink-0 border-r transition-[width,transform] duration-200"
+    :class="[
+      // Desktop layout — always visible, no transform
+      'lg:relative lg:flex lg:translate-x-0 lg:flex-col',
+      isCollapsed ? 'lg:w-[68px]' : 'lg:w-[288px]',
+      // Mobile layout — overlay drawer
+      'fixed inset-y-0 left-0 z-50 flex w-[288px] flex-col',
+      isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+    ]"
+    :aria-hidden="!isMobileOpen ? 'true' : undefined"
   >
     <div
       class="prism-sidebar-header flex items-center border-b"
@@ -237,6 +267,17 @@ function handleSearchShortcut(event: KeyboardEvent) {
             <p class="prism-sidebar-muted truncate text-xs">{{ accountMeta }}</p>
           </div>
         </div>
+
+        <!-- Close button visible only in mobile drawer mode -->
+        <button
+          v-if="isMobileOpen"
+          type="button"
+          class="prism-sidebar-icon-button ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors lg:hidden"
+          aria-label="Tutup navigasi"
+          @click="emit('close')"
+        >
+          <i class="pi pi-times text-sm" />
+        </button>
       </div>
     </div>
 
@@ -345,7 +386,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
     <div class="prism-sidebar-footer border-t p-3" :class="isCollapsed ? 'flex justify-center' : ''">
       <button
         type="button"
-        class="prism-sidebar-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+        class="prism-sidebar-icon-button hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors lg:flex"
         :class="isCollapsed ? '' : 'ml-auto'"
         :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import { formatDateTime } from '@/utils/formatters'
 import type { ProjectAuditEntry } from '@/types/audit.types'
 
 interface ProjectAuditRailItem extends ProjectAuditEntry {
@@ -20,16 +21,7 @@ function actionSeverity(action: string) {
   return 'info'
 }
 
-function formatDateTime(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
 
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
 </script>
 
 <template>

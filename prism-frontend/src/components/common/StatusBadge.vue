@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Tag from 'primevue/tag'
+import { getStatusLabel, getStatusSeverity, type StatusDomain } from '@/utils/status-labels'
 
 const props = defineProps<{
   status: string
+  /** Override label — if provided, skips the status-labels lookup */
   label?: string
+  /** Domain context for domain-specific label/severity resolution */
+  domain?: StatusDomain
 }>()
 
-const severity = computed(() => {
-  const normalized = props.status.toLowerCase()
-
-  if (normalized === 'active') return 'success'
-  if (normalized === 'deleted') return 'danger'
-  if (normalized === 'superseded') return 'secondary'
-  if (normalized === 'extended') return 'warn'
-  if (['tw1', 'tw2', 'tw3', 'tw4'].includes(normalized)) return 'info'
-
-  return 'secondary'
-})
+const resolvedSeverity = computed(() => getStatusSeverity(props.status, props.domain ?? 'default'))
+const resolvedLabel = computed(() => props.label ?? getStatusLabel(props.status, props.domain ?? 'default'))
 </script>
 
 <template>
-  <Tag :severity="severity" :value="label ?? status" rounded />
+  <Tag :severity="resolvedSeverity" :value="resolvedLabel" rounded />
 </template>

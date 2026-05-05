@@ -39,7 +39,7 @@ function updateRow(index: number, patch: Partial<GBActivityPayload>) {
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+  <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
     <table class="w-full min-w-[56rem] text-left text-sm">
       <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
         <tr>

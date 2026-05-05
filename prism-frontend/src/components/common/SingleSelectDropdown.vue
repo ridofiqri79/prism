@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import InputText from 'primevue/inputtext'
+import { useDropdownOverlay, useOptionResolver } from '@/composables/useDropdownOverlay'
 
 type SingleSelectOption = Record<string, unknown>
 type SelectValue = unknown
@@ -92,10 +93,17 @@ type SelectedOption = {
 const rootRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const filterInputRef = ref<HTMLInputElement | null>(null)
-const isOpen = ref(false)
 const filterText = ref('')
-const floatingOverlayStyle = ref<Record<string, string | number>>({})
-let hasFloatingListeners = false
+
+// --------------- shared composables ---------------
+const { toOptionRecord, getOptionLabel, getOptionValue, getOptionDisabled, stableKey, isSameValue } =
+  useOptionResolver(props)
+
+const overlay = useDropdownOverlay(rootRef, panelRef, filterInputRef, props, {
+  show: () => emit('show'),
+  hide: () => emit('hide'),
+})
+// --------------------------------------------------
 
 const normalizedValue = computed(() => (props.modelValue === undefined ? null : props.modelValue))
 
@@ -107,51 +115,28 @@ const hasSelectedValue = computed(
 )
 
 const selectedOption = computed<SelectedOption | null>(() => {
-  if (!hasSelectedValue.value) {
-    return null
-  }
+  if (!hasSelectedValue.value) return null
 
   const option = props.options.find((item) =>
     isSameValue(getOptionValue(item), normalizedValue.value),
   )
 
   return option
-    ? {
-        value: normalizedValue.value,
-        label: getOptionLabel(option),
-      }
-    : {
-        value: normalizedValue.value,
-        label: String(normalizedValue.value ?? ''),
-      }
+    ? { value: normalizedValue.value, label: getOptionLabel(option) }
+    : { value: normalizedValue.value, label: String(normalizedValue.value ?? '') }
 })
 
 const searchPlaceholder = computed(() => props.filterPlaceholder ?? `Cari ${props.placeholder}`)
 
 const visibleOptions = computed(() => {
   const search = filterText.value.trim().toLowerCase()
-
-  if (!props.filter || !search) {
-    return props.options
-  }
-
+  if (!props.filter || !search) return props.options
   return props.options.filter((option) =>
-    [getOptionLabel(option), String(getOptionValue(option) ?? '')].some((value) =>
-      value.toLowerCase().includes(search),
+    [getOptionLabel(option), String(getOptionValue(option) ?? '')].some((v) =>
+      v.toLowerCase().includes(search),
     ),
   )
 })
-
-const overlayInlineStyle = computed(() => ({
-  minWidth: '100%',
-  ...props.overlayStyle,
-}))
-
-const shouldTeleportPanel = computed(() => props.appendTo !== 'self')
-
-const teleportTarget = computed(() =>
-  props.appendTo === 'self' ? 'body' : props.appendTo,
-)
 
 const controlClass = computed(() =>
   [
@@ -163,99 +148,9 @@ const controlClass = computed(() =>
   ].join(' '),
 )
 
-function toOptionRecord(option: SelectValue): SingleSelectOption {
-  return option && typeof option === 'object' ? (option as SingleSelectOption) : { value: option }
-}
-
-function resolveField(option: SelectValue, field?: string) {
-  if (!field) {
-    return undefined
-  }
-
-  return field.split('.').reduce<unknown>((value, key) => {
-    if (value && typeof value === 'object' && key in value) {
-      return (value as Record<string, unknown>)[key]
-    }
-
-    return undefined
-  }, toOptionRecord(option))
-}
-
-function getOptionLabel(option: SelectValue) {
-  const value = resolveField(option, props.optionLabel)
-
-  return String(value ?? option ?? '')
-}
-
-function getOptionValue(option: SelectValue) {
-  return props.optionValue ? resolveField(option, props.optionValue) : option
-}
-
-function getOptionDisabled(option: SelectValue) {
-  const value = props.optionDisabled ? resolveField(option, props.optionDisabled) : false
-
-  return Boolean(value)
-}
-
-function stableKey(value: SelectValue) {
-  if (value === null || value === undefined) {
-    return ''
-  }
-
-  if (typeof value === 'object') {
-    return JSON.stringify(value)
-  }
-
-  return String(value)
-}
-
-function isSameValue(left: SelectValue, right: SelectValue) {
-  return stableKey(left) === stableKey(right)
-}
-
 function isSelected(option: SelectValue) {
-  if (!hasSelectedValue.value) {
-    return false
-  }
-
+  if (!hasSelectedValue.value) return false
   return isSameValue(getOptionValue(option), normalizedValue.value)
-}
-
-function openPanel() {
-  if (props.disabled || isOpen.value) {
-    return
-  }
-
-  isOpen.value = true
-  emit('show')
-
-  void nextTick(() => {
-    updateFloatingOverlayStyle()
-    addFloatingListeners()
-
-    if (props.filter) {
-      filterInputRef.value?.focus()
-    }
-  })
-}
-
-function closePanel() {
-  if (!isOpen.value) {
-    return
-  }
-
-  isOpen.value = false
-  removeFloatingListeners()
-  emit('hide')
-}
-
-function togglePanel() {
-  if (isOpen.value) {
-    closePanel()
-    return
-  }
-
-  openPanel()
 }
 
 function updateSelected(value: SelectValue | null, originalEvent: Event | null) {
@@ -264,98 +159,29 @@ function updateSelected(value: SelectValue | null, originalEvent: Event | null) 
 }
 
 function chooseOption(option: SelectValue, event: Event) {
-  if (props.disabled || getOptionDisabled(option)) {
-    return
-  }
+  if (props.disabled || getOptionDisabled(option)) return
 
   const value = getOptionValue(option)
 
   if (isSelected(option)) {
-    closePanel()
+    overlay.closePanel()
     return
   }
 
   updateSelected(value, event)
-  closePanel()
+  overlay.closePanel()
 }
 
 function clearSelection(event: Event) {
-  if (props.disabled) {
-    return
-  }
-
+  if (props.disabled) return
   updateSelected(null, event)
 }
 
 function handleFilterInput(event: Event) {
   const value = (event.target as HTMLInputElement).value
-
   filterText.value = value
   emit('filter', { originalEvent: event, value })
 }
-
-function updateFloatingOverlayStyle() {
-  if (!shouldTeleportPanel.value || !rootRef.value) {
-    return
-  }
-
-  const rect = rootRef.value.getBoundingClientRect()
-
-  floatingOverlayStyle.value = {
-    ...props.overlayStyle,
-    position: 'fixed',
-    left: `${rect.left}px`,
-    top: `${rect.bottom + 8}px`,
-    width: `${rect.width}px`,
-    minWidth: `${rect.width}px`,
-    zIndex: 1200,
-  }
-}
-
-function addFloatingListeners() {
-  if (!shouldTeleportPanel.value || hasFloatingListeners) {
-    return
-  }
-
-  window.addEventListener('resize', updateFloatingOverlayStyle)
-  window.addEventListener('scroll', updateFloatingOverlayStyle, true)
-  hasFloatingListeners = true
-}
-
-function removeFloatingListeners() {
-  if (!hasFloatingListeners) {
-    return
-  }
-
-  window.removeEventListener('resize', updateFloatingOverlayStyle)
-  window.removeEventListener('scroll', updateFloatingOverlayStyle, true)
-  hasFloatingListeners = false
-}
-
-function handleDocumentPointerDown(event: PointerEvent) {
-  const target = event.target as Node
-
-  if (!rootRef.value?.contains(target) && !panelRef.value?.contains(target)) {
-    closePanel()
-  }
-}
-
-function handleDocumentKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    closePanel()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('pointerdown', handleDocumentPointerDown)
-  document.addEventListener('keydown', handleDocumentKeydown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', handleDocumentPointerDown)
-  document.removeEventListener('keydown', handleDocumentKeydown)
-  removeFloatingListeners()
-})
 </script>
 
 <template>
@@ -363,23 +189,18 @@ onBeforeUnmount(() => {
     <div
       role="combobox"
       aria-haspopup="listbox"
-      :aria-expanded="isOpen"
+      :aria-expanded="overlay.isOpen.value"
       :aria-invalid="invalid || undefined"
       :aria-label="ariaLabel ?? undefined"
       :aria-labelledby="ariaLabelledby ?? undefined"
       :tabindex="disabled ? -1 : 0"
       :class="controlClass"
-      @click.prevent="togglePanel"
-      @keydown.enter.prevent="togglePanel"
-      @keydown.space.prevent="togglePanel"
-      @keydown.down.prevent="openPanel"
+      @click.prevent="overlay.togglePanel"
+      @keydown.enter.prevent="overlay.togglePanel"
+      @keydown.space.prevent="overlay.togglePanel"
+      @keydown.down.prevent="overlay.openPanel"
     >
-      <slot
-        name="value"
-        :value="normalizedValue"
-        :placeholder="placeholder"
-        :selected-option="selectedOption"
-      >
+      <slot name="value" :value="normalizedValue" :placeholder="placeholder" :selected-option="selectedOption">
         <div v-if="selectedOption" class="min-w-0 flex-1 pr-1">
           <span
             class="inline-flex max-w-full items-center rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700"
@@ -403,25 +224,23 @@ onBeforeUnmount(() => {
         </button>
         <span
           class="pi shrink-0 text-xs text-surface-500"
-          :class="isOpen ? 'pi-chevron-up' : 'pi-chevron-down'"
+          :class="overlay.isOpen.value ? 'pi-chevron-up' : 'pi-chevron-down'"
           aria-hidden="true"
         />
       </div>
     </div>
 
-    <Teleport v-if="isOpen && shouldTeleportPanel" :to="teleportTarget">
+    <!-- Teleported (floating) panel -->
+    <Teleport v-if="overlay.isOpen.value && overlay.shouldTeleportPanel.value" :to="overlay.teleportTarget.value">
       <div
         ref="panelRef"
         class="rounded-lg border border-surface-200 bg-white p-3 shadow-lg"
         :class="[panelClass, overlayClass]"
-        :style="floatingOverlayStyle"
+        :style="overlay.floatingOverlayStyle.value"
       >
         <label v-if="filter" class="relative block w-full">
           <span class="sr-only">{{ searchPlaceholder }}</span>
-          <i
-            class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400"
-            aria-hidden="true"
-          />
+          <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" aria-hidden="true" />
           <InputText
             :id="inputId ?? undefined"
             ref="filterInputRef"
@@ -431,16 +250,11 @@ onBeforeUnmount(() => {
             :aria-label="searchPlaceholder"
             :disabled="disabled"
             @input="handleFilterInput"
-            @keydown.escape.stop.prevent="closePanel"
+            @keydown.escape.stop.prevent="overlay.closePanel"
           />
         </label>
 
-        <div
-          role="listbox"
-          class="space-y-1 overflow-y-auto pr-1"
-          :class="{ 'mt-3': filter }"
-          :style="{ maxHeight: scrollHeight }"
-        >
+        <div role="listbox" class="space-y-1 overflow-y-auto pr-1" :class="{ 'mt-3': filter }" :style="{ maxHeight: scrollHeight }">
           <button
             v-for="(option, index) in visibleOptions"
             :key="stableKey(getOptionValue(option))"
@@ -449,58 +263,36 @@ onBeforeUnmount(() => {
             :aria-selected="isSelected(option)"
             :disabled="disabled || getOptionDisabled(option)"
             class="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition"
-            :class="
-              isSelected(option)
-                ? 'border-primary-200 bg-primary-50 text-primary-800'
-                : getOptionDisabled(option)
-                  ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400'
-                  : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'
-            "
+            :class="isSelected(option) ? 'border-primary-200 bg-primary-50 text-primary-800' : getOptionDisabled(option) ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400' : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'"
             @click="chooseOption(option, $event)"
           >
             <div class="min-w-0 flex-1">
-              <slot
-                name="option"
-                :option="toOptionRecord(option)"
-                :selected="isSelected(option)"
-                :index="index"
-              >
+              <slot name="option" :option="toOptionRecord(option)" :selected="isSelected(option)" :index="index">
                 <span class="block truncate font-medium">{{ getOptionLabel(option) }}</span>
               </slot>
             </div>
-            <span
-              v-if="isSelected(option)"
-              class="pi pi-check shrink-0 text-sm text-primary-600"
-              aria-hidden="true"
-            />
+            <span v-if="isSelected(option)" class="pi pi-check shrink-0 text-sm text-primary-600" aria-hidden="true" />
           </button>
 
-          <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
-            Memuat data
-          </p>
-          <p
-            v-else-if="visibleOptions.length === 0"
-            class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500"
-          >
+          <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">Memuat data</p>
+          <p v-else-if="visibleOptions.length === 0" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
             {{ filterText ? emptyFilterMessage : emptyMessage }}
           </p>
         </div>
       </div>
     </Teleport>
 
+    <!-- Inline (non-teleported) panel -->
     <div
-      v-else-if="isOpen"
+      v-else-if="overlay.isOpen.value"
       ref="panelRef"
       class="absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-surface-200 bg-white p-3 shadow-lg"
       :class="[panelClass, overlayClass]"
-      :style="overlayInlineStyle"
+      :style="overlay.overlayInlineStyle.value"
     >
       <label v-if="filter" class="relative block w-full">
         <span class="sr-only">{{ searchPlaceholder }}</span>
-        <i
-          class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400"
-          aria-hidden="true"
-        />
+        <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" aria-hidden="true" />
         <InputText
           :id="inputId ?? undefined"
           ref="filterInputRef"
@@ -510,16 +302,11 @@ onBeforeUnmount(() => {
           :aria-label="searchPlaceholder"
           :disabled="disabled"
           @input="handleFilterInput"
-          @keydown.escape.stop.prevent="closePanel"
+          @keydown.escape.stop.prevent="overlay.closePanel"
         />
       </label>
 
-      <div
-        role="listbox"
-        class="space-y-1 overflow-y-auto pr-1"
-        :class="{ 'mt-3': filter }"
-        :style="{ maxHeight: scrollHeight }"
-      >
+      <div role="listbox" class="space-y-1 overflow-y-auto pr-1" :class="{ 'mt-3': filter }" :style="{ maxHeight: scrollHeight }">
         <button
           v-for="(option, index) in visibleOptions"
           :key="stableKey(getOptionValue(option))"
@@ -528,39 +315,19 @@ onBeforeUnmount(() => {
           :aria-selected="isSelected(option)"
           :disabled="disabled || getOptionDisabled(option)"
           class="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition"
-          :class="
-            isSelected(option)
-              ? 'border-primary-200 bg-primary-50 text-primary-800'
-              : getOptionDisabled(option)
-                ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400'
-                : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'
-          "
+          :class="isSelected(option) ? 'border-primary-200 bg-primary-50 text-primary-800' : getOptionDisabled(option) ? 'cursor-not-allowed border-surface-100 bg-surface-50 text-surface-400' : 'border-surface-200 bg-white text-surface-700 hover:border-primary-200 hover:bg-surface-50'"
           @click="chooseOption(option, $event)"
         >
           <div class="min-w-0 flex-1">
-            <slot
-              name="option"
-              :option="toOptionRecord(option)"
-              :selected="isSelected(option)"
-              :index="index"
-            >
+            <slot name="option" :option="toOptionRecord(option)" :selected="isSelected(option)" :index="index">
               <span class="block truncate font-medium">{{ getOptionLabel(option) }}</span>
             </slot>
           </div>
-          <span
-            v-if="isSelected(option)"
-            class="pi pi-check shrink-0 text-sm text-primary-600"
-            aria-hidden="true"
-          />
+          <span v-if="isSelected(option)" class="pi pi-check shrink-0 text-sm text-primary-600" aria-hidden="true" />
         </button>
 
-        <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
-          Memuat data
-        </p>
-        <p
-          v-else-if="visibleOptions.length === 0"
-          class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500"
-        >
+        <p v-if="loading" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">Memuat data</p>
+        <p v-else-if="visibleOptions.length === 0" class="rounded-md bg-surface-50 px-3 py-2 text-sm text-surface-500">
           {{ filterText ? emptyFilterMessage : emptyMessage }}
         </p>
       </div>

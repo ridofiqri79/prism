@@ -19,6 +19,7 @@ import ValueChipList from '@/components/common/ValueChipList.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
+import { formatDateTime } from '@/utils/formatters'
 import { formatGreenBookStatus } from './green-book-page-utils'
 
 const route = useRoute()
@@ -61,17 +62,6 @@ async function loadData() {
 
 function historyRoute(item: GBProjectHistoryItem) {
   return { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } }
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
 }
 
 function bbProjectRoute(bbProject: BBProjectSummary) {

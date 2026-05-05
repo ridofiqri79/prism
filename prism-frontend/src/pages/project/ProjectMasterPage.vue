@@ -31,6 +31,7 @@ import type {
   ProjectPipelineStatus,
   ProjectStatus,
 } from '@/types/project.types'
+import { getPipelineStatusLabel } from '@/utils/status-labels'
 
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
@@ -143,13 +144,6 @@ const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus
   { label: 'Monitoring', value: 'Monitoring' },
 ]
 
-const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
-  BB: 'Blue Book',
-  GB: 'Green Book',
-  DK: 'Daftar Kegiatan',
-  LA: 'Loan Agreement',
-  Monitoring: 'Monitoring',
-}
 const fundingSummaryCards = computed(() => [
   {
     label: 'Total Pinjaman',
@@ -280,7 +274,7 @@ function listLabel(values: string[]) {
 }
 
 function statusLabel(project: ProjectMasterRow) {
-  return `${project.project_status} - ${pipelineStatusLabels[project.pipeline_status]}`
+  return `${project.project_status} - ${getPipelineStatusLabel(project.pipeline_status)}`
 }
 
 function sortIcon(field: ProjectMasterSortField) {
@@ -419,7 +413,7 @@ function formatProjectFilterValue(key: string, value: unknown) {
     }
 
     if (key === 'pipeline_statuses') {
-      return selectedLabelSummary(value.map((item) => pipelineStatusLabels[item as ProjectPipelineStatus] ?? item))
+      return selectedLabelSummary(value.map((item) => getPipelineStatusLabel(item as ProjectPipelineStatus)))
     }
 
     return selectedLabelSummary(value.map(String))

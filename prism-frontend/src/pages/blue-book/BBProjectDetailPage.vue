@@ -19,6 +19,7 @@ import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
+import { formatDateTime } from '@/utils/formatters'
 import { formatBlueBookStatus, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
@@ -100,17 +101,6 @@ function revisionChangeMeta(item: BBProjectHistoryItem) {
   if (item.last_changed_at) parts.push(formatDateTime(item.last_changed_at))
 
   return parts.join(' - ') || 'Belum ada catatan perubahan'
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
 }
 
 function hasRichText(value?: string | null) {

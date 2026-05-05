@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import TreeTable from 'primevue/treetable'
 import type { TreeNode } from 'primevue/treenode'
 import EmptyState from '@/components/common/EmptyState.vue'
+import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
-
-interface PageEvent {
-  page: number
-  rows: number
-}
 
 interface SortEvent {
   sortField?: unknown
@@ -44,7 +39,6 @@ const emit = defineEmits<{
   sort: [value: { sort: string; order: SortOrder }]
 }>()
 
-const first = computed(() => (props.page - 1) * props.limit)
 const tableSortOrder = computed(() => {
   if (!props.sortOrder) return undefined
   return props.sortOrder === 'asc' ? 1 : -1
@@ -52,15 +46,6 @@ const tableSortOrder = computed(() => {
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.value.length === 0)
 const refreshingRows = computed(() => props.loading && props.value.length > 0)
-
-function handlePage(event: PageEvent) {
-  if (event.rows !== props.limit) {
-    emit('update:limit', event.rows)
-    return
-  }
-
-  emit('update:page', event.page + 1)
-}
 
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
@@ -115,12 +100,12 @@ function handleExpandedKeys(value: ExpandedKeys) {
       </TreeTable>
     </TableReloadShell>
 
-    <Paginator
-      :first="first"
-      :rows="limit"
-      :total-records="total"
-      :rows-per-page-options="[10, 20, 50, 100]"
-      @page="handlePage"
+    <ListPaginationFooter
+      :page="page"
+      :limit="limit"
+      :total="total"
+      @update:page="(value) => emit('update:page', value)"
+      @update:limit="(value) => { emit('update:limit', value); emit('update:page', 1) }"
     />
   </div>
 </template>

@@ -13,7 +13,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+  <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
     <div class="flex items-center justify-between border-b border-surface-200 px-4 py-3">
       <h2 class="font-semibold text-surface-950">Letter of Intent</h2>
       <Button

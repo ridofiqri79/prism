@@ -17,12 +17,15 @@ const props = withDefaults(
     activeFilters?: ActiveFilterPill[]
     filterCount?: number
     initiallyOpen?: boolean
+    /** Hide the filter toggle button — use for search-only bars without a filter panel */
+    hideFilterButton?: boolean
   }>(),
   {
     searchPlaceholder: 'Cari data',
     activeFilters: () => [],
     filterCount: undefined,
     initiallyOpen: false,
+    hideFilterButton: false,
   },
 )
 
@@ -64,6 +67,7 @@ function applyFilters() {
       </label>
 
       <Button
+        v-if="!hideFilterButton"
         type="button"
         :label="filterButtonLabel"
         :icon="filterPanelOpen ? 'pi pi-chevron-up' : 'pi pi-sliders-h'"

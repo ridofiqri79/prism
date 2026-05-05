@@ -8,6 +8,7 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -134,15 +135,11 @@ watch(controls.search, () => {
       </template>
     </PageHeader>
 
-    <div class="rounded-lg border border-surface-200 bg-white p-4">
-      <label class="block max-w-md space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Currency</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Kode atau nama currency" />
-        </span>
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Cari kode atau nama currency"
+    />
+
 
     <DataTable
       :data="masterStore.currencies"
