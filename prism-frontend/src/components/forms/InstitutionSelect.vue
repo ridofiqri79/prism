@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import Select from 'primevue/select'
-import MultiSelect from 'primevue/multiselect'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
 import { useMasterStore } from '@/stores/master.store'
 import type { Institution } from '@/types/master.types'
 
@@ -10,12 +10,14 @@ const props = withDefaults(
     modelValue: string | string[] | null
     multiple?: boolean
     levelFilter?: string[]
+    extraOptions?: Institution[]
     placeholder?: string
     disabled?: boolean
   }>(),
   {
     multiple: false,
     levelFilter: undefined,
+    extraOptions: () => [],
     placeholder: 'Pilih instansi',
     disabled: false,
   },
@@ -32,8 +34,23 @@ const selectedValue = computed({
   set: (value: string | string[] | null) => emit('update:modelValue', value),
 })
 
+const multiSelectedValue = computed({
+  get: () => (Array.isArray(props.modelValue) ? props.modelValue : []),
+  set: (value: string[]) => emit('update:modelValue', value),
+})
+
+const mergedOptions = computed(() => {
+  const byId = new Map<string, Institution>()
+
+  for (const institution of [...masterStore.institutions, ...props.extraOptions]) {
+    byId.set(institution.id, institution)
+  }
+
+  return [...byId.values()]
+})
+
 const options = computed(() =>
-  masterStore.institutions
+  mergedOptions.value
     .filter((institution) => !props.levelFilter || props.levelFilter.includes(institution.level))
     .map((institution) => ({
       ...institution,
@@ -41,21 +58,44 @@ const options = computed(() =>
     })),
 )
 
+function lookupParams(search?: string) {
+  return {
+    limit: 50,
+    search: search?.trim() || undefined,
+    level: props.levelFilter,
+    sort: 'name',
+    order: 'asc' as const,
+  }
+}
+
+function loadOptions(search?: string, force = true) {
+  void masterStore.fetchInstitutions(force, lookupParams(search))
+}
+
 function formatInstitutionLabel(institution: Institution) {
-  return institution.short_name
+  const baseLabel = institution.short_name
     ? `${institution.name} (${institution.short_name})`
     : institution.name
+  const parent = mergedOptions.value.find((item) => item.id === institution.parent_id)
+
+  if (!parent) {
+    return baseLabel
+  }
+
+  const parentLabel = parent.short_name ? `${parent.name} (${parent.short_name})` : parent.name
+
+  return `${parentLabel} / ${baseLabel}`
 }
 
 onMounted(() => {
-  void masterStore.fetchInstitutions()
+  void masterStore.fetchInstitutions(false, lookupParams())
 })
 </script>
 
 <template>
   <MultiSelect
     v-if="multiple"
-    v-model="selectedValue"
+    v-model="multiSelectedValue"
     :options="options"
     option-label="label"
     option-value="id"
@@ -63,9 +103,12 @@ onMounted(() => {
     :disabled="disabled"
     filter
     display="chip"
+    append-to="body"
+    :overlay-style="{ minWidth: '100%' }"
     class="w-full"
+    @filter="loadOptions($event.value)"
   />
-  <Select
+  <SingleSelectDropdown
     v-else
     v-model="selectedValue"
     :options="options"
@@ -74,7 +117,9 @@ onMounted(() => {
     :placeholder="placeholder"
     :disabled="disabled"
     filter
-    show-clear
+    append-to="body"
+    :overlay-style="{ minWidth: '100%' }"
     class="w-full"
+    @filter="loadOptions($event.value)"
   />
 </template>

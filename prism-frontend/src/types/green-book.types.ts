@@ -18,6 +18,7 @@ export interface GreenBook {
   replaces_green_book_id?: string | null
   revision_number: number
   status: GreenBookStatus
+  project_count: number
   created_at?: string
   updated_at?: string
 }
@@ -26,6 +27,12 @@ export interface GreenBookPayload {
   publish_year: number
   replaces_green_book_id?: string | null
   revision_number: number
+  status: GreenBookStatus
+}
+
+export interface ImportGBProjectsFromGreenBookPayload {
+  source_green_book_id: string
+  project_ids: string[]
 }
 
 export interface GreenBookListParams extends ListParams {
@@ -77,6 +84,13 @@ export interface GBProject {
   has_newer_revision: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface GBProjectRevisionSourceOption extends GBProject {
+  source_green_book_id: string
+  source_green_book_label: string
+  disabled?: boolean
+  unavailable_reason?: string
 }
 
 export interface GBActivity {

@@ -4,6 +4,12 @@ type GreenBookRequest struct {
 	PublishYear         int32   `json:"publish_year" validate:"required"`
 	ReplacesGreenBookID *string `json:"replaces_green_book_id"`
 	RevisionNumber      int32   `json:"revision_number"`
+	Status              string  `json:"status"`
+}
+
+type ImportGBProjectsFromGreenBookRequest struct {
+	SourceGreenBookID string   `json:"source_green_book_id" validate:"required"`
+	ProjectIDs        []string `json:"project_ids" validate:"required,min=1"`
 }
 
 type GreenBookResponse struct {
@@ -12,6 +18,7 @@ type GreenBookResponse struct {
 	ReplacesGreenBookID *string `json:"replaces_green_book_id,omitempty"`
 	RevisionNumber      int32   `json:"revision_number"`
 	Status              string  `json:"status"`
+	ProjectCount        int64   `json:"project_count"`
 	CreatedAt           string  `json:"created_at,omitempty"`
 	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
@@ -87,6 +94,7 @@ type GBProjectResponse struct {
 	GreenBookID          string                        `json:"green_book_id"`
 	GBProjectIdentityID  string                        `json:"gb_project_identity_id"`
 	ProgramTitleID       *string                       `json:"program_title_id,omitempty"`
+	ProgramTitle         *ProgramTitleResponse         `json:"program_title,omitempty"`
 	GBCode               string                        `json:"gb_code"`
 	ProjectName          string                        `json:"project_name"`
 	Duration             *int32                        `json:"duration"`

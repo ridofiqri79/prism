@@ -6,6 +6,12 @@ type BlueBookRequest struct {
 	PublishDate        string  `json:"publish_date" validate:"required"`
 	RevisionNumber     int32   `json:"revision_number"`
 	RevisionYear       *int32  `json:"revision_year"`
+	Status             string  `json:"status"`
+}
+
+type ImportBBProjectsFromBlueBookRequest struct {
+	SourceBlueBookID string   `json:"source_blue_book_id" validate:"required"`
+	ProjectIDs       []string `json:"project_ids" validate:"required,min=1"`
 }
 
 type PeriodInfo struct {
@@ -23,6 +29,7 @@ type BlueBookResponse struct {
 	RevisionNumber     int32      `json:"revision_number"`
 	RevisionYear       *int32     `json:"revision_year"`
 	Status             string     `json:"status"`
+	ProjectCount       int64      `json:"project_count"`
 	CreatedAt          string     `json:"created_at,omitempty"`
 	UpdatedAt          string     `json:"updated_at,omitempty"`
 }
@@ -74,6 +81,7 @@ type BBProjectResponse struct {
 	BlueBookID           string                     `json:"blue_book_id"`
 	ProjectIdentityID    string                     `json:"project_identity_id"`
 	ProgramTitleID       *string                    `json:"program_title_id,omitempty"`
+	ProgramTitle         *ProgramTitleResponse      `json:"program_title,omitempty"`
 	BappenasPartners     []BappenasPartnerResponse  `json:"bappenas_partners"`
 	BBCode               string                     `json:"bb_code"`
 	ProjectName          string                     `json:"project_name"`

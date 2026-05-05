@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -16,6 +17,7 @@ import type {
   DaftarKegiatanListParams,
   DaftarKegiatanPayload,
 } from '@/types/daftar-kegiatan.types'
+import { formatApiError } from '@/utils/api-error'
 import { formatDate, toFormErrors, type FormErrors } from './daftar-kegiatan-page-utils'
 
 type DKField = keyof DaftarKegiatanPayload
@@ -26,6 +28,7 @@ interface DKFilterState {
 
 const dkStore = useDaftarKegiatanStore()
 const toast = useToast()
+const confirm = useConfirm()
 const { can } = usePermission()
 
 const listControls = useListControls<DKFilterState>({
@@ -85,6 +88,31 @@ async function save() {
   toast.success('Berhasil', 'Daftar Kegiatan berhasil dibuat')
   dialogVisible.value = false
   await loadData()
+}
+
+function deleteDaftarKegiatan(row: DaftarKegiatan) {
+  if ((row.project_count ?? 0) > 0) {
+    toast.warn('Tidak Bisa Menghapus', 'Daftar Kegiatan masih memiliki Project di Daftar Kegiatan.')
+    return
+  }
+
+  confirm.confirmDelete(`Daftar Kegiatan ${row.letter_number || row.subject}`, async () => {
+    try {
+      await dkStore.deleteDK(row.id)
+      toast.success('Berhasil', 'Daftar Kegiatan berhasil dihapus permanen')
+      if (dkStore.daftarKegiatan.length === 1 && listControls.page.value > 1) {
+        listControls.page.value -= 1
+      } else {
+        await loadData()
+      }
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Daftar Kegiatan masih memiliki Project di Daftar Kegiatan'),
+        12000,
+      )
+    }
+  })
 }
 
 watch(
@@ -158,6 +186,17 @@ onMounted(() => {
             label="Detail"
             size="small"
             outlined
+          />
+          <Button
+            v-if="can('daftar_kegiatan', 'delete') && ((row as unknown as DaftarKegiatan).project_count ?? 0) === 0"
+            v-tooltip.top="'Hapus Daftar Kegiatan'"
+            icon="pi pi-trash"
+            size="small"
+            severity="danger"
+            outlined
+            rounded
+            aria-label="Hapus Daftar Kegiatan"
+            @click="deleteDaftarKegiatan(row as unknown as DaftarKegiatan)"
           />
         </div>
         <span v-else>{{ row[column.field] || '-' }}</span>

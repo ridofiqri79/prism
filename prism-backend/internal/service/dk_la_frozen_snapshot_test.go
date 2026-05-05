@@ -25,8 +25,7 @@ func TestDKLAFrozenSnapshotResolvesLatestAtCreateAndKeepsStoredConcreteVersion(t
 	originalGBProject := env.createGBProjectWithFundingLender(t, gbService, originalGB.ID, oldBBProject.ID, "GB-001", "Flood Control GB", legacyLender)
 
 	revision1GB := env.createGreenBook(t, gbService, 1, &originalGB.ID)
-	revision1Project := env.singleGBProject(t, gbService, revision1GB.ID)
-	revision1Project = env.updateGBProjectFundingLender(t, gbService, revision1GB.ID, revision1Project.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 1", storedLender)
+	revision1Project := env.createGBProjectWithFundingLender(t, gbService, revision1GB.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 1", storedLender)
 
 	dk := env.createDaftarKegiatan(t, dkService, "DK-001")
 	_, err := dkService.CreateDKProject(env.ctx, mustParseUUID(t, dk.ID), env.dkProjectRequest(originalGBProject.ID, legacyLender))
@@ -46,8 +45,7 @@ func TestDKLAFrozenSnapshotResolvesLatestAtCreateAndKeepsStoredConcreteVersion(t
 	env.assertDKAllowedLenders(t, dkProject.ID, []queries.Lender{storedLender}, []queries.Lender{legacyLender, newerLender})
 
 	revision2GB := env.createGreenBook(t, gbService, 2, &revision1GB.ID)
-	revision2Project := env.singleGBProject(t, gbService, revision2GB.ID)
-	revision2Project = env.updateGBProjectFundingLender(t, gbService, revision2GB.ID, revision2Project.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 2", newerLender)
+	revision2Project := env.createGBProjectWithFundingLender(t, gbService, revision2GB.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 2", newerLender)
 
 	reloadedDKProject, err := dkService.GetDKProject(env.ctx, mustParseUUID(t, dk.ID), mustParseUUID(t, dkProject.ID))
 	if err != nil {

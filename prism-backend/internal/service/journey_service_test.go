@@ -66,8 +66,10 @@ func TestJourneyReturnsConcretePathRevisionMetadataAndFundingDetails(t *testing.
 		t.Fatalf("CreateMonitoring(journey) error = %v", err)
 	}
 
-	env.createBlueBook(t, 1, &blueBook.ID)
-	env.createGreenBook(t, gbService, 1, &greenBook.ID)
+	blueBookRevision := env.createBlueBook(t, 1, &blueBook.ID)
+	env.importBBProjectFromBlueBook(t, blueBookRevision.ID, blueBook.ID, bbProject.ID)
+	greenBookRevision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
+	env.createGBProjectWithFundingLender(t, gbService, greenBookRevision.ID, bbProject.ID, "GB-JRN-001", "Journey GB Revision", lender)
 
 	journey, err := journeyService.GetProjectJourney(env.ctx, mustParseUUID(t, bbProject.ID))
 	if err != nil {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import MultiSelect from 'primevue/multiselect'
+import { computed } from 'vue'
+import MultiSelectDropdown from '@/components/common/MultiSelectDropdown.vue'
 import { useMasterStore } from '@/stores/master.store'
 import type { Region } from '@/types/master.types'
 
@@ -39,6 +39,7 @@ const regionOptions = computed(() =>
   masterStore.regions.map((region) => ({
     ...region,
     label: formatRegionLabel(region),
+    type_label: formatRegionType(region),
     disabled:
       selectedCountryCodes.value.length > 0 &&
       region.type !== 'COUNTRY' &&
@@ -58,6 +59,18 @@ function formatRegionLabel(region: Region) {
   return `- ${region.name}`
 }
 
+function formatRegionType(region: Region) {
+  if (region.type === 'COUNTRY') {
+    return 'Nasional'
+  }
+
+  if (region.type === 'PROVINCE') {
+    return 'Provinsi'
+  }
+
+  return 'Kab/Kota'
+}
+
 function isCoveredBySelectedCountry(region: Region) {
   if (!region.parent_code) {
     return false
@@ -71,14 +84,10 @@ function isCoveredBySelectedCountry(region: Region) {
 
   return parent?.parent_code ? selectedCountryCodes.value.includes(parent.parent_code) : false
 }
-
-onMounted(() => {
-  void masterStore.fetchAllRegionLevels()
-})
 </script>
 
 <template>
-  <MultiSelect
+  <MultiSelectDropdown
     v-model="selectedValues"
     :options="regionOptions"
     option-label="label"
@@ -87,7 +96,21 @@ onMounted(() => {
     :placeholder="placeholder"
     :disabled="disabled"
     filter
+    filter-placeholder="Cari wilayah"
     display="chip"
-    class="w-full"
-  />
+    scroll-height="18rem"
+    @show="void masterStore.fetchAllRegionLevels()"
+  >
+    <template #option="{ option }">
+      <span class="block min-w-0">
+        <span class="block truncate font-medium">{{ option.label }}</span>
+        <span class="mt-1 flex items-center gap-2 text-xs text-surface-500">
+          <span class="rounded bg-surface-100 px-1.5 py-0.5 font-mono text-[0.65rem]">
+            {{ option.code }}
+          </span>
+          <span>{{ option.type_label }}</span>
+        </span>
+      </span>
+    </template>
+  </MultiSelectDropdown>
 </template>

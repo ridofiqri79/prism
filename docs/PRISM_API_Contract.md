@@ -536,13 +536,17 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `PUT` | `/blue-books/:id` | update: `blue_book` |
 | `DELETE` | `/blue-books/:id` | delete: `blue_book` |
 
+`DELETE /blue-books/:id` melakukan hard delete hanya jika Blue Book belum memiliki Project Blue Book dan tidak dipakai sebagai sumber revisi Blue Book lain. Jika masih memiliki Project Blue Book, backend mengembalikan `409 CONFLICT` dengan pesan aman agar user menghapus Project Blue Book terlebih dahulu.
+
 **`GET /blue-books` Query Params tambahan:**
 
 | Param | Format | Keterangan |
 |-------|--------|------------|
 | `search` | string | Cari berdasarkan nama periode, tanggal terbit, tahun revisi, atau status |
 | `period_id` | multi-value UUID | Filter periode Blue Book |
-| `status` | multi-value enum | `active`, `superseded` |
+| `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+
+Response list Blue Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
 **`POST /blue-books` Request:**
 ```json
@@ -551,9 +555,13 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
   "replaces_blue_book_id": "uuid-blue-book-sebelumnya",
   "publish_date": "2025-01-15",
   "revision_number": 0,
-  "revision_year": null
+  "revision_year": null,
+  "status": "active"
 }
 ```
+
+Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Blue Book lain menjadi `superseded` ketika Blue Book baru dibuat.
+Create Blue Book baru selalu dimulai kosong. Jika user ingin membawa Project Blue Book dari dokumen lain, gunakan endpoint import di detail Blue Book melalui tombol `Impor Proyek dari Blue Book Lain`.
 
 **`GET /blue-books/:id` Response `200`:**
 ```json
@@ -566,6 +574,7 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
     "revision_number": 0,
     "revision_year": null,
     "status": "active",
+    "project_count": 0,
     "created_at": "2025-01-15T08:00:00Z",
     "updated_at": "2025-01-15T08:00:00Z"
   }
@@ -581,8 +590,19 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `GET` | `/blue-books/:bb_id/import-projects/template` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/execute` | ADMIN only |
+| `POST` | `/blue-books/:bb_id/import-projects/from-blue-book` | create: `bb_project` |
 
-**Content-Type:** `multipart/form-data`
+**Import dari Blue Book lain:**
+```json
+{
+  "source_blue_book_id": "uuid-blue-book-sumber",
+  "project_ids": ["uuid-bb-project-sumber"]
+}
+```
+
+Endpoint `POST /blue-books/:bb_id/import-projects/from-blue-book` meng-clone Project Blue Book terpilih dari Blue Book sumber ke Blue Book target. Blue Book sumber harus berbeda dari target dan berada pada periode yang sama. Backend menolak import jika salah satu project tidak berasal dari Blue Book sumber, `BB Code` sudah ada di target, atau logical project yang sama sudah ada di target. Relasi anak ikut di-clone sebagai snapshot baru: institution, Mitra Kerja Bappenas, lokasi, national priority, project cost, lender indication, dan LoI.
+
+**Import workbook Content-Type:** `multipart/form-data`
 
 **Form field:**
 
@@ -815,20 +835,26 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 
 | Param | Format | Keterangan |
 |-------|--------|------------|
-| `search` | string | Cari berdasarkan tahun terbit, nomor revisi, atau status |
+| `search` | string | Cari berdasarkan tahun terbit, nomor revisi, status teknis, atau label status |
 | `publish_year` | multi-value number | Filter tahun terbit Green Book |
-| `status` | multi-value enum | `active`, `superseded` |
+| `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+
+Response list dan detail Green Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
 **`POST /green-books` Request:**
 ```json
 {
   "publish_year": 2025,
   "replaces_green_book_id": "uuid-green-book-sebelumnya",
-  "revision_number": 0
+  "revision_number": 0,
+  "status": "active"
 }
 ```
 
 Validasi: kombinasi `publish_year` + `revision_number` harus unik. Jika sudah ada, backend mengembalikan `409 CONFLICT`.
+Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Green Book lain menjadi `superseded` ketika Green Book baru dibuat. Green Book baru selalu dimulai kosong; Project Green Book dari dokumen/revisi lain hanya dibuat jika user membuatnya manual, menjalankan import workbook, atau memakai tombol `Tambahkan Proyek dari Green Book Lain`.
+
+`DELETE /green-books/:id` melakukan hard delete. Backend menolak penghapusan jika Green Book masih memiliki Project Green Book atau masih dipakai sebagai sumber revisi Green Book lain.
 
 ---
 
@@ -839,6 +865,17 @@ Validasi: kombinasi `publish_year` + `revision_number` harus unik. Jika sudah ad
 | `GET` | `/green-books/:gb_id/import-projects/template` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/execute` | ADMIN only |
+| `POST` | `/green-books/:gb_id/import-projects/from-green-book` | create: `gb_project` |
+
+**Tambahkan dari Green Book lain:**
+```json
+{
+  "source_green_book_id": "uuid-green-book-sumber",
+  "project_ids": ["uuid-gb-project-sumber"]
+}
+```
+
+Endpoint `POST /green-books/:gb_id/import-projects/from-green-book` meng-clone Project Green Book terpilih dari Green Book sumber ke Green Book target. Green Book sumber harus berbeda dari target, tetapi boleh berasal dari `publish_year` yang berbeda. Backend menolak import jika salah satu project tidak berasal dari Green Book sumber, `GB Code` sudah ada di target, atau logical Green Book project yang sama sudah ada di target. Relasi anak ikut di-clone sebagai snapshot baru: relasi BB Project di-resolve ke latest BB Project snapshot, Mitra Kerja Bappenas, institution, lokasi, activities, funding source, disbursement plan, dan funding allocation.
 
 **Content-Type:** `multipart/form-data`
 
@@ -973,6 +1010,8 @@ Frontend dapat membuka form GB Project dari action BB Project "Tambah Green Book
     "id": "uuid-gb-project-snapshot",
     "gb_project_identity_id": "uuid-logical-gb-project",
     "green_book_id": "uuid",
+    "program_title_id": "uuid-program-title",
+    "program_title": { "id": "uuid-program-title", "title": "Infrastruktur Transportasi" },
     "gb_code": "GB-2025-001",
     "is_latest": true,
     "has_newer_revision": false,
@@ -1114,6 +1153,10 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `search` | string | Cari berdasarkan `subject`, `letter_number`, atau tanggal surat |
 | `date_from` | date `YYYY-MM-DD` | Batas awal tanggal surat |
 | `date_to` | date `YYYY-MM-DD` | Batas akhir tanggal surat |
+
+Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menentukan apakah tombol hapus boleh ditampilkan.
+
+`DELETE /daftar-kegiatan/:id` melakukan hard delete hanya jika Daftar Kegiatan belum memiliki Project di Daftar Kegiatan. Jika masih memiliki proyek, backend mengembalikan `409 CONFLICT` dengan pesan aman agar user menghapus Project Daftar Kegiatan terlebih dahulu.
 
 **`POST /daftar-kegiatan` Request:**
 ```json

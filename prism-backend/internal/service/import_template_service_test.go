@@ -68,7 +68,7 @@ func TestImportTemplateGuidesDocumentInstitutionFallback(t *testing.T) {
 	sheets := map[string]simpleXLSXSheet{
 		"master":     buildMasterGuideSheet(),
 		"blue_book":  buildBlueBookGuideSheet(queries.GetBlueBookRow{PeriodName: "2025-2029"}),
-		"green_book": buildGreenBookGuideSheet(queries.GreenBook{PublishYear: 2026, RevisionNumber: 1}),
+		"green_book": buildGreenBookGuideSheet(queries.GetGreenBookRow{PublishYear: 2026, RevisionNumber: 1}),
 		"dk":         buildDKGuideSheet(),
 	}
 

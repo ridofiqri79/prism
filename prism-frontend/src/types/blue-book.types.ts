@@ -22,6 +22,7 @@ export interface BlueBook {
   revision_number: number
   revision_year?: number | null
   status: BlueBookStatus
+  project_count: number
   created_at?: string
   updated_at?: string
 }
@@ -32,6 +33,12 @@ export interface BlueBookPayload {
   publish_date: string
   revision_number: number
   revision_year?: number | null
+  status: BlueBookStatus
+}
+
+export interface ImportBBProjectsFromBlueBookPayload {
+  source_blue_book_id: string
+  project_ids: string[]
 }
 
 export interface BlueBookListParams extends ListParams {
@@ -70,6 +77,8 @@ export interface BBProject {
 export interface BBProjectRevisionSourceOption extends BBProject {
   source_blue_book_id: string
   source_blue_book_label: string
+  disabled?: boolean
+  unavailable_reason?: string
 }
 
 export interface BBProjectListParams extends ListParams {

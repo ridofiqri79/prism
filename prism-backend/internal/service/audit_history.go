@@ -56,13 +56,20 @@ func projectAuditEntry(id pgtype.UUID, tableName, action string, changedFields [
 		Section:            section,
 		Action:             action,
 		ActionLabel:        actionLabel,
-		ChangedFields:      changedFields,
-		ChangedFieldLabels: fieldLabels,
+		ChangedFields:      nonNilStrings(changedFields),
+		ChangedFieldLabels: nonNilStrings(fieldLabels),
 		ChangedByID:        stringPtrFromUUID(changedBy),
 		ChangedByUsername:  changedByUsername,
 		ChangedAt:          formatMasterTime(changedAt),
 		Summary:            summary,
 	}
+}
+
+func nonNilStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
 }
 
 func applyLatestAuditSummary(changedBy, changedAt, summary **string, entries []model.ProjectAuditEntry) {
@@ -139,6 +146,8 @@ func auditFieldLabels(tableName string, fields []string) []string {
 
 func shouldSkipAuditField(tableName, field string) bool {
 	switch tableName {
+	case "bb_project_institution", "bb_project_bappenas_partner", "bb_project_location", "bb_project_national_priority":
+		return field == "bb_project_id"
 	case "bb_project_cost", "lender_indication", "loi":
 		return field == "bb_project_id"
 	case "gb_activity", "gb_funding_source", "gb_disbursement_plan":

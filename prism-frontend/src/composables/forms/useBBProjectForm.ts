@@ -8,6 +8,7 @@ import type {
   LenderIndicationPayload,
   ProjectCostPayload,
 } from '@/types/blue-book.types'
+import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
 
 export interface BBProjectFormValues {
   project_identity_id: string
@@ -93,6 +94,11 @@ function assignErrors(target: BBProjectFormErrors, error: ZodError) {
   }
 }
 
+function richTextPayload(value: string) {
+  const sanitized = sanitizeRichText(value)
+  return isRichTextEmpty(sanitized) ? null : sanitized
+}
+
 export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BBProject | null) {
   const initialValues: Partial<BBProjectFormValues> =
     initialData && 'id' in initialData ? fromProject(initialData) : (initialData ?? {})
@@ -140,10 +146,10 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
       ...values,
       project_identity_id: values.project_identity_id || null,
       duration: values.duration ?? null,
-      objective: values.objective || null,
-      scope_of_work: values.scope_of_work || null,
-      outputs: values.outputs || null,
-      outcomes: values.outcomes || null,
+      objective: richTextPayload(values.objective),
+      scope_of_work: richTextPayload(values.scope_of_work),
+      outputs: richTextPayload(values.outputs),
+      outcomes: richTextPayload(values.outcomes),
       project_costs: projectCosts.value,
       lender_indications: lenderIndications.value.map((item) => ({
         lender_id: item.lender_id,

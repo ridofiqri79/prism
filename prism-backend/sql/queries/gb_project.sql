@@ -1,22 +1,35 @@
 -- ===== GREEN BOOK =====
 
 -- name: ListGreenBooks :many
-SELECT *
-FROM green_book
+SELECT
+    gb.id,
+    gb.publish_year,
+    gb.replaces_green_book_id,
+    gb.revision_number,
+    gb.status,
+    gb.created_at,
+    gb.updated_at,
+    (
+        SELECT COUNT(*)
+        FROM gb_project gp
+        WHERE gp.green_book_id = gb.id
+    )::BIGINT AS project_count
+FROM green_book gb
 WHERE (
     sqlc.narg('search')::text IS NULL
-    OR publish_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR status ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR gb.publish_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR gb.status ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR CASE gb.status WHEN 'active' THEN 'Berlaku' WHEN 'superseded' THEN 'Tidak Berlaku' ELSE gb.status END ILIKE '%' || sqlc.narg('search')::text || '%'
 )
 AND (
     COALESCE(cardinality(sqlc.arg('publish_years')::int[]), 0) = 0
-    OR publish_year = ANY(sqlc.arg('publish_years')::int[])
+    OR gb.publish_year = ANY(sqlc.arg('publish_years')::int[])
 )
 AND (
     COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
-    OR status = ANY(sqlc.arg('statuses')::text[])
+    OR gb.status = ANY(sqlc.arg('statuses')::text[])
 )
-ORDER BY publish_year DESC, revision_number DESC
+ORDER BY gb.publish_year DESC, gb.revision_number DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountGreenBooks :one
@@ -26,6 +39,7 @@ WHERE (
     sqlc.narg('search')::text IS NULL
     OR publish_year::text ILIKE '%' || sqlc.narg('search')::text || '%'
     OR status ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR CASE status WHEN 'active' THEN 'Berlaku' WHEN 'superseded' THEN 'Tidak Berlaku' ELSE status END ILIKE '%' || sqlc.narg('search')::text || '%'
 )
 AND (
     COALESCE(cardinality(sqlc.arg('publish_years')::int[]), 0) = 0
@@ -37,19 +51,32 @@ AND (
 );
 
 -- name: GetGreenBook :one
-SELECT *
-FROM green_book
-WHERE id = $1;
+SELECT
+    gb.id,
+    gb.publish_year,
+    gb.replaces_green_book_id,
+    gb.revision_number,
+    gb.status,
+    gb.created_at,
+    gb.updated_at,
+    (
+        SELECT COUNT(*)
+        FROM gb_project gp
+        WHERE gp.green_book_id = gb.id
+    )::BIGINT AS project_count
+FROM green_book gb
+WHERE gb.id = $1;
 
 -- name: CreateGreenBook :one
 INSERT INTO green_book (publish_year, replaces_green_book_id, revision_number, status)
-VALUES ($1, $2, $3, 'active')
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: UpdateGreenBook :one
 UPDATE green_book
 SET publish_year = $2,
     revision_number = $3,
+    status = $4,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -82,11 +109,29 @@ WHERE publish_year = sqlc.arg('publish_year')
   AND revision_number = sqlc.arg('revision_number')
   AND id <> sqlc.arg('id');
 
--- name: SupersedeGreenBook :one
-UPDATE green_book
-SET status = 'superseded',
-    updated_at = NOW()
-WHERE id = $1
+-- name: CountAnyGBProjectsByGreenBook :one
+SELECT COUNT(*)
+FROM gb_project
+WHERE green_book_id = $1;
+
+-- name: CountGreenBookRevisionsReplacing :one
+SELECT COUNT(*)
+FROM green_book
+WHERE replaces_green_book_id = $1;
+
+-- name: HardDeleteGreenBook :one
+DELETE FROM green_book
+WHERE green_book.id = $1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM gb_project gp
+      WHERE gp.green_book_id = green_book.id
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM green_book child
+      WHERE child.replaces_green_book_id = green_book.id
+  )
 RETURNING *;
 
 -- ===== GB PROJECT =====
@@ -336,13 +381,21 @@ WHERE green_book_id = $1
   AND status = 'active'
 ORDER BY gb_code ASC;
 
+-- name: ListGBProjectsForCloneByIDs :many
+SELECT *
+FROM gb_project
+WHERE green_book_id = $1
+  AND status = 'active'
+  AND id = ANY(sqlc.arg('project_ids')::uuid[])
+ORDER BY gb_code ASC;
+
 -- name: GetLatestGBProjectByIdentity :one
 SELECT gp.*
 FROM gb_project gp
 JOIN green_book gb ON gb.id = gp.green_book_id
 WHERE gp.gb_project_identity_id = $1
   AND gp.status = 'active'
-ORDER BY gb.revision_number DESC, gb.created_at DESC
+ORDER BY gb.publish_year DESC, gb.revision_number DESC, gb.created_at DESC
 LIMIT 1;
 
 -- name: GetLatestGBProjectByProject :one
@@ -354,7 +407,7 @@ JOIN LATERAL (
     JOIN green_book gb ON gb.id = gp.green_book_id
     WHERE gp.gb_project_identity_id = current_project.gb_project_identity_id
       AND gp.status = 'active'
-    ORDER BY gb.revision_number DESC, gb.created_at DESC
+    ORDER BY gb.publish_year DESC, gb.revision_number DESC, gb.created_at DESC
     LIMIT 1
 ) latest ON TRUE
 WHERE current_project.id = $1;
@@ -375,7 +428,7 @@ SELECT
         JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
         WHERE latest.gb_project_identity_id = gp.gb_project_identity_id
           AND latest.status = 'active'
-        ORDER BY latest_gb.revision_number DESC, latest_gb.created_at DESC
+        ORDER BY latest_gb.publish_year DESC, latest_gb.revision_number DESC, latest_gb.created_at DESC
         LIMIT 1
     ))::boolean AS is_latest,
     EXISTS (
@@ -386,7 +439,7 @@ SELECT
 FROM gb_project gp
 JOIN green_book gb ON gb.id = gp.green_book_id
 WHERE gp.gb_project_identity_id = $1
-ORDER BY gb.revision_number ASC, gb.created_at ASC;
+ORDER BY gb.publish_year ASC, gb.revision_number ASC, gb.created_at ASC;
 
 -- name: ListGBProjectHistoryByProject :many
 SELECT history.*
@@ -407,7 +460,7 @@ JOIN LATERAL (
             JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
             WHERE latest.gb_project_identity_id = gp.gb_project_identity_id
               AND latest.status = 'active'
-            ORDER BY latest_gb.revision_number DESC, latest_gb.created_at DESC
+            ORDER BY latest_gb.publish_year DESC, latest_gb.revision_number DESC, latest_gb.created_at DESC
             LIMIT 1
         ))::boolean AS is_latest,
         EXISTS (
@@ -418,7 +471,7 @@ JOIN LATERAL (
     FROM gb_project gp
     JOIN green_book gb ON gb.id = gp.green_book_id
     WHERE gp.gb_project_identity_id = current_project.gb_project_identity_id
-    ORDER BY gb.revision_number ASC, gb.created_at ASC
+    ORDER BY gb.publish_year ASC, gb.revision_number ASC, gb.created_at ASC
 ) history ON TRUE
 WHERE current_project.id = $1;
 

@@ -1,23 +1,30 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from 'primevue/multiselect'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { blueBookSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { BlueBook, BlueBookListParams, BlueBookPayload, BlueBookStatus } from '@/types/blue-book.types'
-import { formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import type {
+  BlueBook,
+  BlueBookListParams,
+  BlueBookPayload,
+  BlueBookStatus,
+} from '@/types/blue-book.types'
+import { formatApiError } from '@/utils/api-error'
+import { formatBlueBookStatus, formatRevision, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type BlueBookField = keyof BlueBookPayload
 interface BlueBookFilterState {
@@ -28,6 +35,7 @@ interface BlueBookFilterState {
 const blueBookStore = useBlueBookStore()
 const masterStore = useMasterStore()
 const toast = useToast()
+const confirm = useConfirm()
 const { can } = usePermission()
 
 const listControls = useListControls<BlueBookFilterState>({
@@ -44,7 +52,7 @@ const listControls = useListControls<BlueBookFilterState>({
       return selectedPeriodSummary(value)
     }
     if (key === 'status' && Array.isArray(value)) {
-      return value.join(', ')
+      return value.map(formatBlueBookStatus).join(', ')
     }
     return Array.isArray(value) ? value.join(', ') : String(value)
   },
@@ -55,6 +63,7 @@ const form = reactive<BlueBookPayload>({
   publish_date: '',
   revision_number: 0,
   revision_year: null,
+  status: 'active',
 })
 const errors = ref<FormErrors<BlueBookField>>({})
 
@@ -63,9 +72,13 @@ const columns: ColumnDef[] = [
   { field: 'publish_date', header: 'Tanggal Terbit' },
   { field: 'revision', header: 'Revision' },
   { field: 'status', header: 'Status' },
+  { field: 'project_count', header: 'Project Blue Book' },
   { field: 'actions', header: 'Aksi' },
 ]
-const statusOptions = ['active', 'superseded']
+const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [
+  { label: 'Berlaku', value: 'active' },
+  { label: 'Tidak Berlaku', value: 'superseded' },
+]
 
 function buildListParams(): BlueBookListParams {
   return listControls.buildParams() as BlueBookListParams
@@ -88,6 +101,7 @@ function openCreate() {
     publish_date: '',
     revision_number: 0,
     revision_year: null,
+    status: 'active',
   })
   errors.value = {}
   dialogVisible.value = true
@@ -97,6 +111,7 @@ async function save() {
   const parsed = blueBookSchema.safeParse({
     ...form,
     revision_year: form.revision_year ?? undefined,
+    replaces_blue_book_id: undefined,
   })
 
   if (!parsed.success) {
@@ -105,17 +120,44 @@ async function save() {
       'publish_date',
       'revision_number',
       'revision_year',
+      'status',
     ])
     return
   }
 
   await blueBookStore.createBlueBook({
     ...parsed.data,
+    replaces_blue_book_id: null,
     revision_year: parsed.data.revision_year ?? null,
   })
   toast.success('Berhasil', 'Blue Book berhasil dibuat')
   dialogVisible.value = false
   await loadBlueBooks()
+}
+
+function deleteBlueBook(blueBook: BlueBook) {
+  if (blueBook.project_count > 0) {
+    toast.warn('Tidak Bisa Menghapus', 'Blue Book masih memiliki Project Blue Book.')
+    return
+  }
+
+  confirm.confirmDelete(`Blue Book ${blueBook.period.name}`, async () => {
+    try {
+      await blueBookStore.deleteBlueBook(blueBook.id)
+      toast.success('Berhasil', 'Blue Book berhasil dihapus permanen')
+      if (blueBookStore.blueBooks.length === 1 && listControls.page.value > 1) {
+        listControls.page.value -= 1
+      } else {
+        await loadBlueBooks()
+      }
+    } catch (error) {
+      toast.warn(
+        'Tidak Bisa Menghapus',
+        formatApiError(error, 'Blue Book masih memiliki Project Blue Book'),
+        12000,
+      )
+    }
+  })
 }
 
 function selectedLabelSummary(labels: string[]) {
@@ -191,6 +233,8 @@ onMounted(() => {
           <MultiSelect
             v-model="listControls.draftFilters.status"
             :options="statusOptions"
+            option-label="label"
+            option-value="value"
             placeholder="Semua status"
             display="chip"
             class="w-full"
@@ -212,7 +256,12 @@ onMounted(() => {
         <span v-else-if="column.field === 'revision'">
           {{ formatRevision((row as BlueBook).revision_number, (row as BlueBook).revision_year) }}
         </span>
-        <StatusBadge v-else-if="column.field === 'status'" :status="String(row.status)" />
+        <StatusBadge
+          v-else-if="column.field === 'status'"
+          :status="String(row.status)"
+          :label="formatBlueBookStatus(String(row.status))"
+        />
+        <span v-else-if="column.field === 'project_count'">{{ (row as BlueBook).project_count }}</span>
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             as="router-link"
@@ -222,12 +271,23 @@ onMounted(() => {
             size="small"
             outlined
           />
+          <Button
+            v-if="can('blue_book', 'delete') && (row as BlueBook).project_count === 0"
+            v-tooltip.top="'Hapus Blue Book'"
+            icon="pi pi-trash"
+            size="small"
+            severity="danger"
+            outlined
+            rounded
+            aria-label="Hapus Blue Book"
+            @click="deleteBlueBook(row as BlueBook)"
+          />
         </div>
         <span v-else>{{ row[column.field] || '-' }}</span>
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal header="Buat Blue Book" class="w-[36rem] max-w-[95vw]">
+    <Dialog v-model:visible="dialogVisible" modal header="Buat Blue Book" class="w-[44rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Periode</span>
@@ -257,6 +317,19 @@ onMounted(() => {
             <InputNumber v-model="form.revision_year" :use-grouping="false" class="w-full" />
           </label>
         </div>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Status</span>
+          <Select
+            v-model="form.status"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Pilih status"
+            class="w-full"
+            :invalid="Boolean(errors.status)"
+          />
+          <small v-if="errors.status" class="text-red-600">{{ errors.status }}</small>
+        </label>
         <div class="flex justify-end gap-2 border-t border-surface-200 pt-4">
           <Button label="Batal" severity="secondary" outlined @click="dialogVisible = false" />
           <Button type="submit" label="Simpan" icon="pi pi-save" />

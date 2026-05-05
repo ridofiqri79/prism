@@ -45,7 +45,7 @@ func (s *DKService) ListDaftarKegiatan(ctx context.Context, filter model.DaftarK
 	}
 	data := make([]model.DaftarKegiatanResponse, 0, len(rows))
 	for _, row := range rows {
-		data = append(data, daftarKegiatanResponse(row))
+		data = append(data, daftarKegiatanFromListRow(row))
 	}
 	return listResponse(data, page, limit, total), nil
 }
@@ -76,7 +76,7 @@ func (s *DKService) GetDaftarKegiatan(ctx context.Context, id pgtype.UUID) (*mod
 	if err != nil {
 		return nil, mapNotFound(err, "Daftar Kegiatan tidak ditemukan")
 	}
-	res := daftarKegiatanResponse(row)
+	res := daftarKegiatanFromGetRow(row)
 	return &res, nil
 }
 
@@ -88,23 +88,29 @@ func (s *DKService) CreateDaftarKegiatan(ctx context.Context, req model.DaftarKe
 	if strings.TrimSpace(req.Subject) == "" {
 		return nil, validation("subject", "wajib diisi")
 	}
-	var created queries.DaftarKegiatan
+	var created model.DaftarKegiatanResponse
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
 		row, err := qtx.CreateDaftarKegiatan(ctx, queries.CreateDaftarKegiatanParams{
 			LetterNumber: nullableTextPtr(req.LetterNumber),
 			Subject:      strings.TrimSpace(req.Subject),
 			Date:         date,
 		})
-		created = row
-		return err
+		if err != nil {
+			return err
+		}
+		reloaded, err := qtx.GetDaftarKegiatan(ctx, row.ID)
+		if err != nil {
+			return err
+		}
+		created = daftarKegiatanFromGetRow(reloaded)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
 	if s.broker != nil {
-		s.broker.Publish("daftar_kegiatan.created", map[string]string{"id": model.UUIDToString(created.ID)})
+		s.broker.Publish("daftar_kegiatan.created", map[string]string{"id": created.ID})
 	}
-	res := daftarKegiatanResponse(created)
-	return &res, nil
+	return &created, nil
 }
 
 func (s *DKService) UpdateDaftarKegiatan(ctx context.Context, id pgtype.UUID, req model.DaftarKegiatanRequest) (*model.DaftarKegiatanResponse, error) {
@@ -115,7 +121,7 @@ func (s *DKService) UpdateDaftarKegiatan(ctx context.Context, id pgtype.UUID, re
 	if strings.TrimSpace(req.Subject) == "" {
 		return nil, validation("subject", "wajib diisi")
 	}
-	var updated queries.DaftarKegiatan
+	var updated model.DaftarKegiatanResponse
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
 		row, err := qtx.UpdateDaftarKegiatan(ctx, queries.UpdateDaftarKegiatanParams{
 			ID:           id,
@@ -126,19 +132,44 @@ func (s *DKService) UpdateDaftarKegiatan(ctx context.Context, id pgtype.UUID, re
 		if err != nil {
 			return mapNotFound(err, "Daftar Kegiatan tidak ditemukan")
 		}
-		updated = row
+		reloaded, err := qtx.GetDaftarKegiatan(ctx, row.ID)
+		if err != nil {
+			return err
+		}
+		updated = daftarKegiatanFromGetRow(reloaded)
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	res := daftarKegiatanResponse(updated)
-	return &res, nil
+	return &updated, nil
 }
 
 func (s *DKService) DeleteDaftarKegiatan(ctx context.Context, id pgtype.UUID) error {
-	return s.withTx(ctx, func(qtx *queries.Queries) error {
-		return qtx.DeleteDaftarKegiatan(ctx, id)
-	})
+	var deleted queries.DaftarKegiatan
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		if _, err := qtx.GetDaftarKegiatan(ctx, id); err != nil {
+			return mapNotFound(err, "Daftar Kegiatan tidak ditemukan")
+		}
+		projectCount, err := qtx.CountAnyDKProjectsByDaftarKegiatan(ctx, id)
+		if err != nil {
+			return apperrors.Internal("Gagal memeriksa Project di Daftar Kegiatan")
+		}
+		if projectCount > 0 {
+			return apperrors.Conflict("Daftar Kegiatan tidak bisa dihapus karena masih memiliki Project di Daftar Kegiatan. Hapus Project Daftar Kegiatan terlebih dahulu.")
+		}
+		row, err := qtx.HardDeleteDaftarKegiatan(ctx, id)
+		if err != nil {
+			return mapNotFound(err, "Daftar Kegiatan tidak ditemukan")
+		}
+		deleted = row
+		return nil
+	}); err != nil {
+		return err
+	}
+	if s.broker != nil {
+		s.broker.Publish("daftar_kegiatan.deleted", map[string]string{"id": model.UUIDToString(deleted.ID)})
+	}
+	return nil
 }
 
 func (s *DKService) ListDKProjects(ctx context.Context, dkID pgtype.UUID, filter model.DKProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.DKProjectResponse], error) {
@@ -541,8 +572,16 @@ func parseDKDate(req model.DaftarKegiatanRequest) (pgtype.Date, error) {
 	return parseDate(value, "date")
 }
 
-func daftarKegiatanResponse(row queries.DaftarKegiatan) model.DaftarKegiatanResponse {
-	return model.DaftarKegiatanResponse{ID: model.UUIDToString(row.ID), LetterNumber: stringPtrFromText(row.LetterNumber), Subject: row.Subject, Date: dateString(row.Date), CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+func daftarKegiatanFromListRow(row queries.ListDaftarKegiatanRow) model.DaftarKegiatanResponse {
+	return daftarKegiatanResponse(row.ID, row.LetterNumber, row.Subject, row.Date, row.ProjectCount, row.CreatedAt, row.UpdatedAt)
+}
+
+func daftarKegiatanFromGetRow(row queries.GetDaftarKegiatanRow) model.DaftarKegiatanResponse {
+	return daftarKegiatanResponse(row.ID, row.LetterNumber, row.Subject, row.Date, row.ProjectCount, row.CreatedAt, row.UpdatedAt)
+}
+
+func daftarKegiatanResponse(id pgtype.UUID, letterNumber pgtype.Text, subject string, date pgtype.Date, projectCount int64, createdAt, updatedAt pgtype.Timestamptz) model.DaftarKegiatanResponse {
+	return model.DaftarKegiatanResponse{ID: model.UUIDToString(id), LetterNumber: stringPtrFromText(letterNumber), Subject: subject, Date: dateString(date), ProjectCount: projectCount, CreatedAt: formatMasterTime(createdAt), UpdatedAt: formatMasterTime(updatedAt)}
 }
 
 func dkFinancingDetailResponse(row queries.GetDKFinancingDetailsRow) model.DKFinancingDetailResponse {

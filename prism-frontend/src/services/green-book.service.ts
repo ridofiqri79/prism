@@ -8,6 +8,7 @@ import type {
   GreenBook,
   GreenBookListParams,
   GreenBookPayload,
+  ImportGBProjectsFromGreenBookPayload,
 } from '@/types/green-book.types'
 import type { MasterImportSummary } from '@/types/master.types'
 
@@ -76,6 +77,15 @@ export const GreenBookService = {
 
   async deleteProject(greenBookId: string, id: string) {
     await http.delete(`/green-books/${greenBookId}/projects/${id}`)
+  },
+
+  async importProjectsFromGreenBook(greenBookId: string, data: ImportGBProjectsFromGreenBookPayload) {
+    const response = await http.post<ApiResponse<GBProject[]>>(
+      `/green-books/${greenBookId}/import-projects/from-green-book`,
+      data,
+    )
+
+    return response.data.data
   },
 
   async downloadImportTemplate(greenBookId: string) {

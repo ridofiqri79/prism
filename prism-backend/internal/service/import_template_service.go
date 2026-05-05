@@ -348,7 +348,7 @@ func (s *BlueBookService) buildBlueBookProjectImportTemplateWorkbook(ctx context
 	return simpleXLSXWorkbook{Sheets: sheets, DefinedNames: definedNames}, nil
 }
 
-func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx context.Context, greenBook queries.GreenBook) (simpleXLSXWorkbook, error) {
+func (s *GreenBookService) buildGreenBookProjectImportTemplateWorkbook(ctx context.Context, greenBook queries.GetGreenBookRow) (simpleXLSXWorkbook, error) {
 	masterSvc := &MasterService{db: s.db, queries: s.queries}
 	reference, err := masterSvc.loadImportTemplateReferenceData(ctx, pgtype.UUID{})
 	if err != nil {
@@ -828,7 +828,7 @@ func buildBlueBookGuideSheet(blueBook queries.GetBlueBookRow) simpleXLSXSheet {
 	}
 }
 
-func buildGreenBookGuideSheet(greenBook queries.GreenBook) simpleXLSXSheet {
+func buildGreenBookGuideSheet(greenBook queries.GetGreenBookRow) simpleXLSXSheet {
 	rows := [][]simpleXLSXCell{
 		styledTextRow(xlsxStyleTitle, "Panduan Import Proyek Green Book"),
 		styledTextRow(xlsxStyleSubtitle, "Target Green Book", fmt.Sprintf("GB %d Revisi %d", greenBook.PublishYear, greenBook.RevisionNumber), "Workbook ini menambah GB Project ke target Green Book yang dipilih."),

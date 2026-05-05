@@ -179,6 +179,7 @@ func main() {
 	blueBooks.POST("/:bbId/import-projects/preview", blueBookHandler.PreviewImportBBProjects, middleware.RequireAdmin())
 	blueBooks.POST("/:bbId/import-projects/execute", blueBookHandler.ImportBBProjects, middleware.RequireAdmin())
 	blueBooks.GET("/:bbId/import-projects/template", blueBookHandler.DownloadBBProjectImportTemplate, middleware.RequireAdmin())
+	blueBooks.POST("/:bbId/import-projects/from-blue-book", blueBookHandler.ImportBBProjectsFromBlueBook, middleware.Require("bb_project", "create"))
 
 	loi := api.Group("/bb-projects/:bbProjectId/loi")
 	loi.GET("", blueBookHandler.ListLoI, middleware.Require("bb_project", "read"))
@@ -198,6 +199,7 @@ func main() {
 	greenBooks.GET("/:gbId/projects/:id", greenBookHandler.GetGBProject, middleware.Require("gb_project", "read"))
 	greenBooks.PUT("/:gbId/projects/:id", greenBookHandler.UpdateGBProject, middleware.Require("gb_project", "update"))
 	greenBooks.DELETE("/:gbId/projects/:id", greenBookHandler.DeleteGBProject, middleware.Require("gb_project", "delete"))
+	greenBooks.POST("/:gbId/import-projects/from-green-book", greenBookHandler.ImportGBProjectsFromGreenBook, middleware.Require("gb_project", "create"))
 	greenBooks.POST("/:gbId/import-projects/preview", greenBookHandler.PreviewImportGBProjects, middleware.RequireAdmin())
 	greenBooks.POST("/:gbId/import-projects/execute", greenBookHandler.ImportGBProjects, middleware.RequireAdmin())
 	greenBooks.GET("/:gbId/import-projects/template", greenBookHandler.DownloadGBProjectImportTemplate, middleware.RequireAdmin())

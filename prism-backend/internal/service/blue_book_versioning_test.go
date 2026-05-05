@@ -46,15 +46,16 @@ func TestBlueBookVersioningAllowsSameCodeAcrossRevisionsButRejectsDuplicateInDoc
 	if err != nil {
 		t.Fatalf("ListBBProjects(revision) error = %v", err)
 	}
-	if len(projects.Data) != 1 {
-		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	if len(projects.Data) != 0 {
+		t.Fatalf("revision projects = %d, want 0", len(projects.Data))
 	}
-	cloned := projects.Data[0]
-	if cloned.BBCode != sourceProject.BBCode {
-		t.Fatalf("cloned BBCode = %q, want %q", cloned.BBCode, sourceProject.BBCode)
+
+	createdInRevision, err := env.service.CreateBBProject(env.ctx, mustParseUUID(t, revision.ID), env.bbProjectRequest("BB-001", "Flood Control Revision"))
+	if err != nil {
+		t.Fatalf("CreateBBProject(revision source code) error = %v", err)
 	}
-	if cloned.ProjectIdentityID != sourceProject.ProjectIdentityID {
-		t.Fatalf("cloned identity = %s, want %s", cloned.ProjectIdentityID, sourceProject.ProjectIdentityID)
+	if createdInRevision.ProjectIdentityID != sourceProject.ProjectIdentityID {
+		t.Fatalf("created identity = %s, want %s", createdInRevision.ProjectIdentityID, sourceProject.ProjectIdentityID)
 	}
 
 	_, err = env.service.CreateBBProject(env.ctx, mustParseUUID(t, revision.ID), env.bbProjectRequest("BB-001", "Duplicate in revision"))
@@ -67,14 +68,12 @@ func TestCreateBBProjectReusesPreviousIdentityWhenCodeMatchesRevisionSource(t *t
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-REUSE", "Flood Control")
 
-	if err := env.queries.SupersedeBlueBooksByPeriod(env.ctx, env.period.ID); err != nil {
-		t.Fatalf("SupersedeBlueBooksByPeriod error = %v", err)
-	}
 	revision, err := env.queries.CreateBlueBook(env.ctx, queries.CreateBlueBookParams{
 		PeriodID:       env.period.ID,
 		PublishDate:    testDate(2026, time.March, 1),
 		RevisionNumber: 1,
 		RevisionYear:   pgtype.Int4{Int32: 2026, Valid: true},
+		Status:         "active",
 	})
 	if err != nil {
 		t.Fatalf("CreateBlueBook(manual revision) error = %v", err)
@@ -124,22 +123,25 @@ func TestCreateBlueBookRejectsDuplicatePeriodAndVersion(t *testing.T) {
 	}
 }
 
-func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
+func TestBlueBookImportPreservesIdentityAndChildren(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
 	revision := env.createBlueBook(t, 1, &original.ID)
 
-	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, revision.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
+	imported, err := env.service.ImportBBProjectsFromBlueBook(env.ctx, mustParseUUID(t, revision.ID), model.ImportBBProjectsFromBlueBookRequest{
+		SourceBlueBookID: original.ID,
+		ProjectIDs:       []string{sourceProject.ID},
+	})
 	if err != nil {
-		t.Fatalf("ListBBProjects(revision) error = %v", err)
+		t.Fatalf("ImportBBProjectsFromBlueBook error = %v", err)
 	}
-	if len(projects.Data) != 1 {
-		t.Fatalf("revision projects = %d, want 1", len(projects.Data))
+	if len(imported) != 1 {
+		t.Fatalf("imported projects = %d, want 1", len(imported))
 	}
 
-	cloned := projects.Data[0]
+	cloned := imported[0]
 	if cloned.ID == sourceProject.ID {
 		t.Fatal("cloned project reused source snapshot id")
 	}
@@ -165,6 +167,79 @@ func TestBlueBookRevisionClonePreservesIdentityAndChildren(t *testing.T) {
 	}
 }
 
+func TestCreateBlueBookRevisionStartsEmpty(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	original := env.createBlueBook(t, 0, nil)
+	_ = env.createBBProject(t, original.ID, "BB-KEEP", "Keep This Project")
+	_ = env.createBBProject(t, original.ID, "BB-SKIP", "Skip This Project")
+
+	revisionYear := int32(2026)
+	created, err := env.service.CreateBlueBook(env.ctx, model.BlueBookRequest{
+		PeriodID:           model.UUIDToString(env.period.ID),
+		ReplacesBlueBookID: &original.ID,
+		PublishDate:        "2026-03-01",
+		RevisionNumber:     1,
+		RevisionYear:       &revisionYear,
+		Status:             "active",
+	})
+	if err != nil {
+		t.Fatalf("CreateBlueBook(revision) error = %v", err)
+	}
+
+	projects, err := env.service.ListBBProjects(env.ctx, mustParseUUID(t, created.ID), model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(created) error = %v", err)
+	}
+	if len(projects.Data) != 0 {
+		t.Fatalf("created projects = %d, want 0", len(projects.Data))
+	}
+}
+
+func TestImportBBProjectsFromBlueBookCarriesOnlySelectedProjects(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	source := env.createBlueBook(t, 0, nil)
+	keepProject := env.createBBProject(t, source.ID, "BB-IMPORT", "Import This Project")
+	_ = env.createBBProject(t, source.ID, "BB-SKIP", "Skip This Project")
+
+	target, err := env.queries.CreateBlueBook(env.ctx, queries.CreateBlueBookParams{
+		PeriodID:       env.period.ID,
+		PublishDate:    testDate(2026, time.May, 1),
+		RevisionNumber: 1,
+		RevisionYear:   pgtype.Int4{Int32: 2026, Valid: true},
+		Status:         "active",
+	})
+	if err != nil {
+		t.Fatalf("CreateBlueBook(target) error = %v", err)
+	}
+
+	imported, err := env.service.ImportBBProjectsFromBlueBook(env.ctx, target.ID, model.ImportBBProjectsFromBlueBookRequest{
+		SourceBlueBookID: source.ID,
+		ProjectIDs:       []string{keepProject.ID},
+	})
+	if err != nil {
+		t.Fatalf("ImportBBProjectsFromBlueBook error = %v", err)
+	}
+	if len(imported) != 1 {
+		t.Fatalf("imported projects = %d, want 1", len(imported))
+	}
+	if imported[0].BBCode != keepProject.BBCode {
+		t.Fatalf("imported project code = %s, want %s", imported[0].BBCode, keepProject.BBCode)
+	}
+	if imported[0].ProjectIdentityID != keepProject.ProjectIdentityID {
+		t.Fatalf("imported identity = %s, want %s", imported[0].ProjectIdentityID, keepProject.ProjectIdentityID)
+	}
+
+	projects, err := env.service.ListBBProjects(env.ctx, target.ID, model.BBProjectListFilter{}, model.PaginationParams{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListBBProjects(target) error = %v", err)
+	}
+	if len(projects.Data) != 1 {
+		t.Fatalf("target projects = %d, want 1", len(projects.Data))
+	}
+}
+
 func TestDeleteBBProjectHardDeletesWhenNoDownstreamAndAuditsChildren(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 
@@ -182,6 +257,34 @@ func TestDeleteBBProjectHardDeletesWhenNoDownstreamAndAuditsChildren(t *testing.
 	assertAuditDeleteExists(t, env, "bb_project_institution", project.ID)
 	assertAuditDeleteExists(t, env, "bb_project_location", project.ID)
 	assertAuditDeleteExists(t, env, "bb_project_cost", project.ProjectCosts[0].ID)
+}
+
+func TestDeleteBlueBookHardDeletesWhenNoProjects(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	blueBookID := mustParseUUID(t, blueBook.ID)
+
+	if err := env.service.DeleteBlueBook(env.ctx, blueBookID); err != nil {
+		t.Fatalf("DeleteBlueBook(no projects) error = %v", err)
+	}
+	if _, err := env.queries.GetBlueBook(env.ctx, blueBookID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("GetBlueBook after hard delete error = %v, want pgx.ErrNoRows", err)
+	}
+	assertAuditDeleteExists(t, env, "blue_book", blueBook.ID)
+}
+
+func TestDeleteBlueBookRejectsWhenProjectsExist(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+
+	blueBook := env.createBlueBook(t, 0, nil)
+	env.createBBProject(t, blueBook.ID, "BB-HEADER-USED", "Header Used")
+
+	err := env.service.DeleteBlueBook(env.ctx, mustParseUUID(t, blueBook.ID))
+	assertAppErrorCode(t, err, "CONFLICT")
+	if _, err := env.queries.GetBlueBook(env.ctx, mustParseUUID(t, blueBook.ID)); err != nil {
+		t.Fatalf("GetBlueBook after blocked delete error = %v", err)
+	}
 }
 
 func TestDeleteBBProjectRejectsDownstreamAndShowsRelations(t *testing.T) {
@@ -248,7 +351,8 @@ func TestGetBBProjectHistoryReturnsOrderedSnapshots(t *testing.T) {
 
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
-	env.createBlueBook(t, 1, &original.ID)
+	revision := env.createBlueBook(t, 1, &original.ID)
+	env.importBBProjectFromBlueBook(t, revision.ID, original.ID, sourceProject.ID)
 
 	history, err := env.service.GetBBProjectHistory(env.ctx, mustParseUUID(t, sourceProject.ID))
 	if err != nil {
@@ -260,8 +364,8 @@ func TestGetBBProjectHistoryReturnsOrderedSnapshots(t *testing.T) {
 	if history[0].ID != sourceProject.ID {
 		t.Fatalf("history[0].ID = %s, want source %s", history[0].ID, sourceProject.ID)
 	}
-	if history[0].BookStatus != "superseded" || history[0].IsLatest {
-		t.Fatalf("history[0] status/latest = %s/%v, want superseded/not latest", history[0].BookStatus, history[0].IsLatest)
+	if history[0].BookStatus != "active" || history[0].IsLatest {
+		t.Fatalf("history[0] status/latest = %s/%v, want active/not latest", history[0].BookStatus, history[0].IsLatest)
 	}
 	if history[1].BookStatus != "active" || !history[1].IsLatest {
 		t.Fatalf("history[1] status/latest = %s/%v, want active/latest", history[1].BookStatus, history[1].IsLatest)
@@ -276,15 +380,13 @@ func TestBlueBookImportReusesPreviousIdentityForRevisionSnapshot(t *testing.T) {
 
 	original := env.createBlueBook(t, 0, nil)
 	sourceProject := env.createBBProject(t, original.ID, "BB-001", "Flood Control")
-	if err := env.queries.SupersedeBlueBooksByPeriod(env.ctx, env.period.ID); err != nil {
-		t.Fatalf("SupersedeBlueBooksByPeriod() error = %v", err)
-	}
 	targetRevision, err := env.queries.CreateBlueBook(env.ctx, queries.CreateBlueBookParams{
 		PeriodID:           env.period.ID,
 		ReplacesBlueBookID: mustParseUUID(t, original.ID),
 		PublishDate:        testDate(2026, time.February, 1),
 		RevisionNumber:     1,
 		RevisionYear:       pgtype.Int4{Int32: 2026, Valid: true},
+		Status:             "active",
 	})
 	if err != nil {
 		t.Fatalf("CreateBlueBook(target revision) error = %v", err)
@@ -543,6 +645,21 @@ func (env *blueBookVersioningTestEnv) createBlueBook(t *testing.T, revisionNumbe
 		t.Fatalf("CreateBlueBook(revision %d) error = %v", revisionNumber, err)
 	}
 	return res
+}
+
+func (env *blueBookVersioningTestEnv) importBBProjectFromBlueBook(t *testing.T, targetBlueBookID, sourceBlueBookID, projectID string) *model.BBProjectResponse {
+	t.Helper()
+	imported, err := env.service.ImportBBProjectsFromBlueBook(env.ctx, mustParseUUID(t, targetBlueBookID), model.ImportBBProjectsFromBlueBookRequest{
+		SourceBlueBookID: sourceBlueBookID,
+		ProjectIDs:       []string{projectID},
+	})
+	if err != nil {
+		t.Fatalf("ImportBBProjectsFromBlueBook() error = %v", err)
+	}
+	if len(imported) != 1 {
+		t.Fatalf("imported projects = %d, want 1", len(imported))
+	}
+	return &imported[0]
 }
 
 func (env *blueBookVersioningTestEnv) createBBProject(t *testing.T, blueBookID, code, name string) *model.BBProjectResponse {

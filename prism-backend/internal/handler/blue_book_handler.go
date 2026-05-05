@@ -84,6 +84,22 @@ func (h *BlueBookHandler) DeleteBlueBook(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *BlueBookHandler) ImportBBProjectsFromBlueBook(c echo.Context) error {
+	bbID, err := parseIDParam(c, "bbId")
+	if err != nil {
+		return err
+	}
+	var req model.ImportBBProjectsFromBlueBookRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.ImportBBProjectsFromBlueBook(c.Request().Context(), bbID, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[[]model.BBProjectResponse]{Data: res})
+}
+
 func (h *BlueBookHandler) ListBBProjects(c echo.Context) error {
 	bbID, err := parseIDParam(c, "bbId")
 	if err != nil {

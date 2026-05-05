@@ -10,6 +10,7 @@ import type {
   BlueBook,
   BlueBookListParams,
   BlueBookPayload,
+  ImportBBProjectsFromBlueBookPayload,
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
@@ -103,6 +104,16 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     })
   }
 
+  async function getBlueBooksByPeriod(periodId: string) {
+    const response = await BlueBookService.getBlueBooks({
+      period_id: [periodId],
+      limit: 1000,
+      sort: 'revision_number',
+      order: 'desc',
+    })
+    return response.data
+  }
+
   async function fetchBlueBook(id: string) {
     return withLoading(async () => {
       currentBlueBook.value = await BlueBookService.getBlueBook(id)
@@ -131,6 +142,15 @@ export const useBlueBookStore = defineStore('blueBook', () => {
       projectTotal.value = response.meta.total
       return response
     })
+  }
+
+  async function getProjectsByBlueBook(blueBookId: string) {
+    const response = await BlueBookService.getProjects(blueBookId, {
+      limit: 1000,
+      sort: 'bb_code',
+      order: 'asc',
+    })
+    return response.data
   }
 
   async function fetchProjectOptions() {
@@ -271,6 +291,13 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     }
   }
 
+  async function importProjectsFromBlueBook(
+    blueBookId: string,
+    data: ImportBBProjectsFromBlueBookPayload,
+  ) {
+    return BlueBookService.importProjectsFromBlueBook(blueBookId, data)
+  }
+
   async function fetchLoI(projectId: string) {
     lois.value = await BlueBookService.getLoI(projectId)
     return lois.value
@@ -279,12 +306,14 @@ export const useBlueBookStore = defineStore('blueBook', () => {
   async function createLoI(projectId: string, data: LoIPayload) {
     const result = await BlueBookService.createLoI(projectId, data)
     await fetchLoI(projectId)
+    await fetchProjectHistory(projectId)
     return result
   }
 
   async function deleteLoI(projectId: string, id: string) {
     await BlueBookService.deleteLoI(projectId, id)
     await fetchLoI(projectId)
+    await fetchProjectHistory(projectId)
   }
 
   function $reset() {
@@ -324,11 +353,13 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     total,
     projectTotal,
     fetchBlueBooks,
+    getBlueBooksByPeriod,
     fetchBlueBook,
     createBlueBook,
     updateBlueBook,
     deleteBlueBook,
     fetchProjects,
+    getProjectsByBlueBook,
     fetchProjectOptions,
     fetchRevisionSourceProjectOptions,
     clearRevisionSourceProjectOptions,
@@ -340,6 +371,7 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     downloadProjectImportTemplate,
     previewProjectImport,
     importProjects,
+    importProjectsFromBlueBook,
     fetchLoI,
     createLoI,
     deleteLoI,

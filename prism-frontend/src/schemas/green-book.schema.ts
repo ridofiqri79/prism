@@ -15,6 +15,12 @@ const optionalDurationMonths = z
 export const greenBookSchema = z.object({
   publish_year: z.number().int().min(1900, 'Tahun terbit wajib diisi'),
   revision_number: z.number().int().min(0, 'Revisi minimal 0'),
+  status: z.enum(['active', 'superseded']),
+})
+
+export const importGBProjectsFromGreenBookSchema = z.object({
+  source_green_book_id: z.string().uuid('Green Book sumber wajib dipilih'),
+  project_ids: z.array(z.string().uuid('Project Green Book tidak valid')).min(1, 'Minimal satu Project Green Book dipilih'),
 })
 
 export const gbProjectSchema = z.object({

@@ -8,6 +8,7 @@ import type {
   BlueBook,
   BlueBookListParams,
   BlueBookPayload,
+  ImportBBProjectsFromBlueBookPayload,
   LoI,
   LoIPayload,
 } from '@/types/blue-book.types'
@@ -78,6 +79,15 @@ export const BlueBookService = {
 
   async deleteProject(blueBookId: string, id: string) {
     await http.delete(`/blue-books/${blueBookId}/projects/${id}`)
+  },
+
+  async importProjectsFromBlueBook(blueBookId: string, data: ImportBBProjectsFromBlueBookPayload) {
+    const response = await http.post<ApiResponse<BBProject[]>>(
+      `/blue-books/${blueBookId}/import-projects/from-blue-book`,
+      data,
+    )
+
+    return response.data.data
   },
 
   async downloadImportTemplate(blueBookId: string) {

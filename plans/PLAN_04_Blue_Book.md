@@ -4,6 +4,8 @@
 > **Deliverable:** Staff bisa input dan melihat Blue Book lengkap.
 > **Referensi:** docs/PRISM_API_Contract.md (Blue Book), docs/PRISM_Business_Rules.md (bagian 3)
 > **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. BB Project perlu `project_identity_id`, indikator latest/newer revision, dan section histori revisi.
+> **Carry-over update:** Setelah Blue Book revisi dibuat, user memakai tombol "Impor Proyek dari Blue Book Lain" di detail Blue Book untuk memilih Project Blue Book dari Blue Book sumber periode yang sama dan meng-clone sebagai snapshot baru.
+> **Create update:** Create Blue Book baru selalu kosong; tidak ada carry-over otomatis dari Blue Book sebelumnya.
 
 ---
 
@@ -11,7 +13,8 @@
 
 **`src/types/blue-book.types.ts`:**
 ```typescript
-export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded' }
+export interface BlueBook { id: string; period: Period; publish_date: string; revision_number: number; revision_year?: number; status: 'active' | 'superseded'; project_count: number }
+export interface BlueBookPayload { period_id: string; replaces_blue_book_id?: string | null; publish_date: string; revision_number: number; revision_year?: number | null; status: 'active' | 'superseded' }
 export interface BBProject { id: string; bb_code: string; project_name: string; program_title?: ProgramTitle; bappenas_partners: BappenasPartner[]; executing_agencies: Institution[]; implementing_agencies: Institution[]; locations: Region[]; national_priorities: NationalPriority[]; project_costs: BBProjectCost[]; lender_indications: LenderIndication[]; duration?: number | null; objective?: string; scope_of_work?: string; outputs?: string; outcomes?: string; status: 'active' }
 export interface LenderIndication { id: string; lender: Lender; remarks?: string }
 export interface LoI { id: string; lender: Lender; subject: string; date: string; letter_number?: string }
@@ -29,6 +32,7 @@ export const blueBookSchema = z.object({
   publish_date: z.string().min(1, 'Tanggal terbit wajib diisi'),
   revision_number: z.number().int().min(0),
   revision_year: z.number().int().optional(),
+  status: z.enum(['active', 'superseded']),
 })
 
 export const bbProjectSchema = z.object({
@@ -68,16 +72,21 @@ export const loiSchema = z.object({
 ## Task 4 — BlueBookListPage.vue
 
 - `<PageHeader title="Blue Book">` + tombol "Buat Blue Book" (can create)
-- `<DataTable>`: period name, publish_date, revision, status badge, total projects, actions
+- `<DataTable>`: period name, publish_date, revision, status badge (`Berlaku`/`Tidak Berlaku`), total projects, actions
 - Click baris → `BlueBookDetailPage`
 - Filter: period dropdown, status
+- Delete Blue Book hanya tersedia jika `project_count = 0`; backend tetap menolak jika masih punya Project Blue Book.
+- Flow impor proyek revisi tidak berada di dialog create. Gunakan tombol "Impor Proyek dari Blue Book Lain" pada detail Blue Book.
+- Create Blue Book baru selalu kosong.
 
 ---
 
 ## Task 5 — BlueBookDetailPage.vue
 
 - Info header Blue Book (period, publish_date, revision_number, status badge)
-- Tombol "Edit BB" dan "Tambah Proyek"
+- Tombol "Edit Blue Book", "Impor Proyek dari Blue Book Lain", dan "Tambah Proyek"
+- Tombol "Hapus Blue Book" hanya jika belum ada Project Blue Book
+- Dialog "Impor Proyek dari Blue Book Lain" menampilkan Blue Book sumber periode yang sama dan multi-select Project Blue Book yang akan di-clone.
 - `<DataTable>` BB Projects: bb_code, project_name, executing agency (first), status badge, actions (View, Edit, Tambah Green Book, Delete)
 - Action "Tambah Green Book" membuka dialog Green Book tujuan + checkbox "Gunakan data di Blue Book sebagai data Green Book". Jika tidak dicentang, form GB hanya membawa BB Code dan relasi BB Project; jika dicentang, field BB/GB yang sama dari BB Project sumber terisi otomatis tetapi tetap editable sebelum save.
 

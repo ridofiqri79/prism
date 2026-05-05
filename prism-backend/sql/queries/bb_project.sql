@@ -13,7 +13,12 @@ SELECT
     bb.updated_at,
     p.name AS period_name,
     p.year_start,
-    p.year_end
+    p.year_end,
+    (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    )::BIGINT AS project_count
 FROM blue_book bb
 JOIN period p ON p.id = bb.period_id
 WHERE (
@@ -65,14 +70,19 @@ SELECT
     bb.updated_at,
     p.name AS period_name,
     p.year_start,
-    p.year_end
+    p.year_end,
+    (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    )::BIGINT AS project_count
 FROM blue_book bb
 JOIN period p ON p.id = bb.period_id
 WHERE bb.id = $1;
 
 -- name: CreateBlueBook :one
 INSERT INTO blue_book (period_id, replaces_blue_book_id, publish_date, revision_number, revision_year, status)
-VALUES ($1, $2, $3, $4, $5, 'active')
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateBlueBook :one
@@ -80,16 +90,10 @@ UPDATE blue_book
 SET publish_date = $2,
     revision_number = $3,
     revision_year = $4,
+    status = $5,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
-
--- name: SupersedeBlueBooksByPeriod :exec
-UPDATE blue_book
-SET status = 'superseded',
-    updated_at = NOW()
-WHERE period_id = $1
-  AND status = 'active';
 
 -- name: GetActiveBlueBookByPeriod :one
 SELECT *
@@ -120,11 +124,29 @@ WHERE period_id = sqlc.arg('period_id')
   )
   AND id <> sqlc.arg('id');
 
--- name: SupersedeBlueBook :one
-UPDATE blue_book
-SET status = 'superseded',
-    updated_at = NOW()
-WHERE id = $1
+-- name: CountAnyBBProjectsByBlueBook :one
+SELECT COUNT(*)
+FROM bb_project
+WHERE blue_book_id = $1;
+
+-- name: CountBlueBookRevisionsReplacing :one
+SELECT COUNT(*)
+FROM blue_book
+WHERE replaces_blue_book_id = $1;
+
+-- name: HardDeleteBlueBook :one
+DELETE FROM blue_book
+WHERE blue_book.id = $1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM bb_project bp
+      WHERE bp.blue_book_id = blue_book.id
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM blue_book child
+      WHERE child.replaces_blue_book_id = blue_book.id
+  )
 RETURNING *;
 
 -- ===== BB PROJECT =====
@@ -283,6 +305,14 @@ SELECT *
 FROM bb_project
 WHERE blue_book_id = $1
   AND status = 'active'
+ORDER BY bb_code ASC;
+
+-- name: ListBBProjectsForCloneByIDs :many
+SELECT *
+FROM bb_project
+WHERE blue_book_id = $1
+  AND status = 'active'
+  AND id = ANY(sqlc.arg('project_ids')::uuid[])
 ORDER BY bb_code ASC;
 
 -- name: GetLatestBBProjectByIdentity :one
@@ -557,6 +587,12 @@ ON CONFLICT DO NOTHING;
 DELETE FROM bb_project_institution
 WHERE bb_project_id = $1;
 
+-- name: DeleteBBProjectInstitution :exec
+DELETE FROM bb_project_institution
+WHERE bb_project_id = $1
+  AND institution_id = $2
+  AND role = $3;
+
 -- ===== BB BAPPENAS PARTNERS =====
 
 -- name: GetBBProjectBappenasPartners :many
@@ -574,6 +610,11 @@ ON CONFLICT DO NOTHING;
 -- name: DeleteBBProjectBappenasPartners :exec
 DELETE FROM bb_project_bappenas_partner
 WHERE bb_project_id = $1;
+
+-- name: DeleteBBProjectBappenasPartner :exec
+DELETE FROM bb_project_bappenas_partner
+WHERE bb_project_id = $1
+  AND bappenas_partner_id = $2;
 
 -- ===== BB LOCATIONS =====
 
@@ -600,6 +641,11 @@ ON CONFLICT DO NOTHING;
 DELETE FROM bb_project_location
 WHERE bb_project_id = $1;
 
+-- name: DeleteBBProjectLocation :exec
+DELETE FROM bb_project_location
+WHERE bb_project_id = $1
+  AND region_id = $2;
+
 -- ===== BB NATIONAL PRIORITIES =====
 
 -- name: GetBBProjectNationalPriorities :many
@@ -623,6 +669,11 @@ ON CONFLICT DO NOTHING;
 DELETE FROM bb_project_national_priority
 WHERE bb_project_id = $1;
 
+-- name: DeleteBBProjectNationalPriority :exec
+DELETE FROM bb_project_national_priority
+WHERE bb_project_id = $1
+  AND national_priority_id = $2;
+
 -- name: CountMismatchedBBProjectNationalPriorities :one
 SELECT COUNT(*)
 FROM national_priority np
@@ -643,9 +694,24 @@ INSERT INTO bb_project_cost (bb_project_id, funding_type, funding_category, amou
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
+-- name: UpdateBBProjectCost :one
+UPDATE bb_project_cost
+SET funding_type = $3,
+    funding_category = $4,
+    amount_usd = $5,
+    updated_at = NOW()
+WHERE id = $1
+  AND bb_project_id = $2
+RETURNING *;
+
 -- name: DeleteBBProjectCosts :exec
 DELETE FROM bb_project_cost
 WHERE bb_project_id = $1;
+
+-- name: DeleteBBProjectCost :exec
+DELETE FROM bb_project_cost
+WHERE id = $1
+  AND bb_project_id = $2;
 
 -- ===== LENDER INDICATION =====
 
@@ -670,9 +736,23 @@ INSERT INTO lender_indication (bb_project_id, lender_id, remarks)
 VALUES ($1, $2, $3)
 RETURNING *;
 
+-- name: UpdateLenderIndication :one
+UPDATE lender_indication
+SET lender_id = $3,
+    remarks = $4,
+    updated_at = NOW()
+WHERE id = $1
+  AND bb_project_id = $2
+RETURNING *;
+
 -- name: DeleteLenderIndications :exec
 DELETE FROM lender_indication
 WHERE bb_project_id = $1;
+
+-- name: DeleteLenderIndication :exec
+DELETE FROM lender_indication
+WHERE id = $1
+  AND bb_project_id = $2;
 
 -- ===== LoI =====
 

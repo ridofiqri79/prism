@@ -3,14 +3,17 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import LenderSelect from '@/components/forms/LenderSelect.vue'
 import type { LenderIndication, LenderIndicationPayload } from '@/types/blue-book.types'
+import type { Lender } from '@/types/master.types'
 
 const props = withDefaults(
   defineProps<{
     rows: LenderIndicationPayload[] | LenderIndication[]
     editable?: boolean
+    extraLenderOptions?: Lender[]
   }>(),
   {
     editable: true,
+    extraLenderOptions: () => [],
   },
 )
 
@@ -58,6 +61,7 @@ function updateRow(index: number, patch: Partial<LenderIndicationPayload>) {
             <LenderSelect
               v-if="editable"
               :model-value="rowLenderId(row)"
+              :extra-options="props.extraLenderOptions"
               @update:model-value="updateRow(index, { lender_id: String($event ?? '') })"
             />
             <span v-else>{{ rowLenderName(row) }}</span>
@@ -95,4 +99,3 @@ function updateRow(index: number, patch: Partial<LenderIndicationPayload>) {
     </div>
   </div>
 </template>
-

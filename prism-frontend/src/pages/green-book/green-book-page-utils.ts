@@ -19,6 +19,12 @@ export function formatGBRevision(revisionNumber: number) {
   return revisionNumber === 0 ? 'Original' : `Revisi ke-${revisionNumber}`
 }
 
+export function formatGreenBookStatus(status: string) {
+  if (status === 'active') return 'Berlaku'
+  if (status === 'superseded') return 'Tidak Berlaku'
+  return status
+}
+
 export function joinNames(items: { name?: string; project_name?: string; bb_code?: string }[]) {
   return (
     items
@@ -27,4 +33,3 @@ export function joinNames(items: { name?: string; project_name?: string; bb_code
       .join(', ') || '-'
   )
 }
-

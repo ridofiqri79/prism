@@ -46,7 +46,7 @@ func (s *GreenBookService) ListGreenBooks(ctx context.Context, filter model.Gree
 	}
 	data := make([]model.GreenBookResponse, 0, len(rows))
 	for _, row := range rows {
-		data = append(data, greenBookResponse(row))
+		data = append(data, greenBookFromListRow(row))
 	}
 	return listResponse(data, page, limit, total), nil
 }
@@ -74,7 +74,7 @@ func (s *GreenBookService) GetGreenBook(ctx context.Context, id pgtype.UUID) (*m
 	if err != nil {
 		return nil, mapNotFound(err, "Green Book tidak ditemukan")
 	}
-	res := greenBookResponse(row)
+	res := greenBookFromGetRow(row)
 	return &res, nil
 }
 
@@ -82,45 +82,36 @@ func (s *GreenBookService) CreateGreenBook(ctx context.Context, req model.GreenB
 	if req.PublishYear <= 0 {
 		return nil, validation("publish_year", "wajib diisi")
 	}
+	status, err := parseGreenBookStatus(req.Status)
+	if err != nil {
+		return nil, err
+	}
 	replacesID, err := parseOptionalUUID(req.ReplacesGreenBookID, "replaces_green_book_id")
 	if err != nil {
 		return nil, err
 	}
 	var created queries.GreenBook
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		sourceID := replacesID
-		if !sourceID.Valid && req.RevisionNumber > 0 {
-			active, err := qtx.GetActiveGreenBookByPublishYear(ctx, req.PublishYear)
-			if err != nil && err != pgx.ErrNoRows {
-				return err
-			}
-			if err == nil {
-				sourceID = active.ID
-			}
-		}
-		if sourceID.Valid {
-			if _, err := qtx.GetGreenBook(ctx, sourceID); err != nil {
+		if replacesID.Valid {
+			sourceGreenBook, err := qtx.GetGreenBook(ctx, replacesID)
+			if err != nil {
 				return mapNotFound(err, "Green Book sumber revisi tidak ditemukan")
+			}
+			if sourceGreenBook.PublishYear != req.PublishYear {
+				return validation("replaces_green_book_id", "harus berasal dari publish year yang sama")
 			}
 		}
 		if err := s.ensureGreenBookVersionAvailable(ctx, qtx, req.PublishYear, req.RevisionNumber, pgtype.UUID{}); err != nil {
 			return err
 		}
-		if err := qtx.SupersedeGreenBooksByPublishYear(ctx, req.PublishYear); err != nil {
-			return err
-		}
 		row, err := qtx.CreateGreenBook(ctx, queries.CreateGreenBookParams{
 			PublishYear:         req.PublishYear,
-			ReplacesGreenBookID: sourceID,
+			ReplacesGreenBookID: replacesID,
 			RevisionNumber:      req.RevisionNumber,
+			Status:              status,
 		})
 		if err != nil {
 			return err
-		}
-		if sourceID.Valid {
-			if err := s.cloneGreenBookProjects(ctx, qtx, sourceID, row.ID); err != nil {
-				return err
-			}
 		}
 		created = row
 		return nil
@@ -130,9 +121,87 @@ func (s *GreenBookService) CreateGreenBook(ctx context.Context, req model.GreenB
 	return s.GetGreenBook(ctx, created.ID)
 }
 
+func (s *GreenBookService) ImportGBProjectsFromGreenBook(ctx context.Context, targetGreenBookID pgtype.UUID, req model.ImportGBProjectsFromGreenBookRequest) ([]model.GBProjectResponse, error) {
+	if strings.TrimSpace(req.SourceGreenBookID) == "" {
+		return nil, validation("source_green_book_id", "wajib dipilih")
+	}
+	sourceGreenBookID, err := model.ParseUUID(req.SourceGreenBookID)
+	if err != nil {
+		return nil, validation("source_green_book_id", "UUID tidak valid")
+	}
+	projectIDs, err := uuidArray(req.ProjectIDs, "project_ids")
+	if err != nil {
+		return nil, err
+	}
+	if len(projectIDs) == 0 {
+		return nil, validation("project_ids", "minimal satu Project Green Book harus dipilih")
+	}
+
+	var clonedProjects []queries.GbProject
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		targetGreenBook, err := qtx.GetGreenBook(ctx, targetGreenBookID)
+		if err != nil {
+			return mapNotFound(err, "Green Book tidak ditemukan")
+		}
+		sourceGreenBook, err := qtx.GetGreenBook(ctx, sourceGreenBookID)
+		if err != nil {
+			return mapNotFound(err, "Green Book sumber tidak ditemukan")
+		}
+		if model.UUIDToString(sourceGreenBook.ID) == model.UUIDToString(targetGreenBook.ID) {
+			return validation("source_green_book_id", "harus berbeda dengan Green Book tujuan")
+		}
+
+		sourceProjects, err := qtx.ListGBProjectsForCloneByIDs(ctx, queries.ListGBProjectsForCloneByIDsParams{
+			GreenBookID: sourceGreenBookID,
+			ProjectIds:  projectIDs,
+		})
+		if err != nil {
+			return err
+		}
+		if len(sourceProjects) != len(projectIDs) {
+			return validation("project_ids", "harus berasal dari Green Book sumber")
+		}
+
+		targetProjects, err := qtx.ListGBProjectsForClone(ctx, targetGreenBookID)
+		if err != nil {
+			return err
+		}
+		if err := ensureGBProjectCloneTargetAvailable(sourceProjects, targetProjects); err != nil {
+			return err
+		}
+
+		clonedProjects, err = s.cloneGreenBookProjectSnapshots(ctx, qtx, targetGreenBookID, sourceProjects)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	responses := make([]model.GBProjectResponse, 0, len(clonedProjects))
+	for _, cloned := range clonedProjects {
+		response, err := s.buildGBProjectResponse(ctx, cloned)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, *response)
+	}
+	if s.broker != nil {
+		for _, cloned := range clonedProjects {
+			s.broker.Publish("gb_project.created", map[string]string{"id": model.UUIDToString(cloned.ID)})
+		}
+	}
+	return responses, nil
+}
+
 func (s *GreenBookService) UpdateGreenBook(ctx context.Context, id pgtype.UUID, req model.GreenBookRequest) (*model.GreenBookResponse, error) {
 	if req.PublishYear <= 0 {
 		return nil, validation("publish_year", "wajib diisi")
+	}
+	status, err := parseGreenBookStatus(req.Status)
+	if err != nil {
+		return nil, err
 	}
 	var updated queries.GreenBook
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
@@ -143,6 +212,7 @@ func (s *GreenBookService) UpdateGreenBook(ctx context.Context, id pgtype.UUID, 
 			ID:             id,
 			PublishYear:    req.PublishYear,
 			RevisionNumber: req.RevisionNumber,
+			Status:         status,
 		})
 		if err != nil {
 			return mapNotFound(err, "Green Book tidak ditemukan")
@@ -156,12 +226,38 @@ func (s *GreenBookService) UpdateGreenBook(ctx context.Context, id pgtype.UUID, 
 }
 
 func (s *GreenBookService) DeleteGreenBook(ctx context.Context, id pgtype.UUID) error {
-	return s.withTx(ctx, func(qtx *queries.Queries) error {
-		if _, err := qtx.SupersedeGreenBook(ctx, id); err != nil {
+	var deleted queries.GreenBook
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		if _, err := qtx.GetGreenBook(ctx, id); err != nil {
 			return mapNotFound(err, "Green Book tidak ditemukan")
 		}
+		projectCount, err := qtx.CountAnyGBProjectsByGreenBook(ctx, id)
+		if err != nil {
+			return apperrors.Internal("Gagal memeriksa Project Green Book")
+		}
+		if projectCount > 0 {
+			return apperrors.Conflict("Green Book tidak bisa dihapus karena masih memiliki Project Green Book. Hapus Project Green Book terlebih dahulu.")
+		}
+		revisionCount, err := qtx.CountGreenBookRevisionsReplacing(ctx, id)
+		if err != nil {
+			return apperrors.Internal("Gagal memeriksa relasi revisi Green Book")
+		}
+		if revisionCount > 0 {
+			return apperrors.Conflict("Green Book tidak bisa dihapus karena masih dipakai sebagai sumber revisi Green Book lain.")
+		}
+		row, err := qtx.HardDeleteGreenBook(ctx, id)
+		if err != nil {
+			return mapNotFound(err, "Green Book tidak ditemukan")
+		}
+		deleted = row
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	if s.broker != nil {
+		s.broker.Publish("green_book.deleted", map[string]string{"id": model.UUIDToString(deleted.ID)})
+	}
+	return nil
 }
 
 func (s *GreenBookService) ListGBProjects(ctx context.Context, gbID pgtype.UUID, filter model.GBProjectListFilter, params model.PaginationParams) (*model.ListResponse[model.GBProjectResponse], error) {
@@ -246,7 +342,7 @@ func (s *GreenBookService) CreateGBProject(ctx context.Context, gbID pgtype.UUID
 		if err := s.ensureGBCodeAvailable(ctx, qtx, gbID, req.GBCode); err != nil {
 			return err
 		}
-		identityID, err := s.resolveGBProjectIdentity(ctx, qtx, req.GBProjectIdentityID)
+		identityID, err := s.resolveGBProjectIdentityForGBProject(ctx, qtx, gbID, req.GBProjectIdentityID, req.GBCode)
 		if err != nil {
 			return err
 		}
@@ -420,6 +516,12 @@ func (s *GreenBookService) cloneGreenBookProjects(ctx context.Context, qtx *quer
 	if err != nil {
 		return err
 	}
+	_, err = s.cloneGreenBookProjectSnapshots(ctx, qtx, targetGreenBookID, sourceProjects)
+	return err
+}
+
+func (s *GreenBookService) cloneGreenBookProjectSnapshots(ctx context.Context, qtx *queries.Queries, targetGreenBookID pgtype.UUID, sourceProjects []queries.GbProject) ([]queries.GbProject, error) {
+	clonedProjects := make([]queries.GbProject, 0, len(sourceProjects))
 	for _, source := range sourceProjects {
 		cloned, err := qtx.CreateGBProject(ctx, queries.CreateGBProjectParams{
 			GreenBookID:         targetGreenBookID,
@@ -432,38 +534,63 @@ func (s *GreenBookService) cloneGreenBookProjects(ctx context.Context, qtx *quer
 			ScopeOfProject:      source.ScopeOfProject,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectBBProjectsWithLatestBB(ctx, queries.CloneGBProjectBBProjectsWithLatestBBParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectBappenasPartners(ctx, queries.CloneGBProjectBappenasPartnersParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectInstitutions(ctx, queries.CloneGBProjectInstitutionsParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectLocations(ctx, queries.CloneGBProjectLocationsParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBFundingSources(ctx, queries.CloneGBFundingSourcesParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBDisbursementPlans(ctx, queries.CloneGBDisbursementPlansParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		activities, err := qtx.ListGBActivitiesByProject(ctx, source.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, activity := range activities {
 			clonedActivity, err := qtx.CloneGBActivity(ctx, queries.CloneGBActivityParams{ID: activity.ID, GbProjectID: cloned.ID})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if err := qtx.CloneGBFundingAllocation(ctx, queries.CloneGBFundingAllocationParams{GbActivityID: activity.ID, GbActivityID_2: clonedActivity.ID}); err != nil {
-				return err
+				return nil, err
 			}
+		}
+		clonedProjects = append(clonedProjects, cloned)
+	}
+	return clonedProjects, nil
+}
+
+func ensureGBProjectCloneTargetAvailable(sourceProjects, targetProjects []queries.GbProject) error {
+	if len(sourceProjects) == 0 {
+		return validation("project_ids", "minimal satu Project Green Book harus dipilih")
+	}
+
+	targetIdentity := map[string]struct{}{}
+	targetCode := map[string]struct{}{}
+	for _, project := range targetProjects {
+		targetIdentity[model.UUIDToString(project.GbProjectIdentityID)] = struct{}{}
+		targetCode[normalizeProjectCode(project.GbCode)] = struct{}{}
+	}
+	for _, project := range sourceProjects {
+		identity := model.UUIDToString(project.GbProjectIdentityID)
+		code := normalizeProjectCode(project.GbCode)
+		if _, exists := targetIdentity[identity]; exists {
+			return validation("project_ids", "salah satu project sudah ada di Green Book tujuan")
+		}
+		if _, exists := targetCode[code]; exists {
+			return validation("project_ids", "GB Code sudah ada di Green Book tujuan")
 		}
 	}
 	return nil
@@ -682,6 +809,22 @@ func (s *GreenBookService) resolveGBProjectIdentity(ctx context.Context, qtx *qu
 	return identityID, nil
 }
 
+func (s *GreenBookService) resolveGBProjectIdentityForGBProject(ctx context.Context, qtx *queries.Queries, gbID pgtype.UUID, identity *string, gbCode string) (pgtype.UUID, error) {
+	if identity != nil && strings.TrimSpace(*identity) != "" {
+		return s.resolveGBProjectIdentity(ctx, qtx, identity)
+	}
+
+	previous, err := qtx.FindPreviousGBProjectByCodeForGreenBook(ctx, queries.FindPreviousGBProjectByCodeForGreenBookParams{ID: gbID, Lower: strings.TrimSpace(gbCode)})
+	if err == nil {
+		return previous.GbProjectIdentityID, nil
+	}
+	if err != nil && err != pgx.ErrNoRows {
+		return pgtype.UUID{}, apperrors.Internal("Gagal memeriksa histori GB Code")
+	}
+
+	return s.resolveGBProjectIdentity(ctx, qtx, nil)
+}
+
 func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queries.GbProject) (*model.GBProjectResponse, error) {
 	bbProjects, err := s.queries.GetGBProjectBBProjects(ctx, row.ID)
 	if err != nil {
@@ -736,6 +879,14 @@ func (s *GreenBookService) buildGBProjectResponse(ctx context.Context, row queri
 		Status:              row.Status,
 		CreatedAt:           formatMasterTime(row.CreatedAt),
 		UpdatedAt:           formatMasterTime(row.UpdatedAt),
+	}
+	if row.ProgramTitleID.Valid {
+		programTitle, err := s.queries.GetProgramTitle(ctx, row.ProgramTitleID)
+		if err != nil {
+			return nil, apperrors.Internal("Gagal mengambil judul program GB Project")
+		}
+		pt := toProgramTitleResponse(programTitle)
+		res.ProgramTitle = &pt
 	}
 	latest, err := s.queries.GetLatestGBProjectByIdentity(ctx, row.GbProjectIdentityID)
 	if err == nil {
@@ -816,8 +967,23 @@ func validateGBProjectRequest(req model.CreateGBProjectRequest, validateCode boo
 	return nil
 }
 
-func greenBookResponse(row queries.GreenBook) model.GreenBookResponse {
-	return model.GreenBookResponse{ID: model.UUIDToString(row.ID), PublishYear: row.PublishYear, ReplacesGreenBookID: stringPtrFromUUID(row.ReplacesGreenBookID), RevisionNumber: row.RevisionNumber, Status: row.Status, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+func parseGreenBookStatus(value string) (string, error) {
+	status := strings.ToLower(strings.TrimSpace(value))
+	if status == "" {
+		status = "active"
+	}
+	if status != "active" && status != "superseded" {
+		return "", validation("status", "harus active atau superseded")
+	}
+	return status, nil
+}
+
+func greenBookFromListRow(row queries.ListGreenBooksRow) model.GreenBookResponse {
+	return model.GreenBookResponse{ID: model.UUIDToString(row.ID), PublishYear: row.PublishYear, ReplacesGreenBookID: stringPtrFromUUID(row.ReplacesGreenBookID), RevisionNumber: row.RevisionNumber, Status: row.Status, ProjectCount: row.ProjectCount, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func greenBookFromGetRow(row queries.GetGreenBookRow) model.GreenBookResponse {
+	return model.GreenBookResponse{ID: model.UUIDToString(row.ID), PublishYear: row.PublishYear, ReplacesGreenBookID: stringPtrFromUUID(row.ReplacesGreenBookID), RevisionNumber: row.RevisionNumber, Status: row.Status, ProjectCount: row.ProjectCount, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
 }
 
 func (s *GreenBookService) bbProjectSummary(ctx context.Context, row queries.BbProject) model.BBProjectSummary {

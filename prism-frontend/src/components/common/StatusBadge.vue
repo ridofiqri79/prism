@@ -4,6 +4,7 @@ import Tag from 'primevue/tag'
 
 const props = defineProps<{
   status: string
+  label?: string
 }>()
 
 const severity = computed(() => {
@@ -20,5 +21,5 @@ const severity = computed(() => {
 </script>
 
 <template>
-  <Tag :severity="severity" :value="status" rounded />
+  <Tag :severity="severity" :value="label ?? status" rounded />
 </template>

@@ -25,9 +25,16 @@ const optionalDurationMonths = z
 
 export const blueBookSchema = z.object({
   period_id: z.string().uuid('Periode wajib dipilih'),
+  replaces_blue_book_id: optionalUUID('Blue Book sumber tidak valid'),
   publish_date: z.string().min(1, 'Tanggal terbit wajib diisi'),
   revision_number: z.number().int().min(0, 'Revisi minimal 0'),
   revision_year: optionalNumber,
+  status: z.enum(['active', 'superseded']),
+})
+
+export const importBBProjectsFromBlueBookSchema = z.object({
+  source_blue_book_id: z.string().uuid('Blue Book sumber wajib dipilih'),
+  project_ids: z.array(z.string().uuid('Project Blue Book tidak valid')).min(1, 'Minimal satu Project Blue Book dipilih'),
 })
 
 export const projectCostSchema = z.object({

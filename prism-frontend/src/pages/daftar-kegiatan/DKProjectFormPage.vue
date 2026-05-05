@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from 'primevue/multiselect'
+import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import Textarea from 'primevue/textarea'
 import ActivityDetailsTable from '@/components/daftar-kegiatan/ActivityDetailsTable.vue'
 import FinancingDetailTable from '@/components/daftar-kegiatan/FinancingDetailTable.vue'
@@ -169,13 +169,13 @@ onMounted(() => {
               form.errors.duration
             }}</small>
           </label>
-          <label class="block space-y-2 md:col-span-2">
+          <div class="block space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-surface-700">Lokasi</span>
             <LocationMultiSelect v-model="form.values.location_ids" />
             <small v-if="form.errors.location_ids" class="text-red-600">{{
               form.errors.location_ids
             }}</small>
-          </label>
+          </div>
           <label class="block space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <Textarea v-model="form.values.objectives" auto-resize rows="3" class="w-full" />
