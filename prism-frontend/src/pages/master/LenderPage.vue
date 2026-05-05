@@ -178,18 +178,18 @@ watch(selectedTypes, () => {
           <Button
             v-if="can('lender', 'update')"
             icon="pi pi-pencil"
-            label="Edit"
-            size="small"
+            rounded
             outlined
+            aria-label="Edit"
             @click="openEdit(row as Lender)"
           />
           <Button
             v-if="can('lender', 'delete')"
             icon="pi pi-trash"
-            label="Hapus"
-            size="small"
-            severity="danger"
+            rounded
             outlined
+            severity="danger"
+            aria-label="Hapus"
             @click="deleteItem(row as Lender)"
           />
         </div>

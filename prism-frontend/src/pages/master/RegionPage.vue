@@ -8,6 +8,7 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -160,27 +161,27 @@ watch(selectedTypes, () => {
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Wilayah</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama wilayah" />
-        </span>
-      </label>
-
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Level</span>
-        <MultiSelect
-          v-model="selectedTypes"
-          :options="typeOptions"
-          placeholder="Semua level"
-          display="chip"
-          :max-selected-labels="2"
-          class="w-full"
-        />
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Nama wilayah"
+      :filter-count="selectedTypes.length"
+      @apply="loadData"
+      @reset="selectedTypes = []; loadData()"
+    >
+      <template #filters>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Tipe Wilayah</span>
+          <MultiSelect
+            v-model="selectedTypes"
+            :options="typeOptions"
+            placeholder="Semua level"
+            display="chip"
+            :max-selected-labels="2"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <MasterTreeTable
       :value="treeNodes"
@@ -209,18 +210,18 @@ watch(selectedTypes, () => {
             <Button
               v-if="can('region', 'update')"
               icon="pi pi-pencil"
-              label="Edit"
-              size="small"
+              rounded
               outlined
+              aria-label="Edit"
               @click="openEdit(node.data as Region)"
             />
             <Button
               v-if="can('region', 'delete')"
               icon="pi pi-trash"
-              label="Hapus"
-              size="small"
-              severity="danger"
+              rounded
               outlined
+              severity="danger"
+              aria-label="Hapus"
               @click="deleteItem(node.data as Region)"
             />
           </div>

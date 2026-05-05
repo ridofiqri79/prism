@@ -5,6 +5,7 @@ import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
@@ -131,15 +132,11 @@ watch(controls.search, () => {
       </template>
     </PageHeader>
 
-    <div class="rounded-lg border border-surface-200 bg-white p-4">
-      <label class="block max-w-md space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Judul Program</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Judul program" />
-        </span>
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Judul program"
+      :hide-filter-button="true"
+    />
 
     <MasterTreeTable
       :value="treeNodes"
@@ -162,18 +159,18 @@ watch(controls.search, () => {
             <Button
               v-if="can('program_title', 'update')"
               icon="pi pi-pencil"
-              label="Edit"
-              size="small"
+              rounded
               outlined
+              aria-label="Edit"
               @click="openEdit(node.data as ProgramTitle)"
             />
             <Button
               v-if="can('program_title', 'delete')"
               icon="pi pi-trash"
-              label="Hapus"
-              size="small"
-              severity="danger"
+              rounded
               outlined
+              severity="danger"
+              aria-label="Hapus"
               @click="deleteItem(node.data as ProgramTitle)"
             />
           </div>

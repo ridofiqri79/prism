@@ -8,6 +8,7 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -172,27 +173,27 @@ watch(selectedLevels, () => {
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_18rem]">
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Instansi</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama atau nama singkat" />
-        </span>
-      </label>
-
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Level</span>
-        <MultiSelect
-          v-model="selectedLevels"
-          :options="levelOptions"
-          placeholder="Semua level"
-          display="chip"
-          :max-selected-labels="2"
-          class="w-full"
-        />
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Nama atau nama singkat"
+      :filter-count="selectedLevels.length"
+      @apply="loadData"
+      @reset="selectedLevels = []; loadData()"
+    >
+      <template #filters>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-700">Level</span>
+          <MultiSelect
+            v-model="selectedLevels"
+            :options="levelOptions"
+            placeholder="Semua level"
+            display="chip"
+            :max-selected-labels="2"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <MasterTreeTable
       :value="treeNodes"
@@ -223,18 +224,17 @@ watch(selectedLevels, () => {
             <Button
               v-if="can('institution', 'update')"
               icon="pi pi-pencil"
-              label="Edit"
-              size="small"
+              rounded
               outlined
+              aria-label="Edit instansi"
               @click="openEdit(node.data as Institution)"
             />
             <Button
               v-if="can('institution', 'delete')"
               icon="pi pi-trash"
-              label="Hapus"
-              size="small"
-              severity="danger"
+              rounded
               outlined
+              severity="danger"
               @click="deleteItem(node.data as Institution)"
             />
           </div>

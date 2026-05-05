@@ -278,7 +278,7 @@ onMounted(() => {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Kode Blue Book</span>
-            <InputText v-model="form.values.bb_code" class="w-full" :disabled="isEditMode" />
+            <InputText v-model="form.values.bb_code" class="w-full" :class="isEditMode ? 'bg-surface-50 opacity-100' : ''" :disabled="isEditMode" />
             <small v-if="form.errors.bb_code" class="text-red-600">{{ form.errors.bb_code }}</small>
           </label>
           <label class="block space-y-2">
@@ -301,7 +301,7 @@ onMounted(() => {
             }}</small>
           </label>
         </div>
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-6">
           <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <RichTextEditor v-model="form.values.objective" placeholder="Tulis tujuan proyek" />
