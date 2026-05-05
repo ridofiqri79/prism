@@ -217,6 +217,96 @@ func TestCreateGBProjectInRevisionMapsFundingAllocationToNewActivity(t *testing.
 	}
 }
 
+func TestImportGBProjectsFromGreenBookClonesSelectedSnapshotsAndLatestBBRelations(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	_, oldBBProject, latestBBProject := env.createBBRevisionPair(t)
+	sourceGreenBook := env.createGreenBook(t, gbService, 0, nil)
+	sourceGBProject := env.createGBProject(t, gbService, sourceGreenBook.ID, oldBBProject.ID, "GB-IMPORT-001", "Flood Control GB")
+	targetGreenBook := env.createGreenBook(t, gbService, 1, &sourceGreenBook.ID)
+
+	res, err := gbService.ImportGBProjectsFromGreenBook(env.ctx, mustParseUUID(t, targetGreenBook.ID), model.ImportGBProjectsFromGreenBookRequest{
+		SourceGreenBookID: sourceGreenBook.ID,
+		ProjectIDs:        []string{sourceGBProject.ID},
+	})
+	if err != nil {
+		t.Fatalf("ImportGBProjectsFromGreenBook() error = %v", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("imported projects length = %d, want 1", len(res))
+	}
+	imported := res[0]
+	if imported.GBProjectIdentityID != sourceGBProject.GBProjectIdentityID {
+		t.Fatalf("imported identity = %s, want %s", imported.GBProjectIdentityID, sourceGBProject.GBProjectIdentityID)
+	}
+	if len(imported.BBProjects) != 1 || imported.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("imported BB relation = %+v, want latest BB %s", imported.BBProjects, latestBBProject.ID)
+	}
+	stored, err := gbService.GetGBProject(env.ctx, mustParseUUID(t, targetGreenBook.ID), mustParseUUID(t, imported.ID))
+	if err != nil {
+		t.Fatalf("GetGBProject(imported) error = %v", err)
+	}
+	if len(stored.BBProjects) != 1 || stored.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("stored BB relation = %+v, want latest BB %s", stored.BBProjects, latestBBProject.ID)
+	}
+}
+
+func TestImportGBProjectsFromGreenBookAllowsDifferentPublishYear(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	_, oldBBProject, _ := env.createBBRevisionPair(t)
+	sourceGreenBook, err := gbService.CreateGreenBook(env.ctx, model.GreenBookRequest{
+		PublishYear:    2025,
+		RevisionNumber: 0,
+	})
+	if err != nil {
+		t.Fatalf("CreateGreenBook(source 2025) error = %v", err)
+	}
+	sourceGBProject := env.createGBProject(t, gbService, sourceGreenBook.ID, oldBBProject.ID, "GB-CROSS-YEAR-001", "Cross Year Source")
+	targetGreenBook := env.createGreenBook(t, gbService, 0, nil)
+
+	if sourceGreenBook.PublishYear == targetGreenBook.PublishYear {
+		t.Fatalf("test setup publish years are equal: %d", sourceGreenBook.PublishYear)
+	}
+
+	res, err := gbService.ImportGBProjectsFromGreenBook(env.ctx, mustParseUUID(t, targetGreenBook.ID), model.ImportGBProjectsFromGreenBookRequest{
+		SourceGreenBookID: sourceGreenBook.ID,
+		ProjectIDs:        []string{sourceGBProject.ID},
+	})
+	if err != nil {
+		t.Fatalf("ImportGBProjectsFromGreenBook(cross year) error = %v", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("imported projects length = %d, want 1", len(res))
+	}
+	if res[0].GreenBookID != targetGreenBook.ID {
+		t.Fatalf("imported green_book_id = %s, want target %s", res[0].GreenBookID, targetGreenBook.ID)
+	}
+	if res[0].GBCode != sourceGBProject.GBCode || res[0].ProjectName != sourceGBProject.ProjectName {
+		t.Fatalf("imported project = %s/%s, want %s/%s", res[0].GBCode, res[0].ProjectName, sourceGBProject.GBCode, sourceGBProject.ProjectName)
+	}
+}
+
+func TestImportGBProjectsFromGreenBookRejectsDuplicateCodeInTarget(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+
+	_, oldBBProject, _ := env.createBBRevisionPair(t)
+	sourceGreenBook := env.createGreenBook(t, gbService, 0, nil)
+	sourceGBProject := env.createGBProject(t, gbService, sourceGreenBook.ID, oldBBProject.ID, "GB-DUP-001", "Duplicate Source")
+	targetGreenBook := env.createGreenBook(t, gbService, 1, &sourceGreenBook.ID)
+	_ = env.createGBProject(t, gbService, targetGreenBook.ID, oldBBProject.ID, "GB-DUP-001", "Duplicate Target")
+
+	_, err := gbService.ImportGBProjectsFromGreenBook(env.ctx, mustParseUUID(t, targetGreenBook.ID), model.ImportGBProjectsFromGreenBookRequest{
+		SourceGreenBookID: sourceGreenBook.ID,
+		ProjectIDs:        []string{sourceGBProject.ID},
+	})
+	assertAppErrorCode(t, err, "VALIDATION_ERROR")
+	assertAppErrorHasDetailField(t, err, "project_ids")
+}
+
 func TestGetGBProjectHistoryReturnsOrderedSnapshotsAndConcreteBBRelations(t *testing.T) {
 	env := setupBlueBookVersioningTest(t)
 	gbService := NewGreenBookService(env.pool, env.queries, nil)

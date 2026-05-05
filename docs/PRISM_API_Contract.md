@@ -852,7 +852,7 @@ Response list dan detail Green Book menyertakan `project_count` pada tiap item u
 ```
 
 Validasi: kombinasi `publish_year` + `revision_number` harus unik. Jika sudah ada, backend mengembalikan `409 CONFLICT`.
-Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Green Book lain menjadi `superseded` ketika Green Book baru dibuat. Green Book baru selalu dimulai kosong; Project Green Book dari dokumen/revisi lain hanya dibuat jika user membuatnya manual atau menjalankan import.
+Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Green Book lain menjadi `superseded` ketika Green Book baru dibuat. Green Book baru selalu dimulai kosong; Project Green Book dari dokumen/revisi lain hanya dibuat jika user membuatnya manual, menjalankan import workbook, atau memakai tombol `Tambahkan Proyek dari Green Book Lain`.
 
 `DELETE /green-books/:id` melakukan hard delete. Backend menolak penghapusan jika Green Book masih memiliki Project Green Book atau masih dipakai sebagai sumber revisi Green Book lain.
 
@@ -865,6 +865,17 @@ Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Gre
 | `GET` | `/green-books/:gb_id/import-projects/template` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/execute` | ADMIN only |
+| `POST` | `/green-books/:gb_id/import-projects/from-green-book` | create: `gb_project` |
+
+**Tambahkan dari Green Book lain:**
+```json
+{
+  "source_green_book_id": "uuid-green-book-sumber",
+  "project_ids": ["uuid-gb-project-sumber"]
+}
+```
+
+Endpoint `POST /green-books/:gb_id/import-projects/from-green-book` meng-clone Project Green Book terpilih dari Green Book sumber ke Green Book target. Green Book sumber harus berbeda dari target, tetapi boleh berasal dari `publish_year` yang berbeda. Backend menolak import jika salah satu project tidak berasal dari Green Book sumber, `GB Code` sudah ada di target, atau logical Green Book project yang sama sudah ada di target. Relasi anak ikut di-clone sebagai snapshot baru: relasi BB Project di-resolve ke latest BB Project snapshot, Mitra Kerja Bappenas, institution, lokasi, activities, funding source, disbursement plan, dan funding allocation.
 
 **Content-Type:** `multipart/form-data`
 

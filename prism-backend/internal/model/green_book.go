@@ -7,6 +7,11 @@ type GreenBookRequest struct {
 	Status              string  `json:"status"`
 }
 
+type ImportGBProjectsFromGreenBookRequest struct {
+	SourceGreenBookID string   `json:"source_green_book_id" validate:"required"`
+	ProjectIDs        []string `json:"project_ids" validate:"required,min=1"`
+}
+
 type GreenBookResponse struct {
 	ID                  string  `json:"id"`
 	PublishYear         int32   `json:"publish_year"`

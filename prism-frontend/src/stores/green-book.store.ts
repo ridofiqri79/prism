@@ -9,6 +9,7 @@ import type {
   GreenBook,
   GreenBookListParams,
   GreenBookPayload,
+  ImportGBProjectsFromGreenBookPayload,
 } from '@/types/green-book.types'
 import type { MasterImportSummary } from '@/types/master.types'
 
@@ -52,6 +53,15 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     })
   }
 
+  async function getGreenBooksForImport() {
+    const response = await GreenBookService.getGreenBooks({
+      limit: 1000,
+      sort: 'publish_year',
+      order: 'desc',
+    })
+    return response.data
+  }
+
   async function createGreenBook(data: GreenBookPayload) {
     return GreenBookService.createGreenBook(data)
   }
@@ -73,6 +83,15 @@ export const useGreenBookStore = defineStore('greenBook', () => {
       projectTotal.value = response.meta.total
       return response
     })
+  }
+
+  async function getProjectsByGreenBook(greenBookId: string) {
+    const response = await GreenBookService.getProjects(greenBookId, {
+      limit: 1000,
+      sort: 'gb_code',
+      order: 'asc',
+    })
+    return response.data
   }
 
   async function fetchProjectOptions() {
@@ -115,6 +134,15 @@ export const useGreenBookStore = defineStore('greenBook', () => {
 
   async function deleteProject(greenBookId: string, id: string) {
     await GreenBookService.deleteProject(greenBookId, id)
+  }
+
+  async function importProjectsFromGreenBook(
+    greenBookId: string,
+    data: ImportGBProjectsFromGreenBookPayload,
+  ) {
+    const result = await GreenBookService.importProjectsFromGreenBook(greenBookId, data)
+    projectOptions.value = []
+    return result
   }
 
   async function downloadProjectImportTemplate(greenBookId: string): Promise<Blob> {
@@ -181,16 +209,19 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     projectTotal,
     fetchGreenBooks,
     fetchGreenBook,
+    getGreenBooksForImport,
     createGreenBook,
     updateGreenBook,
     deleteGreenBook,
     fetchProjects,
+    getProjectsByGreenBook,
     fetchProjectOptions,
     fetchProject,
     fetchProjectHistory,
     createProject,
     updateProject,
     deleteProject,
+    importProjectsFromGreenBook,
     downloadProjectImportTemplate,
     previewProjectImport,
     importProjects,

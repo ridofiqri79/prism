@@ -2,8 +2,10 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
@@ -15,14 +17,17 @@ import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useBlueBookStore } from '@/stores/blue-book.store'
-import { greenBookSchema } from '@/schemas/green-book.schema'
+import { greenBookSchema, importGBProjectsFromGreenBookSchema } from '@/schemas/green-book.schema'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
 import type {
   GBProject,
   GBProjectListParams,
+  GBProjectRevisionSourceOption,
+  GreenBook,
   GreenBookPayload,
   GreenBookStatus,
+  ImportGBProjectsFromGreenBookPayload,
 } from '@/types/green-book.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatApiError } from '@/utils/api-error'
@@ -35,6 +40,7 @@ import {
 } from './green-book-page-utils'
 
 type GreenBookField = keyof GreenBookPayload
+type ImportFromGreenBookField = keyof ImportGBProjectsFromGreenBookPayload
 
 const route = useRoute()
 const router = useRouter()
@@ -70,12 +76,23 @@ const projectControls = useListControls<GBProjectFilterState>({
   },
 })
 const dialogVisible = ref(false)
+const importDialogVisible = ref(false)
 const form = reactive<GreenBookPayload>({
   publish_year: new Date().getFullYear(),
   revision_number: 0,
   status: 'active',
 })
 const errors = ref<FormErrors<GreenBookField>>({})
+const importErrors = ref<FormErrors<ImportFromGreenBookField>>({})
+const importSourceGreenBookOptions = ref<GreenBook[]>([])
+const importSourceGreenBookLoading = ref(false)
+const importProjectOptions = ref<GBProjectRevisionSourceOption[]>([])
+const importProjectSearchQuery = ref('')
+const importProjectLoading = ref(false)
+const importForm = reactive<ImportGBProjectsFromGreenBookPayload>({
+  source_green_book_id: '',
+  project_ids: [],
+})
 const columns: ColumnDef[] = [
   { field: 'gb_code', header: 'Kode Green Book' },
   { field: 'project_name', header: 'Nama Proyek' },
@@ -122,6 +139,50 @@ const locationFilterOptions = computed(() =>
 const canDeleteCurrentGreenBook = computed(
   () => can('green_book', 'delete') && (greenBookStore.currentGreenBook?.project_count ?? 0) === 0,
 )
+const canImportProjectsFromGreenBook = computed(
+  () => can('gb_project', 'create') && Boolean(greenBookStore.currentGreenBook),
+)
+const importSourceGreenBookSelectOptions = computed(() =>
+  importSourceGreenBookOptions.value.map((greenBook) => ({
+    ...greenBook,
+    label: sourceGreenBookLabel(greenBook),
+  })),
+)
+const importableProjectOptions = computed(() =>
+  importProjectOptions.value.filter((project) => !project.disabled),
+)
+const hasImportableProjectOptions = computed(() => importableProjectOptions.value.length > 0)
+const filteredImportProjectOptions = computed(() => {
+  const query = normalizeSearchText(importProjectSearchQuery.value)
+  if (!query) return importProjectOptions.value
+
+  return importProjectOptions.value.filter((project) => projectMatchesImportSearch(project, query))
+})
+const filteredImportableProjectOptions = computed(() =>
+  filteredImportProjectOptions.value.filter((project) => !project.disabled),
+)
+const hasFilteredImportableProjectOptions = computed(
+  () => filteredImportableProjectOptions.value.length > 0,
+)
+const selectedImportProjectCount = computed(() => {
+  const importableProjectIds = new Set(importableProjectOptions.value.map((project) => project.id))
+  return importForm.project_ids.filter((projectId) => importableProjectIds.has(projectId)).length
+})
+const importProjectSelectionSummary = computed(() =>
+  importableProjectOptions.value.length > 0
+    ? `${selectedImportProjectCount.value} / ${importableProjectOptions.value.length} dipilih`
+    : '0 proyek bisa ditambahkan',
+)
+const allFilteredImportProjectsSelected = computed(
+  () =>
+    hasFilteredImportableProjectOptions.value &&
+    filteredImportableProjectOptions.value.every((project) => importForm.project_ids.includes(project.id)),
+)
+const importSubmitLabel = computed(() =>
+  selectedImportProjectCount.value > 0
+    ? `Tambahkan ${selectedImportProjectCount.value} Proyek`
+    : 'Tambahkan Proyek',
+)
 
 function buildProjectParams(): GBProjectListParams {
   const params = projectControls.buildParams() as GBProjectListParams
@@ -144,6 +205,110 @@ async function loadData() {
 
 async function loadProjects() {
   await greenBookStore.fetchProjects(greenBookId.value, buildProjectParams())
+}
+
+function clearImportProjects() {
+  importProjectOptions.value = []
+  importForm.project_ids = []
+  importProjectSearchQuery.value = ''
+}
+
+function clearImportSource() {
+  importSourceGreenBookOptions.value = []
+  importForm.source_green_book_id = ''
+  clearImportProjects()
+}
+
+async function loadImportSourceGreenBooks() {
+  const current = greenBookStore.currentGreenBook
+  if (!current) {
+    clearImportSource()
+    return
+  }
+
+  importSourceGreenBookLoading.value = true
+  try {
+    const allGreenBooks = await greenBookStore.getGreenBooksForImport()
+    importSourceGreenBookOptions.value = allGreenBooks
+      .filter((greenBook) => isSourceGreenBook(greenBook, current))
+      .sort(compareGreenBookVersionDesc)
+
+    const currentSourceStillAvailable = importSourceGreenBookOptions.value.some(
+      (greenBook) => greenBook.id === importForm.source_green_book_id,
+    )
+    if (!currentSourceStillAvailable) {
+      importForm.source_green_book_id = importSourceGreenBookOptions.value[0]?.id ?? ''
+      if (!importForm.source_green_book_id) {
+        clearImportProjects()
+        return
+      }
+    }
+
+    await loadImportProjects(importForm.source_green_book_id)
+  } finally {
+    importSourceGreenBookLoading.value = false
+  }
+}
+
+async function loadImportProjects(sourceGreenBookId?: string) {
+  importProjectSearchQuery.value = ''
+
+  if (!sourceGreenBookId) {
+    clearImportProjects()
+    return
+  }
+
+  const current = greenBookStore.currentGreenBook
+  if (!current) {
+    clearImportProjects()
+    return
+  }
+
+  importProjectLoading.value = true
+  try {
+    const [sourceProjects, currentProjects] = await Promise.all([
+      greenBookStore.getProjectsByGreenBook(sourceGreenBookId),
+      greenBookStore.getProjectsByGreenBook(current.id),
+    ])
+    const sourceGreenBook = importSourceGreenBookOptions.value.find(
+      (greenBook) => greenBook.id === sourceGreenBookId,
+    )
+    const usedIdentityIds = new Set(currentProjects.map((project) => project.gb_project_identity_id))
+    const usedCodes = new Set(currentProjects.map((project) => normalizeProjectCode(project.gb_code)))
+
+    importProjectOptions.value = sourceProjects.map((project) => {
+      const unavailableReason = importUnavailableReason(project, usedIdentityIds, usedCodes)
+
+      return {
+        ...project,
+        source_green_book_id: sourceGreenBookId,
+        source_green_book_label: sourceGreenBook ? sourceGreenBookLabel(sourceGreenBook) : '',
+        disabled: Boolean(unavailableReason),
+        unavailable_reason: unavailableReason ?? undefined,
+      }
+    })
+    importForm.project_ids = importProjectOptions.value
+      .filter((project) => !project.disabled)
+      .map((project) => project.id)
+  } finally {
+    importProjectLoading.value = false
+  }
+}
+
+function importUnavailableReason(
+  project: GBProject,
+  usedIdentityIds: Set<string>,
+  usedCodes: Set<string>,
+) {
+  if (usedIdentityIds.has(project.gb_project_identity_id)) {
+    return 'Sudah ada di Green Book tujuan'
+  }
+
+  if (usedCodes.has(normalizeProjectCode(project.gb_code))) {
+    return 'Kode Green Book sudah ada di Green Book tujuan'
+  }
+
+  return null
 }
 
 function openEdit() {
@@ -211,6 +376,42 @@ function deleteProject(project: GBProject) {
       )
     }
   })
+}
+
+function openImportFromGreenBookDialog() {
+  importErrors.value = {}
+  importForm.source_green_book_id = ''
+  importForm.project_ids = []
+  importProjectSearchQuery.value = ''
+  importDialogVisible.value = true
+  void loadImportSourceGreenBooks()
+}
+
+async function saveImportFromGreenBook() {
+  const parsed = importGBProjectsFromGreenBookSchema.safeParse(importForm)
+  if (!parsed.success) {
+    importErrors.value = toFormErrors(parsed.error, ['source_green_book_id', 'project_ids'])
+    return
+  }
+
+  const importableProjectIds = new Set(
+    importProjectOptions.value.filter((project) => !project.disabled).map((project) => project.id),
+  )
+  const projectIds = parsed.data.project_ids.filter((projectId) => importableProjectIds.has(projectId))
+  if (projectIds.length === 0) {
+    importErrors.value = {
+      project_ids: 'Pilih minimal satu Project Green Book yang belum ada di Green Book tujuan',
+    }
+    return
+  }
+
+  await greenBookStore.importProjectsFromGreenBook(greenBookId.value, {
+    ...parsed.data,
+    project_ids: projectIds,
+  })
+  toast.success('Berhasil', 'Proyek Green Book berhasil ditambahkan')
+  importDialogVisible.value = false
+  await Promise.all([greenBookStore.fetchGreenBook(greenBookId.value), loadProjects()])
 }
 
 function formatInstitution(institution: Institution) {
@@ -289,6 +490,87 @@ function selectedRegionSummary(ids: string[]) {
   )
 }
 
+function compareGreenBookVersionDesc(left: GreenBook, right: GreenBook) {
+  if (left.publish_year !== right.publish_year) {
+    return right.publish_year - left.publish_year
+  }
+
+  if (left.revision_number !== right.revision_number) {
+    return right.revision_number - left.revision_number
+  }
+
+  return String(right.created_at ?? '').localeCompare(String(left.created_at ?? ''))
+}
+
+function isSourceGreenBook(greenBook: GreenBook, targetGreenBook: GreenBook) {
+  return greenBook.id !== targetGreenBook.id
+}
+
+function sourceGreenBookLabel(greenBook: GreenBook) {
+  return `Green Book ${greenBook.publish_year} - ${formatGBRevision(greenBook.revision_number)} (${formatGreenBookStatus(greenBook.status)})`
+}
+
+function normalizeProjectCode(code: string) {
+  return code.trim().toLowerCase()
+}
+
+function normalizeSearchText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function projectMatchesImportSearch(project: GBProjectRevisionSourceOption, query: string) {
+  const searchable = [
+    project.gb_code,
+    project.project_name,
+    project.source_green_book_label,
+    project.unavailable_reason ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return searchable.includes(query)
+}
+
+function isImportProjectSelected(projectId: string) {
+  return importForm.project_ids.includes(projectId)
+}
+
+function setImportProjectSelected(project: GBProjectRevisionSourceOption, selected: boolean) {
+  if (project.disabled) {
+    return
+  }
+
+  const ids = new Set(importForm.project_ids)
+  if (selected) {
+    ids.add(project.id)
+  } else {
+    ids.delete(project.id)
+  }
+
+  importForm.project_ids = [...ids]
+}
+
+function setAllFilteredImportProjectsSelected(selected: boolean) {
+  const ids = new Set(importForm.project_ids)
+  filteredImportableProjectOptions.value.forEach((project) => {
+    if (selected) {
+      ids.add(project.id)
+    } else {
+      ids.delete(project.id)
+    }
+  })
+
+  importForm.project_ids = [...ids]
+}
+
+function selectAllImportProjects() {
+  importForm.project_ids = importableProjectOptions.value.map((project) => project.id)
+}
+
+function clearAllImportProjects() {
+  importForm.project_ids = []
+}
+
 onMounted(() => {
   void loadData()
 })
@@ -322,6 +604,13 @@ watch(
           severity="danger"
           outlined
           @click="deleteGreenBook"
+        />
+        <Button
+          v-if="canImportProjectsFromGreenBook"
+          icon="pi pi-file-import"
+          label="Tambahkan Proyek dari Green Book Lain"
+          outlined
+          @click="openImportFromGreenBookDialog"
         />
         <Button
           v-if="can('gb_project', 'create')"
@@ -450,6 +739,207 @@ watch(
         <span v-else>{{ row[column.field] || '-' }}</span>
       </template>
     </DataTable>
+
+    <Dialog
+      v-model:visible="importDialogVisible"
+      modal
+      header="Tambahkan Proyek dari Green Book Lain"
+      class="w-[64rem] max-w-[calc(100vw-2rem)]"
+    >
+      <form class="flex flex-col gap-5" @submit.prevent="saveImportFromGreenBook">
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-surface-700">Green Book Sumber</span>
+          <SingleSelectDropdown
+            v-model="importForm.source_green_book_id"
+            :options="importSourceGreenBookSelectOptions"
+            option-label="label"
+            option-value="id"
+            placeholder="Pilih Green Book sumber"
+            filter
+            filter-placeholder="Cari Green Book"
+            append-to="body"
+            class="w-full"
+            :loading="importSourceGreenBookLoading"
+            :invalid="Boolean(importErrors.source_green_book_id)"
+            @change="loadImportProjects(importForm.source_green_book_id)"
+          />
+          <small v-if="importErrors.source_green_book_id" class="text-red-600">
+            {{ importErrors.source_green_book_id }}
+          </small>
+          <small
+            v-else-if="!importSourceGreenBookLoading && importSourceGreenBookOptions.length === 0"
+            class="text-surface-500"
+          >
+            Belum ada Green Book lain yang bisa dijadikan sumber.
+          </small>
+        </label>
+
+        <section class="grid gap-3">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center">
+            <label class="relative min-w-0 flex-1">
+              <span class="sr-only">Cari Project Green Book</span>
+              <i
+                class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400"
+              />
+              <InputText
+                v-model="importProjectSearchQuery"
+                placeholder="Cari kode atau nama proyek..."
+                class="w-full pl-10"
+                :disabled="!importForm.source_green_book_id || importProjectLoading"
+              />
+            </label>
+            <p class="shrink-0 text-sm font-semibold text-surface-600">
+              {{ importProjectSelectionSummary }}
+            </p>
+          </div>
+
+          <div class="overflow-hidden rounded-lg border border-surface-200 bg-surface-0">
+            <div class="max-h-[22rem] overflow-auto">
+              <table class="min-w-full table-fixed text-sm">
+                <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold text-surface-600">
+                  <tr class="border-b border-surface-200">
+                    <th class="w-12 px-4 py-3">
+                      <Checkbox
+                        binary
+                        :model-value="allFilteredImportProjectsSelected"
+                        :disabled="!hasFilteredImportableProjectOptions"
+                        @update:model-value="setAllFilteredImportProjectsSelected(Boolean($event))"
+                      />
+                    </th>
+                    <th class="w-44 px-3 py-3">Kode Proyek</th>
+                    <th class="px-3 py-3">Nama Proyek</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="importProjectLoading">
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                      Memuat Project Green Book...
+                    </td>
+                  </tr>
+                  <tr v-else-if="!importForm.source_green_book_id">
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                      Pilih Green Book sumber untuk melihat Project Green Book.
+                    </td>
+                  </tr>
+                  <tr v-else-if="importProjectOptions.length === 0">
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                      Green Book sumber ini belum memiliki Project Green Book.
+                    </td>
+                  </tr>
+                  <tr v-else-if="filteredImportProjectOptions.length === 0">
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                      Tidak ada Project Green Book yang cocok dengan pencarian.
+                    </td>
+                  </tr>
+                  <template v-else>
+                    <tr
+                      v-for="option in filteredImportProjectOptions"
+                      :key="option.id"
+                      class="border-b border-surface-100 last:border-b-0"
+                      :class="
+                        option.disabled
+                          ? 'bg-surface-50 text-surface-400'
+                          : isImportProjectSelected(option.id)
+                            ? 'bg-primary-50/60 text-surface-950'
+                            : 'bg-surface-0 text-surface-800 hover:bg-surface-50'
+                      "
+                    >
+                      <td class="px-4 py-3 align-top">
+                        <Checkbox
+                          binary
+                          :model-value="isImportProjectSelected(option.id)"
+                          :disabled="option.disabled"
+                          @update:model-value="setImportProjectSelected(option, Boolean($event))"
+                        />
+                      </td>
+                      <td class="px-3 py-3 align-top">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span
+                            class="rounded border border-surface-200 bg-surface-0 px-2 py-0.5 font-mono text-xs font-semibold text-surface-700"
+                          >
+                            {{ option.gb_code }}
+                          </span>
+                          <span
+                            v-if="isImportProjectSelected(option.id) && !option.disabled"
+                            class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700"
+                          >
+                            Dipilih
+                          </span>
+                          <span
+                            v-if="option.unavailable_reason"
+                            class="rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                          >
+                            Sudah ada
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-3 align-top">
+                        <p class="font-medium leading-snug">
+                          {{ option.project_name }}
+                        </p>
+                        <p class="mt-1 text-xs text-surface-500">{{ option.source_green_book_label }}</p>
+                        <p v-if="option.unavailable_reason" class="mt-1 text-xs text-amber-700">
+                          {{ option.unavailable_reason }}
+                        </p>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p v-if="importErrors.project_ids" class="text-sm text-red-600">
+            {{ importErrors.project_ids }}
+          </p>
+          <p
+            v-else-if="
+              importForm.source_green_book_id &&
+              !importProjectLoading &&
+              importProjectOptions.length > 0 &&
+              !hasImportableProjectOptions
+            "
+            class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700"
+          >
+            Semua Project Green Book dari sumber ini sudah ada di Green Book tujuan.
+          </p>
+        </section>
+
+        <div class="flex flex-col gap-3 border-t border-surface-200 pt-5 md:flex-row md:items-center md:justify-between">
+          <div class="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              label="Pilih Semua"
+              severity="secondary"
+              outlined
+              :disabled="!hasImportableProjectOptions || selectedImportProjectCount === importableProjectOptions.length"
+              @click="selectAllImportProjects"
+            />
+            <Button
+              type="button"
+              label="Hapus Semua"
+              severity="secondary"
+              outlined
+              :disabled="selectedImportProjectCount === 0"
+              @click="clearAllImportProjects"
+            />
+          </div>
+          <div class="flex justify-end gap-2">
+            <Button type="button" label="Batal" severity="secondary" outlined @click="importDialogVisible = false" />
+            <Button
+              type="submit"
+              :label="importSubmitLabel"
+              icon="pi pi-file-import"
+              :disabled="
+                !importForm.source_green_book_id ||
+                selectedImportProjectCount === 0 ||
+                !hasImportableProjectOptions
+              "
+            />
+          </div>
+        </div>
+      </form>
+    </Dialog>
 
     <Dialog v-model:visible="dialogVisible" modal header="Edit Green Book" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">

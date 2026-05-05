@@ -18,6 +18,11 @@ export const greenBookSchema = z.object({
   status: z.enum(['active', 'superseded']),
 })
 
+export const importGBProjectsFromGreenBookSchema = z.object({
+  source_green_book_id: z.string().uuid('Green Book sumber wajib dipilih'),
+  project_ids: z.array(z.string().uuid('Project Green Book tidak valid')).min(1, 'Minimal satu Project Green Book dipilih'),
+})
+
 export const gbProjectSchema = z.object({
   program_title_id: z.string().uuid('Judul program wajib dipilih'),
   gb_code: z.string().min(1, 'Kode Green Book wajib diisi'),

@@ -61,6 +61,7 @@
 - Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
 - Green Book baru selalu dimulai kosong. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
+- Pada Green Book detail, user dapat memakai tombol `Tambahkan Proyek dari Green Book Lain` untuk memilih Project Green Book dari Green Book sumber mana pun dan membawanya ke Green Book tujuan.
 - Saat user membuat GB Project baru dengan `gb_code` yang sama pada revisi Green Book berikutnya, backend menyambungkan snapshot tersebut ke logical identity sebelumnya.
 - Green Book boleh dihapus permanen hanya jika belum memiliki Project Green Book dan tidak menjadi sumber revisi Green Book lain.
 - GB Project wajib mereferensikan minimal 1 BB Project.

@@ -381,13 +381,21 @@ WHERE green_book_id = $1
   AND status = 'active'
 ORDER BY gb_code ASC;
 
+-- name: ListGBProjectsForCloneByIDs :many
+SELECT *
+FROM gb_project
+WHERE green_book_id = $1
+  AND status = 'active'
+  AND id = ANY(sqlc.arg('project_ids')::uuid[])
+ORDER BY gb_code ASC;
+
 -- name: GetLatestGBProjectByIdentity :one
 SELECT gp.*
 FROM gb_project gp
 JOIN green_book gb ON gb.id = gp.green_book_id
 WHERE gp.gb_project_identity_id = $1
   AND gp.status = 'active'
-ORDER BY gb.revision_number DESC, gb.created_at DESC
+ORDER BY gb.publish_year DESC, gb.revision_number DESC, gb.created_at DESC
 LIMIT 1;
 
 -- name: GetLatestGBProjectByProject :one
@@ -399,7 +407,7 @@ JOIN LATERAL (
     JOIN green_book gb ON gb.id = gp.green_book_id
     WHERE gp.gb_project_identity_id = current_project.gb_project_identity_id
       AND gp.status = 'active'
-    ORDER BY gb.revision_number DESC, gb.created_at DESC
+    ORDER BY gb.publish_year DESC, gb.revision_number DESC, gb.created_at DESC
     LIMIT 1
 ) latest ON TRUE
 WHERE current_project.id = $1;
@@ -420,7 +428,7 @@ SELECT
         JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
         WHERE latest.gb_project_identity_id = gp.gb_project_identity_id
           AND latest.status = 'active'
-        ORDER BY latest_gb.revision_number DESC, latest_gb.created_at DESC
+        ORDER BY latest_gb.publish_year DESC, latest_gb.revision_number DESC, latest_gb.created_at DESC
         LIMIT 1
     ))::boolean AS is_latest,
     EXISTS (
@@ -431,7 +439,7 @@ SELECT
 FROM gb_project gp
 JOIN green_book gb ON gb.id = gp.green_book_id
 WHERE gp.gb_project_identity_id = $1
-ORDER BY gb.revision_number ASC, gb.created_at ASC;
+ORDER BY gb.publish_year ASC, gb.revision_number ASC, gb.created_at ASC;
 
 -- name: ListGBProjectHistoryByProject :many
 SELECT history.*
@@ -452,7 +460,7 @@ JOIN LATERAL (
             JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
             WHERE latest.gb_project_identity_id = gp.gb_project_identity_id
               AND latest.status = 'active'
-            ORDER BY latest_gb.revision_number DESC, latest_gb.created_at DESC
+            ORDER BY latest_gb.publish_year DESC, latest_gb.revision_number DESC, latest_gb.created_at DESC
             LIMIT 1
         ))::boolean AS is_latest,
         EXISTS (
@@ -463,7 +471,7 @@ JOIN LATERAL (
     FROM gb_project gp
     JOIN green_book gb ON gb.id = gp.green_book_id
     WHERE gp.gb_project_identity_id = current_project.gb_project_identity_id
-    ORDER BY gb.revision_number ASC, gb.created_at ASC
+    ORDER BY gb.publish_year ASC, gb.revision_number ASC, gb.created_at ASC
 ) history ON TRUE
 WHERE current_project.id = $1;
 

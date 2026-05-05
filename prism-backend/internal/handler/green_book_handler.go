@@ -84,6 +84,22 @@ func (h *GreenBookHandler) DeleteGreenBook(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *GreenBookHandler) ImportGBProjectsFromGreenBook(c echo.Context) error {
+	gbID, err := parseIDParam(c, "gbId")
+	if err != nil {
+		return err
+	}
+	var req model.ImportGBProjectsFromGreenBookRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.ImportGBProjectsFromGreenBook(c.Request().Context(), gbID, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[[]model.GBProjectResponse]{Data: res})
+}
+
 func (h *GreenBookHandler) ListGBProjects(c echo.Context) error {
 	gbID, err := parseIDParam(c, "gbId")
 	if err != nil {

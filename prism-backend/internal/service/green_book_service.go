@@ -121,6 +121,80 @@ func (s *GreenBookService) CreateGreenBook(ctx context.Context, req model.GreenB
 	return s.GetGreenBook(ctx, created.ID)
 }
 
+func (s *GreenBookService) ImportGBProjectsFromGreenBook(ctx context.Context, targetGreenBookID pgtype.UUID, req model.ImportGBProjectsFromGreenBookRequest) ([]model.GBProjectResponse, error) {
+	if strings.TrimSpace(req.SourceGreenBookID) == "" {
+		return nil, validation("source_green_book_id", "wajib dipilih")
+	}
+	sourceGreenBookID, err := model.ParseUUID(req.SourceGreenBookID)
+	if err != nil {
+		return nil, validation("source_green_book_id", "UUID tidak valid")
+	}
+	projectIDs, err := uuidArray(req.ProjectIDs, "project_ids")
+	if err != nil {
+		return nil, err
+	}
+	if len(projectIDs) == 0 {
+		return nil, validation("project_ids", "minimal satu Project Green Book harus dipilih")
+	}
+
+	var clonedProjects []queries.GbProject
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		targetGreenBook, err := qtx.GetGreenBook(ctx, targetGreenBookID)
+		if err != nil {
+			return mapNotFound(err, "Green Book tidak ditemukan")
+		}
+		sourceGreenBook, err := qtx.GetGreenBook(ctx, sourceGreenBookID)
+		if err != nil {
+			return mapNotFound(err, "Green Book sumber tidak ditemukan")
+		}
+		if model.UUIDToString(sourceGreenBook.ID) == model.UUIDToString(targetGreenBook.ID) {
+			return validation("source_green_book_id", "harus berbeda dengan Green Book tujuan")
+		}
+
+		sourceProjects, err := qtx.ListGBProjectsForCloneByIDs(ctx, queries.ListGBProjectsForCloneByIDsParams{
+			GreenBookID: sourceGreenBookID,
+			ProjectIds:  projectIDs,
+		})
+		if err != nil {
+			return err
+		}
+		if len(sourceProjects) != len(projectIDs) {
+			return validation("project_ids", "harus berasal dari Green Book sumber")
+		}
+
+		targetProjects, err := qtx.ListGBProjectsForClone(ctx, targetGreenBookID)
+		if err != nil {
+			return err
+		}
+		if err := ensureGBProjectCloneTargetAvailable(sourceProjects, targetProjects); err != nil {
+			return err
+		}
+
+		clonedProjects, err = s.cloneGreenBookProjectSnapshots(ctx, qtx, targetGreenBookID, sourceProjects)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	responses := make([]model.GBProjectResponse, 0, len(clonedProjects))
+	for _, cloned := range clonedProjects {
+		response, err := s.buildGBProjectResponse(ctx, cloned)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, *response)
+	}
+	if s.broker != nil {
+		for _, cloned := range clonedProjects {
+			s.broker.Publish("gb_project.created", map[string]string{"id": model.UUIDToString(cloned.ID)})
+		}
+	}
+	return responses, nil
+}
+
 func (s *GreenBookService) UpdateGreenBook(ctx context.Context, id pgtype.UUID, req model.GreenBookRequest) (*model.GreenBookResponse, error) {
 	if req.PublishYear <= 0 {
 		return nil, validation("publish_year", "wajib diisi")
@@ -442,6 +516,12 @@ func (s *GreenBookService) cloneGreenBookProjects(ctx context.Context, qtx *quer
 	if err != nil {
 		return err
 	}
+	_, err = s.cloneGreenBookProjectSnapshots(ctx, qtx, targetGreenBookID, sourceProjects)
+	return err
+}
+
+func (s *GreenBookService) cloneGreenBookProjectSnapshots(ctx context.Context, qtx *queries.Queries, targetGreenBookID pgtype.UUID, sourceProjects []queries.GbProject) ([]queries.GbProject, error) {
+	clonedProjects := make([]queries.GbProject, 0, len(sourceProjects))
 	for _, source := range sourceProjects {
 		cloned, err := qtx.CreateGBProject(ctx, queries.CreateGBProjectParams{
 			GreenBookID:         targetGreenBookID,
@@ -454,38 +534,63 @@ func (s *GreenBookService) cloneGreenBookProjects(ctx context.Context, qtx *quer
 			ScopeOfProject:      source.ScopeOfProject,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectBBProjectsWithLatestBB(ctx, queries.CloneGBProjectBBProjectsWithLatestBBParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectBappenasPartners(ctx, queries.CloneGBProjectBappenasPartnersParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectInstitutions(ctx, queries.CloneGBProjectInstitutionsParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBProjectLocations(ctx, queries.CloneGBProjectLocationsParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBFundingSources(ctx, queries.CloneGBFundingSourcesParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		if err := qtx.CloneGBDisbursementPlans(ctx, queries.CloneGBDisbursementPlansParams{GbProjectID: source.ID, GbProjectID_2: cloned.ID}); err != nil {
-			return err
+			return nil, err
 		}
 		activities, err := qtx.ListGBActivitiesByProject(ctx, source.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, activity := range activities {
 			clonedActivity, err := qtx.CloneGBActivity(ctx, queries.CloneGBActivityParams{ID: activity.ID, GbProjectID: cloned.ID})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if err := qtx.CloneGBFundingAllocation(ctx, queries.CloneGBFundingAllocationParams{GbActivityID: activity.ID, GbActivityID_2: clonedActivity.ID}); err != nil {
-				return err
+				return nil, err
 			}
+		}
+		clonedProjects = append(clonedProjects, cloned)
+	}
+	return clonedProjects, nil
+}
+
+func ensureGBProjectCloneTargetAvailable(sourceProjects, targetProjects []queries.GbProject) error {
+	if len(sourceProjects) == 0 {
+		return validation("project_ids", "minimal satu Project Green Book harus dipilih")
+	}
+
+	targetIdentity := map[string]struct{}{}
+	targetCode := map[string]struct{}{}
+	for _, project := range targetProjects {
+		targetIdentity[model.UUIDToString(project.GbProjectIdentityID)] = struct{}{}
+		targetCode[normalizeProjectCode(project.GbCode)] = struct{}{}
+	}
+	for _, project := range sourceProjects {
+		identity := model.UUIDToString(project.GbProjectIdentityID)
+		code := normalizeProjectCode(project.GbCode)
+		if _, exists := targetIdentity[identity]; exists {
+			return validation("project_ids", "salah satu project sudah ada di Green Book tujuan")
+		}
+		if _, exists := targetCode[code]; exists {
+			return validation("project_ids", "GB Code sudah ada di Green Book tujuan")
 		}
 	}
 	return nil
