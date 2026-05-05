@@ -14,6 +14,7 @@ import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.vue'
 import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
 import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
+import ProjectSnapshotHeader from '@/components/common/ProjectSnapshotHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -22,7 +23,8 @@ import { useBlueBookStore } from '@/stores/blue-book.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
 import { toNameList } from '@/utils/formatters'
-import { formatBlueBookStatus, toFormErrors, type FormErrors } from './blue-book-page-utils'
+import { formatBookStatus } from '@/utils/formatters'
+import { toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
 
@@ -68,7 +70,7 @@ const revisionHistoryItems = computed<RevisionHistoryItem[]>(() =>
     label: historyLabel(item),
     code: item.bb_code,
     book_status: item.book_status,
-    status_label: formatBlueBookStatus(item.book_status),
+    status_label: formatBookStatus(item.book_status),
     is_latest: item.is_latest,
     route: { name: 'bb-project-detail', params: { bbId: item.blue_book_id, id: item.id } },
   })),
@@ -96,10 +98,8 @@ function historyLabel(item: BBProjectHistoryItem) {
   return `${item.book_label} - Rev ${item.revision_number}${year}`
 }
 
-function formatProjectStatus(status: string) {
-  if (status === 'active') return 'Berlaku'
-  return status
-}
+
+
 
 function hasRichText(value?: string | null) {
   return !isRichTextEmpty(value)
@@ -174,27 +174,13 @@ onMounted(() => {
 
     <div v-if="project" class="space-y-6">
       <!-- Top card: Judul Program + Status -->
-      <div class="rounded-lg border border-surface-200 bg-white p-5">
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div class="min-w-0 space-y-1.5">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Judul Program</p>
-            <p class="truncate text-base font-semibold text-surface-950">{{ programTitleName }}</p>
-          </div>
-          <div class="flex flex-col gap-2 lg:items-end">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status Snapshot</p>
-            <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-              <StatusBadge :status="project.status" :label="formatProjectStatus(project.status)" />
-              <Tag v-if="project.is_latest" value="Versi terbaru" severity="success" rounded />
-              <Tag
-                v-else-if="project.has_newer_revision"
-                value="Ada revisi lebih baru"
-                severity="warn"
-                rounded
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProjectSnapshotHeader
+        :program-title-name="programTitleName"
+        :status="project.status"
+        :status-label="formatBookStatus(project.status)"
+        :is-latest="project.is_latest"
+        :has-newer-revision="project.has_newer_revision"
+      />
 
       <!-- Rincian Proyek -->
       <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">

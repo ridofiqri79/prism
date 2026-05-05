@@ -1,5 +1,5 @@
 import { computed, reactive, watch } from 'vue'
-import type { ZodError } from 'zod'
+import { assignFormErrors } from '@/utils/form-errors'
 import { loanAgreementSchema } from '@/schemas/loan-agreement.schema'
 import { LoanAgreementService } from '@/services/loan-agreement.service'
 import type { DKProjectLoanOption, LoanAgreement, LoanAgreementPayload } from '@/types/loan-agreement.types'
@@ -22,18 +22,7 @@ function defaultValues(): LoanAgreementPayload {
   }
 }
 
-function assignErrors(target: LAFormErrors, error: ZodError) {
-  Object.keys(target).forEach((key) => {
-    delete target[key as keyof LAFormErrors]
-  })
 
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as keyof LoanAgreementPayload
-    if (!target[field]) {
-      target[field] = issue.message
-    }
-  }
-}
 
 function daysBetween(start: string, end: string) {
   if (!start || !end) return 0
@@ -132,7 +121,7 @@ export function useLAForm(
     return async () => {
       const parsed = loanAgreementSchema.safeParse(values)
       if (!parsed.success) {
-        assignErrors(errors, parsed.error)
+        assignFormErrors(errors, parsed.error)
         return
       }
 

@@ -1,5 +1,5 @@
 import { computed, reactive, ref, watch } from 'vue'
-import type { ZodError } from 'zod'
+import { assignFormErrors } from '@/utils/form-errors'
 import { dkProjectSchema } from '@/schemas/daftar-kegiatan.schema'
 import type { BBProject } from '@/types/blue-book.types'
 import type {
@@ -85,18 +85,7 @@ function fromProject(project?: DKProject | null): Partial<DKProjectFormValues> {
   }
 }
 
-function assignErrors(target: DKProjectFormErrors, error: ZodError) {
-  Object.keys(target).forEach((key) => {
-    delete target[key as keyof DKProjectFormErrors]
-  })
 
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as keyof DKProjectFormErrors
-    if (!target[field]) {
-      target[field] = issue.message
-    }
-  }
-}
 
 function normalizeActivities(rows: DKActivityDetailPayload[]) {
   rows.forEach((row, index) => {
@@ -369,7 +358,7 @@ export function useDKProjectForm(
       normalizeActivities(activityDetails.value)
       const parsed = dkProjectSchema.safeParse(toPayload())
       if (!parsed.success) {
-        assignErrors(errors, parsed.error)
+        assignFormErrors(errors, parsed.error)
         return
       }
 

@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
+import FormActionBar from '@/components/common/FormActionBar.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
 import LocationMultiSelect from '@/components/forms/LocationMultiSelect.vue'
@@ -398,17 +399,10 @@ onMounted(() => {
         />
       </section>
 
-      <div
-        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
-      >
-        <Button
-          label="Batal"
-          severity="secondary"
-          outlined
-          @click="router.push({ name: 'blue-book-detail', params: { id: blueBookId } })"
-        />
-        <Button type="submit" label="Simpan" icon="pi pi-save" :loading="blueBookStore.loading" />
-      </div>
+      <FormActionBar
+        :loading="blueBookStore.loading"
+        @cancel="router.push({ name: 'blue-book-detail', params: { id: blueBookId } })"
+      />
     </form>
   </section>
 </template>

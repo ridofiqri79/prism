@@ -17,12 +17,12 @@ import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
 import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.vue'
 import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
 import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
+import ProjectSnapshotHeader from '@/components/common/ProjectSnapshotHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
-import { toNameList } from '@/utils/formatters'
-import { formatGreenBookStatus } from './green-book-page-utils'
+import { toNameList, formatBookStatus } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,7 +45,7 @@ const revisionHistoryItems = computed<RevisionHistoryItem[]>(() =>
     label: item.book_label,
     code: item.gb_code,
     book_status: item.book_status,
-    status_label: formatGreenBookStatus(item.book_status),
+    status_label: formatBookStatus(item.book_status),
     is_latest: item.is_latest,
     route: { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } },
   })),
@@ -105,45 +105,29 @@ onMounted(() => {
 
     <div v-if="project" class="space-y-6">
       <!-- Top card: Judul Program + Durasi + Status -->
-      <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-        <div class="p-5">
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <div class="min-w-0 space-y-3">
-              <div class="space-y-1.5">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Judul Program</p>
-                <p class="truncate text-base font-semibold text-surface-950">{{ programTitleName }}</p>
-              </div>
-              <div class="space-y-1.5">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
-                <p class="text-sm font-semibold text-surface-950">
-                  {{ project.duration ? `${project.duration} bulan` : '-' }}
-                </p>
-              </div>
-            </div>
-            <div class="flex flex-col gap-2 lg:items-end">
-              <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status Snapshot</p>
-              <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-                <StatusBadge :status="project.status" :label="formatGreenBookStatus(project.status)" />
-                <Tag v-if="project.is_latest" value="Versi terbaru" severity="success" rounded />
-                <Tag
-                  v-else-if="project.has_newer_revision"
-                  value="Ada revisi lebih baru"
-                  severity="warn"
-                  rounded
-                />
-              </div>
-            </div>
-          </div>
+      <ProjectSnapshotHeader
+        :program-title-name="programTitleName"
+        :status="project.status"
+        :status-label="formatBookStatus(project.status)"
+        :is-latest="project.is_latest"
+        :has-newer-revision="project.has_newer_revision"
+      >
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
+          <p class="text-sm font-semibold text-surface-950">
+            {{ project.duration ? `${project.duration} bulan` : '-' }}
+          </p>
         </div>
-        <!-- Institusi & Lokasi (reusable grid) -->
-        <ProjectInstitutionGrid
-          :executing-agencies="executingAgencyNames"
-          :implementing-agencies="implementingAgencyNames"
-          :bappenas-partners="bappenasPartnerNames"
-          :locations="locationNames"
-          class="border-t border-surface-100"
-        />
-      </div>
+      </ProjectSnapshotHeader>
+
+      <!-- Institusi & Lokasi -->
+      <ProjectInstitutionGrid
+        :executing-agencies="executingAgencyNames"
+        :implementing-agencies="implementingAgencyNames"
+        :bappenas-partners="bappenasPartnerNames"
+        :locations="locationNames"
+        class="rounded-lg border border-surface-200 bg-white"
+      />
 
       <!-- Referensi Proyek Blue Book -->
       <div class="rounded-lg border border-surface-200 bg-white p-5">

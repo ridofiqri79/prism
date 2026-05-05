@@ -14,6 +14,7 @@ import ActivitiesTable from '@/components/green-book/ActivitiesTable.vue'
 import DisbursementPlanTable from '@/components/green-book/DisbursementPlanTable.vue'
 import FundingAllocationTable from '@/components/green-book/FundingAllocationTable.vue'
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
+import FormActionBar from '@/components/common/FormActionBar.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import CurrencySelect from '@/components/forms/CurrencySelect.vue'
 import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
@@ -351,17 +352,10 @@ onMounted(() => {
         </TabPanels>
       </Tabs>
 
-      <div
-        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
-      >
-        <Button
-          label="Batal"
-          severity="secondary"
-          outlined
-          @click="router.push({ name: 'green-book-detail', params: { id: greenBookId } })"
-        />
-        <Button type="submit" label="Simpan" icon="pi pi-save" :loading="greenBookStore.loading" />
-      </div>
+      <FormActionBar
+        :loading="greenBookStore.loading"
+        @cancel="router.push({ name: 'green-book-detail', params: { id: greenBookId } })"
+      />
     </form>
   </section>
 </template>

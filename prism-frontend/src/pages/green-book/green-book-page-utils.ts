@@ -1,18 +1,25 @@
 import { toFormErrors } from '@/utils/form-errors'
+import { formatBookStatus, formatRevision as _formatRevision } from '@/utils/formatters'
 
 export type { FormErrors } from '@/utils/form-errors'
 
-// Re-export shared utility for backward compatibility
+// Re-export shared utilities for backward compatibility
 export { toFormErrors }
 
+/**
+ * @deprecated Gunakan `formatRevision` dari `@/utils/formatters`.
+ * Tetap di-export untuk backward compatibility.
+ */
 export function formatGBRevision(revisionNumber: number) {
-  return revisionNumber === 0 ? 'Original' : `Revisi ke-${revisionNumber}`
+  return _formatRevision(revisionNumber)
 }
 
+/**
+ * @deprecated Gunakan `formatBookStatus` dari `@/utils/formatters`.
+ * Tetap di-export untuk backward compatibility.
+ */
 export function formatGreenBookStatus(status: string) {
-  if (status === 'active') return 'Berlaku'
-  if (status === 'superseded') return 'Tidak Berlaku'
-  return status
+  return formatBookStatus(status)
 }
 
 export function joinNames(items: { name?: string; project_name?: string; bb_code?: string }[]) {

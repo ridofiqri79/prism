@@ -1,5 +1,6 @@
 import { reactive, ref, watch } from 'vue'
-import type { ZodError } from 'zod'
+import { assignFormErrors } from '@/utils/form-errors'
+import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
 import { gbProjectSchema } from '@/schemas/green-book.schema'
 import type { BBProject } from '@/types/blue-book.types'
 import type {
@@ -80,23 +81,17 @@ function fromProject(project?: GBProject | null): Partial<GBProjectFormValues> {
   }
 }
 
-function assignErrors(target: GBProjectFormErrors, error: ZodError) {
-  Object.keys(target).forEach((key) => {
-    delete target[key as keyof GBProjectFormValues]
-  })
 
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as keyof GBProjectFormValues
-    if (!target[field]) {
-      target[field] = issue.message
-    }
-  }
-}
 
 function normalizeActivitySort(rows: GBActivityPayload[]) {
   rows.forEach((row, index) => {
     row.sort_order = index
   })
+}
+
+function richTextPayload(value: string) {
+  const sanitized = sanitizeRichText(value)
+  return isRichTextEmpty(sanitized) ? null : sanitized
 }
 
 export type GBProjectSourceMode = 'new' | 'existing'
@@ -278,8 +273,8 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     return {
       ...values,
       duration: values.duration ?? null,
-      objective: values.objective || null,
-      scope_of_project: values.scope_of_project || null,
+      objective: richTextPayload(values.objective),
+      scope_of_project: richTextPayload(values.scope_of_project),
       activities: activities.value.map((item, index) => ({
         activity_name: item.activity_name,
         implementation_location: item.implementation_location || null,
@@ -309,7 +304,7 @@ export function useGBProjectForm(initialData?: Partial<GBProjectFormValues> | GB
     return async () => {
       const parsed = gbProjectSchema.safeParse(values)
       if (!parsed.success) {
-        assignErrors(errors, parsed.error)
+        assignFormErrors(errors, parsed.error)
         return
       }
 
