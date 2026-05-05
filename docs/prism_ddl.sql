@@ -449,19 +449,20 @@ CREATE TABLE dk_activity_detail (
 
 CREATE TABLE loan_agreement (
     id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dk_project_id         UUID NOT NULL UNIQUE REFERENCES dk_project(id), -- One-to-One
+    dk_project_id         UUID NOT NULL REFERENCES dk_project(id), -- One-to-Many: satu DK Project dapat memiliki lebih dari satu Loan Agreement
     lender_id             UUID NOT NULL REFERENCES lender(id),
     loan_code             VARCHAR(100) NOT NULL UNIQUE,
     agreement_date        DATE NOT NULL,
     effective_date        DATE NOT NULL,
-    original_closing_date DATE NOT NULL,
-    closing_date          DATE NOT NULL,               -- sama dengan original jika belum diperpanjang
+    original_closing_date DATE,                         -- diisi hanya jika pinjaman diperpanjang
+    closing_date          DATE NOT NULL,
     currency              VARCHAR(10) NOT NULL,        -- kode ISO mata uang lender
     amount_original       NUMERIC(20, 2) NOT NULL,     -- dalam mata uang lender
     amount_usd            NUMERIC(20, 2) NOT NULL,     -- ekuivalen USD, dikonversi manual
+    cumulative_disbursement NUMERIC(20, 2) NOT NULL DEFAULT 0, -- cumulative disbursement dalam currency yang dipilih
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_closing_date CHECK (closing_date >= original_closing_date)
+    CONSTRAINT chk_closing_date CHECK (original_closing_date IS NULL OR closing_date >= original_closing_date)
 );
 
 -- View helper: deteksi LA yang diperpanjang
@@ -471,8 +472,11 @@ SELECT
     loan_code,
     original_closing_date,
     closing_date,
-    (closing_date != original_closing_date) AS is_extended,
-    (closing_date - original_closing_date)  AS extension_days
+    (original_closing_date IS NOT NULL AND closing_date != original_closing_date) AS is_extended,
+    CASE
+        WHEN original_closing_date IS NOT NULL THEN closing_date - original_closing_date
+        ELSE 0
+    END AS extension_days
 FROM loan_agreement;
 
 

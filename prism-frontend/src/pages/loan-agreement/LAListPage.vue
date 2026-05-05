@@ -59,6 +59,7 @@ const columns: ColumnDef[] = [
   { field: 'closing_date', header: 'Tanggal Penutupan' },
   { field: 'currency', header: 'Mata Uang' },
   { field: 'amount_usd', header: 'Nilai USD' },
+  { field: 'cumulative_disbursement', header: 'Cumulative Disbursement' },
   { field: 'status', header: 'Status' },
   { field: 'actions', header: 'Aksi' },
 ]
@@ -149,6 +150,11 @@ onMounted(() => {
           v-else-if="column.field === 'amount_usd'"
           :amount="Number(row.amount_usd)"
           currency="USD"
+        />
+        <CurrencyDisplay
+          v-else-if="column.field === 'cumulative_disbursement'"
+          :amount="Number(row.cumulative_disbursement)"
+          :currency="String((row as LoanAgreement).currency || 'USD')"
         />
         <StatusBadge
           v-else-if="column.field === 'status' && (row as LoanAgreement).is_extended"

@@ -66,7 +66,7 @@ func (s *JourneyService) GetProjectJourney(ctx context.Context, bbProjectID pgty
 					Date:         dateString(dk.DkDate),
 					LetterNumber: stringPtrFromText(dk.DkLetterNumber),
 				},
-				LoanAgreement: loanAgreementsByDK[uuidKey(dk.ID)],
+				LoanAgreements: loanAgreementsByDK[uuidKey(dk.ID)],
 			})
 		}
 		fundingSources := fundingByGB[gbKey]
@@ -153,8 +153,8 @@ func (s *JourneyService) journeyDKProjectsByGB(ctx context.Context, gbIDs []pgty
 	return data, dkIDs, nil
 }
 
-func (s *JourneyService) journeyLoanAgreementsByDK(ctx context.Context, dkIDs []pgtype.UUID) (map[string]*model.JourneyLoanAgreement, error) {
-	data := map[string]*model.JourneyLoanAgreement{}
+func (s *JourneyService) journeyLoanAgreementsByDK(ctx context.Context, dkIDs []pgtype.UUID) (map[string][]model.JourneyLoanAgreement, error) {
+	data := map[string][]model.JourneyLoanAgreement{}
 	if len(dkIDs) == 0 {
 		return data, nil
 	}
@@ -172,7 +172,8 @@ func (s *JourneyService) journeyLoanAgreementsByDK(ctx context.Context, dkIDs []
 		return nil, err
 	}
 	for _, row := range rows {
-		data[uuidKey(row.DkProjectID)] = toJourneyLoanAgreement(row, monitoringByLA[uuidKey(row.ID)])
+		key := uuidKey(row.DkProjectID)
+		data[key] = append(data[key], toJourneyLoanAgreement(row, monitoringByLA[uuidKey(row.ID)]))
 	}
 	return data, nil
 }
@@ -228,11 +229,11 @@ func toJourneyLoIs(rows []queries.ListJourneyLoIsByBBProjectRow) []model.Journey
 	return data
 }
 
-func toJourneyLoanAgreement(row queries.ListJourneyLoanAgreementsByDKProjectsRow, monitoring []model.JourneyMonitoringResponse) *model.JourneyLoanAgreement {
+func toJourneyLoanAgreement(row queries.ListJourneyLoanAgreementsByDKProjectsRow, monitoring []model.JourneyMonitoringResponse) model.JourneyLoanAgreement {
 	if monitoring == nil {
 		monitoring = []model.JourneyMonitoringResponse{}
 	}
-	return &model.JourneyLoanAgreement{
+	return model.JourneyLoanAgreement{
 		ID:                  model.UUIDToString(row.ID),
 		LoanCode:            row.LoanCode,
 		Lender:              journeyLender(row.LenderID, row.LenderName, row.LenderShortName, row.LenderType),

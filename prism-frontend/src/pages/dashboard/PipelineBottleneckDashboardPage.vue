@@ -19,6 +19,15 @@ import type {
 
 const dashboard = useDashboardStore()
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const listControls = useListControls({
   initialFilters: {
     stage: null as PipelineBottleneckStage | null,
@@ -133,8 +142,9 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
+      v-if="!props.embedded"
       title="Pipeline & Bottleneck"
-      subtitle="Worklist proyek yang tertahan di Blue Book, Letter of Intent, Green Book, Daftar Kegiatan, Loan Agreement, dan monitoring."
+      subtitle="Worklist proyek yang tertahan di Blue Book, Letter of Intent, Green Book, Daftar Kegiatan, dan Loan Agreement."
     />
 
     <PipelineStageTabs

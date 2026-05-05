@@ -143,18 +143,6 @@ la_costs AS (
     JOIN dk_project dp ON dp.id = la.dk_project_id
     WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-),
-monitoring_costs AS (
-    SELECT
-        COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_disbursement_usd,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_disbursement_usd
-    FROM monitoring_disbursement md
-    JOIN loan_agreement la ON la.id = md.loan_agreement_id
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-      AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
 )
 SELECT
     (SELECT COUNT(*) FROM selected_bb)::bigint AS total_bb_projects,
@@ -165,19 +153,8 @@ SELECT
     gb_costs.gb_local_usd,
     dk_costs.dk_financing_usd,
     dk_costs.dk_counterpart_usd,
-    la_costs.la_commitment_usd,
-    monitoring_costs.planned_disbursement_usd,
-    monitoring_costs.realized_disbursement_usd,
-    CASE
-        WHEN monitoring_costs.planned_disbursement_usd = 0 THEN 0
-        ELSE (monitoring_costs.realized_disbursement_usd / monitoring_costs.planned_disbursement_usd * 100)
-    END::numeric AS absorption_pct,
-    CASE
-        WHEN la_costs.la_commitment_usd = 0 THEN 0
-        ELSE (monitoring_costs.realized_disbursement_usd / la_costs.la_commitment_usd * 100)
-    END::numeric AS la_absorption_pct,
-    (la_costs.la_commitment_usd - monitoring_costs.realized_disbursement_usd)::numeric AS undisbursed_usd
-FROM bb_costs, gb_costs, dk_costs, la_costs, monitoring_costs;
+    la_costs.la_commitment_usd
+FROM bb_costs, gb_costs, dk_costs, la_costs;
 
 -- name: GetDashboardStageCounts :many
 WITH ranked_bb AS (
@@ -205,46 +182,20 @@ stage_source AS (
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date <= CURRENT_DATE
-            ) THEN 'MONITORING_ACTIVE'
+            ) THEN 'LA'
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date <= CURRENT_DATE
-            ) THEN 'LA_EFFECTIVE_NO_MONITORING'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date > CURRENT_DATE
-            ) THEN 'LA_SIGNED_NOT_EFFECTIVE'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
-                LEFT JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.id IS NULL
             ) THEN 'DK'
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
-                LEFT JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND dpg.dk_project_id IS NULL
             ) THEN 'GB'
             WHEN EXISTS (
                 SELECT 1
@@ -269,9 +220,7 @@ ORDER BY CASE stage
     WHEN 'BB_WITH_LOI' THEN 3
     WHEN 'GB' THEN 4
     WHEN 'DK' THEN 5
-    WHEN 'LA_SIGNED_NOT_EFFECTIVE' THEN 6
-    WHEN 'LA_EFFECTIVE_NO_MONITORING' THEN 7
-    WHEN 'MONITORING_ACTIVE' THEN 8
+    WHEN 'LA' THEN 6
     ELSE 99
 END;
 
@@ -301,45 +250,20 @@ stage_source AS (
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date <= CURRENT_DATE
-            ) THEN 'MONITORING_ACTIVE'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date <= CURRENT_DATE
-            ) THEN 'LA_EFFECTIVE_NO_MONITORING'
-            WHEN EXISTS (
-                SELECT 1
-                FROM gb_project_bb_project gbp
-                JOIN gb_project gp ON gp.id = gbp.gb_project_id
-                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gp.id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
-                WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.effective_date > CURRENT_DATE
-            ) THEN 'LA_SIGNED_NOT_EFFECTIVE'
+            ) THEN 'LA'
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                LEFT JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND la.id IS NULL
             ) THEN 'DK'
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
-                LEFT JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 WHERE gbp.bb_project_id IN (SELECT bp2.id FROM bb_project bp2 WHERE bp2.project_identity_id = sb.project_identity_id)
-                  AND dpg.dk_project_id IS NULL
             ) THEN 'GB'
             WHEN EXISTS (
                 SELECT 1
@@ -358,7 +282,6 @@ stage_source AS (
 stage_amount AS (
     SELECT
         ss.stage,
-        ss.id,
         COALESCE(
             (SELECT SUM(la.amount_usd)
              FROM gb_project_bb_project gbp
@@ -391,113 +314,9 @@ ORDER BY CASE stage
     WHEN 'BB_WITH_LOI' THEN 3
     WHEN 'GB' THEN 4
     WHEN 'DK' THEN 5
-    WHEN 'LA_SIGNED_NOT_EFFECTIVE' THEN 6
-    WHEN 'LA_EFFECTIVE_NO_MONITORING' THEN 7
-    WHEN 'MONITORING_ACTIVE' THEN 8
+    WHEN 'LA' THEN 6
     ELSE 99
 END;
-
--- name: GetDashboardMonitoringRollup :many
-SELECT
-    md.budget_year,
-    md.quarter,
-    COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_usd,
-    COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd,
-    CASE
-        WHEN COALESCE(SUM(md.planned_usd), 0) = 0 THEN 0
-        ELSE COALESCE(SUM(md.realized_usd), 0) / COALESCE(SUM(md.planned_usd), 0) * 100
-    END::numeric AS absorption_pct
-FROM monitoring_disbursement md
-JOIN loan_agreement la ON la.id = md.loan_agreement_id
-JOIN dk_project dp ON dp.id = la.dk_project_id
-WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-  AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-  AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-  AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-GROUP BY md.budget_year, md.quarter
-ORDER BY md.budget_year ASC, md.quarter ASC;
-
--- name: GetDashboardLAExposureRollup :one
-WITH monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-),
-exposure AS (
-    SELECT
-        COALESCE(SUM(la.amount_usd), 0)::numeric AS la_commitment_usd,
-        COALESCE(SUM(mbl.realized_usd), 0)::numeric AS realized_disbursement_usd
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-)
-SELECT
-    la_commitment_usd,
-    realized_disbursement_usd,
-    (la_commitment_usd - realized_disbursement_usd)::numeric AS undisbursed_usd,
-    CASE
-        WHEN la_commitment_usd = 0 THEN 0
-        ELSE realized_disbursement_usd / la_commitment_usd * 100
-    END::numeric AS la_absorption_pct
-FROM exposure;
-
--- name: GetDashboardLenderRollup :many
-WITH monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-)
-SELECT
-    l.id,
-    COALESCE(l.short_name, l.name)::text AS label,
-    COUNT(DISTINCT la.id)::bigint AS item_count,
-    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd,
-    COALESCE(SUM(mbl.realized_usd), 0)::numeric AS realized_usd
-FROM lender l
-LEFT JOIN loan_agreement la ON la.lender_id = l.id
-LEFT JOIN dk_project dp ON dp.id = la.dk_project_id
-LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
-WHERE (sqlc.narg('lender_id')::uuid IS NULL OR l.id = sqlc.narg('lender_id')::uuid)
-  AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-GROUP BY l.id, COALESCE(l.short_name, l.name)
-HAVING COUNT(DISTINCT la.id) > 0
-ORDER BY amount_usd DESC, label ASC;
-
--- name: GetDashboardInstitutionRollup :many
-WITH monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-)
-SELECT
-    i.id,
-    COALESCE(i.short_name, i.name)::text AS label,
-    COUNT(DISTINCT dp.id)::bigint AS item_count,
-    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd,
-    COALESCE(SUM(mbl.realized_usd), 0)::numeric AS realized_usd
-FROM institution i
-LEFT JOIN dk_project dp ON dp.institution_id = i.id
-LEFT JOIN loan_agreement la ON la.dk_project_id = dp.id
-LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
-WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-  AND (sqlc.narg('institution_id')::uuid IS NULL OR i.id = sqlc.narg('institution_id')::uuid)
-GROUP BY i.id, COALESCE(i.short_name, i.name)
-HAVING COUNT(DISTINCT dp.id) > 0
-ORDER BY amount_usd DESC, label ASC;
 
 -- name: ListDashboardFilterOptions :many
 SELECT 'period'::text AS option_type, p.id::text AS value, p.name::text AS label
@@ -509,13 +328,6 @@ GROUP BY gb.publish_year
 UNION ALL
 SELECT 'green_book'::text AS option_type, gb.id::text AS value, ('GB ' || gb.publish_year::text || ' Revisi ke-' || gb.revision_number::text)::text AS label
 FROM green_book gb
-UNION ALL
-SELECT 'budget_year'::text AS option_type, md.budget_year::text AS value, md.budget_year::text AS label
-FROM monitoring_disbursement md
-GROUP BY md.budget_year
-UNION ALL
-SELECT 'quarter'::text AS option_type, q.quarter AS value, q.quarter AS label
-FROM (VALUES ('TW1'), ('TW2'), ('TW3'), ('TW4')) AS q(quarter)
 UNION ALL
 SELECT 'lender'::text AS option_type, l.id::text AS value, COALESCE(l.short_name, l.name)::text AS label
 FROM lender l
@@ -553,7 +365,6 @@ selected_bb AS (
 ranked_gb AS (
     SELECT
         gp.id,
-        gp.gb_project_identity_id,
         ROW_NUMBER() OVER (
             PARTITION BY gp.gb_project_identity_id
             ORDER BY gb.revision_number DESC, gb.created_at DESC, gp.created_at DESC
@@ -575,7 +386,7 @@ ranked_gb AS (
       )
 ),
 selected_gb AS (
-    SELECT id, gb_project_identity_id
+    SELECT id
     FROM ranked_gb
     WHERE sqlc.arg('include_history')::boolean OR rn = 1
 ),
@@ -592,22 +403,14 @@ bb_stage AS (
 gb_stage AS (
     SELECT sg.id
     FROM selected_gb sg
-    WHERE NOT EXISTS (
-        SELECT 1
-        FROM dk_project_gb_project dpg
-        WHERE dpg.gb_project_id = sg.id
-    )
+    WHERE NOT EXISTS (SELECT 1 FROM dk_project_gb_project dpg WHERE dpg.gb_project_id = sg.id)
 ),
 dk_stage AS (
     SELECT DISTINCT dp.id
     FROM dk_project dp
     JOIN dk_project_gb_project dpg ON dpg.dk_project_id = dp.id
     JOIN selected_gb sg ON sg.id = dpg.gb_project_id
-    WHERE NOT EXISTS (
-        SELECT 1
-        FROM loan_agreement la
-        WHERE la.dk_project_id = dp.id
-    )
+    WHERE NOT EXISTS (SELECT 1 FROM loan_agreement la WHERE la.dk_project_id = dp.id)
 ),
 la_stage AS (
     SELECT la.id, la.amount_usd
@@ -619,30 +422,6 @@ la_stage AS (
         JOIN selected_gb sg ON sg.id = dpg.gb_project_id
         WHERE dpg.dk_project_id = dp.id
     )
-    AND NOT EXISTS (
-        SELECT 1
-        FROM monitoring_disbursement md
-        WHERE md.loan_agreement_id = la.id
-          AND (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-          AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    )
-),
-monitoring_stage AS (
-    SELECT
-        la.id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
-    WHERE EXISTS (
-        SELECT 1
-        FROM dk_project_gb_project dpg
-        JOIN selected_gb sg ON sg.id = dpg.gb_project_id
-        WHERE dpg.dk_project_id = dp.id
-    )
-      AND (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY la.id
 )
 SELECT 'BB'::text AS stage, COUNT(DISTINCT bs.id)::bigint AS project_count, COALESCE(SUM(bpc.amount_usd), 0)::numeric AS amount_usd
 FROM bb_stage bs
@@ -657,29 +436,14 @@ FROM dk_stage ds
 LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = ds.id
 UNION ALL
 SELECT 'LA'::text AS stage, COUNT(*)::bigint AS project_count, COALESCE(SUM(amount_usd), 0)::numeric AS amount_usd
-FROM la_stage
-UNION ALL
-SELECT 'MONITORING'::text AS stage, COUNT(*)::bigint AS project_count, COALESCE(SUM(realized_usd), 0)::numeric AS amount_usd
-FROM monitoring_stage;
+FROM la_stage;
 
 -- name: GetDashboardExecutiveTopInstitutions :many
 WITH RECURSIVE institution_ancestors AS (
-    SELECT
-        i.id AS institution_id,
-        i.id AS ancestor_id,
-        i.parent_id,
-        i.name,
-        i.short_name,
-        i.level
+    SELECT i.id AS institution_id, i.id AS ancestor_id, i.parent_id, i.name, i.short_name, i.level
     FROM institution i
     UNION ALL
-    SELECT
-        ia.institution_id,
-        parent.id AS ancestor_id,
-        parent.parent_id,
-        parent.name,
-        parent.short_name,
-        parent.level
+    SELECT ia.institution_id, parent.id AS ancestor_id, parent.parent_id, parent.name, parent.short_name, parent.level
     FROM institution_ancestors ia
     JOIN institution parent ON parent.id = ia.parent_id
 ),
@@ -691,26 +455,15 @@ institution_roots AS (
     FROM institution_ancestors
     WHERE parent_id IS NULL OR level = 'Kementerian/Badan/Lembaga'
     ORDER BY institution_id, CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END
-),
-monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
 )
 SELECT
     ir.root_id AS id,
     ir.root_label AS label,
     COUNT(DISTINCT dp.id)::bigint AS item_count,
-    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd,
-    COALESCE(SUM(mbl.realized_usd), 0)::numeric AS realized_usd
+    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd
 FROM dk_project dp
 JOIN institution_roots ir ON ir.institution_id = dp.institution_id
 LEFT JOIN loan_agreement la ON la.dk_project_id = dp.id
-LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
 WHERE (
     sqlc.narg('publish_year')::int IS NULL
     OR EXISTS (
@@ -739,25 +492,14 @@ ORDER BY amount_usd DESC, item_count DESC, label ASC
 LIMIT 10;
 
 -- name: GetDashboardExecutiveTopLenders :many
-WITH monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-)
 SELECT
     l.id,
     COALESCE(l.short_name, l.name)::text AS label,
     COUNT(DISTINCT la.id)::bigint AS item_count,
-    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd,
-    COALESCE(SUM(mbl.realized_usd), 0)::numeric AS realized_usd
+    COALESCE(SUM(la.amount_usd), 0)::numeric AS amount_usd
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
 JOIN dk_project dp ON dp.id = la.dk_project_id
-LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
 WHERE (
     sqlc.narg('publish_year')::int IS NULL
     OR EXISTS (
@@ -835,16 +577,6 @@ selected_gb AS (
     FROM ranked_gb
     WHERE sqlc.arg('include_history')::boolean OR rn = 1
 ),
-monitoring_by_la AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_usd,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-),
 la_base AS (
     SELECT
         la.id,
@@ -854,12 +586,9 @@ la_base AS (
         la.closing_date,
         la.amount_usd,
         dp.project_name,
-        mbl.planned_usd,
-        mbl.realized_usd,
         latest_bp.id AS journey_bb_project_id
     FROM loan_agreement la
     JOIN dk_project dp ON dp.id = la.dk_project_id
-    LEFT JOIN monitoring_by_la mbl ON mbl.loan_agreement_id = la.id
     LEFT JOIN LATERAL (
         SELECT latest.id
         FROM dk_project_gb_project dpg
@@ -908,46 +637,26 @@ risks AS (
         ('Loan Agreement ' || la_base.loan_code || ' closing pada ' || la_base.closing_date::text)::text AS description,
         la_base.amount_usd::numeric AS amount_usd,
         (la_base.closing_date - CURRENT_DATE)::int AS days_until_closing,
-        CASE WHEN COALESCE(la_base.planned_usd, 0) = 0 THEN 0 ELSE COALESCE(la_base.realized_usd, 0) / la_base.planned_usd * 100 END::numeric AS absorption_pct,
         90::numeric AS score
     FROM la_base
     WHERE la_base.closing_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '12 months')::date
     UNION ALL
     SELECT
-        'EFFECTIVE_LA_NO_MONITORING'::text AS risk_type,
-        'high'::text AS severity,
-        la_base.id AS reference_id,
-        'loan_agreement'::text AS reference_type,
-        la_base.journey_bb_project_id,
-        la_base.loan_code::text AS code,
-        la_base.project_name::text AS title,
-        ('Loan Agreement ' || la_base.loan_code || ' sudah efektif tanpa monitoring')::text AS description,
-        la_base.amount_usd::numeric AS amount_usd,
-        0::int AS days_until_closing,
-        0::numeric AS absorption_pct,
-        85::numeric AS score
-    FROM la_base
-    WHERE la_base.effective_date <= CURRENT_DATE
-      AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la_base.id)
-    UNION ALL
-    SELECT
-        'HIGH_ELAPSED_LOW_ABSORPTION'::text AS risk_type,
+        'HIGH_ELAPSED_LA'::text AS risk_type,
         'medium'::text AS severity,
         la_base.id AS reference_id,
         'loan_agreement'::text AS reference_type,
         la_base.journey_bb_project_id,
         la_base.loan_code::text AS code,
         la_base.project_name::text AS title,
-        ('Waktu berjalan tinggi tetapi serapan masih rendah untuk LA ' || la_base.loan_code)::text AS description,
+        ('Loan Agreement ' || la_base.loan_code || ' sudah berjalan lama dan perlu perhatian')::text AS description,
         la_base.amount_usd::numeric AS amount_usd,
         0::int AS days_until_closing,
-        CASE WHEN COALESCE(la_base.planned_usd, 0) = 0 THEN 0 ELSE COALESCE(la_base.realized_usd, 0) / la_base.planned_usd * 100 END::numeric AS absorption_pct,
         75::numeric AS score
     FROM la_base
     WHERE la_base.effective_date < CURRENT_DATE
       AND la_base.closing_date > la_base.effective_date
       AND ((CURRENT_DATE - la_base.effective_date)::numeric / NULLIF((la_base.closing_date - la_base.effective_date)::numeric, 0)) >= 0.7
-      AND (CASE WHEN COALESCE(la_base.planned_usd, 0) = 0 THEN 0 ELSE COALESCE(la_base.realized_usd, 0) / la_base.planned_usd * 100 END) < 50
     UNION ALL
     SELECT
         'GB_WITHOUT_DK'::text AS risk_type,
@@ -960,7 +669,6 @@ risks AS (
         ('Green Book project ' || sg.gb_code || ' belum masuk Daftar Kegiatan')::text AS description,
         COALESCE(SUM(gfs.loan_usd + gfs.grant_usd), 0)::numeric AS amount_usd,
         0::int AS days_until_closing,
-        0::numeric AS absorption_pct,
         60::numeric AS score
     FROM selected_gb sg
     LEFT JOIN gb_funding_source gfs ON gfs.gb_project_id = sg.id
@@ -986,7 +694,6 @@ risks AS (
         ('Daftar Kegiatan project belum memiliki Loan Agreement')::text AS description,
         COALESCE(SUM(dfd.amount_usd + dfd.grant_usd), 0)::numeric AS amount_usd,
         0::int AS days_until_closing,
-        0::numeric AS absorption_pct,
         65::numeric AS score
     FROM dk_project dp
     JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
@@ -1015,7 +722,6 @@ SELECT
     description,
     amount_usd,
     days_until_closing,
-    absorption_pct,
     score
 FROM risks
 ORDER BY score DESC, amount_usd DESC, title ASC
@@ -1172,25 +878,6 @@ worklist AS (
       AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-    UNION ALL
-    SELECT
-        'EFFECTIVE_NO_MONITORING'::text AS stage,
-        la.id AS project_id,
-        dp.project_name::text AS project_name,
-        la.amount_usd::numeric AS amount_usd,
-        GREATEST((CURRENT_DATE - la.effective_date), 0)::int AS age_days,
-        la.effective_date::timestamptz AS relevant_at,
-        COALESCE(i.short_name, i.name, '')::text AS institution_name,
-        ARRAY[COALESCE(l.short_name, l.name)]::text[] AS lender_names
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    JOIN lender l ON l.id = la.lender_id
-    LEFT JOIN institution i ON i.id = dp.institution_id
-    WHERE la.effective_date <= CURRENT_DATE
-      AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la.id)
-      AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id)
-      AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
 ),
 filtered AS (
     SELECT *
@@ -1218,7 +905,6 @@ ORDER BY CASE stage
     WHEN 'GB_NO_DK' THEN 4
     WHEN 'DK_NO_LA' THEN 5
     WHEN 'LA_NOT_EFFECTIVE' THEN 6
-    WHEN 'EFFECTIVE_NO_MONITORING' THEN 7
     ELSE 99
 END;
 
@@ -1264,10 +950,6 @@ worklist AS (
     SELECT 'LA_NOT_EFFECTIVE'::text, la.id, dp.project_name::text, GREATEST((CURRENT_DATE - la.agreement_date), 0)::int, COALESCE(i.short_name, i.name, '')::text, ARRAY[COALESCE(l.short_name, l.name)]::text[]
     FROM loan_agreement la JOIN dk_project dp ON dp.id = la.dk_project_id JOIN lender l ON l.id = la.lender_id LEFT JOIN institution i ON i.id = dp.institution_id
     WHERE la.effective_date > CURRENT_DATE AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id) AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid) AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-    UNION ALL
-    SELECT 'EFFECTIVE_NO_MONITORING'::text, la.id, dp.project_name::text, GREATEST((CURRENT_DATE - la.effective_date), 0)::int, COALESCE(i.short_name, i.name, '')::text, ARRAY[COALESCE(l.short_name, l.name)]::text[]
-    FROM loan_agreement la JOIN dk_project dp ON dp.id = la.dk_project_id JOIN lender l ON l.id = la.lender_id LEFT JOIN institution i ON i.id = dp.institution_id
-    WHERE la.effective_date <= CURRENT_DATE AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la.id) AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id) AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid) AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
 ),
 filtered AS (
     SELECT * FROM worklist
@@ -1319,10 +1001,6 @@ worklist AS (
     SELECT 'LA_NOT_EFFECTIVE'::text, 'loan_agreement'::text, la.id, (SELECT bp.id FROM dk_project_gb_project dpg JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id JOIN bb_project bp ON bp.id = gbp.bb_project_id WHERE dpg.dk_project_id = dp.id LIMIT 1), la.loan_code::text, dp.project_name::text, la.amount_usd::numeric, GREATEST((CURRENT_DATE - la.agreement_date), 0)::int, la.agreement_date::timestamptz, COALESCE(i.short_name, i.name, '')::text, ARRAY[COALESCE(l.short_name, l.name)]::text[]
     FROM loan_agreement la JOIN dk_project dp ON dp.id = la.dk_project_id JOIN lender l ON l.id = la.lender_id LEFT JOIN institution i ON i.id = dp.institution_id
     WHERE la.effective_date > CURRENT_DATE AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id) AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid) AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-    UNION ALL
-    SELECT 'EFFECTIVE_NO_MONITORING'::text, 'loan_agreement'::text, la.id, (SELECT bp.id FROM dk_project_gb_project dpg JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id JOIN bb_project bp ON bp.id = gbp.bb_project_id WHERE dpg.dk_project_id = dp.id LIMIT 1), la.loan_code::text, dp.project_name::text, la.amount_usd::numeric, GREATEST((CURRENT_DATE - la.effective_date), 0)::int, la.effective_date::timestamptz, COALESCE(i.short_name, i.name, '')::text, ARRAY[COALESCE(l.short_name, l.name)]::text[]
-    FROM loan_agreement la JOIN dk_project dp ON dp.id = la.dk_project_id JOIN lender l ON l.id = la.lender_id LEFT JOIN institution i ON i.id = dp.institution_id
-    WHERE la.effective_date <= CURRENT_DATE AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la.id) AND EXISTS (SELECT 1 FROM dk_project_gb_project dpg JOIN selected_gb sg ON sg.id = dpg.gb_project_id WHERE dpg.dk_project_id = dp.id) AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid) AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
 ),
 filtered AS (
     SELECT * FROM worklist
@@ -1894,15 +1572,6 @@ all_sources AS (
     WHERE (sqlc.narg('lender_type')::text IS NULL OR l.type = sqlc.narg('lender_type')::text)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('currency')::text IS NULL OR la.currency = sqlc.narg('currency')::text)
-      AND (
-          sqlc.narg('budget_year')::int IS NULL
-          OR EXISTS (
-              SELECT 1
-              FROM monitoring_disbursement md
-              WHERE md.loan_agreement_id = la.id
-                AND md.budget_year = sqlc.narg('budget_year')::int
-          )
-      )
 ),
 la_type_amounts AS (
     SELECT
@@ -1914,15 +1583,6 @@ la_type_amounts AS (
     WHERE (sqlc.narg('lender_type')::text IS NULL OR l.type = sqlc.narg('lender_type')::text)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('currency')::text IS NULL OR la.currency = sqlc.narg('currency')::text)
-      AND (
-          sqlc.narg('budget_year')::int IS NULL
-          OR EXISTS (
-              SELECT 1
-              FROM monitoring_disbursement md
-              WHERE md.loan_agreement_id = la.id
-                AND md.budget_year = sqlc.narg('budget_year')::int
-          )
-      )
     GROUP BY l.type
 ),
 gb_cofinancing AS (
@@ -2139,15 +1799,6 @@ stage_sources AS (
     WHERE (sqlc.narg('lender_type')::text IS NULL OR l.type = sqlc.narg('lender_type')::text)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('currency')::text IS NULL OR la.currency = sqlc.narg('currency')::text)
-      AND (
-          sqlc.narg('budget_year')::int IS NULL
-          OR EXISTS (
-              SELECT 1
-              FROM monitoring_disbursement md
-              WHERE md.loan_agreement_id = la.id
-                AND md.budget_year = sqlc.narg('budget_year')::int
-          )
-      )
 )
 SELECT
     stage,
@@ -2334,15 +1985,6 @@ la_stage AS (
     WHERE (sqlc.narg('lender_type')::text IS NULL OR l.type = sqlc.narg('lender_type')::text)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('currency')::text IS NULL OR la.currency = sqlc.narg('currency')::text)
-      AND (
-          sqlc.narg('budget_year')::int IS NULL
-          OR EXISTS (
-              SELECT 1
-              FROM monitoring_disbursement md
-              WHERE md.loan_agreement_id = la.id
-                AND md.budget_year = sqlc.narg('budget_year')::int
-          )
-      )
     GROUP BY la.lender_id
 ),
 all_lenders AS (
@@ -2473,15 +2115,6 @@ currency_sources AS (
     WHERE (sqlc.narg('lender_type')::text IS NULL OR l.type = sqlc.narg('lender_type')::text)
       AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
       AND (sqlc.narg('currency')::text IS NULL OR la.currency = sqlc.narg('currency')::text)
-      AND (
-          sqlc.narg('budget_year')::int IS NULL
-          OR EXISTS (
-              SELECT 1
-              FROM monitoring_disbursement md
-              WHERE md.loan_agreement_id = la.id
-                AND md.budget_year = sqlc.narg('budget_year')::int
-          )
-      )
 )
 SELECT
     currency,
@@ -2832,23 +2465,7 @@ la_by_institution_project AS (
     FROM dk_by_institution_project dk
     JOIN loan_agreement la ON la.dk_project_id = dk.project_id
 ),
-monitoring_filtered AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_usd,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-),
-monitoring_all AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    GROUP BY md.loan_agreement_id
-),
+
 bb_agg AS (
     SELECT
         institution_id,
@@ -2890,15 +2507,6 @@ la_agg AS (
     FROM la_by_institution_project
     GROUP BY institution_id
 ),
-monitoring_agg AS (
-    SELECT
-        la.institution_id,
-        COALESCE(SUM(mf.planned_usd), 0)::numeric AS planned_usd,
-        COALESCE(SUM(mf.realized_usd), 0)::numeric AS realized_usd
-    FROM la_by_institution_project la
-    LEFT JOIN monitoring_filtered mf ON mf.loan_agreement_id = la.loan_agreement_id
-    GROUP BY la.institution_id
-),
 gb_risk AS (
     SELECT
         gb.institution_id,
@@ -2930,15 +2538,11 @@ la_risk AS (
             WHERE la.closing_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '12 months'
         )
         + COUNT(DISTINCT la.loan_agreement_id) FILTER (
-            WHERE la.effective_date <= CURRENT_DATE
-              AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la.loan_agreement_id)
-        )
-        + COUNT(DISTINCT la.loan_agreement_id) FILTER (
-            WHERE la.effective_date <= CURRENT_DATE - INTERVAL '12 months'
-              AND COALESCE(ma.realized_usd, 0) < (la.amount_usd * 0.25)
+            WHERE la.effective_date < CURRENT_DATE
+              AND la.closing_date > la.effective_date
+              AND ((CURRENT_DATE - la.effective_date)::numeric / NULLIF((la.closing_date - la.effective_date)::numeric, 0)) >= 0.7
         ) AS risk_count
     FROM la_by_institution_project la
-    LEFT JOIN monitoring_all ma ON ma.loan_agreement_id = la.loan_agreement_id
     GROUP BY la.institution_id
 ),
 risk_agg AS (
@@ -2971,12 +2575,6 @@ scored AS (
         COALESCE(la.la_count, 0)::bigint AS la_count,
         (COALESCE(bb.bb_pipeline_usd, 0) + COALESCE(gb.gb_pipeline_usd, 0) + COALESCE(dk.dk_pipeline_usd, 0))::numeric AS pipeline_usd,
         COALESCE(la.la_commitment_usd, 0)::numeric AS la_commitment_usd,
-        COALESCE(mon.planned_usd, 0)::numeric AS planned_usd,
-        COALESCE(mon.realized_usd, 0)::numeric AS realized_usd,
-        CASE
-            WHEN COALESCE(mon.planned_usd, 0) = 0 THEN 0
-            ELSE COALESCE(mon.realized_usd, 0) / COALESCE(mon.planned_usd, 0) * 100
-        END::numeric AS absorption_pct,
         COALESCE(risk.risk_count, 0)::bigint AS risk_count,
         CASE
             WHEN COALESCE(gb.gb_project_count, 0) = 0 THEN 100
@@ -2988,17 +2586,15 @@ scored AS (
     LEFT JOIN gb_agg gb ON gb.institution_id = ai.institution_id
     LEFT JOIN dk_agg dk ON dk.institution_id = ai.institution_id
     LEFT JOIN la_agg la ON la.institution_id = ai.institution_id
-    LEFT JOIN monitoring_agg mon ON mon.institution_id = ai.institution_id
     LEFT JOIN risk_agg risk ON risk.institution_id = ai.institution_id
 ),
 final_items AS (
     SELECT
         s.*,
         (
-            LEAST(100, s.absorption_pct) * 0.40
-            + s.pipeline_progress_score * 0.25
-            + s.data_completeness_score * 0.20
-            + GREATEST(0, 100 - s.risk_count::numeric * 20) * 0.15
+            s.pipeline_progress_score * 0.45
+            + s.data_completeness_score * 0.35
+            + GREATEST(0, 100 - s.risk_count::numeric * 20) * 0.20
         )::numeric AS performance_score
     FROM scored s
 )
@@ -3011,9 +2607,6 @@ SELECT
     la_count,
     pipeline_usd,
     la_commitment_usd,
-    planned_usd,
-    realized_usd,
-    absorption_pct,
     risk_count,
     performance_score,
     CASE
@@ -3025,331 +2618,9 @@ FROM final_items
 ORDER BY
     CASE WHEN sqlc.narg('sort_by')::text = 'pipeline_usd' THEN pipeline_usd END DESC,
     CASE WHEN sqlc.narg('sort_by')::text = 'la_commitment_usd' THEN la_commitment_usd END DESC,
-    CASE WHEN sqlc.narg('sort_by')::text = 'absorption_pct' THEN absorption_pct END ASC,
     CASE WHEN sqlc.narg('sort_by')::text = 'risk_count' THEN risk_count END DESC,
     pipeline_usd DESC,
     institution_name ASC;
-
--- ===== DASHBOARD LA DISBURSEMENT =====
-
--- name: GetDashboardLADisbursementSummary :one
-WITH filtered_la AS (
-    SELECT
-        la.id,
-        la.dk_project_id,
-        la.lender_id,
-        la.loan_code,
-        la.effective_date,
-        la.original_closing_date,
-        la.closing_date,
-        la.amount_usd
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-      AND (sqlc.narg('is_extended')::boolean IS NULL OR (la.closing_date != la.original_closing_date) = sqlc.narg('is_extended')::boolean)
-      AND (
-          sqlc.narg('closing_months')::int IS NULL
-          OR la.closing_date <= CURRENT_DATE + make_interval(months => sqlc.narg('closing_months')::int)
-      )
-),
-monitoring_filtered AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_usd,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd
-    FROM monitoring_disbursement md
-    JOIN filtered_la la ON la.id = md.loan_agreement_id
-    WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-      AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-    GROUP BY md.loan_agreement_id
-),
-monitoring_cumulative AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS cumulative_realized_usd
-    FROM monitoring_disbursement md
-    JOIN filtered_la la ON la.id = md.loan_agreement_id
-    GROUP BY md.loan_agreement_id
-),
-summary AS (
-    SELECT
-        COUNT(DISTINCT la.id)::bigint AS la_count,
-        COUNT(DISTINCT la.id) FILTER (WHERE la.effective_date <= CURRENT_DATE)::bigint AS effective_count,
-        COUNT(DISTINCT la.id) FILTER (WHERE la.effective_date > CURRENT_DATE)::bigint AS not_effective_count,
-        COUNT(DISTINCT la.id) FILTER (WHERE la.closing_date != la.original_closing_date)::bigint AS extended_count,
-        COALESCE(SUM(la.amount_usd), 0)::numeric AS commitment_usd,
-        COALESCE(SUM(mf.planned_usd), 0)::numeric AS planned_usd,
-        COALESCE(SUM(mf.realized_usd), 0)::numeric AS realized_usd,
-        COALESCE(SUM(mc.cumulative_realized_usd), 0)::numeric AS cumulative_realized_usd
-    FROM filtered_la la
-    LEFT JOIN monitoring_filtered mf ON mf.loan_agreement_id = la.id
-    LEFT JOIN monitoring_cumulative mc ON mc.loan_agreement_id = la.id
-)
-SELECT
-    la_count,
-    effective_count,
-    not_effective_count,
-    extended_count,
-    commitment_usd,
-    planned_usd,
-    realized_usd,
-    CASE
-        WHEN planned_usd = 0 THEN 0
-        ELSE realized_usd / planned_usd * 100
-    END::numeric AS absorption_pct,
-    (commitment_usd - cumulative_realized_usd)::numeric AS undisbursed_usd
-FROM summary;
-
--- name: GetDashboardLADisbursementQuarterlyTrend :many
-WITH filtered_la AS (
-    SELECT la.id
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-      AND (sqlc.narg('is_extended')::boolean IS NULL OR (la.closing_date != la.original_closing_date) = sqlc.narg('is_extended')::boolean)
-      AND (
-          sqlc.narg('closing_months')::int IS NULL
-          OR la.closing_date <= CURRENT_DATE + make_interval(months => sqlc.narg('closing_months')::int)
-      )
-)
-SELECT
-    md.budget_year,
-    md.quarter,
-    COALESCE(SUM(md.planned_usd), 0)::numeric AS planned_usd,
-    COALESCE(SUM(md.realized_usd), 0)::numeric AS realized_usd,
-    CASE
-        WHEN COALESCE(SUM(md.planned_usd), 0) = 0 THEN 0
-        ELSE COALESCE(SUM(md.realized_usd), 0) / COALESCE(SUM(md.planned_usd), 0) * 100
-    END::numeric AS absorption_pct
-FROM monitoring_disbursement md
-JOIN filtered_la la ON la.id = md.loan_agreement_id
-WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-  AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-GROUP BY md.budget_year, md.quarter
-ORDER BY md.budget_year ASC,
-    CASE md.quarter WHEN 'TW1' THEN 1 WHEN 'TW2' THEN 2 WHEN 'TW3' THEN 3 WHEN 'TW4' THEN 4 ELSE 99 END;
-
--- name: ListDashboardLAClosingRisks :many
-WITH filtered_la AS (
-    SELECT
-        la.id,
-        la.dk_project_id,
-        la.lender_id,
-        la.loan_code,
-        la.effective_date,
-        la.original_closing_date,
-        la.closing_date,
-        la.amount_usd,
-        dp.project_name,
-        COALESCE(l.short_name, l.name)::text AS lender_name
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    JOIN lender l ON l.id = la.lender_id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-      AND (sqlc.narg('is_extended')::boolean IS NULL OR (la.closing_date != la.original_closing_date) = sqlc.narg('is_extended')::boolean)
-),
-monitoring_cumulative AS (
-    SELECT
-        md.loan_agreement_id,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS cumulative_realized_usd
-    FROM monitoring_disbursement md
-    JOIN filtered_la la ON la.id = md.loan_agreement_id
-    GROUP BY md.loan_agreement_id
-),
-risk_items AS (
-    SELECT
-        la.id AS loan_agreement_id,
-        la.loan_code::text AS loan_code,
-        la.project_name::text AS project_name,
-        la.lender_name,
-        la.effective_date,
-        la.closing_date,
-        (la.closing_date - CURRENT_DATE)::int AS days_until_closing,
-        la.amount_usd::numeric AS commitment_usd,
-        COALESCE(mc.cumulative_realized_usd, 0)::numeric AS cumulative_realized_usd,
-        (la.amount_usd - COALESCE(mc.cumulative_realized_usd, 0))::numeric AS undisbursed_usd,
-        CASE
-            WHEN la.amount_usd = 0 THEN 0
-            ELSE COALESCE(mc.cumulative_realized_usd, 0) / la.amount_usd * 100
-        END::numeric AS la_absorption_pct,
-        CASE
-            WHEN la.closing_date <= CURRENT_DATE + INTERVAL '3 months' THEN 'CLOSING_3_MONTHS'
-            WHEN la.closing_date <= CURRENT_DATE + INTERVAL '6 months' THEN 'CLOSING_6_MONTHS'
-            ELSE 'CLOSING_12_MONTHS'
-        END::text AS risk_type,
-        CASE
-            WHEN la.closing_date <= CURRENT_DATE + INTERVAL '3 months' THEN 'high'
-            WHEN la.closing_date <= CURRENT_DATE + INTERVAL '6 months' THEN 'medium'
-            ELSE 'low'
-        END::text AS risk_level
-    FROM filtered_la la
-    LEFT JOIN monitoring_cumulative mc ON mc.loan_agreement_id = la.id
-    WHERE la.closing_date >= CURRENT_DATE
-      AND la.closing_date <= CURRENT_DATE + make_interval(months => COALESCE(sqlc.narg('closing_months')::int, 12))
-)
-SELECT
-    loan_agreement_id,
-    loan_code,
-    project_name,
-    lender_name,
-    effective_date,
-    closing_date,
-    days_until_closing,
-    commitment_usd,
-    cumulative_realized_usd,
-    undisbursed_usd,
-    la_absorption_pct,
-    risk_type,
-    risk_level
-FROM risk_items
-WHERE (sqlc.narg('risk_level')::text IS NULL OR risk_level = sqlc.narg('risk_level')::text)
-ORDER BY days_until_closing ASC, commitment_usd DESC, loan_code ASC
-LIMIT 50;
-
--- name: ListDashboardLAUnderDisbursementRisks :many
-WITH filtered_la AS (
-    SELECT
-        la.id,
-        la.dk_project_id,
-        la.lender_id,
-        la.loan_code,
-        la.effective_date,
-        la.original_closing_date,
-        la.closing_date,
-        la.amount_usd,
-        dp.project_name,
-        COALESCE(l.short_name, l.name)::text AS lender_name
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    JOIN lender l ON l.id = la.lender_id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-      AND (sqlc.narg('is_extended')::boolean IS NULL OR (la.closing_date != la.original_closing_date) = sqlc.narg('is_extended')::boolean)
-      AND (
-          sqlc.narg('closing_months')::int IS NULL
-          OR la.closing_date <= CURRENT_DATE + make_interval(months => sqlc.narg('closing_months')::int)
-      )
-),
-monitoring_cumulative AS (
-    SELECT
-        md.loan_agreement_id,
-        COUNT(*)::bigint AS monitoring_count,
-        COALESCE(SUM(md.realized_usd), 0)::numeric AS cumulative_realized_usd
-    FROM monitoring_disbursement md
-    JOIN filtered_la la ON la.id = md.loan_agreement_id
-    GROUP BY md.loan_agreement_id
-),
-risk_base AS (
-    SELECT
-        la.id AS loan_agreement_id,
-        la.loan_code::text AS loan_code,
-        la.project_name::text AS project_name,
-        la.lender_name,
-        la.effective_date,
-        la.closing_date,
-        la.amount_usd::numeric AS commitment_usd,
-        COALESCE(mc.cumulative_realized_usd, 0)::numeric AS cumulative_realized_usd,
-        (la.amount_usd - COALESCE(mc.cumulative_realized_usd, 0))::numeric AS undisbursed_usd,
-        CASE
-            WHEN la.amount_usd = 0 THEN 0
-            ELSE COALESCE(mc.cumulative_realized_usd, 0) / la.amount_usd * 100
-        END::numeric AS la_absorption_pct,
-        CASE
-            WHEN la.effective_date >= la.closing_date THEN 0
-            ELSE LEAST(100, GREATEST(0, ((CURRENT_DATE - la.effective_date)::numeric / NULLIF((la.closing_date - la.effective_date)::numeric, 0)) * 100))
-        END::numeric AS time_elapsed_pct,
-        GREATEST(CEIL((la.closing_date - CURRENT_DATE)::numeric / 30.0), 0)::numeric AS remaining_months,
-        COALESCE(mc.monitoring_count, 0)::bigint AS monitoring_count,
-        (la.closing_date != la.original_closing_date)::boolean AS is_extended
-    FROM filtered_la la
-    LEFT JOIN monitoring_cumulative mc ON mc.loan_agreement_id = la.id
-    WHERE la.effective_date <= CURRENT_DATE
-),
-risk_items AS (
-    SELECT
-        rb.*,
-        (rb.time_elapsed_pct - rb.la_absorption_pct)::numeric AS absorption_gap_pct,
-        CASE
-            WHEN rb.remaining_months <= 0 THEN 0
-            ELSE rb.undisbursed_usd / rb.remaining_months
-        END::numeric AS required_monthly_disbursement_usd,
-        CASE
-            WHEN rb.time_elapsed_pct - rb.la_absorption_pct >= 40 THEN 'UNDER_DISBURSEMENT_HIGH'
-            WHEN rb.time_elapsed_pct - rb.la_absorption_pct >= 20 THEN 'UNDER_DISBURSEMENT_MEDIUM'
-            WHEN rb.monitoring_count = 0 THEN 'EFFECTIVE_NO_MONITORING'
-            ELSE 'EXTENDED'
-        END::text AS risk_type,
-        CASE
-            WHEN rb.time_elapsed_pct - rb.la_absorption_pct >= 40 THEN 'high'
-            WHEN rb.time_elapsed_pct - rb.la_absorption_pct >= 20 OR rb.monitoring_count = 0 THEN 'medium'
-            ELSE 'low'
-        END::text AS risk_level
-    FROM risk_base rb
-    WHERE rb.time_elapsed_pct - rb.la_absorption_pct >= 20
-       OR rb.monitoring_count = 0
-       OR rb.is_extended
-)
-SELECT
-    loan_agreement_id,
-    loan_code,
-    project_name,
-    lender_name,
-    effective_date,
-    closing_date,
-    commitment_usd,
-    cumulative_realized_usd,
-    undisbursed_usd,
-    la_absorption_pct,
-    time_elapsed_pct,
-    absorption_gap_pct,
-    remaining_months,
-    required_monthly_disbursement_usd,
-    monitoring_count,
-    is_extended,
-    risk_type,
-    risk_level
-FROM risk_items
-WHERE (sqlc.narg('risk_level')::text IS NULL OR risk_level = sqlc.narg('risk_level')::text)
-ORDER BY
-    CASE risk_level WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-    absorption_gap_pct DESC,
-    undisbursed_usd DESC,
-    loan_code ASC
-LIMIT 50;
-
--- name: GetDashboardLAComponentBreakdown :many
-WITH filtered_la AS (
-    SELECT la.id
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
-      AND (sqlc.narg('institution_id')::uuid IS NULL OR dp.institution_id = sqlc.narg('institution_id')::uuid)
-      AND (sqlc.narg('is_extended')::boolean IS NULL OR (la.closing_date != la.original_closing_date) = sqlc.narg('is_extended')::boolean)
-      AND (
-          sqlc.narg('closing_months')::int IS NULL
-          OR la.closing_date <= CURRENT_DATE + make_interval(months => sqlc.narg('closing_months')::int)
-      )
-)
-SELECT
-    mk.component_name::text AS component_name,
-    COUNT(DISTINCT md.loan_agreement_id)::bigint AS la_count,
-    COALESCE(SUM(mk.planned_usd), 0)::numeric AS planned_usd,
-    COALESCE(SUM(mk.realized_usd), 0)::numeric AS realized_usd,
-    CASE
-        WHEN COALESCE(SUM(mk.planned_usd), 0) = 0 THEN 0
-        ELSE COALESCE(SUM(mk.realized_usd), 0) / COALESCE(SUM(mk.planned_usd), 0) * 100
-    END::numeric AS absorption_pct
-FROM monitoring_komponen mk
-JOIN monitoring_disbursement md ON md.id = mk.monitoring_disbursement_id
-JOIN filtered_la la ON la.id = md.loan_agreement_id
-WHERE (sqlc.narg('budget_year')::int IS NULL OR md.budget_year = sqlc.narg('budget_year')::int)
-  AND (sqlc.narg('quarter')::text IS NULL OR md.quarter = sqlc.narg('quarter')::text)
-GROUP BY mk.component_name
-ORDER BY COALESCE(SUM(mk.realized_usd), 0) DESC, COALESCE(SUM(mk.planned_usd), 0) DESC, mk.component_name ASC
-LIMIT 25;
 
 -- ===== DASHBOARD DATA QUALITY & GOVERNANCE =====
 
@@ -3446,31 +2717,10 @@ issues AS (
     WHERE NOT EXISTS (SELECT 1 FROM loan_agreement la WHERE la.dk_project_id = dp.id)
 
     UNION ALL
-    SELECT 'info'::text, 'loan_agreement'::text, 'LA_NOT_EFFECTIVE'::text, la.id, (la.loan_code || ' - ' || dp.project_name)::text, 'Loan Agreement belum efektif'::text, 'Monitor pemenuhan effectiveness conditions.'::text, false::boolean
+    SELECT 'info'::text, 'loan_agreement'::text, 'LA_NOT_EFFECTIVE'::text, la.id, (la.loan_code || ' - ' || dp.project_name)::text, 'Loan Agreement belum efektif'::text, 'Pantau pemenuhan effectiveness conditions.'::text, false::boolean
     FROM loan_agreement la
     JOIN dk_project dp ON dp.id = la.dk_project_id
     WHERE la.effective_date > CURRENT_DATE
-
-    UNION ALL
-    SELECT 'error'::text, 'monitoring_disbursement'::text, 'EFFECTIVE_LA_WITHOUT_MONITORING'::text, la.id, (la.loan_code || ' - ' || dp.project_name)::text, 'Loan Agreement sudah efektif tetapi belum memiliki monitoring disbursement'::text, 'Input monitoring triwulanan untuk Loan Agreement efektif.'::text, false::boolean
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE la.effective_date <= CURRENT_DATE
-      AND NOT EXISTS (SELECT 1 FROM monitoring_disbursement md WHERE md.loan_agreement_id = la.id)
-
-    UNION ALL
-    SELECT 'error'::text, 'monitoring_disbursement'::text, 'MONITORING_PLANNED_ZERO_REALIZED_POSITIVE'::text, md.id, (la.loan_code || ' - ' || md.budget_year::text || ' ' || md.quarter)::text, 'Monitoring memiliki planned USD nol tetapi realized USD positif'::text, 'Periksa kembali rencana disbursement atau realisasi pada periode ini.'::text, false::boolean
-    FROM monitoring_disbursement md
-    JOIN loan_agreement la ON la.id = md.loan_agreement_id
-    WHERE md.planned_usd = 0
-      AND md.realized_usd > 0
-
-    UNION ALL
-    SELECT 'warning'::text, 'monitoring_disbursement'::text, 'MONITORING_COMPONENT_NAME_EMPTY'::text, mk.id, (la.loan_code || ' - ' || md.budget_year::text || ' ' || md.quarter)::text, 'Komponen monitoring memiliki nama kosong'::text, 'Isi nama komponen monitoring atau hapus baris komponen.'::text, false::boolean
-    FROM monitoring_komponen mk
-    JOIN monitoring_disbursement md ON md.id = mk.monitoring_disbursement_id
-    JOIN loan_agreement la ON la.id = md.loan_agreement_id
-    WHERE TRIM(mk.component_name) = ''
 
     UNION ALL
     SELECT 'warning'::text, 'gb_project'::text, 'CURRENCY_USD_MISMATCH'::text, gfs.id, (gp.gb_code || ' - ' || gp.project_name)::text, 'Funding source memakai currency USD tetapi nilai original tidak sama dengan nilai USD'::text, 'Samakan nilai original dan USD untuk currency USD.'::text, false::boolean
@@ -3492,19 +2742,6 @@ issues AS (
     JOIN dk_project dp ON dp.id = la.dk_project_id
     WHERE la.currency = 'USD'
       AND la.amount_original != la.amount_usd
-
-    UNION ALL
-    SELECT 'error'::text, 'monitoring_disbursement'::text, 'CLOSING_DATE_SOON_NO_RECENT_MONITORING'::text, la.id, (la.loan_code || ' - ' || dp.project_name)::text, 'Loan Agreement closing dalam 6 bulan tetapi tidak memiliki monitoring terbaru'::text, 'Update monitoring disbursement terbaru sebelum closing date.'::text, false::boolean
-    FROM loan_agreement la
-    JOIN dk_project dp ON dp.id = la.dk_project_id
-    WHERE la.effective_date <= CURRENT_DATE
-      AND la.closing_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '6 months'
-      AND NOT EXISTS (
-          SELECT 1
-          FROM monitoring_disbursement md
-          WHERE md.loan_agreement_id = la.id
-            AND md.updated_at >= NOW() - INTERVAL '6 months'
-      )
 )
 SELECT
     severity,

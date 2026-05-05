@@ -33,11 +33,6 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
           {{ usdFormatter.format(data.amount_usd ?? 0) }}
         </template>
       </Column>
-      <Column field="realized_usd" header="Realized" class="w-40">
-        <template #body="{ data }">
-          {{ usdFormatter.format(data.realized_usd ?? 0) }}
-        </template>
-      </Column>
       <template #empty>
         <div class="py-6 text-center text-sm text-surface-500">Tidak ada data untuk filter ini.</div>
       </template>

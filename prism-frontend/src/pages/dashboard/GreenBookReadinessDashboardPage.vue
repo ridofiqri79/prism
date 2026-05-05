@@ -13,6 +13,15 @@ import type { GreenBookReadinessParams, GreenBookReadinessStatus } from '@/types
 
 const dashboard = useDashboardStore()
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const filters = reactive<{
   publish_year: number | null
   green_book_id: string | null
@@ -113,6 +122,7 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
+      v-if="!props.embedded"
       title="Green Book Readiness"
       subtitle="Kesiapan proyek Green Book berdasarkan referensi Blue Book, K/L, lokasi, pendanaan, activities, disbursement plan, dan funding allocation."
     />

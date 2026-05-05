@@ -13,25 +13,14 @@ import type {
   JourneyResponse,
   KLPortfolioPerformanceDashboard,
   KLPortfolioPerformanceParams,
-  LADisbursementDashboard,
-  LADisbursementParams,
   LenderFinancingMixDashboard,
   LenderFinancingMixParams,
-  MonitoringSummary,
-  MonitoringSummaryApiResponse,
   PipelineBottleneckApiResponse,
   PipelineBottleneckParams,
   StageMetric,
-  TimeSeriesPoint,
 } from '@/types/dashboard.types'
 
 function normalizeSummary(data: DashboardSummaryApiResponse): DashboardSummary {
-  const realized =
-    data.total_realized_usd ??
-    data.total_realisasi_usd ??
-    data.realized_disbursement_usd ??
-    0
-
   return {
     total_bb_projects: data.total_bb_projects ?? 0,
     total_gb_projects: data.total_gb_projects ?? 0,
@@ -42,40 +31,6 @@ function normalizeSummary(data: DashboardSummaryApiResponse): DashboardSummary {
       data.gb_pipeline_usd ??
       data.bb_pipeline_usd ??
       0,
-    total_realized_usd: realized,
-    total_realisasi_usd: realized,
-    overall_absorption_pct: data.overall_absorption_pct ?? data.absorption_pct ?? 0,
-    active_monitoring: data.active_monitoring ?? 0,
-  }
-}
-
-function normalizeMonitoringSummary(data: MonitoringSummaryApiResponse): MonitoringSummary {
-  const planned = data.total_planned_usd ?? data.total_rencana_usd ?? 0
-  const realized = data.total_realized_usd ?? data.total_realisasi_usd ?? 0
-
-  return {
-    budget_year: data.budget_year ?? data.tahun_anggaran,
-    tahun_anggaran: data.tahun_anggaran ?? data.budget_year,
-    quarter: data.quarter ?? data.triwulan,
-    triwulan: data.triwulan ?? data.quarter,
-    total_planned_usd: planned,
-    total_rencana_usd: planned,
-    total_realized_usd: realized,
-    total_realisasi_usd: realized,
-    absorption_pct: data.absorption_pct ?? 0,
-    by_lender: (data.by_lender ?? []).map((item) => {
-      const lenderPlanned = item.planned_usd ?? item.rencana_usd ?? 0
-      const lenderRealized = item.realized_usd ?? item.realisasi_usd ?? 0
-
-      return {
-        lender: item.lender,
-        planned_usd: lenderPlanned,
-        rencana_usd: lenderPlanned,
-        realized_usd: lenderRealized,
-        realisasi_usd: lenderRealized,
-        absorption_pct: item.absorption_pct ?? 0,
-      }
-    }),
   }
 }
 
@@ -92,21 +47,6 @@ export const DashboardService = {
       params,
     })
     return response.data.data
-  },
-
-  async getMonitoringRollup(params?: DashboardFilterParams) {
-    const response = await http.get<ApiResponse<TimeSeriesPoint[]>>('/dashboard/monitoring-rollup', {
-      params,
-    })
-    return response.data.data
-  },
-
-  async getMonitoringSummary(params?: DashboardFilterParams) {
-    const response = await http.get<ApiResponse<MonitoringSummaryApiResponse>>(
-      '/dashboard/monitoring-summary',
-      { params },
-    )
-    return normalizeMonitoringSummary(response.data.data)
   },
 
   async getFilterOptions() {
@@ -149,14 +89,6 @@ export const DashboardService = {
   async getKLPortfolioPerformance(params?: KLPortfolioPerformanceParams) {
     const response = await http.get<ApiResponse<KLPortfolioPerformanceDashboard>>(
       '/dashboard/kl-portfolio-performance',
-      { params },
-    )
-    return response.data.data
-  },
-
-  async getLADisbursement(params?: LADisbursementParams) {
-    const response = await http.get<ApiResponse<LADisbursementDashboard>>(
-      '/dashboard/la-disbursement',
       { params },
     )
     return response.data.data

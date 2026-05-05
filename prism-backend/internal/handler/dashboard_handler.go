@@ -44,18 +44,6 @@ func (h *DashboardHandler) StageFunnel(c echo.Context) error {
 	return c.JSON(http.StatusOK, model.DataResponse[[]model.StageMetric]{Data: res})
 }
 
-func (h *DashboardHandler) MonitoringRollup(c echo.Context) error {
-	filter, err := dashboardFilter(c)
-	if err != nil {
-		return err
-	}
-	res, err := h.service.GetMonitoringRollup(c.Request().Context(), filter)
-	if err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, model.DataResponse[[]model.TimeSeriesPoint]{Data: res})
-}
-
 func (h *DashboardHandler) FilterOptions(c echo.Context) error {
 	res, err := h.service.GetFilterOptions(c.Request().Context())
 	if err != nil {
@@ -124,18 +112,6 @@ func (h *DashboardHandler) KLPortfolioPerformance(c echo.Context) error {
 	return c.JSON(http.StatusOK, model.DataResponse[*model.KLPortfolioPerformanceDashboard]{Data: res})
 }
 
-func (h *DashboardHandler) LADisbursement(c echo.Context) error {
-	filter, err := dashboardLADisbursementFilter(c)
-	if err != nil {
-		return err
-	}
-	res, err := h.service.GetLADisbursement(c.Request().Context(), filter)
-	if err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, model.DataResponse[*model.LADisbursementDashboard]{Data: res})
-}
-
 func (h *DashboardHandler) DataQualityGovernance(c echo.Context) error {
 	filter, err := dashboardDataQualityGovernanceFilter(c)
 	if err != nil {
@@ -162,21 +138,6 @@ func dashboardFilter(c echo.Context) (model.DashboardFilterRequest, error) {
 		}
 		year := int32(parsed)
 		filter.PublishYear = &year
-	}
-	if value := strings.TrimSpace(c.QueryParam("budget_year")); value != "" {
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "budget_year", Message: "harus angka"})
-		}
-		year := int32(parsed)
-		filter.BudgetYear = &year
-	}
-	if value := strings.TrimSpace(c.QueryParam("quarter")); value != "" {
-		quarter := strings.ToUpper(value)
-		if quarter != "TW1" && quarter != "TW2" && quarter != "TW3" && quarter != "TW4" {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "quarter", Message: "harus TW1, TW2, TW3, atau TW4"})
-		}
-		filter.Quarter = &quarter
 	}
 	if value := strings.TrimSpace(c.QueryParam("lender_id")); value != "" {
 		filter.LenderID = &value
@@ -260,14 +221,6 @@ func dashboardLenderFinancingMixFilter(c echo.Context) (model.LenderFinancingMix
 		year := int32(parsed)
 		filter.PublishYear = &year
 	}
-	if value := strings.TrimSpace(c.QueryParam("budget_year")); value != "" {
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "budget_year", Message: "harus angka"})
-		}
-		year := int32(parsed)
-		filter.BudgetYear = &year
-	}
 	return filter, nil
 }
 
@@ -299,79 +252,13 @@ func dashboardKLPortfolioPerformanceFilter(c echo.Context) (model.KLPortfolioPer
 		year := int32(parsed)
 		filter.PublishYear = &year
 	}
-	if value := strings.TrimSpace(c.QueryParam("budget_year")); value != "" {
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "budget_year", Message: "harus angka"})
-		}
-		year := int32(parsed)
-		filter.BudgetYear = &year
-	}
-	if value := strings.TrimSpace(c.QueryParam("quarter")); value != "" {
-		quarter := strings.ToUpper(value)
-		if quarter != "TW1" && quarter != "TW2" && quarter != "TW3" && quarter != "TW4" {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "quarter", Message: "harus TW1, TW2, TW3, atau TW4"})
-		}
-		filter.Quarter = &quarter
-	}
 	if value := strings.TrimSpace(c.QueryParam("sort_by")); value != "" {
 		switch value {
-		case "pipeline_usd", "la_commitment_usd", "absorption_pct", "risk_count":
+		case "pipeline_usd", "la_commitment_usd", "risk_count":
 			filter.SortBy = &value
 		default:
 			return filter, apperrors.Validation(apperrors.FieldError{Field: "sort_by", Message: "sort_by tidak valid"})
 		}
-	}
-	return filter, nil
-}
-
-func dashboardLADisbursementFilter(c echo.Context) (model.LADisbursementFilterRequest, error) {
-	filter := model.LADisbursementFilterRequest{}
-	if value := strings.TrimSpace(c.QueryParam("budget_year")); value != "" {
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "budget_year", Message: "harus angka"})
-		}
-		year := int32(parsed)
-		filter.BudgetYear = &year
-	}
-	if value := strings.TrimSpace(c.QueryParam("quarter")); value != "" {
-		quarter := strings.ToUpper(value)
-		if quarter != "TW1" && quarter != "TW2" && quarter != "TW3" && quarter != "TW4" {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "quarter", Message: "harus TW1, TW2, TW3, atau TW4"})
-		}
-		filter.Quarter = &quarter
-	}
-	if value := strings.TrimSpace(c.QueryParam("lender_id")); value != "" {
-		filter.LenderID = &value
-	}
-	if value := strings.TrimSpace(c.QueryParam("institution_id")); value != "" {
-		filter.InstitutionID = &value
-	}
-	if value := strings.TrimSpace(c.QueryParam("is_extended")); value != "" {
-		parsed, err := strconv.ParseBool(value)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "is_extended", Message: "harus true atau false"})
-		}
-		filter.IsExtended = &parsed
-	}
-	if value := strings.TrimSpace(c.QueryParam("closing_months")); value != "" {
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "closing_months", Message: "harus angka"})
-		}
-		months := int32(parsed)
-		if months != 3 && months != 6 && months != 12 {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "closing_months", Message: "harus 3, 6, atau 12"})
-		}
-		filter.ClosingMonths = &months
-	}
-	if value := strings.TrimSpace(c.QueryParam("risk_level")); value != "" {
-		riskLevel := strings.ToLower(value)
-		if riskLevel != "low" && riskLevel != "medium" && riskLevel != "high" {
-			return filter, apperrors.Validation(apperrors.FieldError{Field: "risk_level", Message: "harus low, medium, atau high"})
-		}
-		filter.RiskLevel = &riskLevel
 	}
 	return filter, nil
 }

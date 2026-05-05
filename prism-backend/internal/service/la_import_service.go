@@ -103,6 +103,7 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 		"currency",
 		"amount_original",
 		"amount_usd",
+		"cumulative_disbursement",
 	})
 	if !ok {
 		addImportError(&result, 0, "Sheet Loan Agreement tidak ditemukan")
@@ -134,7 +135,6 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 	}
 
 	createdIDs := make([]string, 0)
-	seenDKProjects := map[string]struct{}{}
 	seenLoanCodes := map[string]struct{}{}
 
 	for _, row := range rows {
@@ -143,7 +143,7 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 			label = row.value("dk_project_ref")
 		}
 
-		parsed, skip, messages := s.parseLoanAgreementImportRow(ctx, qtx, row, lookup, allowedByDK, lookups, seenDKProjects, seenLoanCodes)
+		parsed, skip, messages := s.parseLoanAgreementImportRow(ctx, qtx, row, lookup, allowedByDK, lookups, seenLoanCodes)
 		switch {
 		case skip:
 			result.Skipped++
@@ -152,16 +152,17 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 			addImportError(&result, row.number, strings.Join(messages, "; "))
 		default:
 			created, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
-				DkProjectID:         parsed.DKProjectID,
-				LenderID:            parsed.LenderID,
-				LoanCode:            parsed.LoanCode,
-				AgreementDate:       parsed.AgreementDate,
-				EffectiveDate:       parsed.EffectiveDate,
-				OriginalClosingDate: parsed.OriginalClosingDate,
-				ClosingDate:         parsed.ClosingDate,
-				Currency:            parsed.Currency,
-				AmountOriginal:      parsed.AmountOriginal,
-				AmountUsd:           parsed.AmountUsd,
+				DkProjectID:            parsed.DKProjectID,
+				LenderID:               parsed.LenderID,
+				LoanCode:               parsed.LoanCode,
+				AgreementDate:          parsed.AgreementDate,
+				EffectiveDate:          parsed.EffectiveDate,
+				OriginalClosingDate:    parsed.OriginalClosingDate,
+				ClosingDate:            parsed.ClosingDate,
+				Currency:               parsed.Currency,
+				AmountOriginal:         parsed.AmountOriginal,
+				AmountUsd:              parsed.AmountUsd,
+				CumulativeDisbursement: parsed.CumulativeDisbursement,
 			})
 			if err != nil {
 				return nil, nil, fromPg(err)
@@ -180,20 +181,21 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 }
 
 type parsedLoanAgreementImportRow struct {
-	DKProjectID         pgtype.UUID
-	DKProjectName       string
-	LenderID            pgtype.UUID
-	LoanCode            string
-	AgreementDate       pgtype.Date
-	EffectiveDate       pgtype.Date
-	OriginalClosingDate pgtype.Date
-	ClosingDate         pgtype.Date
-	Currency            string
-	AmountOriginal      pgtype.Numeric
-	AmountUsd           pgtype.Numeric
+	DKProjectID            pgtype.UUID
+	DKProjectName          string
+	LenderID               pgtype.UUID
+	LoanCode               string
+	AgreementDate          pgtype.Date
+	EffectiveDate          pgtype.Date
+	OriginalClosingDate    pgtype.Date
+	ClosingDate            pgtype.Date
+	Currency               string
+	AmountOriginal         pgtype.Numeric
+	AmountUsd              pgtype.Numeric
+	CumulativeDisbursement pgtype.Numeric
 }
 
-func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *queries.Queries, row importRow, dkLookup laImportDKProjectLookup, allowedByDK map[string]map[string]struct{}, lookups *masterImportLookups, seenDKProjects map[string]struct{}, seenLoanCodes map[string]struct{}) (parsedLoanAgreementImportRow, bool, []string) {
+func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *queries.Queries, row importRow, dkLookup laImportDKProjectLookup, allowedByDK map[string]map[string]struct{}, lookups *masterImportLookups, seenLoanCodes map[string]struct{}) (parsedLoanAgreementImportRow, bool, []string) {
 	var parsed parsedLoanAgreementImportRow
 	messages := make([]string, 0)
 	addMessage := func(message string) {
@@ -212,17 +214,8 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 	} else {
 		parsed.DKProjectID = dkProject.ID
 		parsed.DKProjectName = dkProject.ProjectName
-		dkProjectID := model.UUIDToString(dkProject.ID)
-		if dkProject.ExistingLoanAgreementID.Valid {
-			return parsed, true, []string{"DK Project sudah memiliki Loan Agreement, dilewati"}
-		}
 		if !dkProject.HasFinancingDetail {
 			addMessage("DK Project belum memiliki Financing Detail")
-		}
-		if _, seen := seenDKProjects[dkProjectID]; seen {
-			addMessage("DK Project duplikat di workbook")
-		} else {
-			seenDKProjects[dkProjectID] = struct{}{}
 		}
 	}
 
@@ -277,7 +270,7 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 	} else {
 		parsed.EffectiveDate = effectiveDate
 	}
-	originalClosingDate, err := parseLAImportDate(row.value("original_closing_date"), "Original Closing Date")
+	originalClosingDate, err := parseLAImportOptionalDate(row.value("original_closing_date"), "Original Closing Date")
 	if err != nil {
 		addMessage(err.Error())
 	} else {
@@ -309,9 +302,14 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 	if err != nil {
 		addMessage(err.Error())
 	}
+	cumulativeDisbursement, err := parseLAImportAmount(row.value("cumulative_disbursement"), "Cumulative Disbursement", false)
+	if err != nil {
+		addMessage(err.Error())
+	}
 	amountOriginal, amountUSD = normalizeCurrencyAmountPair(currency, amountOriginal, amountUSD)
 	parsed.AmountOriginal = numericFromFloat(amountOriginal)
 	parsed.AmountUsd = numericFromFloat(amountUSD)
+	parsed.CumulativeDisbursement = numericFromFloat(cumulativeDisbursement)
 
 	return parsed, false, messages
 }
@@ -365,6 +363,17 @@ func buildLAImportAllowedLenderMap(items []queries.ListLoanAgreementAllowedLende
 func parseLAImportDate(value, label string) (pgtype.Date, error) {
 	if strings.TrimSpace(value) == "" {
 		return pgtype.Date{}, fmt.Errorf("%s wajib diisi", label)
+	}
+	date, err := parseDKImportDate(value)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("%s harus tanggal valid", label)
+	}
+	return date, nil
+}
+
+func parseLAImportOptionalDate(value, label string) (pgtype.Date, error) {
+	if strings.TrimSpace(value) == "" {
+		return pgtype.Date{}, nil
 	}
 	date, err := parseDKImportDate(value)
 	if err != nil {

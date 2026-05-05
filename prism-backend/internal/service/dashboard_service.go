@@ -40,11 +40,6 @@ func (s *DashboardService) GetSummary(ctx context.Context, filter model.Dashboar
 		DKFinancingUSD:          floatFromNumeric(row.DkFinancingUsd),
 		DKCounterpartUSD:        floatFromNumeric(row.DkCounterpartUsd),
 		LACommitmentUSD:         floatFromNumeric(row.LaCommitmentUsd),
-		PlannedDisbursementUSD:  floatFromNumeric(row.PlannedDisbursementUsd),
-		RealizedDisbursementUSD: floatFromNumeric(row.RealizedDisbursementUsd),
-		AbsorptionPct:           floatFromNumeric(row.AbsorptionPct),
-		LAAbsorptionPct:         floatFromNumeric(row.LaAbsorptionPct),
-		UndisbursedUSD:          floatFromNumeric(row.UndisbursedUsd),
 	}
 	summary.Metrics = dashboardMetricCards(summary)
 	return summary, nil
@@ -85,92 +80,6 @@ func (s *DashboardService) GetStageFunnel(ctx context.Context, filter model.Dash
 		})
 	}
 	return stages, nil
-}
-
-func (s *DashboardService) GetMonitoringRollup(ctx context.Context, filter model.DashboardFilterRequest) ([]model.TimeSeriesPoint, error) {
-	params, err := dashboardRollupParams(filter)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.queries.GetDashboardMonitoringRollup(ctx, params)
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil rollup monitoring")
-	}
-	points := make([]model.TimeSeriesPoint, 0, len(rows))
-	for _, row := range rows {
-		points = append(points, model.TimeSeriesPoint{
-			Period:        fmt.Sprintf("%d-%s", row.BudgetYear, row.Quarter),
-			BudgetYear:    row.BudgetYear,
-			Quarter:       row.Quarter,
-			PlannedUSD:    floatFromNumeric(row.PlannedUsd),
-			RealizedUSD:   floatFromNumeric(row.RealizedUsd),
-			AbsorptionPct: floatFromNumeric(row.AbsorptionPct),
-		})
-	}
-	return points, nil
-}
-
-func (s *DashboardService) GetLAExposureRollup(ctx context.Context, filter model.DashboardFilterRequest) (*model.DashboardLAExposure, error) {
-	params, err := dashboardLAExposureParams(filter)
-	if err != nil {
-		return nil, err
-	}
-	row, err := s.queries.GetDashboardLAExposureRollup(ctx, params)
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil exposure loan agreement")
-	}
-	return &model.DashboardLAExposure{
-		LACommitmentUSD:         floatFromNumeric(row.LaCommitmentUsd),
-		RealizedDisbursementUSD: floatFromNumeric(row.RealizedDisbursementUsd),
-		UndisbursedUSD:          floatFromNumeric(row.UndisbursedUsd),
-		LAAbsorptionPct:         floatFromNumeric(row.LaAbsorptionPct),
-	}, nil
-}
-
-func (s *DashboardService) GetLenderRollup(ctx context.Context, filter model.DashboardFilterRequest) ([]model.BreakdownItem, error) {
-	params, err := dashboardLenderRollupParams(filter)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.queries.GetDashboardLenderRollup(ctx, params)
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil rollup lender")
-	}
-	items := make([]model.BreakdownItem, 0, len(rows))
-	for _, row := range rows {
-		id := model.UUIDToString(row.ID)
-		items = append(items, model.BreakdownItem{
-			ID:          &id,
-			Label:       row.Label,
-			ItemCount:   int(row.ItemCount),
-			AmountUSD:   floatFromNumeric(row.AmountUsd),
-			RealizedUSD: floatFromNumeric(row.RealizedUsd),
-		})
-	}
-	return items, nil
-}
-
-func (s *DashboardService) GetInstitutionRollup(ctx context.Context, filter model.DashboardFilterRequest) ([]model.BreakdownItem, error) {
-	params, err := dashboardInstitutionRollupParams(filter)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.queries.GetDashboardInstitutionRollup(ctx, params)
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil rollup institution")
-	}
-	items := make([]model.BreakdownItem, 0, len(rows))
-	for _, row := range rows {
-		id := model.UUIDToString(row.ID)
-		items = append(items, model.BreakdownItem{
-			ID:          &id,
-			Label:       row.Label,
-			ItemCount:   int(row.ItemCount),
-			AmountUSD:   floatFromNumeric(row.AmountUsd),
-			RealizedUSD: floatFromNumeric(row.RealizedUsd),
-		})
-	}
-	return items, nil
 }
 
 func (s *DashboardService) GetFilterOptions(ctx context.Context) (model.DashboardFilterOptions, error) {
@@ -352,7 +261,6 @@ func (s *DashboardService) GetLenderFinancingMix(ctx context.Context, filter mod
 		LenderType:  params.LenderType,
 		LenderID:    params.LenderID,
 		Currency:    params.Currency,
-		BudgetYear:  params.BudgetYear,
 	})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil currency exposure")
@@ -390,79 +298,6 @@ func (s *DashboardService) GetKLPortfolioPerformance(ctx context.Context, filter
 	return &model.KLPortfolioPerformanceDashboard{
 		Summary: klPortfolioPerformanceSummary(items),
 		Items:   items,
-	}, nil
-}
-
-func (s *DashboardService) GetLADisbursement(ctx context.Context, filter model.LADisbursementFilterRequest) (*model.LADisbursementDashboard, error) {
-	params, err := dashboardLADisbursementParams(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	summaryRow, err := s.queries.GetDashboardLADisbursementSummary(ctx, queries.GetDashboardLADisbursementSummaryParams{
-		LenderID:      params.LenderID,
-		InstitutionID: params.InstitutionID,
-		IsExtended:    params.IsExtended,
-		ClosingMonths: params.ClosingMonths,
-		BudgetYear:    params.BudgetYear,
-		Quarter:       params.Quarter,
-	})
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil ringkasan Loan Agreement disbursement")
-	}
-
-	trendRows, err := s.queries.GetDashboardLADisbursementQuarterlyTrend(ctx, queries.GetDashboardLADisbursementQuarterlyTrendParams{
-		BudgetYear:    params.BudgetYear,
-		Quarter:       params.Quarter,
-		LenderID:      params.LenderID,
-		InstitutionID: params.InstitutionID,
-		IsExtended:    params.IsExtended,
-		ClosingMonths: params.ClosingMonths,
-	})
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil tren Loan Agreement disbursement")
-	}
-
-	closingRows, err := s.queries.ListDashboardLAClosingRisks(ctx, queries.ListDashboardLAClosingRisksParams{
-		RiskLevel:     params.RiskLevel,
-		LenderID:      params.LenderID,
-		InstitutionID: params.InstitutionID,
-		IsExtended:    params.IsExtended,
-		ClosingMonths: params.ClosingMonths,
-	})
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil risiko closing Loan Agreement")
-	}
-
-	underRows, err := s.queries.ListDashboardLAUnderDisbursementRisks(ctx, queries.ListDashboardLAUnderDisbursementRisksParams{
-		RiskLevel:     params.RiskLevel,
-		LenderID:      params.LenderID,
-		InstitutionID: params.InstitutionID,
-		IsExtended:    params.IsExtended,
-		ClosingMonths: params.ClosingMonths,
-	})
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil risiko under-disbursement")
-	}
-
-	componentRows, err := s.queries.GetDashboardLAComponentBreakdown(ctx, queries.GetDashboardLAComponentBreakdownParams{
-		BudgetYear:    params.BudgetYear,
-		Quarter:       params.Quarter,
-		LenderID:      params.LenderID,
-		InstitutionID: params.InstitutionID,
-		IsExtended:    params.IsExtended,
-		ClosingMonths: params.ClosingMonths,
-	})
-	if err != nil {
-		return nil, apperrors.Internal("Gagal mengambil breakdown komponen monitoring")
-	}
-
-	return &model.LADisbursementDashboard{
-		Summary:                laDisbursementSummary(summaryRow),
-		QuarterlyTrend:         laDisbursementTrend(trendRows),
-		ClosingRisks:           laClosingRisks(closingRows),
-		UnderDisbursementRisks: laUnderDisbursementRisks(underRows),
-		ComponentBreakdown:     laComponentBreakdown(componentRows),
 	}, nil
 }
 
@@ -534,76 +369,6 @@ func dashboardSummaryParams(filter model.DashboardFilterRequest) (queries.GetDas
 		LenderID:       lenderID,
 		IncludeHistory: filter.IncludeHistory,
 		PublishYear:    optionalDashboardInt4(filter.PublishYear),
-		BudgetYear:     optionalDashboardInt4(filter.BudgetYear),
-		Quarter:        optionalText(filter.Quarter),
-	}, nil
-}
-
-func dashboardRollupParams(filter model.DashboardFilterRequest) (queries.GetDashboardMonitoringRollupParams, error) {
-	lenderID, err := optionalUUID(filter.LenderID)
-	if err != nil {
-		return queries.GetDashboardMonitoringRollupParams{}, validation("lender_id", "UUID tidak valid")
-	}
-	institutionID, err := optionalUUID(filter.InstitutionID)
-	if err != nil {
-		return queries.GetDashboardMonitoringRollupParams{}, validation("institution_id", "UUID tidak valid")
-	}
-	return queries.GetDashboardMonitoringRollupParams{
-		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
-		Quarter:       optionalText(filter.Quarter),
-		LenderID:      lenderID,
-		InstitutionID: institutionID,
-	}, nil
-}
-
-func dashboardLAExposureParams(filter model.DashboardFilterRequest) (queries.GetDashboardLAExposureRollupParams, error) {
-	lenderID, err := optionalUUID(filter.LenderID)
-	if err != nil {
-		return queries.GetDashboardLAExposureRollupParams{}, validation("lender_id", "UUID tidak valid")
-	}
-	institutionID, err := optionalUUID(filter.InstitutionID)
-	if err != nil {
-		return queries.GetDashboardLAExposureRollupParams{}, validation("institution_id", "UUID tidak valid")
-	}
-	return queries.GetDashboardLAExposureRollupParams{
-		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
-		Quarter:       optionalText(filter.Quarter),
-		LenderID:      lenderID,
-		InstitutionID: institutionID,
-	}, nil
-}
-
-func dashboardLenderRollupParams(filter model.DashboardFilterRequest) (queries.GetDashboardLenderRollupParams, error) {
-	lenderID, err := optionalUUID(filter.LenderID)
-	if err != nil {
-		return queries.GetDashboardLenderRollupParams{}, validation("lender_id", "UUID tidak valid")
-	}
-	institutionID, err := optionalUUID(filter.InstitutionID)
-	if err != nil {
-		return queries.GetDashboardLenderRollupParams{}, validation("institution_id", "UUID tidak valid")
-	}
-	return queries.GetDashboardLenderRollupParams{
-		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
-		Quarter:       optionalText(filter.Quarter),
-		LenderID:      lenderID,
-		InstitutionID: institutionID,
-	}, nil
-}
-
-func dashboardInstitutionRollupParams(filter model.DashboardFilterRequest) (queries.GetDashboardInstitutionRollupParams, error) {
-	lenderID, err := optionalUUID(filter.LenderID)
-	if err != nil {
-		return queries.GetDashboardInstitutionRollupParams{}, validation("lender_id", "UUID tidak valid")
-	}
-	institutionID, err := optionalUUID(filter.InstitutionID)
-	if err != nil {
-		return queries.GetDashboardInstitutionRollupParams{}, validation("institution_id", "UUID tidak valid")
-	}
-	return queries.GetDashboardInstitutionRollupParams{
-		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
-		Quarter:       optionalText(filter.Quarter),
-		LenderID:      lenderID,
-		InstitutionID: institutionID,
 	}, nil
 }
 
@@ -616,8 +381,6 @@ func dashboardExecutiveFunnelParams(filter model.DashboardFilterRequest) (querie
 		PeriodID:       periodID,
 		IncludeHistory: filter.IncludeHistory,
 		PublishYear:    optionalDashboardInt4(filter.PublishYear),
-		BudgetYear:     optionalDashboardInt4(filter.BudgetYear),
-		Quarter:        optionalText(filter.Quarter),
 	}, nil
 }
 
@@ -629,8 +392,6 @@ func dashboardExecutiveRollupParams(filter model.DashboardFilterRequest) (querie
 	return queries.GetDashboardExecutiveTopInstitutionsParams{
 		PublishYear: optionalDashboardInt4(filter.PublishYear),
 		PeriodID:    periodID,
-		BudgetYear:  optionalDashboardInt4(filter.BudgetYear),
-		Quarter:     optionalText(filter.Quarter),
 	}, nil
 }
 
@@ -720,7 +481,6 @@ func dashboardLenderFinancingMixParams(filter model.LenderFinancingMixFilterRequ
 		Currency:    currency,
 		LenderType:  lenderType,
 		LenderID:    lenderID,
-		BudgetYear:  optionalDashboardInt4(filter.BudgetYear),
 	}, nil
 }
 
@@ -737,60 +497,12 @@ func dashboardKLPortfolioPerformanceParams(filter model.KLPortfolioPerformanceFi
 	if err != nil {
 		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, err
 	}
-	quarter, err := optionalQuarter(filter.Quarter)
-	if err != nil {
-		return queries.GetDashboardKLPortfolioPerformanceItemsParams{}, err
-	}
 	return queries.GetDashboardKLPortfolioPerformanceItemsParams{
 		SortBy:          optionalKLSortBy(filter.SortBy),
 		InstitutionID:   institutionID,
 		PeriodID:        periodID,
 		PublishYear:     optionalDashboardInt4(filter.PublishYear),
 		InstitutionRole: institutionRole,
-		BudgetYear:      optionalDashboardInt4(filter.BudgetYear),
-		Quarter:         quarter,
-	}, nil
-}
-
-type dashboardLADisbursementQueryParams struct {
-	BudgetYear    pgtype.Int4
-	Quarter       pgtype.Text
-	LenderID      pgtype.UUID
-	InstitutionID pgtype.UUID
-	IsExtended    pgtype.Bool
-	ClosingMonths pgtype.Int4
-	RiskLevel     pgtype.Text
-}
-
-func dashboardLADisbursementParams(filter model.LADisbursementFilterRequest) (dashboardLADisbursementQueryParams, error) {
-	lenderID, err := optionalUUID(filter.LenderID)
-	if err != nil {
-		return dashboardLADisbursementQueryParams{}, validation("lender_id", "UUID tidak valid")
-	}
-	institutionID, err := optionalUUID(filter.InstitutionID)
-	if err != nil {
-		return dashboardLADisbursementQueryParams{}, validation("institution_id", "UUID tidak valid")
-	}
-	quarter, err := optionalQuarter(filter.Quarter)
-	if err != nil {
-		return dashboardLADisbursementQueryParams{}, err
-	}
-	closingMonths, err := optionalClosingMonths(filter.ClosingMonths)
-	if err != nil {
-		return dashboardLADisbursementQueryParams{}, err
-	}
-	riskLevel, err := optionalDashboardRiskLevel(filter.RiskLevel)
-	if err != nil {
-		return dashboardLADisbursementQueryParams{}, err
-	}
-	return dashboardLADisbursementQueryParams{
-		BudgetYear:    optionalDashboardInt4(filter.BudgetYear),
-		Quarter:       quarter,
-		LenderID:      lenderID,
-		InstitutionID: institutionID,
-		IsExtended:    optionalDashboardBool(filter.IsExtended),
-		ClosingMonths: closingMonths,
-		RiskLevel:     riskLevel,
 	}, nil
 }
 
@@ -823,38 +535,6 @@ func optionalDashboardInt4(value *int32) pgtype.Int4 {
 		return pgtype.Int4{}
 	}
 	return pgtype.Int4{Int32: *value, Valid: true}
-}
-
-func optionalDashboardBool(value *bool) pgtype.Bool {
-	if value == nil {
-		return pgtype.Bool{}
-	}
-	return pgtype.Bool{Bool: *value, Valid: true}
-}
-
-func optionalClosingMonths(value *int32) (pgtype.Int4, error) {
-	if value == nil {
-		return pgtype.Int4{}, nil
-	}
-	switch *value {
-	case 3, 6, 12:
-		return pgtype.Int4{Int32: *value, Valid: true}, nil
-	default:
-		return pgtype.Int4{}, validation("closing_months", "closing_months harus 3, 6, atau 12")
-	}
-}
-
-func optionalDashboardRiskLevel(value *string) (pgtype.Text, error) {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return pgtype.Text{}, nil
-	}
-	riskLevel := strings.ToLower(strings.TrimSpace(*value))
-	switch riskLevel {
-	case "low", "medium", "high":
-		return pgtype.Text{String: riskLevel, Valid: true}, nil
-	default:
-		return pgtype.Text{}, validation("risk_level", "risk_level harus low, medium, atau high")
-	}
 }
 
 func optionalDataQualitySeverity(value *string) (pgtype.Text, error) {
@@ -936,25 +616,12 @@ func optionalInstitutionRole(value *string) (pgtype.Text, error) {
 	return pgtype.Text{String: role, Valid: true}, nil
 }
 
-func optionalQuarter(value *string) (pgtype.Text, error) {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return pgtype.Text{}, nil
-	}
-	quarter := strings.ToUpper(strings.TrimSpace(*value))
-	switch quarter {
-	case "TW1", "TW2", "TW3", "TW4":
-		return pgtype.Text{String: quarter, Valid: true}, nil
-	default:
-		return pgtype.Text{}, validation("quarter", "quarter tidak valid")
-	}
-}
-
 func optionalKLSortBy(value *string) pgtype.Text {
 	if value == nil {
 		return pgtype.Text{String: "pipeline_usd", Valid: true}
 	}
 	switch strings.TrimSpace(*value) {
-	case "pipeline_usd", "la_commitment_usd", "absorption_pct", "risk_count":
+	case "pipeline_usd", "la_commitment_usd", "risk_count":
 		return pgtype.Text{String: strings.TrimSpace(*value), Valid: true}
 	default:
 		return pgtype.Text{String: "pipeline_usd", Valid: true}
@@ -1166,9 +833,6 @@ func klPortfolioPerformanceItems(rows []queries.GetDashboardKLPortfolioPerforman
 			LACount:             int(row.LaCount),
 			PipelineUSD:         floatFromNumeric(row.PipelineUsd),
 			LACommitmentUSD:     floatFromNumeric(row.LaCommitmentUsd),
-			PlannedUSD:          floatFromNumeric(row.PlannedUsd),
-			RealizedUSD:         floatFromNumeric(row.RealizedUsd),
-			AbsorptionPct:       floatFromNumeric(row.AbsorptionPct),
 			RiskCount:           int(row.RiskCount),
 			PerformanceScore:    floatFromNumeric(row.PerformanceScore),
 			PerformanceCategory: row.PerformanceCategory,
@@ -1184,124 +848,23 @@ func klPortfolioPerformanceSummary(items []model.KLPortfolioPerformanceItem) mod
 	}
 
 	topExposure := items[0]
-	lowestAbsorption := items[0]
 	highestRisk := items[0]
-	absorptionTotal := 0.0
 	for _, item := range items {
 		exposure := item.PipelineUSD + item.LACommitmentUSD
 		if exposure > topExposure.PipelineUSD+topExposure.LACommitmentUSD {
 			topExposure = item
-		}
-		if item.AbsorptionPct < lowestAbsorption.AbsorptionPct {
-			lowestAbsorption = item
 		}
 		if item.RiskCount > highestRisk.RiskCount {
 			highestRisk = item
 		}
 		summary.TotalInstitutionExposureUSD += exposure
 		summary.TotalInstitutionRiskCount += item.RiskCount
-		absorptionTotal += item.AbsorptionPct
 	}
 	summary.TopExposureInstitution = topExposure.InstitutionName
 	summary.TopExposureUSD = topExposure.PipelineUSD + topExposure.LACommitmentUSD
-	summary.LowestAbsorptionInstitution = lowestAbsorption.InstitutionName
-	summary.LowestAbsorptionPct = lowestAbsorption.AbsorptionPct
 	summary.HighestRiskInstitution = highestRisk.InstitutionName
 	summary.HighestRiskCount = highestRisk.RiskCount
-	summary.AverageAbsorptionPct = absorptionTotal / float64(len(items))
 	return summary
-}
-
-func laDisbursementSummary(row queries.GetDashboardLADisbursementSummaryRow) model.LADisbursementSummary {
-	return model.LADisbursementSummary{
-		LACount:           int(row.LaCount),
-		EffectiveCount:    int(row.EffectiveCount),
-		NotEffectiveCount: int(row.NotEffectiveCount),
-		ExtendedCount:     int(row.ExtendedCount),
-		CommitmentUSD:     floatFromNumeric(row.CommitmentUsd),
-		PlannedUSD:        floatFromNumeric(row.PlannedUsd),
-		RealizedUSD:       floatFromNumeric(row.RealizedUsd),
-		AbsorptionPct:     floatFromNumeric(row.AbsorptionPct),
-		UndisbursedUSD:    floatFromNumeric(row.UndisbursedUsd),
-	}
-}
-
-func laDisbursementTrend(rows []queries.GetDashboardLADisbursementQuarterlyTrendRow) []model.LADisbursementTrendPoint {
-	items := make([]model.LADisbursementTrendPoint, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, model.LADisbursementTrendPoint{
-			Period:        fmt.Sprintf("%d-%s", row.BudgetYear, row.Quarter),
-			BudgetYear:    row.BudgetYear,
-			Quarter:       row.Quarter,
-			PlannedUSD:    floatFromNumeric(row.PlannedUsd),
-			RealizedUSD:   floatFromNumeric(row.RealizedUsd),
-			AbsorptionPct: floatFromNumeric(row.AbsorptionPct),
-		})
-	}
-	return items
-}
-
-func laClosingRisks(rows []queries.ListDashboardLAClosingRisksRow) []model.LAClosingRiskItem {
-	items := make([]model.LAClosingRiskItem, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, model.LAClosingRiskItem{
-			LoanAgreementID:       model.UUIDToString(row.LoanAgreementID),
-			LoanCode:              row.LoanCode,
-			ProjectName:           row.ProjectName,
-			LenderName:            row.LenderName,
-			EffectiveDate:         dateString(row.EffectiveDate),
-			ClosingDate:           dateString(row.ClosingDate),
-			DaysUntilClosing:      int(row.DaysUntilClosing),
-			CommitmentUSD:         floatFromNumeric(row.CommitmentUsd),
-			CumulativeRealizedUSD: floatFromNumeric(row.CumulativeRealizedUsd),
-			UndisbursedUSD:        floatFromNumeric(row.UndisbursedUsd),
-			LAAbsorptionPct:       floatFromNumeric(row.LaAbsorptionPct),
-			RiskType:              row.RiskType,
-			RiskLevel:             row.RiskLevel,
-		})
-	}
-	return items
-}
-
-func laUnderDisbursementRisks(rows []queries.ListDashboardLAUnderDisbursementRisksRow) []model.LAUnderDisbursementRiskItem {
-	items := make([]model.LAUnderDisbursementRiskItem, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, model.LAUnderDisbursementRiskItem{
-			LoanAgreementID:                model.UUIDToString(row.LoanAgreementID),
-			LoanCode:                       row.LoanCode,
-			ProjectName:                    row.ProjectName,
-			LenderName:                     row.LenderName,
-			EffectiveDate:                  dateString(row.EffectiveDate),
-			ClosingDate:                    dateString(row.ClosingDate),
-			CommitmentUSD:                  floatFromNumeric(row.CommitmentUsd),
-			CumulativeRealizedUSD:          floatFromNumeric(row.CumulativeRealizedUsd),
-			UndisbursedUSD:                 floatFromNumeric(row.UndisbursedUsd),
-			LAAbsorptionPct:                floatFromNumeric(row.LaAbsorptionPct),
-			TimeElapsedPct:                 floatFromNumeric(row.TimeElapsedPct),
-			AbsorptionGapPct:               floatFromNumeric(row.AbsorptionGapPct),
-			RemainingMonths:                floatFromNumeric(row.RemainingMonths),
-			RequiredMonthlyDisbursementUSD: floatFromNumeric(row.RequiredMonthlyDisbursementUsd),
-			MonitoringCount:                int(row.MonitoringCount),
-			IsExtended:                     row.IsExtended,
-			RiskType:                       row.RiskType,
-			RiskLevel:                      row.RiskLevel,
-		})
-	}
-	return items
-}
-
-func laComponentBreakdown(rows []queries.GetDashboardLAComponentBreakdownRow) []model.LAComponentBreakdownItem {
-	items := make([]model.LAComponentBreakdownItem, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, model.LAComponentBreakdownItem{
-			ComponentName: row.ComponentName,
-			LACount:       int(row.LaCount),
-			PlannedUSD:    floatFromNumeric(row.PlannedUsd),
-			RealizedUSD:   floatFromNumeric(row.RealizedUsd),
-			AbsorptionPct: floatFromNumeric(row.AbsorptionPct),
-		})
-	}
-	return items
 }
 
 func dataQualityIssues(rows []queries.ListDashboardDataQualityIssuesRow) []model.DataQualityIssueItem {
@@ -1390,21 +953,16 @@ var dataQualityIssueTypes = map[string]struct{}{
 	"DK_WITHOUT_ACTIVITY_DETAIL":                {},
 	"DK_WITHOUT_LA":                             {},
 	"LA_NOT_EFFECTIVE":                          {},
-	"EFFECTIVE_LA_WITHOUT_MONITORING":           {},
-	"MONITORING_PLANNED_ZERO_REALIZED_POSITIVE": {},
-	"MONITORING_COMPONENT_NAME_EMPTY":           {},
 	"CURRENCY_USD_MISMATCH":                     {},
-	"CLOSING_DATE_SOON_NO_RECENT_MONITORING":    {},
 }
 
 var pipelineStageLabels = map[string]string{
-	"BB_NO_LENDER":            "Blue Book No Lender",
-	"INDICATION_NO_LOI":       "Indication No Letter of Intent",
-	"LOI_NO_GB":               "Letter of Intent No Green Book",
-	"GB_NO_DK":                "Green Book No Daftar Kegiatan",
-	"DK_NO_LA":                "Daftar Kegiatan No Loan Agreement",
-	"LA_NOT_EFFECTIVE":        "Loan Agreement Not Effective",
-	"EFFECTIVE_NO_MONITORING": "Effective No Monitoring",
+	"BB_NO_LENDER":      "Blue Book No Lender",
+	"INDICATION_NO_LOI": "Indication No Letter of Intent",
+	"LOI_NO_GB":         "Letter of Intent No Green Book",
+	"GB_NO_DK":          "Green Book No Daftar Kegiatan",
+	"DK_NO_LA":          "Daftar Kegiatan No Loan Agreement",
+	"LA_NOT_EFFECTIVE":  "Loan Agreement Not Effective",
 }
 
 var greenBookReadinessStatusLabels = map[string]string{
@@ -1434,9 +992,7 @@ func pipelineRecommendedAction(stage string) string {
 	case "DK_NO_LA":
 		return "Dorong negosiasi/legal agreement."
 	case "LA_NOT_EFFECTIVE":
-		return "Monitor effectiveness conditions."
-	case "EFFECTIVE_NO_MONITORING":
-		return "Input monitoring triwulanan."
+		return "Pantau pemenuhan effectiveness conditions."
 	default:
 		return "Tindak lanjuti status proyek."
 	}
@@ -1448,8 +1004,6 @@ func executiveMetricCards(summary *model.DashboardSummary) []model.MetricCard {
 		{Key: "gb_projects", Label: "Green Book Projects", Value: float64(summary.TotalGBProjects), Unit: "project", Category: "pipeline"},
 		{Key: "dk_financing_usd", Label: "Daftar Kegiatan Financing", Value: summary.DKFinancingUSD, Unit: "USD", Category: "commitment"},
 		{Key: "la_commitment_usd", Label: "Loan Agreement Commitment", Value: summary.LACommitmentUSD, Unit: "USD", Category: "commitment"},
-		{Key: "realized_disbursement_usd", Label: "Realized Disbursement", Value: summary.RealizedDisbursementUSD, Unit: "USD", Category: "monitoring"},
-		{Key: "absorption_pct", Label: "Absorption", Value: summary.AbsorptionPct, Unit: "percent", Category: "monitoring"},
 	}
 }
 
@@ -1458,7 +1012,7 @@ func executiveFunnelMetrics(rows []queries.GetDashboardExecutiveFunnelRow) []mod
 	for _, row := range rows {
 		byStage[row.Stage] = row
 	}
-	order := []string{"BB", "GB", "DK", "LA", "MONITORING"}
+	order := []string{"BB", "GB", "DK", "LA"}
 	metrics := make([]model.StageMetric, 0, len(order))
 	for _, stage := range order {
 		row := byStage[stage]
@@ -1481,7 +1035,6 @@ func executiveInstitutionBreakdown(rows []queries.GetDashboardExecutiveTopInstit
 			Label:       row.Label,
 			ItemCount:   int(row.ItemCount),
 			AmountUSD:   floatFromNumeric(row.AmountUsd),
-			RealizedUSD: floatFromNumeric(row.RealizedUsd),
 		})
 	}
 	return items
@@ -1496,7 +1049,6 @@ func executiveLenderBreakdown(rows []queries.GetDashboardExecutiveTopLendersRow)
 			Label:       row.Label,
 			ItemCount:   int(row.ItemCount),
 			AmountUSD:   floatFromNumeric(row.AmountUsd),
-			RealizedUSD: floatFromNumeric(row.RealizedUsd),
 		})
 	}
 	return items
@@ -1528,7 +1080,6 @@ func executiveRiskItems(rows []queries.ListDashboardExecutiveRiskItemsRow) []mod
 			Severity:           row.Severity,
 			AmountUSD:          floatFromNumeric(row.AmountUsd),
 			DaysUntilClosing:   daysUntilClosing,
-			AbsorptionPct:      floatFromNumeric(row.AbsorptionPct),
 			Score:              floatFromNumeric(row.Score),
 		})
 	}
@@ -1565,8 +1116,8 @@ func executiveInsights(summary *model.DashboardSummary, funnel []model.StageMetr
 			bottleneck.AmountUSD,
 		))
 	}
-	insights = append(insights, fmt.Sprintf("Serapan kumulatif mencapai %.2f%% dari rencana monitoring.", summary.AbsorptionPct))
 	insights = append(insights, fmt.Sprintf("%d Loan Agreement akan closing dalam 12 bulan.", closingCount))
+	insights = append(insights, fmt.Sprintf("Total Loan Agreement commitment mencapai USD %.0f.", summary.LACommitmentUSD))
 	return insights
 }
 
@@ -1578,11 +1129,6 @@ func dashboardMetricCards(summary *model.DashboardSummary) []model.MetricCard {
 		{Key: "dk_financing_usd", Label: "Daftar Kegiatan Financing", Value: summary.DKFinancingUSD, Unit: "USD", Category: "commitment"},
 		{Key: "dk_counterpart_usd", Label: "Daftar Kegiatan Counterpart", Value: summary.DKCounterpartUSD, Unit: "USD", Category: "commitment"},
 		{Key: "la_commitment_usd", Label: "Loan Agreement Commitment", Value: summary.LACommitmentUSD, Unit: "USD", Category: "commitment"},
-		{Key: "planned_disbursement_usd", Label: "Planned Disbursement", Value: summary.PlannedDisbursementUSD, Unit: "USD", Category: "monitoring"},
-		{Key: "realized_disbursement_usd", Label: "Realized Disbursement", Value: summary.RealizedDisbursementUSD, Unit: "USD", Category: "monitoring"},
-		{Key: "absorption_pct", Label: "Absorption", Value: summary.AbsorptionPct, Unit: "percent", Category: "monitoring"},
-		{Key: "la_absorption_pct", Label: "LA Absorption", Value: summary.LAAbsorptionPct, Unit: "percent", Category: "monitoring"},
-		{Key: "undisbursed_usd", Label: "Undisbursed", Value: summary.UndisbursedUSD, Unit: "USD", Category: "monitoring"},
 	}
 }
 
@@ -1592,8 +1138,6 @@ func stageLabel(stage string) string {
 		return "Blue Book"
 	case "LA":
 		return "Loan Agreement"
-	case "MONITORING":
-		return "Monitoring"
 	case "BB_ONLY":
 		return "Blue Book Only"
 	case "BB_WITH_LENDER_INDICATION":
@@ -1606,10 +1150,6 @@ func stageLabel(stage string) string {
 		return "Daftar Kegiatan"
 	case "LA_SIGNED_NOT_EFFECTIVE":
 		return "Loan Agreement Signed Not Effective"
-	case "LA_EFFECTIVE_NO_MONITORING":
-		return "Loan Agreement Effective No Monitoring"
-	case "MONITORING_ACTIVE":
-		return "Monitoring Active"
 	default:
 		return stage
 	}

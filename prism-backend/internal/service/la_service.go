@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -97,11 +96,6 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 	}
 	var created queries.LoanAgreement
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		if _, err := qtx.GetLoanAgreementByDKProject(ctx, parsed.DKProjectID); err == nil {
-			return apperrors.Conflict("DK Project sudah memiliki Loan Agreement")
-		} else if err != pgx.ErrNoRows {
-			return err
-		}
 		if err := validateLALender(ctx, qtx, parsed.DKProjectID, parsed.LenderID); err != nil {
 			return err
 		}
@@ -109,16 +103,17 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 			return err
 		}
 		row, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
-			DkProjectID:         parsed.DKProjectID,
-			LenderID:            parsed.LenderID,
-			LoanCode:            parsed.LoanCode,
-			AgreementDate:       parsed.AgreementDate,
-			EffectiveDate:       parsed.EffectiveDate,
-			OriginalClosingDate: parsed.OriginalClosingDate,
-			ClosingDate:         parsed.ClosingDate,
-			Currency:            parsed.Currency,
-			AmountOriginal:      parsed.AmountOriginal,
-			AmountUsd:           parsed.AmountUsd,
+			DkProjectID:            parsed.DKProjectID,
+			LenderID:               parsed.LenderID,
+			LoanCode:               parsed.LoanCode,
+			AgreementDate:          parsed.AgreementDate,
+			EffectiveDate:          parsed.EffectiveDate,
+			OriginalClosingDate:    parsed.OriginalClosingDate,
+			ClosingDate:            parsed.ClosingDate,
+			Currency:               parsed.Currency,
+			AmountOriginal:         parsed.AmountOriginal,
+			AmountUsd:              parsed.AmountUsd,
+			CumulativeDisbursement: parsed.CumulativeDisbursement,
 		})
 		created = row
 		return err
@@ -150,16 +145,17 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 			return err
 		}
 		row, err := qtx.UpdateLoanAgreement(ctx, queries.UpdateLoanAgreementParams{
-			ID:                  id,
-			LenderID:            parsed.LenderID,
-			LoanCode:            parsed.LoanCode,
-			AgreementDate:       parsed.AgreementDate,
-			EffectiveDate:       parsed.EffectiveDate,
-			OriginalClosingDate: parsed.OriginalClosingDate,
-			ClosingDate:         parsed.ClosingDate,
-			Currency:            parsed.Currency,
-			AmountOriginal:      parsed.AmountOriginal,
-			AmountUsd:           parsed.AmountUsd,
+			ID:                     id,
+			LenderID:               parsed.LenderID,
+			LoanCode:               parsed.LoanCode,
+			AgreementDate:          parsed.AgreementDate,
+			EffectiveDate:          parsed.EffectiveDate,
+			OriginalClosingDate:    parsed.OriginalClosingDate,
+			ClosingDate:            parsed.ClosingDate,
+			Currency:               parsed.Currency,
+			AmountOriginal:         parsed.AmountOriginal,
+			AmountUsd:              parsed.AmountUsd,
+			CumulativeDisbursement: parsed.CumulativeDisbursement,
 		})
 		if err != nil {
 			return err
@@ -204,16 +200,17 @@ func (s *LAService) withTx(ctx context.Context, fn func(*queries.Queries) error)
 }
 
 type parsedLoanAgreementRequest struct {
-	DKProjectID         pgtype.UUID
-	LenderID            pgtype.UUID
-	LoanCode            string
-	AgreementDate       pgtype.Date
-	EffectiveDate       pgtype.Date
-	OriginalClosingDate pgtype.Date
-	ClosingDate         pgtype.Date
-	Currency            string
-	AmountOriginal      pgtype.Numeric
-	AmountUsd           pgtype.Numeric
+	DKProjectID            pgtype.UUID
+	LenderID               pgtype.UUID
+	LoanCode               string
+	AgreementDate          pgtype.Date
+	EffectiveDate          pgtype.Date
+	OriginalClosingDate    pgtype.Date
+	ClosingDate            pgtype.Date
+	Currency               string
+	AmountOriginal         pgtype.Numeric
+	AmountUsd              pgtype.Numeric
+	CumulativeDisbursement pgtype.Numeric
 }
 
 func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreementRequest, error) {
@@ -236,13 +233,16 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 	if err != nil {
 		return parsedLoanAgreementRequest{}, err
 	}
-	originalClosingDate, err := parseDate(req.OriginalClosingDate, "original_closing_date")
+	originalClosingDate, err := parseOptionalLoanAgreementDate(req.OriginalClosingDate, "original_closing_date")
 	if err != nil {
 		return parsedLoanAgreementRequest{}, err
 	}
 	closingDate, err := parseDate(req.ClosingDate, "closing_date")
 	if err != nil {
 		return parsedLoanAgreementRequest{}, err
+	}
+	if originalClosingDate.Valid && closingDate.Time.Before(originalClosingDate.Time) {
+		return parsedLoanAgreementRequest{}, validation("closing_date", "tidak boleh lebih awal dari tanggal closing awal")
 	}
 	if strings.TrimSpace(req.LoanCode) == "" {
 		return parsedLoanAgreementRequest{}, validation("loan_code", "wajib diisi")
@@ -251,19 +251,30 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 		return parsedLoanAgreementRequest{}, validation("currency", "wajib diisi")
 	}
 	currency := normalizeCurrency(req.Currency)
+	if req.CumulativeDisbursement < 0 {
+		return parsedLoanAgreementRequest{}, validation("cumulative_disbursement", "tidak boleh negatif")
+	}
 	amountOriginal, amountUSD := normalizeCurrencyAmountPair(currency, req.AmountOriginal, req.AmountUSD)
 	return parsedLoanAgreementRequest{
-		DKProjectID:         dkProjectID,
-		LenderID:            lenderID,
-		LoanCode:            strings.TrimSpace(req.LoanCode),
-		AgreementDate:       agreementDate,
-		EffectiveDate:       effectiveDate,
-		OriginalClosingDate: originalClosingDate,
-		ClosingDate:         closingDate,
-		Currency:            currency,
-		AmountOriginal:      numericFromFloat(amountOriginal),
-		AmountUsd:           numericFromFloat(amountUSD),
+		DKProjectID:            dkProjectID,
+		LenderID:               lenderID,
+		LoanCode:               strings.TrimSpace(req.LoanCode),
+		AgreementDate:          agreementDate,
+		EffectiveDate:          effectiveDate,
+		OriginalClosingDate:    originalClosingDate,
+		ClosingDate:            closingDate,
+		Currency:               currency,
+		AmountOriginal:         numericFromFloat(amountOriginal),
+		AmountUsd:              numericFromFloat(amountUSD),
+		CumulativeDisbursement: numericFromFloat(req.CumulativeDisbursement),
 	}, nil
+}
+
+func parseOptionalLoanAgreementDate(value string, field string) (pgtype.Date, error) {
+	if strings.TrimSpace(value) == "" {
+		return pgtype.Date{}, nil
+	}
+	return parseDate(value, field)
 }
 
 func validateLALender(ctx context.Context, qtx *queries.Queries, dkProjectID, lenderID pgtype.UUID) error {
@@ -279,41 +290,43 @@ func validateLALender(ctx context.Context, qtx *queries.Queries, dkProjectID, le
 
 func laGetResponse(row queries.GetLoanAgreementRow) model.LoanAgreementResponse {
 	return model.LoanAgreementResponse{
-		ID:                  model.UUIDToString(row.ID),
-		DKProjectID:         model.UUIDToString(row.DkProjectID),
-		Lender:              model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
-		LoanCode:            row.LoanCode,
-		AgreementDate:       dateString(row.AgreementDate),
-		EffectiveDate:       dateString(row.EffectiveDate),
-		OriginalClosingDate: dateString(row.OriginalClosingDate),
-		ClosingDate:         dateString(row.ClosingDate),
-		IsExtended:          isExtended(row.OriginalClosingDate, row.ClosingDate),
-		ExtensionDays:       extensionDays(row.OriginalClosingDate, row.ClosingDate),
-		Currency:            row.Currency,
-		AmountOriginal:      floatFromNumeric(row.AmountOriginal),
-		AmountUSD:           floatFromNumeric(row.AmountUsd),
-		CreatedAt:           formatMasterTime(row.CreatedAt),
-		UpdatedAt:           formatMasterTime(row.UpdatedAt),
+		ID:                     model.UUIDToString(row.ID),
+		DKProjectID:            model.UUIDToString(row.DkProjectID),
+		Lender:                 model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
+		LoanCode:               row.LoanCode,
+		AgreementDate:          dateString(row.AgreementDate),
+		EffectiveDate:          dateString(row.EffectiveDate),
+		OriginalClosingDate:    dateString(row.OriginalClosingDate),
+		ClosingDate:            dateString(row.ClosingDate),
+		IsExtended:             isExtended(row.OriginalClosingDate, row.ClosingDate),
+		ExtensionDays:          extensionDays(row.OriginalClosingDate, row.ClosingDate),
+		Currency:               row.Currency,
+		AmountOriginal:         floatFromNumeric(row.AmountOriginal),
+		AmountUSD:              floatFromNumeric(row.AmountUsd),
+		CumulativeDisbursement: floatFromNumeric(row.CumulativeDisbursement),
+		CreatedAt:              formatMasterTime(row.CreatedAt),
+		UpdatedAt:              formatMasterTime(row.UpdatedAt),
 	}
 }
 
 func laListResponse(row queries.ListLoanAgreementsRow) model.LoanAgreementResponse {
 	return model.LoanAgreementResponse{
-		ID:                  model.UUIDToString(row.ID),
-		DKProjectID:         model.UUIDToString(row.DkProjectID),
-		Lender:              model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
-		LoanCode:            row.LoanCode,
-		AgreementDate:       dateString(row.AgreementDate),
-		EffectiveDate:       dateString(row.EffectiveDate),
-		OriginalClosingDate: dateString(row.OriginalClosingDate),
-		ClosingDate:         dateString(row.ClosingDate),
-		IsExtended:          isExtended(row.OriginalClosingDate, row.ClosingDate),
-		ExtensionDays:       extensionDays(row.OriginalClosingDate, row.ClosingDate),
-		Currency:            row.Currency,
-		AmountOriginal:      floatFromNumeric(row.AmountOriginal),
-		AmountUSD:           floatFromNumeric(row.AmountUsd),
-		CreatedAt:           formatMasterTime(row.CreatedAt),
-		UpdatedAt:           formatMasterTime(row.UpdatedAt),
+		ID:                     model.UUIDToString(row.ID),
+		DKProjectID:            model.UUIDToString(row.DkProjectID),
+		Lender:                 model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
+		LoanCode:               row.LoanCode,
+		AgreementDate:          dateString(row.AgreementDate),
+		EffectiveDate:          dateString(row.EffectiveDate),
+		OriginalClosingDate:    dateString(row.OriginalClosingDate),
+		ClosingDate:            dateString(row.ClosingDate),
+		IsExtended:             isExtended(row.OriginalClosingDate, row.ClosingDate),
+		ExtensionDays:          extensionDays(row.OriginalClosingDate, row.ClosingDate),
+		Currency:               row.Currency,
+		AmountOriginal:         floatFromNumeric(row.AmountOriginal),
+		AmountUSD:              floatFromNumeric(row.AmountUsd),
+		CumulativeDisbursement: floatFromNumeric(row.CumulativeDisbursement),
+		CreatedAt:              formatMasterTime(row.CreatedAt),
+		UpdatedAt:              formatMasterTime(row.UpdatedAt),
 	}
 }
 

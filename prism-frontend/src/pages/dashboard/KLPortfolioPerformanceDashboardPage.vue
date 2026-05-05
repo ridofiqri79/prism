@@ -8,7 +8,6 @@ import KLPerformanceTable from '@/components/dashboard/KLPerformanceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import type {
-  DashboardQuarter,
   InstitutionRole,
   KLPortfolioPerformanceParams,
   KLPortfolioSortBy,
@@ -16,21 +15,26 @@ import type {
 
 const dashboard = useDashboardStore()
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const filters = reactive<{
   institution_id: string | null
   institution_role: InstitutionRole | null
   period_id: string | null
   publish_year: number | null
-  budget_year: number | null
-  quarter: DashboardQuarter | null
   sort_by: KLPortfolioSortBy
 }>({
   institution_id: null,
   institution_role: null,
   period_id: null,
   publish_year: null,
-  budget_year: null,
-  quarter: null,
   sort_by: 'pipeline_usd',
 })
 
@@ -69,26 +73,9 @@ const publishYearOptions = computed(() =>
     .filter((item) => Number.isFinite(item.value)),
 )
 
-const budgetYearOptions = computed(() =>
-  (dashboard.filterOptions.budget_year ?? [])
-    .map((item) => ({
-      label: item.label,
-      value: Number(item.key),
-    }))
-    .filter((item) => Number.isFinite(item.value)),
-)
-
-const quarterOptions = computed(() =>
-  (dashboard.filterOptions.quarter ?? []).map((item) => ({
-    label: item.label,
-    value: item.key as DashboardQuarter,
-  })),
-)
-
 const sortOptions = computed(() => [
   { label: 'Pipeline USD', value: 'pipeline_usd' },
   { label: 'LA Commitment USD', value: 'la_commitment_usd' },
-  { label: 'Absorption', value: 'absorption_pct' },
   { label: 'Risk Count', value: 'risk_count' },
 ])
 
@@ -109,10 +96,10 @@ const kpiCards = computed(() => [
     detail: usdFormatter.format(summary.value?.top_exposure_usd ?? 0),
   },
   {
-    key: 'lowest-absorption',
-    label: 'Lowest Absorption',
-    title: summary.value?.lowest_absorption_institution || '-',
-    detail: `${(summary.value?.lowest_absorption_pct ?? 0).toFixed(2)}%`,
+    key: 'total-risk',
+    label: 'Total Risk',
+    title: String(summary.value?.total_institution_risk_count ?? 0),
+    detail: 'risk item',
   },
   {
     key: 'highest-risk',
@@ -128,8 +115,6 @@ function buildParams(): KLPortfolioPerformanceParams {
     institution_role: filters.institution_role ?? undefined,
     period_id: filters.period_id ?? undefined,
     publish_year: filters.publish_year ?? undefined,
-    budget_year: filters.budget_year ?? undefined,
-    quarter: filters.quarter ?? undefined,
     sort_by: filters.sort_by,
   }
 }
@@ -147,8 +132,6 @@ function clearFilters() {
   filters.institution_role = null
   filters.period_id = null
   filters.publish_year = null
-  filters.budget_year = null
-  filters.quarter = null
   filters.sort_by = 'pipeline_usd'
   void loadPerformance()
 }
@@ -161,13 +144,14 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
+      v-if="!props.embedded"
       title="K/L Portfolio Performance"
-      subtitle="Perbandingan portfolio dan kinerja K/L/Badan lintas Blue Book, Green Book, Daftar Kegiatan, Loan Agreement, dan Monitoring."
+      subtitle="Perbandingan portfolio dan kinerja K/L/Badan lintas Blue Book, Green Book, Daftar Kegiatan, dan Loan Agreement."
     />
 
     <DashboardFilterBar
       :loading="dashboard.klPortfolioPerformanceLoading"
-      grid-class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_12rem_1fr_10rem_10rem_8rem_12rem]"
+      grid-class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_12rem_1fr_10rem_12rem]"
       @apply="loadPerformance"
       @reset="clearFilters"
     >
@@ -215,32 +199,6 @@ onMounted(() => {
           <Select
             v-model="filters.publish_year"
             :options="publishYearOptions"
-            option-label="label"
-            option-value="value"
-            show-clear
-            class="w-full"
-            placeholder="Semua"
-          />
-        </label>
-
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Budget Year</span>
-          <Select
-            v-model="filters.budget_year"
-            :options="budgetYearOptions"
-            option-label="label"
-            option-value="value"
-            show-clear
-            class="w-full"
-            placeholder="Semua"
-          />
-        </label>
-
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Quarter</span>
-          <Select
-            v-model="filters.quarter"
-            :options="quarterOptions"
             option-label="label"
             option-value="value"
             show-clear

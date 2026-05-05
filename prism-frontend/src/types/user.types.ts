@@ -36,7 +36,6 @@ export const permissionModules: PermissionModule[] = [
   { module: 'gb_project', label: 'Proyek Green Book' },
   { module: 'daftar_kegiatan', label: 'Daftar Kegiatan' },
   { module: 'loan_agreement', label: 'Loan Agreement' },
-  { module: 'monitoring_disbursement', label: 'Monitoring Disbursement' },
   { module: 'institution', label: 'Instansi' },
   { module: 'lender', label: 'Lender' },
   { module: 'currency', label: 'Currency' },

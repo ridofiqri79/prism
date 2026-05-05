@@ -78,7 +78,7 @@ const option = computed(() => ({
 <template>
   <DashboardChartCard
     title="Portfolio Funnel"
-    subtitle="Blue Book sampai Monitoring tanpa penghitungan ulang di komponen."
+    subtitle="Blue Book sampai Loan Agreement tanpa penghitungan ulang di komponen."
     :empty="data.length === 0"
     empty-title="Tidak ada data funnel"
     empty-message="Ubah filter untuk melihat funnel portfolio."

@@ -89,11 +89,13 @@
 
 ## 6. Aturan Loan Agreement
 
-- One-to-One dengan DK Project — tidak boleh ada LA kedua untuk DK yang sama.
-- `closing_date >= original_closing_date` (enforced di DDL).
+- One-to-Many dari DK Project — satu Proyek Daftar Kegiatan boleh memiliki lebih dari satu Loan Agreement.
+- `loan_code` tetap unik secara global.
+- `original_closing_date` opsional; jika diisi, `closing_date >= original_closing_date` (enforced di DDL).
 - `is_extended` dan `extension_days` adalah computed, tidak disimpan di DB.
 - Saat `closing_date` diupdate → kirim SSE `loan_agreement.extended`.
 - `currency`: kode ISO 4217. Konversi ke USD dilakukan manual oleh Staff — sistem tidak konversi otomatis.
+- `cumulative_disbursement` diinput manual mengikuti `currency` Loan Agreement yang dipilih, tidak dikonversi otomatis.
 
 ---
 

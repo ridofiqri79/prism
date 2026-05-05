@@ -21,6 +21,8 @@ export interface DaftarKegiatan {
 export interface DKProjectLoanAgreementSummary {
   id: string
   loan_code: string
+  currency: string
+  cumulative_disbursement: number
 }
 
 export interface DKProject {
@@ -40,7 +42,7 @@ export interface DKProject {
   financing_details: DKFinancingDetail[]
   loan_allocations: DKLoanAllocation[]
   activity_details: DKActivityDetail[]
-  loan_agreement?: DKProjectLoanAgreementSummary | null
+  loan_agreements: DKProjectLoanAgreementSummary[]
   created_at?: string
   updated_at?: string
 }

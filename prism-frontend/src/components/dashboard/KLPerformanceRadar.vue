@@ -22,7 +22,7 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
 const chartData = computed(() =>
   props.items.map((item) => ({
     name: item.institution_name,
-    value: [item.la_commitment_usd, item.absorption_pct, item.risk_count],
+    value: [item.la_commitment_usd, item.pipeline_usd, item.risk_count],
     item,
   })),
 )
@@ -37,7 +37,7 @@ const option = computed(() => ({
       return [
         `<strong>${params.data?.name ?? ''}</strong>`,
         `LA: ${usdFormatter.format(item.la_commitment_usd)}`,
-        `Absorption: ${item.absorption_pct.toFixed(2)}%`,
+        `Pipeline: ${usdFormatter.format(item.pipeline_usd)}`,
         `Risk: ${item.risk_count}`,
       ].join('<br/>')
     },
@@ -52,11 +52,9 @@ const option = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    name: 'Absorption',
-    min: 0,
-    max: 100,
+    name: 'Pipeline',
     axisLabel: {
-      formatter: (value: number) => `${value}%`,
+      formatter: (value: number) => `$${Math.round(value / 1_000_000)}M`,
     },
   },
   series: [
@@ -76,7 +74,7 @@ const option = computed(() => ({
 <template>
   <section class="rounded-lg border border-surface-200 bg-white p-4">
     <div class="mb-3">
-      <h2 class="text-lg font-semibold text-surface-950">LA Commitment vs Absorption</h2>
+      <h2 class="text-lg font-semibold text-surface-950">LA Commitment vs Pipeline</h2>
       <p class="text-sm text-surface-500">Bubble size follows risk count.</p>
     </div>
     <VChart :option="option" autoresize class="h-80 w-full" />

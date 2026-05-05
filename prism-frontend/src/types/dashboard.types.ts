@@ -9,7 +9,7 @@ export interface DashboardNavigationItem {
   description: string
   route_name: string
   icon: string
-  accent: 'portfolio' | 'pipeline' | 'readiness' | 'financing' | 'institution' | 'disbursement' | 'quality'
+  accent: 'portfolio' | 'pipeline' | 'readiness' | 'financing' | 'institution' | 'quality'
 }
 
 export interface MetricCard {
@@ -27,22 +27,12 @@ export interface StageMetric {
   amount_usd: number
 }
 
-export interface TimeSeriesPoint {
-  period: string
-  budget_year?: number
-  quarter?: DashboardQuarter
-  planned_usd: number
-  realized_usd: number
-  absorption_pct: number
-}
-
 export interface BreakdownItem {
   id?: string
   key?: string
   label: string
   item_count?: number
   amount_usd?: number
-  realized_usd?: number
   percentage?: number
 }
 
@@ -58,7 +48,6 @@ export interface RiskItem {
   severity: 'low' | 'medium' | 'high' | string
   amount_usd?: number
   days_until_closing?: number
-  absorption_pct?: number
   score?: number
 }
 
@@ -80,7 +69,6 @@ export type PipelineBottleneckStage =
   | 'GB_NO_DK'
   | 'DK_NO_LA'
   | 'LA_NOT_EFFECTIVE'
-  | 'EFFECTIVE_NO_MONITORING'
 
 export type PipelineBottleneckSort = 'stage' | 'project_name' | 'amount_usd' | 'age_days'
 
@@ -262,7 +250,6 @@ export interface LenderFinancingMixParams {
   currency?: string
   period_id?: string
   publish_year?: number
-  budget_year?: number
 }
 
 export type InstitutionRole = 'Executing Agency' | 'Implementing Agency'
@@ -270,18 +257,14 @@ export type InstitutionRole = 'Executing Agency' | 'Implementing Agency'
 export type KLPortfolioSortBy =
   | 'pipeline_usd'
   | 'la_commitment_usd'
-  | 'absorption_pct'
   | 'risk_count'
 
 export interface KLPortfolioPerformanceSummary {
   total_institutions: number
   top_exposure_institution?: string
   top_exposure_usd?: number
-  lowest_absorption_institution?: string
-  lowest_absorption_pct?: number
   highest_risk_institution?: string
   highest_risk_count?: number
-  average_absorption_pct?: number
   total_institution_exposure_usd?: number
   total_institution_risk_count?: number
 }
@@ -295,9 +278,6 @@ export interface KLPortfolioPerformanceItem {
   la_count: number
   pipeline_usd: number
   la_commitment_usd: number
-  planned_usd: number
-  realized_usd: number
-  absorption_pct: number
   risk_count: number
   performance_score: number
   performance_category: 'Good' | 'Watch' | 'High Risk' | string
@@ -313,95 +293,7 @@ export interface KLPortfolioPerformanceParams {
   institution_role?: InstitutionRole
   period_id?: string
   publish_year?: number
-  budget_year?: number
-  quarter?: DashboardQuarter
   sort_by?: KLPortfolioSortBy
-}
-
-export type LARiskLevel = 'low' | 'medium' | 'high'
-
-export interface LADisbursementSummary {
-  la_count: number
-  effective_count: number
-  not_effective_count: number
-  extended_count: number
-  commitment_usd: number
-  planned_usd: number
-  realized_usd: number
-  absorption_pct: number
-  undisbursed_usd: number
-}
-
-export interface LADisbursementTrendPoint {
-  period: string
-  budget_year: number
-  quarter: DashboardQuarter
-  planned_usd: number
-  realized_usd: number
-  absorption_pct: number
-}
-
-export interface LAClosingRiskItem {
-  loan_agreement_id: string
-  loan_code: string
-  project_name: string
-  lender_name: string
-  effective_date: string
-  closing_date: string
-  days_until_closing: number
-  commitment_usd: number
-  cumulative_realized_usd: number
-  undisbursed_usd: number
-  la_absorption_pct: number
-  risk_type: string
-  risk_level: LARiskLevel | string
-}
-
-export interface LAUnderDisbursementRiskItem {
-  loan_agreement_id: string
-  loan_code: string
-  project_name: string
-  lender_name: string
-  effective_date: string
-  closing_date: string
-  commitment_usd: number
-  cumulative_realized_usd: number
-  undisbursed_usd: number
-  la_absorption_pct: number
-  time_elapsed_pct: number
-  absorption_gap_pct: number
-  remaining_months: number
-  required_monthly_disbursement_usd: number
-  monitoring_count: number
-  is_extended: boolean
-  risk_type: string
-  risk_level: LARiskLevel | string
-}
-
-export interface LAComponentBreakdownItem {
-  component_name: string
-  la_count: number
-  planned_usd: number
-  realized_usd: number
-  absorption_pct: number
-}
-
-export interface LADisbursementDashboard {
-  summary: LADisbursementSummary
-  quarterly_trend: LADisbursementTrendPoint[]
-  closing_risks: LAClosingRiskItem[]
-  under_disbursement_risks: LAUnderDisbursementRiskItem[]
-  component_breakdown: LAComponentBreakdownItem[]
-}
-
-export interface LADisbursementParams {
-  budget_year?: number
-  quarter?: DashboardQuarter
-  lender_id?: string
-  institution_id?: string
-  is_extended?: boolean
-  closing_months?: 3 | 6 | 12
-  risk_level?: LARiskLevel
 }
 
 export type DataQualitySeverity = 'info' | 'warning' | 'error'
@@ -465,32 +357,6 @@ export interface DashboardSummary {
   total_gb_projects: number
   total_loan_agreements: number
   total_amount_usd: number
-  total_realized_usd: number
-  total_realisasi_usd: number
-  overall_absorption_pct: number
-  active_monitoring: number
-}
-
-export interface MonitoringSummary {
-  budget_year?: number
-  tahun_anggaran?: number
-  quarter?: DashboardQuarter
-  triwulan?: DashboardQuarter
-  total_planned_usd: number
-  total_rencana_usd: number
-  total_realized_usd: number
-  total_realisasi_usd: number
-  absorption_pct: number
-  by_lender: LenderSummary[]
-}
-
-export interface LenderSummary {
-  lender: Lender
-  planned_usd: number
-  rencana_usd: number
-  realized_usd: number
-  realisasi_usd: number
-  absorption_pct: number
 }
 
 export interface BBProjectSummary {
@@ -572,7 +438,7 @@ export interface DKProjectJourney {
     tanggal?: string
     letter_number?: string | null
   } | null
-  loan_agreement: LAJourney | null
+  loan_agreements: LAJourney[]
 }
 
 export interface LAJourney {
@@ -678,31 +544,15 @@ export interface JourneyFlowLink {
 export interface DashboardFilterParams {
   period_id?: string
   publish_year?: number
-  budget_year?: number
-  quarter?: DashboardQuarter
   lender_id?: string
   institution_id?: string
   include_history?: boolean
 }
 
-export type DashboardSummaryApiResponse = Omit<
-  DashboardSummary,
-  'total_realized_usd' | 'total_realisasi_usd'
-> & {
-  total_realized_usd?: number
-  total_realisasi_usd?: number
+export type DashboardSummaryApiResponse = DashboardSummary & {
   bb_pipeline_usd?: number
+  dk_financing_usd?: number
   gb_pipeline_usd?: number
   la_commitment_usd?: number
-  realized_disbursement_usd?: number
-  absorption_pct?: number
   metrics?: MetricCard[]
-}
-
-export type MonitoringSummaryApiResponse = Partial<Omit<MonitoringSummary, 'by_lender'>> & {
-  by_lender?: Array<
-    Partial<Omit<LenderSummary, 'lender'>> & {
-      lender: Lender
-    }
-  >
 }

@@ -1,6 +1,6 @@
 # PLAN BE-05 — Daftar Kegiatan & Loan Agreement
 
-> **Scope:** CRUD DK (header + project + sub-tabel multi-currency) dan LA (One-to-One dengan DK).
+> **Scope:** CRUD DK (header + project + sub-tabel multi-currency) dan LA (One-to-Many dari DK Project).
 > **Deliverable:** DK tersimpan dengan validasi lender. LA tersimpan dengan deteksi perpanjangan.
 > **Referensi:** docs/PRISM_API_Contract.md (DK & LA), docs/PRISM_Business_Rules.md (bagian 5 & 6)
 > **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. DK baru harus resolve pilihan GB Project ke versi latest, tetapi setelah DK/LA dibuat relasi downstream tetap frozen pada concrete snapshot yang tersimpan.
@@ -123,8 +123,8 @@ ORDER BY la.created_at DESC LIMIT $1 OFFSET $2;
 SELECT la.*, l.name as lender_name FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id WHERE la.id = $1;
 
--- name: GetLoanAgreementByDKProject :one
-SELECT * FROM loan_agreement WHERE dk_project_id = $1;
+-- name: ListLoanAgreementsByDKProject :many
+SELECT * FROM loan_agreement WHERE dk_project_id = $1 ORDER BY created_at DESC, loan_code ASC;
 
 -- name: CreateLoanAgreement :one
 INSERT INTO loan_agreement (dk_project_id, lender_id, loan_code, agreement_date, effective_date, original_closing_date, closing_date, currency, amount_original, amount_usd)
@@ -173,12 +173,6 @@ func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req m
 
 ```go
 func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.CreateLoanAgreementRequest) (*model.LAResponse, error) {
-    // Cek DK sudah punya LA
-    existing, _ := s.queries.GetLoanAgreementByDKProject(ctx, req.DKProjectID)
-    if existing != nil {
-        return nil, errors.Conflict("DK Project sudah memiliki Loan Agreement")
-    }
-
     // Validasi lender dari DK financing detail
     allowedLenders, _ := s.queries.GetAllowedLenderIDsForLA(ctx, req.DKProjectID)
     if !inSet(req.LenderID, allowedLenders) {
@@ -196,8 +190,8 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.CreateLoa
 func (s *LAService) buildResponse(la *queries.LoanAgreement) *model.LAResponse {
     return &model.LAResponse{
         // ...
-        IsExtended:    la.ClosingDate != la.OriginalClosingDate,
-        ExtensionDays: int(la.ClosingDate.Time.Sub(la.OriginalClosingDate.Time).Hours() / 24),
+        IsExtended:    la.OriginalClosingDate.Valid && la.ClosingDate != la.OriginalClosingDate,
+        ExtensionDays: func() int { if !la.OriginalClosingDate.Valid { return 0 }; return int(la.ClosingDate.Time.Sub(la.OriginalClosingDate.Time).Hours() / 24) }(),
     }
 }
 ```
@@ -239,9 +233,9 @@ la.DELETE("/:id", laHandler.DeleteLA, permission.Require("loan_agreement", "dele
 - [x] `make generate`
 - [x] `internal/model/daftar_kegiatan.go` + `internal/model/loan_agreement.go`
 - [x] `internal/service/dk_service.go` — validasi lender dari allowed set
-- [x] `internal/service/la_service.go` — cek duplicate + validasi lender + computed is_extended
+- [x] `internal/service/la_service.go` — validasi lender + loan_code unik + computed is_extended
 - [x] Handler DK dan LA
 - [x] Routes terdaftar
 - [x] `POST /dk-projects` dengan lender tidak dari GB/BB → 422
-- [x] `POST /loan-agreements` untuk DK yang sudah punya LA → 409
-- [x] `is_extended = true` saat `closing_date != original_closing_date`
+- [x] `POST /loan-agreements` untuk DK yang sama boleh lebih dari satu selama `loan_code` unik
+- [x] `is_extended = true` saat `original_closing_date` diisi dan `closing_date != original_closing_date`

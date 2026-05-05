@@ -188,7 +188,8 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
       ensureNode(nodes, dkNode, 'completed', 'daftar-kegiatan')
       links.push(makeLink(greenBookNode, dkNode, dkAmount, 'Green Book ke Daftar Kegiatan'))
 
-      if (!dkProject.loan_agreement) {
+      const loanAgreements = loanAgreementsForDk(dkProject)
+      if (loanAgreements.length === 0) {
         const pendingLoanAgreementNode = `Loan Agreement\nBelum ada untuk ${shortLabel(
           dkLabel(dkProject),
           28,
@@ -200,7 +201,9 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
         continue
       }
 
-      appendLoanAgreementFlow(nodes, links, dkNode, dkAmount, dkProject.loan_agreement)
+      for (const loanAgreement of loanAgreements) {
+        appendLoanAgreementFlow(nodes, links, dkNode, dkAmount, loanAgreement)
+      }
     }
   }
 
@@ -311,13 +314,21 @@ function fundingTotalForGreenBook(project: GBProjectJourney) {
 }
 
 function amountForDk(greenBookProject: GBProjectJourney, dkProject: DKProjectJourney) {
-  if ((dkProject.loan_agreement?.amount_usd ?? 0) > 0) {
-    return dkProject.loan_agreement?.amount_usd ?? 0
+  const loanAgreementAmount = loanAgreementsForDk(dkProject).reduce(
+    (sum, loanAgreement) => sum + (loanAgreement.amount_usd ?? 0),
+    0,
+  )
+  if (loanAgreementAmount > 0) {
+    return loanAgreementAmount
   }
 
   const greenBookAmount = fundingTotalForGreenBook(greenBookProject)
   if (greenBookAmount <= 0) return 0
   return greenBookAmount / Math.max(1, greenBookProject.dk_projects.length)
+}
+
+function loanAgreementsForDk(project: DKProjectJourney) {
+  return project.loan_agreements ?? []
 }
 
 function dkLabel(project: DKProjectJourney) {

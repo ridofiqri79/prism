@@ -8,7 +8,6 @@ import { greenBookRoutes } from '@/router/routes/green-book.routes'
 import { journeyRoutes } from '@/router/routes/journey.routes'
 import { loanAgreementRoutes } from '@/router/routes/loan-agreement.routes'
 import { masterRoutes } from '@/router/routes/master.routes'
-import { monitoringRoutes } from '@/router/routes/monitoring.routes'
 import { projectRoutes } from '@/router/routes/project.routes'
 import { spatialDistributionRoutes } from '@/router/routes/spatial-distribution.routes'
 import { userRoutes } from '@/router/routes/user.routes'
@@ -27,7 +26,6 @@ const appRoutes: RouteRecordRaw[] = [
       ...greenBookRoutes,
       ...daftarKegiatanRoutes,
       ...loanAgreementRoutes,
-      ...monitoringRoutes,
       ...journeyRoutes,
       {
         path: 'forbidden',

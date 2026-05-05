@@ -17,13 +17,14 @@ export interface LoanAgreement {
   loan_code: string
   agreement_date: string
   effective_date: string
-  original_closing_date: string
+  original_closing_date: string | null
   closing_date: string
   is_extended: boolean
   extension_days: number
   currency: string
   amount_original: number
   amount_usd: number
+  cumulative_disbursement: number
   created_at?: string
   updated_at?: string
 }
@@ -39,6 +40,7 @@ export interface LoanAgreementPayload {
   currency: string
   amount_original: number
   amount_usd: number
+  cumulative_disbursement: number
 }
 
 export interface LoanAgreementListParams extends ListParams {

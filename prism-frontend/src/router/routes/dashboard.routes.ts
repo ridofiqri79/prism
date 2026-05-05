@@ -16,65 +16,26 @@ export const dashboardRoutes: RouteRecordRaw[] = [
   },
   {
     path: 'dashboard/executive-portfolio',
-    name: 'dashboard-executive-portfolio',
-    component: () => import('@/pages/dashboard/ExecutivePortfolioDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Executive Portfolio',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'executive' } },
   },
   {
     path: 'dashboard/pipeline-bottleneck',
-    name: 'dashboard-pipeline-bottleneck',
-    component: () => import('@/pages/dashboard/PipelineBottleneckDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Pipeline & Bottleneck',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'pipeline' } },
   },
   {
     path: 'dashboard/green-book-readiness',
-    name: 'dashboard-green-book-readiness',
-    component: () => import('@/pages/dashboard/GreenBookReadinessDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Green Book Readiness',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'readiness' } },
   },
   {
     path: 'dashboard/lender-financing-mix',
-    name: 'dashboard-lender-financing-mix',
-    component: () => import('@/pages/dashboard/LenderFinancingMixDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Lender & Financing Mix',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'financing' } },
   },
   {
     path: 'dashboard/kl-portfolio-performance',
-    name: 'dashboard-kl-portfolio-performance',
-    component: () => import('@/pages/dashboard/KLPortfolioPerformanceDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'K/L Portfolio Performance',
-    },
-  },
-  {
-    path: 'dashboard/la-disbursement',
-    name: 'dashboard-la-disbursement',
-    component: () => import('@/pages/dashboard/LADisbursementDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Loan Agreement & Disbursement',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'institution' } },
   },
   {
     path: 'dashboard/data-quality-governance',
-    name: 'dashboard-data-quality-governance',
-    component: () => import('@/pages/dashboard/DataQualityGovernanceDashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Data Quality & Governance',
-    },
+    redirect: { name: 'dashboard', query: { tab: 'quality' } },
   },
 ]

@@ -386,7 +386,7 @@ SELECT
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
 WHERE la.dk_project_id = ANY(sqlc.arg('dk_project_ids')::uuid[])
-ORDER BY la.dk_project_id ASC;
+ORDER BY la.dk_project_id ASC, la.loan_code ASC;
 
 -- name: ListJourneyMonitoringByLAs :many
 SELECT

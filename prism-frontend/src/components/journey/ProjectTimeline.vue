@@ -11,7 +11,6 @@ import type {
   JourneyLoI,
   JourneyResponse,
   LAJourney,
-  MonitoringSummaryItem,
 } from '@/types/dashboard.types'
 
 const props = defineProps<{
@@ -89,8 +88,8 @@ function laRoute(loanAgreement: LAJourney) {
   return `/loan-agreements/${loanAgreement.id}`
 }
 
-function monitoringRoute(loanAgreement: LAJourney, monitoring?: MonitoringSummaryItem) {
-  return `/loan-agreements/${loanAgreement.id}/monitoring${monitoring?.id ? `#${monitoring.id}` : ''}`
+function loanAgreementsForDk(project: DKProjectJourney) {
+  return project.loan_agreements ?? []
 }
 
 watch(
@@ -387,7 +386,7 @@ watch(
 
                         <div class="ml-7 border-l border-surface-100 pl-5">
                           <div
-                            v-if="!dkProject.loan_agreement"
+                            v-if="loanAgreementsForDk(dkProject).length === 0"
                             class="flex items-center gap-2 text-sm italic text-surface-400"
                           >
                             <i class="pi pi-file" />
@@ -395,108 +394,108 @@ watch(
                           </div>
 
                           <div v-else class="space-y-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <i
-                                class="pi pi-file-edit"
-                                :class="
-                                  nodeClass(
-                                    dkProject.loan_agreement.is_extended ? 'extended' : 'completed',
-                                  )
-                                "
-                              />
-                              <RouterLink
-                                :to="laRoute(dkProject.loan_agreement)"
-                                class="font-semibold hover:underline"
-                                :class="
-                                  nodeClass(
-                                    dkProject.loan_agreement.is_extended ? 'extended' : 'completed',
-                                  )
-                                "
-                              >
-                                Loan Agreement: {{ dkProject.loan_agreement.loan_code }}
-                              </RouterLink>
-                              <Tag
-                                :value="
-                                  dkProject.loan_agreement.is_extended ? 'Diperpanjang' : 'Completed'
-                                "
-                                :severity="
-                                  dkProject.loan_agreement.is_extended ? 'warn' : 'success'
-                                "
-                                rounded
-                              />
-                            </div>
-                            <div class="grid gap-2 text-sm text-surface-600 md:grid-cols-2">
-                              <span>Lender: {{ lenderLabel(dkProject.loan_agreement.lender) }}</span>
-                              <span>
-                                Nilai:
-                                <CurrencyDisplay
-                                  :amount="dkProject.loan_agreement.amount_usd ?? 0"
-                                  currency="USD"
-                                  compact
+                            <div
+                              v-for="loanAgreement in loanAgreementsForDk(dkProject)"
+                              :key="loanAgreement.id"
+                              class="space-y-3"
+                            >
+                              <div class="flex flex-wrap items-center gap-2">
+                                <i
+                                  class="pi pi-file-edit"
+                                  :class="
+                                    nodeClass(
+                                      loanAgreement.is_extended ? 'extended' : 'completed',
+                                    )
+                                  "
                                 />
-                              </span>
-                              <span>
-                                Agreement:
-                                {{ formatDate(dkProject.loan_agreement.agreement_date) }}
-                              </span>
-                              <span>
-                                Efektif:
-                                {{ formatDate(dkProject.loan_agreement.effective_date) }}
-                              </span>
-                              <span>
-                                Original Closing:
-                                {{ formatDate(dkProject.loan_agreement.original_closing_date) }}
-                              </span>
-                              <span>
-                                Closing:
-                                {{ formatDate(dkProject.loan_agreement.closing_date) }}
-                                <span v-if="dkProject.loan_agreement.extension_days">
-                                  (+{{ dkProject.loan_agreement.extension_days }} hari)
+                                <RouterLink
+                                  :to="laRoute(loanAgreement)"
+                                  class="font-semibold hover:underline"
+                                  :class="
+                                    nodeClass(
+                                      loanAgreement.is_extended ? 'extended' : 'completed',
+                                    )
+                                  "
+                                >
+                                  Loan Agreement: {{ loanAgreement.loan_code }}
+                                </RouterLink>
+                                <Tag
+                                  :value="loanAgreement.is_extended ? 'Diperpanjang' : 'Completed'"
+                                  :severity="loanAgreement.is_extended ? 'warn' : 'success'"
+                                  rounded
+                                />
+                              </div>
+                              <div class="grid gap-2 text-sm text-surface-600 md:grid-cols-2">
+                                <span>Lender: {{ lenderLabel(loanAgreement.lender) }}</span>
+                                <span>
+                                  Nilai:
+                                  <CurrencyDisplay
+                                    :amount="loanAgreement.amount_usd ?? 0"
+                                    currency="USD"
+                                    compact
+                                  />
                                 </span>
-                              </span>
-                            </div>
+                                <span>
+                                  Agreement:
+                                  {{ formatDate(loanAgreement.agreement_date) }}
+                                </span>
+                                <span>
+                                  Efektif:
+                                  {{ formatDate(loanAgreement.effective_date) }}
+                                </span>
+                                <span>
+                                  Original Closing:
+                                  {{ formatDate(loanAgreement.original_closing_date) }}
+                                </span>
+                                <span>
+                                  Closing:
+                                  {{ formatDate(loanAgreement.closing_date) }}
+                                  <span v-if="loanAgreement.extension_days">
+                                    (+{{ loanAgreement.extension_days }} hari)
+                                  </span>
+                                </span>
+                              </div>
 
-                            <div class="space-y-2 border-l border-surface-100 pl-5">
-                              <RouterLink
-                                :to="monitoringRoute(dkProject.loan_agreement)"
-                                class="inline-flex items-center gap-2 text-sm font-semibold text-prism-green-deep hover:underline"
-                              >
-                                <i class="pi pi-chart-line" />
-                                Monitoring
-                              </RouterLink>
-                              <p
-                                v-if="dkProject.loan_agreement.monitoring.length === 0"
-                                class="text-sm italic text-surface-400"
-                              >
-                                Belum ada
-                              </p>
-                              <RouterLink
-                                v-for="monitoring in dkProject.loan_agreement.monitoring"
-                                :key="`${monitoring.budget_year}-${monitoring.quarter}`"
-                                :to="monitoringRoute(dkProject.loan_agreement, monitoring)"
-                                class="grid gap-2 rounded-lg border border-surface-100 p-3 text-sm hover:border-primary/50 md:grid-cols-[1fr_10rem]"
-                              >
-                                <span class="font-medium text-prism-green-deep">
-                                  {{ monitoring.quarter }} {{ monitoring.budget_year }}
-                                </span>
-                                <AbsorptionBar :pct="monitoring.absorption_pct" />
-                                <span class="text-surface-500">
-                                  <CurrencyDisplay
-                                    :amount="monitoring.planned_usd"
-                                    currency="USD"
-                                    compact
-                                  />
-                                  planned
-                                </span>
-                                <span class="text-surface-500">
-                                  <CurrencyDisplay
-                                    :amount="monitoring.realized_usd"
-                                    currency="USD"
-                                    compact
-                                  />
-                                  realized
-                                </span>
-                              </RouterLink>
+                              <div class="space-y-2 border-l border-surface-100 pl-5">
+                                <div
+                                  class="inline-flex items-center gap-2 text-sm font-semibold text-prism-green-deep"
+                                >
+                                  <i class="pi pi-chart-line" />
+                                  Monitoring
+                                </div>
+                                <p
+                                  v-if="loanAgreement.monitoring.length === 0"
+                                  class="text-sm italic text-surface-400"
+                                >
+                                  Belum ada
+                                </p>
+                                <div
+                                  v-for="monitoring in loanAgreement.monitoring"
+                                  :key="`${loanAgreement.id}-${monitoring.budget_year}-${monitoring.quarter}`"
+                                  class="grid gap-2 rounded-lg border border-surface-100 p-3 text-sm md:grid-cols-[1fr_10rem]"
+                                >
+                                  <span class="font-medium text-prism-green-deep">
+                                    {{ monitoring.quarter }} {{ monitoring.budget_year }}
+                                  </span>
+                                  <AbsorptionBar :pct="monitoring.absorption_pct" />
+                                  <span class="text-surface-500">
+                                    <CurrencyDisplay
+                                      :amount="monitoring.planned_usd"
+                                      currency="USD"
+                                      compact
+                                    />
+                                    planned
+                                  </span>
+                                  <span class="text-surface-500">
+                                    <CurrencyDisplay
+                                      :amount="monitoring.realized_usd"
+                                      currency="USD"
+                                      compact
+                                    />
+                                    realized
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>

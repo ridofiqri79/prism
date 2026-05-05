@@ -13,6 +13,7 @@ SELECT
     la.currency,
     la.amount_original,
     la.amount_usd,
+    la.cumulative_disbursement,
     la.created_at,
     la.updated_at,
     l.name AS lender_name,
@@ -29,7 +30,7 @@ WHERE (
 AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
 AND (
     sqlc.narg('is_extended')::boolean IS NULL
-    OR (la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
+    OR (la.original_closing_date IS NOT NULL AND la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
 )
 AND (
     sqlc.narg('closing_date_before')::date IS NULL
@@ -51,7 +52,7 @@ WHERE (
 AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
 AND (
     sqlc.narg('is_extended')::boolean IS NULL
-    OR (la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
+    OR (la.original_closing_date IS NOT NULL AND la.closing_date <> la.original_closing_date) = sqlc.narg('is_extended')::boolean
 )
 AND (
     sqlc.narg('closing_date_before')::date IS NULL
@@ -71,6 +72,7 @@ SELECT
     la.currency,
     la.amount_original,
     la.amount_usd,
+    la.cumulative_disbursement,
     la.created_at,
     la.updated_at,
     l.name AS lender_name,
@@ -80,10 +82,11 @@ FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
 WHERE la.id = $1;
 
--- name: GetLoanAgreementByDKProject :one
+-- name: ListLoanAgreementsByDKProject :many
 SELECT *
 FROM loan_agreement
-WHERE dk_project_id = $1;
+WHERE dk_project_id = $1
+ORDER BY created_at DESC, loan_code ASC;
 
 -- name: GetLoanAgreementByLoanCode :one
 SELECT *
@@ -104,21 +107,26 @@ SELECT
         WHERE dfd.dk_project_id = dp.id
           AND dfd.lender_id IS NOT NULL
     ) AS has_financing_detail,
-    la.id AS existing_loan_agreement_id,
-    la.loan_code AS existing_loan_code
+    (
+        SELECT COUNT(*)::bigint
+        FROM loan_agreement la
+        WHERE la.dk_project_id = dp.id
+    ) AS loan_agreement_count,
+    COALESCE((
+        SELECT string_agg(la.loan_code, ', ' ORDER BY la.loan_code)
+        FROM loan_agreement la
+        WHERE la.dk_project_id = dp.id
+    ), '')::text AS existing_loan_codes
 FROM dk_project dp
 JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
 LEFT JOIN dk_project_gb_project dkgb ON dkgb.dk_project_id = dp.id
 LEFT JOIN gb_project gp ON gp.id = dkgb.gb_project_id
-LEFT JOIN loan_agreement la ON la.dk_project_id = dp.id
 GROUP BY
     dp.id,
     dk.id,
     dk.letter_number,
     dk.subject,
-    dp.project_name,
-    la.id,
-    la.loan_code
+    dp.project_name
 ORDER BY dk.date DESC, COALESCE(dk.letter_number, '') ASC, dp.project_name ASC;
 
 -- name: ListLoanAgreementAllowedLenderReferences :many
@@ -147,9 +155,10 @@ INSERT INTO loan_agreement (
     closing_date,
     currency,
     amount_original,
-    amount_usd
+    amount_usd,
+    cumulative_disbursement
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: UpdateLoanAgreement :one
@@ -163,6 +172,7 @@ SET lender_id = $2,
     currency = $8,
     amount_original = $9,
     amount_usd = $10,
+    cumulative_disbursement = $11,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

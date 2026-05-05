@@ -23,7 +23,7 @@ const numberFormatter = new Intl.NumberFormat('id-ID')
 const gbProjects = computed(() => props.journey.gb_projects)
 const dkProjects = computed(() => gbProjects.value.flatMap((project) => project.dk_projects))
 const loanAgreements = computed(() =>
-  dkProjects.value.map((project) => project.loan_agreement).filter(isLoanAgreement),
+  dkProjects.value.flatMap((project) => loanAgreementsForProject(project)),
 )
 const monitoringRows = computed(() =>
   loanAgreements.value.flatMap((loanAgreement) => loanAgreement.monitoring),
@@ -80,7 +80,9 @@ const missingItems = computed(() => {
     items.push('Daftar Kegiatan belum tersedia pada seluruh proyek Green Book.')
   }
 
-  const dkWithoutLoanAgreement = dkProjects.value.length - loanAgreements.value.length
+  const dkWithoutLoanAgreement = dkProjects.value.filter(
+    (project) => loanAgreementsForProject(project).length === 0,
+  ).length
   if (dkWithoutLoanAgreement > 0) {
     items.push(
       `${numberFormatter.format(dkWithoutLoanAgreement)} Daftar Kegiatan belum memiliki Loan Agreement.`,
@@ -148,11 +150,13 @@ const summaryMetrics = computed<JourneySummaryMetric[]>(() => [
       dkProjects.value.length === 0
         ? 'Menunggu Daftar Kegiatan'
         : `${numberFormatter.format(
-            Math.max(0, dkProjects.value.length - loanAgreements.value.length),
+            dkProjects.value.filter((project) => loanAgreementsForProject(project).length === 0)
+              .length,
           )} Daftar Kegiatan belum legal binding`,
     icon: 'pi pi-file-edit',
     state:
-      dkProjects.value.length > 0 && loanAgreements.value.length === dkProjects.value.length
+      dkProjects.value.length > 0 &&
+      dkProjects.value.every((project) => loanAgreementsForProject(project).length > 0)
         ? 'completed'
         : 'pending',
   },
@@ -297,8 +301,11 @@ const matrixRows = computed<JourneyMatrixRow[]>(() => {
     }
 
     return greenBookProject.dk_projects.map((dkProject) => {
-      const loanAgreement = dkProject.loan_agreement
-      const monitoringCount = loanAgreement?.monitoring.length ?? 0
+      const projectLoanAgreements = loanAgreementsForProject(dkProject)
+      const monitoringCount = projectLoanAgreements.reduce(
+        (sum, loanAgreement) => sum + loanAgreement.monitoring.length,
+        0,
+      )
 
       return {
         key: dkProject.id,
@@ -312,8 +319,8 @@ const matrixRows = computed<JourneyMatrixRow[]>(() => {
           stage(
             'loan-agreement',
             'Loan Agreement',
-            loanAgreement?.loan_code || 'Belum ada',
-            loanAgreement ? (loanAgreement.is_extended ? 'extended' : 'completed') : 'pending',
+            loanAgreementStageValue(projectLoanAgreements),
+            loanAgreementStageState(projectLoanAgreements),
           ),
           stage(
             'monitoring',
@@ -327,10 +334,6 @@ const matrixRows = computed<JourneyMatrixRow[]>(() => {
   })
 })
 
-function isLoanAgreement(value: LAJourney | null): value is LAJourney {
-  return value !== null
-}
-
 function stage(
   key: string,
   label: string,
@@ -338,6 +341,23 @@ function stage(
   state: JourneyStageState,
 ): JourneyMatrixStage {
   return { key, label, value, state }
+}
+
+function loanAgreementsForProject(project: DKProjectJourney) {
+  return project.loan_agreements ?? []
+}
+
+function loanAgreementStageValue(loanAgreements: LAJourney[]) {
+  if (loanAgreements.length === 0) return 'Belum ada'
+  if (loanAgreements.length === 1) return loanAgreements[0]?.loan_code ?? '1 dokumen'
+  return `${numberFormatter.format(loanAgreements.length)} dokumen`
+}
+
+function loanAgreementStageState(loanAgreements: LAJourney[]): JourneyStageState {
+  if (loanAgreements.length === 0) return 'pending'
+  return loanAgreements.some((loanAgreement) => loanAgreement.is_extended)
+    ? 'extended'
+    : 'completed'
 }
 
 function dkLabel(project: DKProjectJourney) {

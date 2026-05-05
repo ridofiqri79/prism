@@ -459,8 +459,8 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil activity detail")
 	}
-	loanAgreement, err := s.queries.GetLoanAgreementByDKProject(ctx, row.ID)
-	if err != nil && err != pgx.ErrNoRows {
+	loanAgreements, err := s.queries.ListLoanAgreementsByDKProject(ctx, row.ID)
+	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil Loan Agreement DK Project")
 	}
 	res := model.DKProjectResponse{
@@ -477,14 +477,17 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		FinancingDetails: make([]model.DKFinancingDetailResponse, 0, len(financingDetails)),
 		LoanAllocations:  make([]model.DKLoanAllocationResponse, 0, len(loanAllocations)),
 		ActivityDetails:  make([]model.DKActivityDetailResponse, 0, len(activityDetails)),
+		LoanAgreements:   make([]model.LoanAgreementSummary, 0, len(loanAgreements)),
 		CreatedAt:        formatMasterTime(row.CreatedAt),
 		UpdatedAt:        formatMasterTime(row.UpdatedAt),
 	}
-	if err == nil {
-		res.LoanAgreement = &model.LoanAgreementSummary{
-			ID:       model.UUIDToString(loanAgreement.ID),
-			LoanCode: loanAgreement.LoanCode,
-		}
+	for _, loanAgreement := range loanAgreements {
+		res.LoanAgreements = append(res.LoanAgreements, model.LoanAgreementSummary{
+			ID:                     model.UUIDToString(loanAgreement.ID),
+			LoanCode:               loanAgreement.LoanCode,
+			Currency:               loanAgreement.Currency,
+			CumulativeDisbursement: floatFromNumeric(loanAgreement.CumulativeDisbursement),
+		})
 	}
 	for _, item := range gbProjects {
 		summary := model.GBProjectSummary{

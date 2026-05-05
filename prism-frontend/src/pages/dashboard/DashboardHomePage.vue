@@ -1,117 +1,267 @@
 <script setup lang="ts">
-import Button from 'primevue/button'
+import { computed, markRaw, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Tag from 'primevue/tag'
-import EmptyInsightState from '@/components/dashboard/EmptyInsightState.vue'
+import AmountDisplay from '@/components/dashboard/AmountDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import type { DashboardNavigationItem } from '@/types/dashboard.types'
+import { useDashboardStore } from '@/stores/dashboard.store'
+import DataQualityGovernanceDashboardPage from '@/pages/dashboard/DataQualityGovernanceDashboardPage.vue'
+import ExecutivePortfolioDashboardPage from '@/pages/dashboard/ExecutivePortfolioDashboardPage.vue'
+import GreenBookReadinessDashboardPage from '@/pages/dashboard/GreenBookReadinessDashboardPage.vue'
+import KLPortfolioPerformanceDashboardPage from '@/pages/dashboard/KLPortfolioPerformanceDashboardPage.vue'
+import LenderFinancingMixDashboardPage from '@/pages/dashboard/LenderFinancingMixDashboardPage.vue'
+import PipelineBottleneckDashboardPage from '@/pages/dashboard/PipelineBottleneckDashboardPage.vue'
 
-const dashboardItems: DashboardNavigationItem[] = [
+const route = useRoute()
+const router = useRouter()
+const dashboard = useDashboardStore()
+
+const dashboardTabs = [
   {
     key: 'executive',
-    title: 'Executive Portfolio',
-    description: 'Pipeline, legal commitment, disbursement, funnel, top K/L, top lenders, dan high-risk items.',
-    route_name: 'dashboard-executive-portfolio',
+    label: 'Ringkasan Eksekutif',
+    shortLabel: 'Eksekutif',
     icon: 'pi pi-briefcase',
-    accent: 'portfolio',
+    component: markRaw(ExecutivePortfolioDashboardPage),
+    caption: 'Kesehatan portfolio dan risk item',
+    question: 'Apakah portfolio pinjaman luar negeri sedang sehat dari pipeline sampai komitmen legal?',
+    scope: 'Portfolio nasional, funnel tahap, top K/L, lender utama, dan risk item lintas workflow.',
+    outcomes: ['Baca kesehatan portfolio', 'Identifikasi risiko utama', 'Lihat eksposur terbesar'],
   },
   {
     key: 'pipeline',
-    title: 'Pipeline & Bottleneck',
-    description: 'Worklist proyek yang tertahan dari Blue Book sampai monitoring dengan server-side pagination.',
-    route_name: 'dashboard-pipeline-bottleneck',
+    label: 'Pipeline Perencanaan',
+    shortLabel: 'Pipeline',
     icon: 'pi pi-sort-amount-down',
-    accent: 'pipeline',
+    component: markRaw(PipelineBottleneckDashboardPage),
+    caption: 'Bottleneck sebelum komitmen legal',
+    question: 'Di tahap mana proyek tertahan sebelum menjadi komitmen legal?',
+    scope: 'Blue Book, Letter of Intent, Green Book, Daftar Kegiatan, dan Loan Agreement.',
+    outcomes: ['Cari bottleneck per tahap', 'Prioritaskan usia tertahan', 'Buka journey proyek'],
   },
   {
     key: 'readiness',
-    title: 'Green Book Readiness',
-    description: 'Kelengkapan funding source, activities, disbursement plan, allocation, dan cofinancing.',
-    route_name: 'dashboard-green-book-readiness',
+    label: 'Kesiapan Green Book',
+    shortLabel: 'Green Book',
     icon: 'pi pi-check-square',
-    accent: 'readiness',
+    component: markRaw(GreenBookReadinessDashboardPage),
+    caption: 'Readiness proyek Green Book',
+    question: 'Proyek Green Book mana yang siap masuk Daftar Kegiatan?',
+    scope: 'Funding source, activities, disbursement plan, funding allocation, dan cofinancing.',
+    outcomes: ['Ukur readiness score', 'Temukan field kosong', 'Validasi struktur pendanaan'],
   },
   {
     key: 'financing',
-    title: 'Lender & Financing Mix',
-    description: 'Profil lender, certainty ladder, conversion, cofinancing, dan currency exposure.',
-    route_name: 'dashboard-lender-financing-mix',
+    label: 'Pembiayaan & Lender',
+    shortLabel: 'Lender',
     icon: 'pi pi-building-columns',
-    accent: 'financing',
+    component: markRaw(LenderFinancingMixDashboardPage),
+    caption: 'Conversion lender dan currency',
+    question: 'Seberapa kuat kepastian lender dari indikasi sampai Loan Agreement?',
+    scope: 'Lender Indication, Letter of Intent, funding source, Daftar Kegiatan, Loan Agreement, dan currency.',
+    outcomes: ['Pantau conversion lender', 'Baca currency exposure', 'Cek cofinancing'],
   },
   {
     key: 'institution',
-    title: 'K/L Portfolio Performance',
-    description: 'Perbandingan portfolio dan kinerja K/L/Badan lintas pipeline, LA, dan monitoring.',
-    route_name: 'dashboard-kl-portfolio-performance',
+    label: 'Kinerja K/L',
+    shortLabel: 'K/L',
     icon: 'pi pi-sitemap',
-    accent: 'institution',
-  },
-  {
-    key: 'disbursement',
-    title: 'Loan Agreement & Disbursement',
-    description: 'Closing risk, undisbursed balance, planned vs realized, dan under-disbursement warnings.',
-    route_name: 'dashboard-la-disbursement',
-    icon: 'pi pi-chart-line',
-    accent: 'disbursement',
+    component: markRaw(KLPortfolioPerformanceDashboardPage),
+    caption: 'Eksposur dan risk K/L',
+    question: 'Kementerian/Lembaga mana yang memegang eksposur dan risiko terbesar?',
+    scope: 'Roll-up K/L, role executing/implementing, nilai pipeline, komitmen legal, dan risk count.',
+    outcomes: ['Bandingkan performa K/L', 'Urutkan eksposur', 'Lihat risiko portfolio'],
   },
   {
     key: 'quality',
-    title: 'Data Quality & Governance',
-    description: 'Issue detection, relationship integrity, monitoring compliance, dan audit summary ADMIN.',
-    route_name: 'dashboard-data-quality-governance',
+    label: 'Kualitas Data',
+    shortLabel: 'Data Quality',
     icon: 'pi pi-shield',
-    accent: 'quality',
+    component: markRaw(DataQualityGovernanceDashboardPage),
+    caption: 'Issue data dan audit',
+    question: 'Data mana yang menghambat workflow, analitik, atau kepatuhan aturan bisnis?',
+    scope: 'Missing relation, business-rule consistency, integritas data, dan audit summary untuk ADMIN.',
+    outcomes: ['Tindaklanjuti issue', 'Validasi relasi data', 'Review aktivitas audit'],
   },
-]
+] as const
 
-function accentClass(accent: DashboardNavigationItem['accent']) {
-  return {
-    portfolio: 'bg-primary text-primary-contrast',
-    pipeline: 'bg-orange-500 text-white',
-    readiness: 'bg-emerald-600 text-white',
-    financing: 'bg-cyan-700 text-white',
-    institution: 'bg-indigo-600 text-white',
-    disbursement: 'bg-sky-700 text-white',
-    quality: 'bg-rose-700 text-white',
-  }[accent]
+type DashboardTabKey = (typeof dashboardTabs)[number]['key']
+
+const defaultTabKey: DashboardTabKey = 'executive'
+const dashboardTabKeys = new Set<DashboardTabKey>(dashboardTabs.map((tab) => tab.key))
+
+function normalizeTab(value: unknown): DashboardTabKey {
+  const candidate = Array.isArray(value) ? value[0] : value
+
+  if (typeof candidate === 'string' && dashboardTabKeys.has(candidate as DashboardTabKey)) {
+    return candidate as DashboardTabKey
+  }
+
+  return defaultTabKey
 }
+
+const activeTabKey = ref<DashboardTabKey>(normalizeTab(route.query.tab))
+
+const activeTab = computed(
+  () => dashboardTabs.find((tab) => tab.key === activeTabKey.value) ?? dashboardTabs[0],
+)
+
+const overviewMetrics = computed(() => [
+  {
+    key: 'bb',
+    label: 'Blue Book Projects',
+    value: dashboard.summary?.total_bb_projects ?? 0,
+    unit: 'project',
+    hint: 'Total proyek di tahap Blue Book',
+  },
+  {
+    key: 'gb',
+    label: 'Green Book Projects',
+    value: dashboard.summary?.total_gb_projects ?? 0,
+    unit: 'project',
+    hint: 'Total proyek di tahap Green Book',
+  },
+  {
+    key: 'la',
+    label: 'Loan Agreements',
+    value: dashboard.summary?.total_loan_agreements ?? 0,
+    unit: 'project',
+    hint: 'Total komitmen legal aktif',
+  },
+  {
+    key: 'amount',
+    label: 'Total Amount',
+    value: dashboard.summary?.total_amount_usd ?? 0,
+    unit: 'USD',
+    hint: 'Eksposur total berbasis USD',
+  },
+])
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    activeTabKey.value = normalizeTab(value)
+  },
+)
+
+function selectTab(tabKey: DashboardTabKey) {
+  activeTabKey.value = tabKey
+
+  const query = { ...route.query }
+  if (tabKey === defaultTabKey) {
+    delete query.tab
+  } else {
+    query.tab = tabKey
+  }
+
+  void router.replace({ name: 'dashboard', query })
+}
+
+function tabButtonClass(tabKey: DashboardTabKey) {
+  const isActive = tabKey === activeTabKey.value
+
+  return [
+    'group flex min-h-[4.75rem] min-w-[13rem] flex-1 items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
+    isActive
+      ? 'border-primary-500 bg-primary-50 text-primary-950'
+      : 'border-surface-200 bg-white text-surface-700 hover:border-primary-300 hover:bg-surface-50',
+  ]
+}
+
+onMounted(() => {
+  void dashboard.fetchSummary()
+})
 </script>
 
 <template>
-  <section class="space-y-6">
+  <section class="space-y-5">
     <PageHeader
       title="Dashboard"
-      subtitle="Pilih dashboard operasional sesuai kebutuhan kontrol portfolio, pipeline, pembiayaan, monitoring, dan governance."
-    />
+      subtitle="Satu workspace untuk membaca portfolio, bottleneck, kesiapan, pembiayaan, kinerja K/L, dan kualitas data."
+    >
+      <template #actions>
+        <Tag value="Analitik read-only" severity="secondary" />
+      </template>
+    </PageHeader>
 
-    <section v-if="dashboardItems.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <RouterLink
-        v-for="item in dashboardItems"
-        :key="item.key"
-        :to="{ name: item.route_name }"
-        class="group rounded-lg border border-surface-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-sm"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div :class="[accentClass(item.accent), 'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg']">
-            <i :class="[item.icon, 'text-lg']" />
-          </div>
-          <Tag value="Dashboard" severity="secondary" />
+    <section class="rounded-lg border border-surface-200 bg-white p-3">
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div
+          v-for="metric in overviewMetrics"
+          :key="metric.key"
+          class="min-w-0 rounded-md border border-surface-200 bg-surface-0 p-3"
+        >
+          <p class="text-xs font-medium text-surface-500">{{ metric.label }}</p>
+          <p class="mt-2 break-words text-xl font-semibold text-surface-950">
+            <AmountDisplay
+              :value="metric.value"
+              :unit="metric.unit"
+              :maximum-fraction-digits="0"
+            />
+          </p>
+          <p class="mt-1 text-xs text-surface-500">{{ metric.hint }}</p>
         </div>
+      </div>
 
-        <h2 class="mt-5 text-lg font-semibold text-surface-950">{{ item.title }}</h2>
-        <p class="mt-2 min-h-16 text-sm leading-6 text-surface-600">{{ item.description }}</p>
-        <div class="mt-5 flex items-center justify-between gap-3">
-          <span class="text-sm font-medium text-primary">Buka dashboard</span>
-          <Button icon="pi pi-arrow-right" text rounded aria-label="Buka dashboard" />
+      <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold uppercase text-primary">Flow bisnis dashboard</p>
+          <h2 class="mt-1 text-xl font-semibold text-surface-950">{{ activeTab.label }}</h2>
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-surface-600">{{ activeTab.question }}</p>
         </div>
-      </RouterLink>
+        <div class="flex shrink-0 flex-wrap gap-2">
+          <Tag value="Blue Book -> Loan Agreement" severity="info" />
+          <Tag value="Latest snapshot" severity="secondary" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <button
+          v-for="tab in dashboardTabs"
+          :key="tab.key"
+          type="button"
+          :class="tabButtonClass(tab.key)"
+          @click="selectTab(tab.key)"
+        >
+          <span
+            class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
+            :class="tab.key === activeTabKey ? 'bg-primary text-primary-contrast' : 'bg-surface-100 text-surface-500 group-hover:text-primary'"
+          >
+            <i :class="[tab.icon, 'text-sm']" />
+          </span>
+          <span class="min-w-0">
+            <span class="block text-sm font-semibold leading-5">{{ tab.shortLabel }}</span>
+            <span class="mt-1 block text-xs leading-5 text-surface-500">
+              {{ tab.caption }}
+            </span>
+          </span>
+        </button>
+      </div>
     </section>
 
-    <EmptyInsightState
-      v-else
-      title="Belum ada dashboard"
-      message="Route dashboard belum tersedia untuk sesi ini."
-      icon="pi pi-chart-bar"
-    />
+    <section class="rounded-lg border border-surface-200 bg-surface-0 p-4">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold uppercase text-surface-500">Fokus analisis</p>
+          <h2 class="mt-1 text-lg font-semibold text-surface-950">{{ activeTab.label }}</h2>
+          <p class="mt-2 text-sm leading-6 text-surface-600">{{ activeTab.scope }}</p>
+        </div>
+
+        <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+          <div
+            v-for="outcome in activeTab.outcomes"
+            :key="outcome"
+            class="flex min-h-10 items-center gap-2 rounded-md border border-surface-200 bg-white px-3 py-2 text-sm font-medium text-surface-700"
+          >
+            <i class="pi pi-check-circle shrink-0 text-primary" />
+            <span class="min-w-0">{{ outcome }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <KeepAlive>
+      <component :is="activeTab.component" :key="activeTab.key" embedded />
+    </KeepAlive>
   </section>
 </template>

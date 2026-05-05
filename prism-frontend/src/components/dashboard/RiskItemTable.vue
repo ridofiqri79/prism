@@ -38,7 +38,7 @@ function severityTone(severity: string) {
   <section class="rounded-lg border border-surface-200 bg-white p-4">
     <div class="mb-3">
       <h2 class="text-lg font-semibold text-surface-950">Risk Items</h2>
-      <p class="text-sm text-surface-500">Item prioritas untuk closing, monitoring, dan kelanjutan pipeline.</p>
+      <p class="text-sm text-surface-500">Item prioritas untuk closing dan kelanjutan pipeline.</p>
     </div>
     <DataTable :value="items" size="small" scrollable scroll-height="32rem">
       <Column field="severity" header="Severity" class="w-28">
@@ -58,11 +58,6 @@ function severityTone(severity: string) {
       <Column field="amount_usd" header="Amount" class="w-40">
         <template #body="{ data }">
           {{ usdFormatter.format(data.amount_usd ?? 0) }}
-        </template>
-      </Column>
-      <Column field="absorption_pct" header="Absorption" class="w-32">
-        <template #body="{ data }">
-          {{ (data.absorption_pct ?? 0).toFixed(1) }}%
         </template>
       </Column>
       <Column header="Open" class="w-28">

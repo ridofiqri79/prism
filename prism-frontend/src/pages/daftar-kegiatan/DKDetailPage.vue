@@ -149,11 +149,7 @@ function executingAgencyNames(project: DKProject) {
   return []
 }
 
-function loanAgreementRoute(project: DKProject) {
-  if (project.loan_agreement) {
-    return { name: 'loan-agreement-detail', params: { id: project.loan_agreement.id } }
-  }
-
+function loanAgreementCreateRoute(project: DKProject) {
   return {
     name: 'loan-agreement-create',
     query: {
@@ -163,10 +159,16 @@ function loanAgreementRoute(project: DKProject) {
   }
 }
 
-function canUseLoanAgreementAction(project: DKProject) {
-  return project.loan_agreement
-    ? can('loan_agreement', 'read')
-    : can('loan_agreement', 'create')
+function loanAgreementDetailRoute(loanAgreement: { id: string }) {
+  return { name: 'loan-agreement-detail', params: { id: loanAgreement.id } }
+}
+
+function canUseLoanAgreementAction() {
+  return can('loan_agreement', 'create')
+}
+
+function canViewLoanAgreementAction() {
+  return can('loan_agreement', 'read')
 }
 
 function hasFinancingLender(project: DKProject) {
@@ -174,22 +176,22 @@ function hasFinancingLender(project: DKProject) {
 }
 
 function isLoanAgreementActionDisabled(project: DKProject) {
-  return !project.loan_agreement && !hasFinancingLender(project)
+  return !hasFinancingLender(project)
 }
 
-function loanAgreementActionLabel(project: DKProject) {
-  return project.loan_agreement ? 'Buka Loan Agreement' : 'Buat Loan Agreement'
+function loanAgreements(project: DKProject) {
+  return project.loan_agreements ?? []
 }
 
-function loanAgreementActionIcon(project: DKProject) {
-  return project.loan_agreement ? 'pi pi-external-link' : 'pi pi-file-plus'
+function loanAgreementActionLabel() {
+  return 'Buat Loan Agreement'
+}
+
+function loanAgreementActionIcon() {
+  return 'pi pi-file-plus'
 }
 
 function loanAgreementActionTitle(project: DKProject) {
-  if (project.loan_agreement) {
-    return `Loan Agreement ${project.loan_agreement.loan_code}`
-  }
-
   if (!hasFinancingLender(project)) {
     return 'Tambahkan lender pada rincian pembiayaan sebelum membuat Loan Agreement'
   }
@@ -197,9 +199,14 @@ function loanAgreementActionTitle(project: DKProject) {
   return 'Buat Loan Agreement dari proyek ini'
 }
 
-function goToLoanAgreement(project: DKProject) {
+function goToLoanAgreementCreate(project: DKProject) {
   if (isLoanAgreementActionDisabled(project)) return
-  void router.push(loanAgreementRoute(project))
+  void router.push(loanAgreementCreateRoute(project))
+}
+
+function goToLoanAgreementDetail(loanAgreement: { id: string }) {
+  if (!canViewLoanAgreementAction()) return
+  void router.push(loanAgreementDetailRoute(loanAgreement))
 }
 
 function deleteDaftarKegiatan() {
@@ -462,14 +469,20 @@ watch(
             <span class="min-w-0 flex-1">{{ project.project_name }}</span>
             <div class="flex flex-wrap items-center justify-end gap-3">
               <Button
-                v-if="canUseLoanAgreementAction(project)"
-                :label="loanAgreementActionLabel(project)"
-                :icon="loanAgreementActionIcon(project)"
+                v-if="canUseLoanAgreementAction()"
+                :label="loanAgreementActionLabel()"
+                :icon="loanAgreementActionIcon()"
                 :disabled="isLoanAgreementActionDisabled(project)"
                 :title="loanAgreementActionTitle(project)"
                 size="small"
                 outlined
-                @click.stop="goToLoanAgreement(project)"
+                @click.stop="goToLoanAgreementCreate(project)"
+              />
+              <Tag
+                v-if="loanAgreements(project).length > 0"
+                :value="`${loanAgreements(project).length} Loan Agreement`"
+                severity="info"
+                rounded
               />
               <span class="text-sm font-normal text-surface-500">{{
                 project.duration ? `${project.duration} bulan` : '-'
@@ -505,6 +518,28 @@ watch(
               <div class="md:col-span-2">
                 <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>
                 <p class="text-surface-800">{{ project.objectives || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h3 class="font-semibold text-surface-950">Loan Agreement</h3>
+              <div
+                v-if="loanAgreements(project).length === 0"
+                class="rounded-lg border border-dashed border-surface-200 p-3 text-sm text-surface-500"
+              >
+                Belum ada Loan Agreement untuk proyek ini.
+              </div>
+              <div v-else class="flex flex-wrap gap-2">
+                <Button
+                  v-for="loanAgreement in loanAgreements(project)"
+                  :key="loanAgreement.id"
+                  :label="loanAgreement.loan_code"
+                  icon="pi pi-external-link"
+                  size="small"
+                  outlined
+                  :disabled="!canViewLoanAgreementAction()"
+                  @click="goToLoanAgreementDetail(loanAgreement)"
+                />
               </div>
             </div>
 

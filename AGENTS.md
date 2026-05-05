@@ -344,8 +344,9 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 - Activity Details: input bebas, tidak ada relasi teknis ke GB Activities
 
 ### Loan Agreement
-- **One-to-One** dengan DK Project â€” tidak boleh ada LA kedua untuk DK yang sama
-- `closing_date >= original_closing_date` (enforced DDL)
+- **One-to-Many** dari DK Project â€” satu Proyek Daftar Kegiatan boleh memiliki lebih dari satu Loan Agreement
+- `loan_code` tetap unik secara global
+- `original_closing_date` opsional; jika diisi, `closing_date >= original_closing_date` (enforced DDL)
 - `is_extended` dan `extension_days` adalah **computed**, tidak disimpan di DB
 - Konversi mata uang: **manual oleh Staff** â€” sistem tidak auto-convert
 
@@ -395,7 +396,7 @@ SALAH  â†’ State tabel nested (activities, funding source) di halaman langs
 | `dk_financing_detail` | Multi-currency: `currency`, `amount_original`, `amount_usd` |
 | `dk_loan_allocation` | Multi-currency: sama dengan financing_detail |
 | `dk_activity_detail` | Activity bebas, field `activity_number/activity_name` |
-| `loan_agreement` | One-to-One dengan `dk_project`, field `loan_code/agreement_date/effective_date/currency` |
+| `loan_agreement` | One-to-Many dari `dk_project`, field `loan_code/agreement_date/effective_date/currency` |
 | `monitoring_disbursement` | Field `budget_year/quarter/exchange_rate_usd_idr/planned_*/realized_*` |
 | `monitoring_komponen` | Field `component_name`, breakdown opsional |
 
@@ -480,7 +481,7 @@ Kerjakan **satu plan per sesi**. Selesaikan semua task dan checklist sebelum pin
 | **FE-04** | `plans/PLAN_04_Blue_Book.md` | `BlueBookListPage`, `BlueBookDetailPage`, `BBProjectFormPage` (5 section: info umum, pihak terlibat, lokasi+prioritas, project cost tabel, lender indication tabel), `BBProjectDetailPage`, LoI dialog, `useBBProjectForm.ts`, komponen: `ProjectCostTable`, `LenderIndicationTable`, `LoITable` |
 | **FE-05** | `plans/PLAN_05_Green_Book.md` | `GBProjectFormPage` (5 tab: info umum, activities, funding source, disbursement plan, funding allocation), `useGBProjectForm.ts` (activitiesâ†”allocationValues sync via `watch`), komponen: `ActivitiesTable` (drag reorder), `FundingSourceTable`, `DisbursementPlanTable`, `FundingAllocationTable` (computed dari activities) |
 | **FE-06** | `plans/PLAN_06_Daftar_Kegiatan.md` | `DKListPage`, `DKDetailPage` (accordion per proyek), `DKProjectFormPage` (4 section: header + financing multi-currency + loan allocation + activity details), `useDKProjectForm.ts` (`allowedLenderIds` computed dari GB funding source + BB lender indication) |
-| **FE-07** | `plans/PLAN_07_Loan_Agreement.md` | `LAListPage` (filter is_extended, closing_date_before), `LAFormPage` (indikator perpanjangan real-time: `isExtended` + `extensionDays` computed), `LADetailPage`, `loan-agreement.schema.ts` (refine closing_date >= original_closing_date) |
+| **FE-07** | `plans/PLAN_07_Loan_Agreement.md` | `LAListPage` (filter is_extended, closing_date_before), `LAFormPage` (indikator perpanjangan real-time: `isExtended` + `extensionDays` computed), `LADetailPage`, `loan-agreement.schema.ts` (original_closing_date opsional, refine hanya saat diisi) |
 | **FE-08** | `plans/PLAN_08_Monitoring.md` | `MonitoringListPage` (guard: disable tombol jika LA belum efektif), `MonitoringFormPage` (3 section: periode + rencana/realisasi tabel 3Ã—2 + komponen opsional), `useMonitoringForm.ts` (`absorptionPct` computed, div-by-zero safe), `AbsorptionBar` (color coding), `MonitoringCard`, `KomponenTable`, `MonitoringChart` (ECharts grouped bar) |
 | **FE-09** | `plans/PLAN_09_Dashboard_Journey.md` | `DashboardPage` (summary cards + filter budget_year/quarter/lender + AbsorptionBar + MonitoringChart + tabel by-lender), `ProjectJourneyPage` (search BB + timeline), `ProjectTimeline.vue` (hierarki vertikal expand/collapse, node status: completed/pending/extended), `SummaryCard.vue` |
 
@@ -503,7 +504,7 @@ Kerjakan **satu plan per sesi**. Selesaikan semua task dan checklist sebelum pin
 | **BE-02** | `plans/PLAN_BE_02_Master_Data.md` | `sql/queries/master.sql` (CRUD semua 8 tabel master, ListLenders dengan JOIN country), `make generate`, `internal/model/master.go`, `internal/service/master_service.go` (validasi lender: country_id wajib Bilateral/KSA, NULL Multilateral), `internal/handler/master_handler.go`, semua routes master terdaftar |
 | **BE-03** | `plans/PLAN_BE_03_Blue_Book.md` | `sql/queries/bb_project.sql` (CRUD BB + BB Project snapshot + logical identity + junction tables institution/location/priority + costs + lender_indication + LoI + SupersedeBlueBooksByPeriod), `make generate`, `internal/model/blue_book.go`, `internal/service/blue_book_service.go` (validasi: bb_code unik per Blue Book, clone revisi dan carry-over proyek pilihan, transaksi multi-tabel, SSE publish), handler + routes |
 | **BE-04** | `plans/PLAN_BE_04_Green_Book.md` | `sql/queries/gb_project.sql` (CRUD GB + GB Project snapshot + logical identity + latest BB resolver + junction + activities ordered by sort_order + funding_source + UpsertGBDisbursementPlan + funding_allocation), `make generate`, `internal/service/green_book_service.go` (validasi: min 1 BB, gb_code unik per Green Book, tahun disbursement tidak duplikat, `activity_index` mapping ke `activityIDs[]` dalam transaksi), handler + routes |
-| **BE-05** | `plans/PLAN_BE_05_DK_LA.md` | `sql/queries/dk_project.sql` (CRUD DK + latest GB resolver + frozen concrete snapshot junction + financing multi-currency + loan_allocation + activity_detail + `GetAllowedLenderIDsForDK` UNION query), `sql/queries/loan_agreement.sql` (CRUD LA + `GetAllowedLenderIDsForLA` + `GetLoanAgreementByDKProject`), `make generate`, service DK (validasi lender dari allowed set setelah GB relations tersimpan), service LA (cek one-to-one + validasi lender + `is_extended` computed + SSE `loan_agreement.extended`), handler + routes |
+| **BE-05** | `plans/PLAN_BE_05_DK_LA.md` | `sql/queries/dk_project.sql` (CRUD DK + latest GB resolver + frozen concrete snapshot junction + financing multi-currency + loan_allocation + activity_detail + `GetAllowedLenderIDsForDK` UNION query), `sql/queries/loan_agreement.sql` (CRUD LA + `GetAllowedLenderIDsForLA` + `ListLoanAgreementsByDKProject`), `make generate`, service DK (validasi lender dari allowed set setelah GB relations tersimpan), service LA (validasi lender + `loan_code` unik + `is_extended` computed + SSE `loan_agreement.extended`), handler + routes |
 | **BE-06** | `plans/PLAN_BE_06_Monitoring.md` | `sql/queries/monitoring.sql` (CRUD monitoring + komponen + `GetMonitoringByLAAndPeriod` + `GetDashboardSummary` aggregate query + `GetMonitoringSummary` GROUP BY lender), `make generate`, `internal/service/monitoring_service.go` (guard: `effective_date <= NOW()`, cek duplikat quarter, `absorption_pct` computed div-by-zero safe), `internal/service/dashboard_service.go`, `internal/service/journey_service.go` (multi-level response assembly), handler monitoring + dashboard + journey, semua routes |
 
 ---

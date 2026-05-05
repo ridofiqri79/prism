@@ -180,9 +180,9 @@ Daftar komponen kegiatan — hanya memuat **nama aktivitas**, diinput secara beb
 
 ### 3.5 Loan Agreement (LA)
 
-Perjanjian pinjaman yang diterbitkan setelah Daftar Kegiatan. Setiap proyek dalam Daftar Kegiatan menghasilkan **tepat satu Loan Agreement** (relasi One-to-One dengan proyek di DK).
+Perjanjian pinjaman yang diterbitkan setelah Daftar Kegiatan. Setiap proyek dalam Daftar Kegiatan dapat memiliki **lebih dari satu Loan Agreement** bila pembiayaan legal binding-nya terbagi ke beberapa perjanjian.
 
-> **Contoh:** Daftar Kegiatan memuat 3 proyek → akan ada 3 Loan Agreement terpisah, masing-masing merujuk ke satu proyek.
+> **Contoh:** Daftar Kegiatan memuat 3 proyek → setiap proyek bisa punya satu atau lebih Loan Agreement sesuai kebutuhan legal binding.
 
 #### Atribut Loan Agreement
 
@@ -191,14 +191,14 @@ Perjanjian pinjaman yang diterbitkan setelah Daftar Kegiatan. Setiap proyek dala
 | Kode Loan | Kode unik Loan Agreement |
 | Tanggal Agreement | Tanggal penandatanganan perjanjian |
 | Tanggal Efektif | Tanggal perjanjian mulai berlaku |
-| Original Closing Date | Tanggal berakhir perjanjian awal *(sebelum perpanjangan)* |
+| Original Closing Date | Tanggal berakhir perjanjian awal *(opsional, diisi hanya jika ada perpanjangan)* |
 | Closing Date | Tanggal berakhir perjanjian terkini *(diperbarui jika ada perpanjangan)* |
 | Lender | Dipilih dari Lender yang sudah terdaftar di GB / DK project terkait |
 | Mata Uang | Mata uang lender yang digunakan dalam perjanjian |
 | Amount (Mata Uang Original) | Nilai pinjaman dalam mata uang lender |
 | Amount (USD) | Ekuivalen USD — dikonversi manual oleh Staff |
 
-> **Catatan:** Apabila Original Closing Date ≠ Closing Date, berarti perjanjian telah mengalami perpanjangan. Sistem dapat mendeteksi ini secara otomatis.
+> **Catatan:** Apabila Original Closing Date diisi dan ≠ Closing Date, berarti perjanjian telah mengalami perpanjangan. Sistem dapat mendeteksi ini secara otomatis.
 
 ---
 
@@ -289,13 +289,13 @@ Berupa **surat** yang diterbitkan Bappenas dengan struktur dua level:
 - Kode Loan *(unik)*
 - Tanggal Agreement
 - Tanggal Efektif
-- Original Closing Date
+- Original Closing Date *(opsional, hanya untuk pinjaman extended)*
 - Closing Date *(jika berbeda dari Original Closing Date → perjanjian telah diperpanjang)*
 - Lender *(dipilih dari Lender yang terdaftar di GB/DK project terkait)*
 - Mata Uang
 - Amount dalam mata uang original
 - Amount ekuivalen USD *(dikonversi manual oleh Staff)*
-- Relasi ke proyek DK: **One-to-One** — satu LA merujuk tepat ke satu proyek di Daftar Kegiatan
+- Relasi ke proyek DK: **Many-to-One** — satu LA merujuk tepat ke satu proyek di Daftar Kegiatan, dan satu proyek DK boleh memiliki lebih dari satu LA
 
 ### 5.4c Monitoring Disbursement
 Aktif setelah Tanggal Efektif LA. Struktur dua level:
@@ -391,7 +391,7 @@ Bappenas Publish Blue Book (per 5 tahun)
          ▼
   Bappenas terbitkan Daftar Kegiatan
          │
-         │ Tiap proyek di DK → 1 Loan Agreement (One-to-One)
+         │ Tiap proyek di DK → >1 Loan Agreement bila diperlukan
          ▼
   Loan Agreement ditandatangani
          │
@@ -422,7 +422,7 @@ Bappenas Publish Blue Book (per 5 tahun)
 - **Region** di BB, GB, dan DK bersifat multi-select dengan tipe: `COUNTRY` → `PROVINCE` → `CITY`. Pemilihan Nasional otomatis mencakup seluruh provinsi.
 - **Country** adalah entitas master tersendiri, digunakan oleh Lender tipe Bilateral dan KSA.
 - **Status proyek** BB dan GB tidak perlu field eksplisit — status diturunkan dari relasi yang ada (ada/tidaknya GB, LoI, atau DK terkait).
-- **Loan Agreement (LA)** merupakan tahapan setelah Daftar Kegiatan — relasi One-to-One dengan proyek di DK. Memuat Kode Loan, tanggal Agreement, Efektif, Original Closing Date, Closing Date, Lender, Mata Uang, dan Amount (original + USD). Perpanjangan LA terdeteksi otomatis apabila Closing Date ≠ Original Closing Date.
+- **Loan Agreement (LA)** merupakan tahapan setelah Daftar Kegiatan — relasi Many-to-One dari LA ke proyek DK. Satu proyek DK boleh memiliki lebih dari satu LA. Memuat Kode Loan, tanggal Agreement, Efektif, Original Closing Date *(opsional)*, Closing Date, Lender, Mata Uang, dan Amount (original + USD). Perpanjangan LA terdeteksi otomatis apabila Original Closing Date diisi dan Closing Date ≠ Original Closing Date.
 - **Monitoring Disbursement** aktif setelah Tanggal Efektif LA, dicatat per triwulan mengikuti tahun anggaran (TW1: Apr–Jun, TW2: Jul–Sep, TW3: Okt–Des, TW4: Jan–Mar). Mencatat rencana vs realisasi dalam tiga mata uang (Mata Uang LA, USD, IDR) dengan kurs diinput manual per triwulan. Breakdown per komponen bersifat **opsional** — dapat diisi jika ingin pencatatan lebih granular.
 - **Disbursement Plan** di GB adalah total keseluruhan proyek per tahun — bukan per lender.
 - **Funding Allocation** di GB kolom Activities mengacu ke baris Activities yang sudah diinput di tabel Activities GB — ada relasi teknis antar keduanya.

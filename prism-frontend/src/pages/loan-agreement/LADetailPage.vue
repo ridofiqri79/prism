@@ -136,6 +136,17 @@ onMounted(() => {
                 <CurrencyDisplay :amount="loanAgreement.amount_usd" currency="USD" />
               </dd>
             </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-surface-500">
+                Cumulative Disbursement ({{ loanAgreement.currency }})
+              </dt>
+              <dd class="mt-1 text-xl font-semibold text-surface-950">
+                <CurrencyDisplay
+                  :amount="loanAgreement.cumulative_disbursement"
+                  :currency="loanAgreement.currency"
+                />
+              </dd>
+            </div>
           </dl>
         </section>
       </div>
@@ -153,13 +164,6 @@ onMounted(() => {
           label="Lihat Proyek Daftar Kegiatan"
           icon="pi pi-list"
           outlined
-          class="w-full"
-        />
-        <Button
-          as="router-link"
-          :to="{ name: 'monitoring-list', params: { laId: loanAgreement.id } }"
-          label="Lihat Monitoring"
-          icon="pi pi-chart-line"
           class="w-full"
         />
       </aside>

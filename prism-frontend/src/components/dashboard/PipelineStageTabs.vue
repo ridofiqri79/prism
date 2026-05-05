@@ -36,7 +36,6 @@ function stageLabel(stage: PipelineStageSummary) {
     GB_NO_DK: 'Green Book tanpa Daftar Kegiatan',
     DK_NO_LA: 'Daftar Kegiatan tanpa Loan Agreement',
     LA_NOT_EFFECTIVE: 'Loan Agreement belum efektif',
-    EFFECTIVE_NO_MONITORING: 'Efektif tanpa monitoring',
   }
 
   return labels[stage.stage] ?? stage.label

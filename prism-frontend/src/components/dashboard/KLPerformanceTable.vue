@@ -20,7 +20,7 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
   <section class="rounded-lg border border-surface-200 bg-white p-4">
     <div class="mb-3">
       <h2 class="text-lg font-semibold text-surface-950">K/L Ranking</h2>
-      <p class="text-sm text-surface-500">Project count per stage, exposure, absorption, and risk by institution.</p>
+      <p class="text-sm text-surface-500">Project count per stage, exposure, and risk by institution.</p>
     </div>
     <DataTable :value="items" :loading="loading" size="small" scrollable scroll-height="32rem">
       <Column field="institution_name" header="K/L" frozen sortable class="min-w-64">
@@ -40,15 +40,6 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
       </Column>
       <Column field="la_commitment_usd" header="LA Commitment" sortable class="w-44">
         <template #body="{ data }">{{ usdFormatter.format(data.la_commitment_usd) }}</template>
-      </Column>
-      <Column field="planned_usd" header="Planned" sortable class="w-40">
-        <template #body="{ data }">{{ usdFormatter.format(data.planned_usd) }}</template>
-      </Column>
-      <Column field="realized_usd" header="Realized" sortable class="w-40">
-        <template #body="{ data }">{{ usdFormatter.format(data.realized_usd) }}</template>
-      </Column>
-      <Column field="absorption_pct" header="Absorption" sortable class="w-32">
-        <template #body="{ data }">{{ data.absorption_pct.toFixed(2) }}%</template>
       </Column>
       <Column field="risk_count" header="Risk" sortable class="w-28">
         <template #body="{ data }">

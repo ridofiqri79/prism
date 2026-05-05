@@ -18,6 +18,7 @@ function defaultValues(): LoanAgreementPayload {
     currency: 'USD',
     amount_original: 0,
     amount_usd: 0,
+    cumulative_disbursement: 0,
   }
 }
 
@@ -61,11 +62,12 @@ export function useLAForm(
           loan_code: initialData.loan_code,
           agreement_date: initialData.agreement_date,
           effective_date: initialData.effective_date,
-          original_closing_date: initialData.original_closing_date,
+          original_closing_date: initialData.original_closing_date ?? '',
           closing_date: initialData.closing_date,
           currency: initialData.currency,
           amount_original: initialData.amount_original,
           amount_usd: initialData.amount_usd,
+          cumulative_disbursement: initialData.cumulative_disbursement,
         }
       : {}),
   })
@@ -117,11 +119,12 @@ export function useLAForm(
       loan_code: data.loan_code,
       agreement_date: data.agreement_date,
       effective_date: data.effective_date,
-      original_closing_date: data.original_closing_date,
+      original_closing_date: data.original_closing_date ?? '',
       closing_date: data.closing_date,
       currency: data.currency,
       amount_original: data.amount_original,
       amount_usd: data.amount_usd,
+      cumulative_disbursement: data.cumulative_disbursement,
     })
   }
 
@@ -138,6 +141,7 @@ export function useLAForm(
       })
       const payload = {
         ...parsed.data,
+        original_closing_date: parsed.data.original_closing_date?.trim() ?? '',
         currency: normalizeCurrency(parsed.data.currency),
         amount_usd:
           normalizeCurrency(parsed.data.currency) === 'USD'
@@ -145,9 +149,17 @@ export function useLAForm(
               ? parsed.data.amount_usd
               : parsed.data.amount_original
             : parsed.data.amount_usd,
+        cumulative_disbursement: parsed.data.cumulative_disbursement,
       }
       await callback(payload)
     }
+  }
+
+  function reset(preserve: Partial<LoanAgreementPayload> = {}) {
+    Object.assign(values, defaultValues(), preserve)
+    Object.keys(errors).forEach((key) => {
+      delete errors[key as keyof LAFormErrors]
+    })
   }
 
   return {
@@ -160,5 +172,6 @@ export function useLAForm(
     extensionDays,
     submit,
     applyLoanAgreement,
+    reset,
   }
 }

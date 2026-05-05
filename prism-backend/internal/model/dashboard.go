@@ -3,8 +3,6 @@ package model
 type DashboardFilterRequest struct {
 	PeriodID       *string `json:"period_id,omitempty"`
 	PublishYear    *int32  `json:"publish_year,omitempty"`
-	BudgetYear     *int32  `json:"budget_year,omitempty"`
-	Quarter        *string `json:"quarter,omitempty"`
 	LenderID       *string `json:"lender_id,omitempty"`
 	InstitutionID  *string `json:"institution_id,omitempty"`
 	IncludeHistory bool    `json:"include_history"`
@@ -25,22 +23,12 @@ type StageMetric struct {
 	AmountUSD    float64 `json:"amount_usd"`
 }
 
-type TimeSeriesPoint struct {
-	Period        string  `json:"period"`
-	BudgetYear    int32   `json:"budget_year"`
-	Quarter       string  `json:"quarter"`
-	PlannedUSD    float64 `json:"planned_usd"`
-	RealizedUSD   float64 `json:"realized_usd"`
-	AbsorptionPct float64 `json:"absorption_pct"`
-}
-
 type BreakdownItem struct {
 	ID          *string  `json:"id,omitempty"`
 	Key         string   `json:"key,omitempty"`
 	Label       string   `json:"label"`
 	ItemCount   int      `json:"item_count,omitempty"`
 	AmountUSD   float64  `json:"amount_usd,omitempty"`
-	RealizedUSD float64  `json:"realized_usd,omitempty"`
 	Percentage  *float64 `json:"percentage,omitempty"`
 }
 
@@ -56,7 +44,6 @@ type RiskItem struct {
 	Severity           string  `json:"severity"`
 	AmountUSD          float64 `json:"amount_usd,omitempty"`
 	DaysUntilClosing   *int    `json:"days_until_closing,omitempty"`
-	AbsorptionPct      float64 `json:"absorption_pct,omitempty"`
 	Score              float64 `json:"score,omitempty"`
 }
 
@@ -70,19 +57,7 @@ type DashboardSummary struct {
 	DKFinancingUSD          float64      `json:"dk_financing_usd"`
 	DKCounterpartUSD        float64      `json:"dk_counterpart_usd"`
 	LACommitmentUSD         float64      `json:"la_commitment_usd"`
-	PlannedDisbursementUSD  float64      `json:"planned_disbursement_usd"`
-	RealizedDisbursementUSD float64      `json:"realized_disbursement_usd"`
-	AbsorptionPct           float64      `json:"absorption_pct"`
-	LAAbsorptionPct         float64      `json:"la_absorption_pct"`
-	UndisbursedUSD          float64      `json:"undisbursed_usd"`
 	Metrics                 []MetricCard `json:"metrics"`
-}
-
-type DashboardLAExposure struct {
-	LACommitmentUSD         float64 `json:"la_commitment_usd"`
-	RealizedDisbursementUSD float64 `json:"realized_disbursement_usd"`
-	UndisbursedUSD          float64 `json:"undisbursed_usd"`
-	LAAbsorptionPct         float64 `json:"la_absorption_pct"`
 }
 
 type DashboardFilterOptions map[string][]BreakdownItem
@@ -194,7 +169,6 @@ type LenderFinancingMixFilterRequest struct {
 	Currency    *string `json:"currency,omitempty"`
 	PeriodID    *string `json:"period_id,omitempty"`
 	PublishYear *int32  `json:"publish_year,omitempty"`
-	BudgetYear  *int32  `json:"budget_year,omitempty"`
 }
 
 type LenderFinancingMixSummary struct {
@@ -259,8 +233,6 @@ type KLPortfolioPerformanceFilterRequest struct {
 	InstitutionRole *string `json:"institution_role,omitempty"`
 	PeriodID        *string `json:"period_id,omitempty"`
 	PublishYear     *int32  `json:"publish_year,omitempty"`
-	BudgetYear      *int32  `json:"budget_year,omitempty"`
-	Quarter         *string `json:"quarter,omitempty"`
 	SortBy          *string `json:"sort_by,omitempty"`
 }
 
@@ -268,11 +240,8 @@ type KLPortfolioPerformanceSummary struct {
 	TotalInstitutions           int     `json:"total_institutions"`
 	TopExposureInstitution      string  `json:"top_exposure_institution,omitempty"`
 	TopExposureUSD              float64 `json:"top_exposure_usd,omitempty"`
-	LowestAbsorptionInstitution string  `json:"lowest_absorption_institution,omitempty"`
-	LowestAbsorptionPct         float64 `json:"lowest_absorption_pct,omitempty"`
 	HighestRiskInstitution      string  `json:"highest_risk_institution,omitempty"`
 	HighestRiskCount            int     `json:"highest_risk_count,omitempty"`
-	AverageAbsorptionPct        float64 `json:"average_absorption_pct,omitempty"`
 	TotalInstitutionExposureUSD float64 `json:"total_institution_exposure_usd,omitempty"`
 	TotalInstitutionRiskCount   int     `json:"total_institution_risk_count,omitempty"`
 }
@@ -286,9 +255,6 @@ type KLPortfolioPerformanceItem struct {
 	LACount             int     `json:"la_count"`
 	PipelineUSD         float64 `json:"pipeline_usd"`
 	LACommitmentUSD     float64 `json:"la_commitment_usd"`
-	PlannedUSD          float64 `json:"planned_usd"`
-	RealizedUSD         float64 `json:"realized_usd"`
-	AbsorptionPct       float64 `json:"absorption_pct"`
 	RiskCount           int     `json:"risk_count"`
 	PerformanceScore    float64 `json:"performance_score"`
 	PerformanceCategory string  `json:"performance_category"`
@@ -297,90 +263,6 @@ type KLPortfolioPerformanceItem struct {
 type KLPortfolioPerformanceDashboard struct {
 	Summary KLPortfolioPerformanceSummary `json:"summary"`
 	Items   []KLPortfolioPerformanceItem  `json:"items"`
-}
-
-type LADisbursementFilterRequest struct {
-	BudgetYear    *int32  `json:"budget_year,omitempty"`
-	Quarter       *string `json:"quarter,omitempty"`
-	LenderID      *string `json:"lender_id,omitempty"`
-	InstitutionID *string `json:"institution_id,omitempty"`
-	IsExtended    *bool   `json:"is_extended,omitempty"`
-	ClosingMonths *int32  `json:"closing_months,omitempty"`
-	RiskLevel     *string `json:"risk_level,omitempty"`
-}
-
-type LADisbursementSummary struct {
-	LACount           int     `json:"la_count"`
-	EffectiveCount    int     `json:"effective_count"`
-	NotEffectiveCount int     `json:"not_effective_count"`
-	ExtendedCount     int     `json:"extended_count"`
-	CommitmentUSD     float64 `json:"commitment_usd"`
-	PlannedUSD        float64 `json:"planned_usd"`
-	RealizedUSD       float64 `json:"realized_usd"`
-	AbsorptionPct     float64 `json:"absorption_pct"`
-	UndisbursedUSD    float64 `json:"undisbursed_usd"`
-}
-
-type LADisbursementTrendPoint struct {
-	Period        string  `json:"period"`
-	BudgetYear    int32   `json:"budget_year"`
-	Quarter       string  `json:"quarter"`
-	PlannedUSD    float64 `json:"planned_usd"`
-	RealizedUSD   float64 `json:"realized_usd"`
-	AbsorptionPct float64 `json:"absorption_pct"`
-}
-
-type LAClosingRiskItem struct {
-	LoanAgreementID       string  `json:"loan_agreement_id"`
-	LoanCode              string  `json:"loan_code"`
-	ProjectName           string  `json:"project_name"`
-	LenderName            string  `json:"lender_name"`
-	EffectiveDate         string  `json:"effective_date"`
-	ClosingDate           string  `json:"closing_date"`
-	DaysUntilClosing      int     `json:"days_until_closing"`
-	CommitmentUSD         float64 `json:"commitment_usd"`
-	CumulativeRealizedUSD float64 `json:"cumulative_realized_usd"`
-	UndisbursedUSD        float64 `json:"undisbursed_usd"`
-	LAAbsorptionPct       float64 `json:"la_absorption_pct"`
-	RiskType              string  `json:"risk_type"`
-	RiskLevel             string  `json:"risk_level"`
-}
-
-type LAUnderDisbursementRiskItem struct {
-	LoanAgreementID                string  `json:"loan_agreement_id"`
-	LoanCode                       string  `json:"loan_code"`
-	ProjectName                    string  `json:"project_name"`
-	LenderName                     string  `json:"lender_name"`
-	EffectiveDate                  string  `json:"effective_date"`
-	ClosingDate                    string  `json:"closing_date"`
-	CommitmentUSD                  float64 `json:"commitment_usd"`
-	CumulativeRealizedUSD          float64 `json:"cumulative_realized_usd"`
-	UndisbursedUSD                 float64 `json:"undisbursed_usd"`
-	LAAbsorptionPct                float64 `json:"la_absorption_pct"`
-	TimeElapsedPct                 float64 `json:"time_elapsed_pct"`
-	AbsorptionGapPct               float64 `json:"absorption_gap_pct"`
-	RemainingMonths                float64 `json:"remaining_months"`
-	RequiredMonthlyDisbursementUSD float64 `json:"required_monthly_disbursement_usd"`
-	MonitoringCount                int     `json:"monitoring_count"`
-	IsExtended                     bool    `json:"is_extended"`
-	RiskType                       string  `json:"risk_type"`
-	RiskLevel                      string  `json:"risk_level"`
-}
-
-type LAComponentBreakdownItem struct {
-	ComponentName string  `json:"component_name"`
-	LACount       int     `json:"la_count"`
-	PlannedUSD    float64 `json:"planned_usd"`
-	RealizedUSD   float64 `json:"realized_usd"`
-	AbsorptionPct float64 `json:"absorption_pct"`
-}
-
-type LADisbursementDashboard struct {
-	Summary                LADisbursementSummary         `json:"summary"`
-	QuarterlyTrend         []LADisbursementTrendPoint    `json:"quarterly_trend"`
-	ClosingRisks           []LAClosingRiskItem           `json:"closing_risks"`
-	UnderDisbursementRisks []LAUnderDisbursementRiskItem `json:"under_disbursement_risks"`
-	ComponentBreakdown     []LAComponentBreakdownItem    `json:"component_breakdown"`
 }
 
 type DataQualityGovernanceFilterRequest struct {

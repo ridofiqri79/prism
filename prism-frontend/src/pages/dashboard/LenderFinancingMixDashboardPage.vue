@@ -14,20 +14,27 @@ import type { LenderFinancingMixParams, LenderType, MetricCard } from '@/types/d
 
 const dashboard = useDashboardStore()
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const filters = reactive<{
   lender_type: LenderType | null
   lender_id: string | null
   currency: string | null
   period_id: string | null
   publish_year: number | null
-  budget_year: number | null
 }>({
   lender_type: null,
   lender_id: null,
   currency: null,
   period_id: null,
   publish_year: null,
-  budget_year: null,
 })
 
 const lenderTypeOptions = computed(() => [
@@ -60,15 +67,6 @@ const periodOptions = computed(() =>
 
 const publishYearOptions = computed(() =>
   (dashboard.filterOptions.publish_year ?? [])
-    .map((item) => ({
-      label: item.label,
-      value: Number(item.key),
-    }))
-    .filter((item) => Number.isFinite(item.value)),
-)
-
-const budgetYearOptions = computed(() =>
-  (dashboard.filterOptions.budget_year ?? [])
     .map((item) => ({
       label: item.label,
       value: Number(item.key),
@@ -126,7 +124,6 @@ function buildParams(): LenderFinancingMixParams {
     currency: filters.currency ?? undefined,
     period_id: filters.period_id ?? undefined,
     publish_year: filters.publish_year ?? undefined,
-    budget_year: filters.budget_year ?? undefined,
   }
 }
 
@@ -144,7 +141,6 @@ function clearFilters() {
   filters.currency = null
   filters.period_id = null
   filters.publish_year = null
-  filters.budget_year = null
   void loadMix()
 }
 
@@ -156,13 +152,14 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
+      v-if="!props.embedded"
       title="Lender & Financing Mix"
       subtitle="Profil lender, certainty ladder, conversion, cofinancing, dan currency exposure berdasarkan data tersimpan."
     />
 
     <DashboardFilterBar
       :loading="dashboard.lenderFinancingMixLoading"
-      grid-class="grid gap-4 md:grid-cols-2 xl:grid-cols-[11rem_1fr_9rem_1fr_10rem_10rem]"
+      grid-class="grid gap-4 md:grid-cols-2 xl:grid-cols-[11rem_1fr_9rem_1fr_10rem]"
       @apply="loadMix"
       @reset="clearFilters"
     >
@@ -232,18 +229,6 @@ onMounted(() => {
           />
         </label>
 
-        <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Budget Year</span>
-          <Select
-            v-model="filters.budget_year"
-            :options="budgetYearOptions"
-            option-label="label"
-            option-value="value"
-            show-clear
-            class="w-full"
-            placeholder="Semua"
-          />
-        </label>
     </DashboardFilterBar>
 
     <Message v-if="dashboard.lenderFinancingMixError" severity="error" icon="pi pi-exclamation-triangle">

@@ -24,6 +24,15 @@ const dashboard = useDashboardStore()
 const auth = useAuthStore()
 const router = useRouter()
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const filters = reactive<{
   severity: DataQualitySeverity | null
   module: string | null
@@ -53,7 +62,6 @@ const moduleOptions = [
   { label: 'Green Book Project', value: 'gb_project' },
   { label: 'Daftar Kegiatan Project', value: 'dk_project' },
   { label: 'Loan Agreement', value: 'loan_agreement' },
-  { label: 'Monitoring Disbursement', value: 'monitoring_disbursement' },
 ]
 
 const issueTypeOptions = [
@@ -69,51 +77,49 @@ const issueTypeOptions = [
   { label: 'Daftar Kegiatan without activity detail', value: 'DK_WITHOUT_ACTIVITY_DETAIL' },
   { label: 'Daftar Kegiatan without Loan Agreement', value: 'DK_WITHOUT_LA' },
   { label: 'Loan Agreement not effective', value: 'LA_NOT_EFFECTIVE' },
-  { label: 'Effective Loan Agreement without monitoring', value: 'EFFECTIVE_LA_WITHOUT_MONITORING' },
-  {
-    label: 'Monitoring planned zero realized positive',
-    value: 'MONITORING_PLANNED_ZERO_REALIZED_POSITIVE',
-  },
-  { label: 'Monitoring component name empty', value: 'MONITORING_COMPONENT_NAME_EMPTY' },
   { label: 'Currency USD mismatch', value: 'CURRENCY_USD_MISMATCH' },
-  {
-    label: 'Closing date soon without recent monitoring',
-    value: 'CLOSING_DATE_SOON_NO_RECENT_MONITORING',
-  },
 ]
 
 const isAdmin = computed(() => auth.user?.role === 'ADMIN')
 const governance = computed(() => dashboard.dataQualityGovernance)
 const summary = computed(() => governance.value?.summary)
 const auditSummary = computed(() => governance.value?.audit_summary)
+const visibleIssues = computed(() => governance.value?.issues ?? [])
+const visibleIssueSummary = computed(() => ({
+  total_issues: visibleIssues.value.length,
+  error_count: visibleIssues.value.filter((item) => item.severity === 'error').length,
+  warning_count: visibleIssues.value.filter((item) => item.severity === 'warning').length,
+  info_count: visibleIssues.value.filter((item) => item.severity === 'info').length,
+  audit_events: summary.value?.audit_events ?? 0,
+}))
 
 const cards = computed<MetricCardType[]>(() => {
   const baseCards: MetricCardType[] = [
     {
       key: 'total_issues',
       label: 'Total Issue',
-      value: summary.value?.total_issues ?? 0,
+      value: visibleIssueSummary.value.total_issues,
       unit: 'issue',
       category: 'quality',
     },
     {
       key: 'error_count',
       label: 'Error',
-      value: summary.value?.error_count ?? 0,
+      value: visibleIssueSummary.value.error_count,
       unit: 'issue',
       category: 'critical',
     },
     {
       key: 'warning_count',
       label: 'Warning',
-      value: summary.value?.warning_count ?? 0,
+      value: visibleIssueSummary.value.warning_count,
       unit: 'issue',
       category: 'watch',
     },
     {
       key: 'info_count',
       label: 'Info',
-      value: summary.value?.info_count ?? 0,
+      value: visibleIssueSummary.value.info_count,
       unit: 'issue',
       category: 'info',
     },
@@ -123,7 +129,7 @@ const cards = computed<MetricCardType[]>(() => {
     baseCards.push({
       key: 'audit_events',
       label: 'Audit Events',
-      value: summary.value?.audit_events ?? 0,
+      value: visibleIssueSummary.value.audit_events,
       unit: 'event',
       category: 'admin',
     })
@@ -164,20 +170,6 @@ function openIssue(item: DataQualityIssueItem) {
     return
   }
   if (
-    item.issue_type === 'EFFECTIVE_LA_WITHOUT_MONITORING' &&
-    router.hasRoute('loan-agreement-detail')
-  ) {
-    void router.push({ name: 'loan-agreement-detail', params: { id: item.record_id } })
-    return
-  }
-  if (
-    item.issue_type === 'CLOSING_DATE_SOON_NO_RECENT_MONITORING' &&
-    router.hasRoute('loan-agreement-detail')
-  ) {
-    void router.push({ name: 'loan-agreement-detail', params: { id: item.record_id } })
-    return
-  }
-  if (
     item.issue_type === 'BB_WITHOUT_BAPPENAS_PARTNER' &&
     router.hasRoute('project-journey')
   ) {
@@ -193,8 +185,9 @@ onMounted(() => {
 <template>
   <section class="space-y-6">
     <PageHeader
+      v-if="!props.embedded"
       title="Data Quality & Governance"
-      subtitle="Kontrol kelengkapan data, konsistensi business rule, integritas relasi, kepatuhan monitoring, dan ringkasan audit ADMIN."
+      subtitle="Kontrol kelengkapan data, konsistensi business rule, integritas relasi, dan ringkasan audit ADMIN."
     />
 
     <DashboardFilterBar
@@ -278,7 +271,7 @@ onMounted(() => {
 
     <DataQualityIssueTable
       v-if="activePanel === 'issues'"
-      :items="governance?.issues ?? []"
+      :items="visibleIssues"
       :loading="dashboard.dataQualityGovernanceLoading"
       @open="openIssue"
     />

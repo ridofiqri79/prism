@@ -1236,20 +1236,26 @@ Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menen
 
 **`GET /daftar-kegiatan/:dk_id/projects/:id` Response `200`** menyertakan `bappenas_partners` sebagai array Mitra Kerja Bappenas Eselon II. Field ini boleh kosong.
 
-Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar-kegiatan/:dk_id/projects/:id` juga menyertakan `loan_agreement` jika proyek tersebut sudah memiliki Loan Agreement. Jika belum ada, field ini tidak dikirim.
+Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar-kegiatan/:dk_id/projects/:id` juga menyertakan `loan_agreements` sebagai array Loan Agreement yang sudah dibuat untuk proyek tersebut. Jika belum ada, array kosong dikirim.
 
 ```json
 {
   "id": "uuid-dk-project",
   "project_name": "Trans Sumatra Section 1 - DK",
-  "loan_agreement": {
-    "id": "uuid-loan-agreement",
-    "loan_code": "IP-603"
-  }
+  "loan_agreements": [
+    {
+      "id": "uuid-loan-agreement",
+      "loan_code": "IP-603"
+    },
+    {
+      "id": "uuid-loan-agreement-2",
+      "loan_code": "IP-604"
+    }
+  ]
 }
 ```
 
-Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect Proyek Daftar Kegiatan. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`; jika `loan_agreement` sudah ada, frontend menampilkan aksi `Buka Loan Agreement`.
+Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect Proyek Daftar Kegiatan. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`. Loan Agreement yang sudah ada ditampilkan sebagai daftar aksi `Buka Loan Agreement`.
 
 ---
 
@@ -1276,7 +1282,7 @@ Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail
 |-------|------------|
 | `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` |
 
-Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru untuk DK Project yang belum memiliki Loan Agreement. DK Project yang sudah memiliki Loan Agreement masuk status `skip`; Loan Code yang sudah dipakai oleh record lain masuk status `failed`.
+Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru. DK Project boleh muncul lebih dari satu kali selama setiap baris memakai `Loan Code` berbeda; `Loan Code` yang sudah dipakai oleh record lain masuk status `failed`.
 
 **Template:**
 `GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, dan currency aktif saat template dibuat.
@@ -1285,7 +1291,7 @@ Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan 
 
 | Sheet | Kolom |
 |-------|-------|
-| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date (*)`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Amount USD` |
+| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Amount USD`, `Cumulative Disbursement` |
 
 **Preview:**
 `POST /loan-agreements/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -1296,9 +1302,10 @@ Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`; `Amount USD` wajib lebih dari `0` untuk non-USD. Jika `Currency` adalah `USD`, `Amount USD` boleh kosong dan backend menyimpan nilai USD sama dengan `Amount Original`.
+`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`; `Amount USD` wajib lebih dari `0` untuk non-USD. Jika `Currency` adalah `USD`, `Amount USD` boleh kosong dan backend menyimpan nilai USD sama dengan `Amount Original`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih.
 
 **`POST /loan-agreements` Request:**
+`original_closing_date` boleh dikosongkan/diomit untuk pinjaman yang belum diperpanjang. `is_extended=false` dan `extension_days=0` saat field ini kosong.
 ```json
 {
   "dk_project_id": "uuid",
@@ -1310,7 +1317,8 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
   "closing_date": "2030-12-31",
   "currency": "JPY",
   "amount_original": 45000000000,
-  "amount_usd": 300000000
+  "amount_usd": 300000000,
+  "cumulative_disbursement": 12500000000
 }
 ```
 
@@ -1331,11 +1339,14 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
     "currency": "JPY",
     "amount_original": 45000000000,
     "amount_usd": 300000000,
+    "cumulative_disbursement": 12500000000,
     "created_at": "2025-03-15T08:00:00Z",
     "updated_at": "2025-03-15T08:00:00Z"
   }
 }
 ```
+
+`cumulative_disbursement` adalah nilai kumulatif dalam `currency` Loan Agreement yang dipilih. Sistem tidak melakukan konversi otomatis ke USD atau IDR.
 
 **`GET /loan-agreements` Query Params tambahan:**
 
@@ -1349,6 +1360,12 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 ---
 
 ## Monitoring Disbursement
+
+> Status aktif: dinonaktifkan. Menu, route frontend, import flow, dan endpoint
+> CRUD Monitoring Disbursement (`/monitoring/*` dan
+> `/loan-agreements/:la_id/monitoring*`) tidak lagi diregistrasikan di aplikasi.
+> Bagian di bawah dipertahankan sebagai catatan kontrak historis sampai dokumen
+> baseline dipangkas menyeluruh.
 
 ### Monitoring Workspace & Import
 
@@ -1570,9 +1587,23 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ## Dashboard & Aggregasi
 
+Dashboard analytics hanya memakai data pipeline perencanaan dan komitmen legal: Blue Book, Green Book, Daftar Kegiatan, dan Loan Agreement. Analytics dashboard tidak memakai `budget_year`, `quarter`, planned/realized triwulan, atau absorption.
+
+Filter umum analytics:
+
+| Param | Keterangan |
+|-------|-----------|
+| `period_id` | Filter periode Blue Book |
+| `publish_year` | Filter tahun Green Book |
+| `lender_id` | Filter lender jika endpoint mendukung |
+| `institution_id` | Filter Kementerian/Lembaga jika endpoint mendukung |
+| `include_history` | `true` untuk menyertakan snapshot historis, default latest snapshot |
+
 ### `GET /dashboard/summary`
 
 **Permission:** Authenticated
+
+**Query Params:** filter umum analytics.
 
 **Response `200`:**
 ```json
@@ -1581,48 +1612,95 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
     "total_bb_projects": 120,
     "total_gb_projects": 85,
     "total_loan_agreements": 42,
-    "total_amount_usd": 15000000000,
-    "total_realized_usd": 8500000000,
-    "overall_absorption_pct": 56.7,
-    "active_monitoring": 38
+    "bb_pipeline_usd": 18000000000,
+    "gb_pipeline_usd": 15000000000,
+    "gb_local_usd": 2500000000,
+    "dk_financing_usd": 12000000000,
+    "dk_counterpart_usd": 1800000000,
+    "la_commitment_usd": 9500000000,
+    "metrics": []
   }
 }
 ```
 
 ---
 
-### `GET /dashboard/monitoring-summary`
+### `GET /dashboard/stage-funnel`
 
 **Permission:** Authenticated
 
-**Query Params:**
+Mengembalikan jumlah proyek per tahap pipeline latest snapshot. Tahap berhenti di `LA`; tidak ada tahap monitoring.
 
-| Param | Keterangan |
-|-------|-----------|
-| `budget_year` | Filter tahun anggaran |
-| `quarter` | Filter: `TW1`, `TW2`, `TW3`, `TW4` |
-| `lender_id` | Filter by lender |
+---
 
-**Response `200`:**
-```json
-{
-  "data": {
-    "budget_year": 2025,
-    "quarter": "TW1",
-    "total_planned_usd": 500000000,
-    "total_realized_usd": 380000000,
-    "absorption_pct": 76.0,
-    "by_lender": [
-      {
-        "lender": { "id": "uuid", "name": "JICA" },
-        "planned_usd": 300000000,
-        "realized_usd": 240000000,
-        "absorption_pct": 80.0
-      }
-    ]
-  }
-}
-```
+### `GET /dashboard/filter-options`
+
+**Permission:** Authenticated
+
+Mengembalikan opsi filter analytics seperti `period`, `publish_year`, `lender`, `institution`, `currency`, dan `lender_type`. Tidak mengembalikan quarter atau budget year untuk analytics dashboard.
+
+---
+
+### `GET /dashboard/executive-portfolio`
+
+**Permission:** Authenticated
+
+Ringkasan eksekutif: KPI pipeline/commitment, funnel BB → GB → DK → LA, top K/L, top lender, risk item pipeline, dan insight otomatis. Risk item tidak memakai absorption.
+
+---
+
+### `GET /dashboard/pipeline-bottleneck`
+
+**Permission:** Authenticated
+
+Tahap bottleneck yang valid:
+
+| Stage | Keterangan |
+|-------|------------|
+| `BB_NO_LENDER` | Blue Book belum memiliki lender indication |
+| `INDICATION_NO_LOI` | Lender indication belum memiliki Letter of Intent |
+| `LOI_NO_GB` | Letter of Intent belum masuk Green Book |
+| `GB_NO_DK` | Green Book belum masuk Daftar Kegiatan |
+| `DK_NO_LA` | Daftar Kegiatan belum memiliki Loan Agreement |
+| `LA_NOT_EFFECTIVE` | Loan Agreement belum efektif |
+
+---
+
+### `GET /dashboard/green-book-readiness`
+
+**Permission:** Authenticated
+
+Mengukur kelengkapan Green Book dari funding source, activities, rencana pencairan Green Book, cofinancing, dan exposure funding.
+
+---
+
+### `GET /dashboard/lender-financing-mix`
+
+**Permission:** Authenticated
+
+**Query Params tambahan:** `lender_type`, `lender_id`, `currency`, `period_id`, `publish_year`.
+
+Mengembalikan certainty ladder lender dari lender indication → Letter of Intent → Green Book funding source → Daftar Kegiatan financing → Loan Agreement.
+
+---
+
+### `GET /dashboard/kl-portfolio-performance`
+
+**Permission:** Authenticated
+
+**Query Params tambahan:** `institution_id`, `institution_role`, `period_id`, `publish_year`, `sort_by`.
+
+Nilai `sort_by`: `pipeline_usd`, `la_commitment_usd`, atau `risk_count`.
+
+Mengembalikan performa Kementerian/Lembaga berdasarkan pipeline progress, kelengkapan data Green Book, exposure, komitmen Loan Agreement, dan risk count. Tidak ada planned/realized triwulan atau absorption.
+
+---
+
+### `GET /dashboard/data-quality-governance`
+
+**Permission:** Authenticated
+
+Mengembalikan issue kelengkapan dan konsistensi data untuk Blue Book, Green Book, Daftar Kegiatan, Loan Agreement, serta ringkasan audit untuk ADMIN.
 
 ---
 
@@ -1876,30 +1954,33 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
               "date": "2025-02-01",
               "letter_number": "B-001/2025"
             },
-            "loan_agreement": {
-              "id": "uuid",
-              "loan_code": "IP-603",
-              "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
-              "agreement_date": "2025-05-01",
-              "effective_date": "2025-06-01",
-              "original_closing_date": "2030-12-31",
-              "closing_date": "2030-12-31",
-              "is_extended": false,
-              "extension_days": 0,
-              "currency": "USD",
-              "amount_original": 300000000,
-              "amount_usd": 300000000,
-              "monitoring": [
-                {
-                  "id": "uuid",
-                  "budget_year": 2025,
-                  "quarter": "TW1",
-                  "planned_usd": 3333333,
-                  "realized_usd": 2800000,
-                  "absorption_pct": 84.0
-                }
-              ]
-            }
+            "loan_agreements": [
+              {
+                "id": "uuid",
+                "loan_code": "IP-603",
+                "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+                "agreement_date": "2025-05-01",
+                "effective_date": "2025-06-01",
+                "original_closing_date": "2030-12-31",
+                "closing_date": "2030-12-31",
+                "is_extended": false,
+                "extension_days": 0,
+                "currency": "USD",
+                "amount_original": 300000000,
+                "amount_usd": 300000000,
+                "cumulative_disbursement": 125000000,
+                "monitoring": [
+                  {
+                    "id": "uuid",
+                    "budget_year": 2025,
+                    "quarter": "TW1",
+                    "planned_usd": 3333333,
+                    "realized_usd": 2800000,
+                    "absorption_pct": 84.0
+                  }
+                ]
+              }
+            ]
           }
         ]
       }

@@ -12,7 +12,7 @@ func TestDashboardFilterParsesPhase0Params(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/dashboard/summary?period_id=period-1&publish_year=2026&budget_year=2027&quarter=tw2&lender_id=lender-1&institution_id=institution-1&include_history=true",
+		"/dashboard/summary?period_id=period-1&publish_year=2026&lender_id=lender-1&institution_id=institution-1&include_history=true",
 		nil,
 	)
 	rec := httptest.NewRecorder()
@@ -28,12 +28,6 @@ func TestDashboardFilterParsesPhase0Params(t *testing.T) {
 	if filter.PublishYear == nil || *filter.PublishYear != 2026 {
 		t.Fatalf("publish_year = %v, want 2026", filter.PublishYear)
 	}
-	if filter.BudgetYear == nil || *filter.BudgetYear != 2027 {
-		t.Fatalf("budget_year = %v, want 2027", filter.BudgetYear)
-	}
-	if filter.Quarter == nil || *filter.Quarter != "TW2" {
-		t.Fatalf("quarter = %v, want TW2", filter.Quarter)
-	}
 	if filter.LenderID == nil || *filter.LenderID != "lender-1" {
 		t.Fatalf("lender_id = %v, want lender-1", filter.LenderID)
 	}
@@ -42,17 +36,6 @@ func TestDashboardFilterParsesPhase0Params(t *testing.T) {
 	}
 	if !filter.IncludeHistory {
 		t.Fatal("include_history = false, want true")
-	}
-}
-
-func TestDashboardFilterRejectsInvalidQuarter(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/dashboard/summary?quarter=Q1", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	if _, err := dashboardFilter(c); err == nil {
-		t.Fatal("dashboardFilter returned nil error for invalid quarter")
 	}
 }
 
@@ -102,7 +85,7 @@ func TestDashboardLenderFinancingMixFilterParsesParams(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/dashboard/lender-financing-mix?lender_type=ksa&lender_id=lender-1&currency=jpy&period_id=period-1&publish_year=2026&budget_year=2027",
+		"/dashboard/lender-financing-mix?lender_type=ksa&lender_id=lender-1&currency=jpy&period_id=period-1&publish_year=2026",
 		nil,
 	)
 	rec := httptest.NewRecorder()
@@ -127,9 +110,6 @@ func TestDashboardLenderFinancingMixFilterParsesParams(t *testing.T) {
 	if filter.PublishYear == nil || *filter.PublishYear != 2026 {
 		t.Fatalf("publish_year = %v, want 2026", filter.PublishYear)
 	}
-	if filter.BudgetYear == nil || *filter.BudgetYear != 2027 {
-		t.Fatalf("budget_year = %v, want 2027", filter.BudgetYear)
-	}
 }
 
 func TestDashboardLenderFinancingMixFilterRejectsInvalidLenderType(t *testing.T) {
@@ -147,7 +127,7 @@ func TestDashboardKLPortfolioPerformanceFilterParsesParams(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/dashboard/kl-portfolio-performance?institution_id=inst-1&institution_role=implementing%20agency&period_id=period-1&publish_year=2026&budget_year=2027&quarter=tw4&sort_by=absorption_pct",
+		"/dashboard/kl-portfolio-performance?institution_id=inst-1&institution_role=implementing%20agency&period_id=period-1&publish_year=2026&sort_by=risk_count",
 		nil,
 	)
 	rec := httptest.NewRecorder()
@@ -169,14 +149,8 @@ func TestDashboardKLPortfolioPerformanceFilterParsesParams(t *testing.T) {
 	if filter.PublishYear == nil || *filter.PublishYear != 2026 {
 		t.Fatalf("publish_year = %v, want 2026", filter.PublishYear)
 	}
-	if filter.BudgetYear == nil || *filter.BudgetYear != 2027 {
-		t.Fatalf("budget_year = %v, want 2027", filter.BudgetYear)
-	}
-	if filter.Quarter == nil || *filter.Quarter != "TW4" {
-		t.Fatalf("quarter = %v, want TW4", filter.Quarter)
-	}
-	if filter.SortBy == nil || *filter.SortBy != "absorption_pct" {
-		t.Fatalf("sort_by = %v, want absorption_pct", filter.SortBy)
+	if filter.SortBy == nil || *filter.SortBy != "risk_count" {
+		t.Fatalf("sort_by = %v, want risk_count", filter.SortBy)
 	}
 }
 
@@ -188,65 +162,6 @@ func TestDashboardKLPortfolioPerformanceFilterRejectsInvalidSort(t *testing.T) {
 
 	if _, err := dashboardKLPortfolioPerformanceFilter(c); err == nil {
 		t.Fatal("dashboardKLPortfolioPerformanceFilter returned nil error for invalid sort_by")
-	}
-}
-
-func TestDashboardLADisbursementFilterParsesParams(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/dashboard/la-disbursement?budget_year=2027&quarter=tw3&lender_id=lender-1&institution_id=inst-1&is_extended=true&closing_months=6&risk_level=HIGH",
-		nil,
-	)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	filter, err := dashboardLADisbursementFilter(c)
-	if err != nil {
-		t.Fatalf("dashboardLADisbursementFilter returned error: %v", err)
-	}
-	if filter.BudgetYear == nil || *filter.BudgetYear != 2027 {
-		t.Fatalf("budget_year = %v, want 2027", filter.BudgetYear)
-	}
-	if filter.Quarter == nil || *filter.Quarter != "TW3" {
-		t.Fatalf("quarter = %v, want TW3", filter.Quarter)
-	}
-	if filter.LenderID == nil || *filter.LenderID != "lender-1" {
-		t.Fatalf("lender_id = %v, want lender-1", filter.LenderID)
-	}
-	if filter.InstitutionID == nil || *filter.InstitutionID != "inst-1" {
-		t.Fatalf("institution_id = %v, want inst-1", filter.InstitutionID)
-	}
-	if filter.IsExtended == nil || !*filter.IsExtended {
-		t.Fatalf("is_extended = %v, want true", filter.IsExtended)
-	}
-	if filter.ClosingMonths == nil || *filter.ClosingMonths != 6 {
-		t.Fatalf("closing_months = %v, want 6", filter.ClosingMonths)
-	}
-	if filter.RiskLevel == nil || *filter.RiskLevel != "high" {
-		t.Fatalf("risk_level = %v, want high", filter.RiskLevel)
-	}
-}
-
-func TestDashboardLADisbursementFilterRejectsInvalidClosingMonths(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/dashboard/la-disbursement?closing_months=9", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	if _, err := dashboardLADisbursementFilter(c); err == nil {
-		t.Fatal("dashboardLADisbursementFilter returned nil error for invalid closing_months")
-	}
-}
-
-func TestDashboardLADisbursementFilterRejectsInvalidRiskLevel(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/dashboard/la-disbursement?risk_level=critical", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	if _, err := dashboardLADisbursementFilter(c); err == nil {
-		t.Fatal("dashboardLADisbursementFilter returned nil error for invalid risk_level")
 	}
 }
 

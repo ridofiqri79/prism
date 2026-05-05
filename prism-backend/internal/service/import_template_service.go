@@ -489,11 +489,11 @@ func (s *LAService) buildLAImportTemplateWorkbook(ctx context.Context) (simpleXL
 	sheets := []simpleXLSXSheet{
 		buildLAGuideSheet(),
 		buildLAMasterDataSnapshotSheet("Master Data", reference),
-		templateInputSheet(laImportSheetInput, []string{"DK Project Ref (*)", "Lender Name (*)", "Loan Code (*)", "Agreement Date (*)", "Effective Date (*)", "Original Closing Date (*)", "Closing Date (*)", "Currency (*)", "Amount Original (*)", "Amount USD"}, []float64{78, 42, 24, 20, 20, 24, 20, 14, 20, 20}, []simpleXLSXValidation{
-			listValidation("A2:A"+inputLastRow(), "ddDKProjectRefs", "DK Project Ref", "Pilih DK Project eligible yang belum memiliki Loan Agreement."),
+		templateInputSheet(laImportSheetInput, []string{"DK Project Ref (*)", "Lender Name (*)", "Loan Code (*)", "Agreement Date (*)", "Effective Date (*)", "Original Closing Date", "Closing Date (*)", "Currency (*)", "Amount Original (*)", "Amount USD", "Cumulative Disbursement"}, []float64{78, 42, 24, 20, 20, 24, 20, 14, 20, 20, 28}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddDKProjectRefs", "DK Project Ref", "Pilih DK Project eligible untuk Loan Agreement."),
 			listValidation("B2:B"+inputLastRow(), "ddLenders", "Lender Name", "Pilih lender dari master data. Backend memvalidasi lender terhadap Financing Detail DK Project terkait."),
 			listValidation("H2:H"+inputLastRow(), "ddCurrencies", "Currency", "Wajib memakai kode ISO 4217 aktif dari Master Currency."),
-			decimalValidation("I2:J"+inputLastRow(), "Amount", "Isi angka lebih besar dari 0. Untuk USD, Amount USD boleh kosong dan akan disamakan dengan Amount Original."),
+			decimalValidation("I2:K"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Amount Original wajib lebih dari 0. Untuk USD, Amount USD boleh kosong dan akan disamakan dengan Amount Original. Cumulative Disbursement memakai Currency yang dipilih."),
 		}),
 		dropdowns,
 	}
@@ -724,12 +724,15 @@ func buildLAMasterDataSnapshotSheet(name string, reference *importTemplateRefere
 	sheet := buildMasterDataSnapshotSheet(name, reference)
 	for _, item := range reference.DKProjects {
 		status := "Eligible"
-		if item.ExistingLoanAgreementID.Valid {
-			status = "Sudah punya Loan Agreement"
-		} else if !item.HasFinancingDetail {
+		if !item.HasFinancingDetail {
 			status = "Tanpa Financing Detail"
+		} else if item.LoanAgreementCount > 0 {
+			status = fmt.Sprintf("Eligible - %d Loan Agreement existing", item.LoanAgreementCount)
 		}
 		sheet.Rows = append(sheet.Rows, textRow("DK Project", model.UUIDToString(item.ID), item.ProjectName, status, laDKProjectContextLabel(item), item.GbCodes))
+		if strings.TrimSpace(item.ExistingLoanCodes) != "" {
+			sheet.Rows = append(sheet.Rows, textRow("Existing Loan Agreement", model.UUIDToString(item.ID), item.ExistingLoanCodes, "", laDKProjectContextLabel(item), ""))
+		}
 	}
 	for _, item := range reference.AllowedDKLenders {
 		sheet.Rows = append(sheet.Rows, textRow("Allowed Loan Agreement Lender", model.UUIDToString(item.DkProjectID), item.LenderName, item.LenderType, item.Currency, model.UUIDToString(item.LenderID)))
@@ -898,19 +901,19 @@ func buildDKGuideSheet() simpleXLSXSheet {
 func buildLAGuideSheet() simpleXLSXSheet {
 	rows := [][]simpleXLSXCell{
 		styledTextRow(xlsxStyleTitle, "Panduan Import Loan Agreement"),
-		styledTextRow(xlsxStyleSubtitle, "Workbook ini hanya membuat Loan Agreement baru. DK Project yang sudah memiliki Loan Agreement akan dilewati."),
+		styledTextRow(xlsxStyleSubtitle, "Workbook ini hanya membuat Loan Agreement baru. Satu DK Project dapat muncul di lebih dari satu baris selama Loan Code berbeda."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Alur Aman", "Deskripsi", "Catatan"),
 		textRow("1. Isi Loan Agreement", "Satu baris mewakili satu Loan Agreement baru untuk DK Project.", "DK Project Ref dari dropdown sudah menyertakan UUID agar tidak ambigu."),
 		textRow("2. Pilih lender", "Lender harus berasal dari Financing Detail DK Project terkait.", "Cek referensi Allowed Loan Agreement Lender di sheet Master Data."),
-		textRow("3. Isi tanggal", "Agreement Date, Effective Date, Original Closing Date, dan Closing Date memakai format YYYY-MM-DD.", "Closing Date tidak boleh lebih awal dari Original Closing Date."),
-		textRow("4. Isi nilai", "Currency wajib kode aktif Master Currency. Amount Original wajib lebih dari 0.", "Amount USD wajib untuk non-USD. Jika Currency USD, Amount USD kosong akan disamakan dengan Amount Original."),
+		textRow("3. Isi tanggal", "Agreement Date, Effective Date, dan Closing Date wajib memakai format YYYY-MM-DD.", "Original Closing Date opsional; isi hanya jika pinjaman diperpanjang."),
+		textRow("4. Isi nilai", "Currency wajib kode aktif Master Currency. Amount Original wajib lebih dari 0.", "Amount USD wajib untuk non-USD. Jika Currency USD, Amount USD kosong akan disamakan dengan Amount Original. Cumulative Disbursement memakai Currency yang dipilih dan boleh kosong."),
 		textRow("5. Preview dan Eksekusi", "Upload workbook lalu Preview untuk melihat create, skip, dan failed. Eksekusi hanya jika failed = 0.", "Preview tidak menyimpan data; eksekusi menyimpan dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
-		textRow("Loan Agreement", "DK Project Ref (*), Lender Name (*), Loan Code (*)", "Import create-only. Loan Code harus unik dan DK Project tidak boleh sudah punya Loan Agreement."),
-		textRow("Loan Agreement", "Agreement Date (*), Effective Date (*), Original Closing Date (*), Closing Date (*)", "Tanggal isi format YYYY-MM-DD atau tanggal Excel valid."),
-		textRow("Loan Agreement", "Currency (*), Amount Original (*)", "Amount USD wajib untuk non-USD dan opsional untuk USD."),
+		textRow("Loan Agreement", "DK Project Ref (*), Lender Name (*), Loan Code (*)", "Import create-only. Loan Code harus unik. DK Project boleh digunakan lebih dari sekali."),
+		textRow("Loan Agreement", "Agreement Date (*), Effective Date (*), Closing Date (*)", "Original Closing Date opsional. Jika diisi, Closing Date tidak boleh lebih awal."),
+		textRow("Loan Agreement", "Currency (*), Amount Original (*)", "Amount USD wajib untuk non-USD dan opsional untuk USD. Cumulative Disbursement opsional dan memakai currency yang dipilih."),
 		textRow(""),
 	}
 	rows = append(rows, lenderFallbackGuideRows()...)
@@ -1270,7 +1273,7 @@ func gbProjectCodeValues(items []queries.ListActiveGBProjectReferencesRow) []str
 func laDKProjectReferenceValues(items []queries.ListLoanAgreementImportDKProjectReferencesRow) []string {
 	values := make([]string, 0, len(items))
 	for _, item := range items {
-		if item.ExistingLoanAgreementID.Valid || !item.HasFinancingDetail {
+		if !item.HasFinancingDetail {
 			continue
 		}
 		values = append(values, laDKProjectReferenceLabel(item))

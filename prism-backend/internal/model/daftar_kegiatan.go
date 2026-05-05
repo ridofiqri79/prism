@@ -88,7 +88,7 @@ type DKProjectResponse struct {
 	FinancingDetails []DKFinancingDetailResponse `json:"financing_details"`
 	LoanAllocations  []DKLoanAllocationResponse  `json:"loan_allocations"`
 	ActivityDetails  []DKActivityDetailResponse  `json:"activity_details"`
-	LoanAgreement    *LoanAgreementSummary       `json:"loan_agreement,omitempty"`
+	LoanAgreements   []LoanAgreementSummary      `json:"loan_agreements"`
 	CreatedAt        string                      `json:"created_at,omitempty"`
 	UpdatedAt        string                      `json:"updated_at,omitempty"`
 }

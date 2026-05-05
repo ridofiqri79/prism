@@ -13,49 +13,40 @@ import type {
   GreenBookReadinessParams,
   KLPortfolioPerformanceDashboard,
   KLPortfolioPerformanceParams,
-  LADisbursementDashboard,
-  LADisbursementParams,
   LenderFinancingMixDashboard,
   LenderFinancingMixParams,
   PipelineBottleneckParams,
   PipelineBottleneckResponse,
   StageMetric,
-  TimeSeriesPoint,
 } from '@/types/dashboard.types'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   const summary = ref<DashboardSummary | null>(null)
   const stageFunnel = ref<StageMetric[]>([])
-  const monitoringRollup = ref<TimeSeriesPoint[]>([])
   const executivePortfolio = ref<ExecutivePortfolioDashboard | null>(null)
   const pipelineBottleneck = ref<PipelineBottleneckResponse | null>(null)
   const pipelineBottleneckMeta = ref<PaginationMeta | null>(null)
   const greenBookReadiness = ref<GreenBookReadinessDashboard | null>(null)
   const lenderFinancingMix = ref<LenderFinancingMixDashboard | null>(null)
   const klPortfolioPerformance = ref<KLPortfolioPerformanceDashboard | null>(null)
-  const laDisbursement = ref<LADisbursementDashboard | null>(null)
   const dataQualityGovernance = ref<DataQualityGovernanceDashboard | null>(null)
   const filterOptions = ref<DashboardFilterOptions>({})
   const loading = ref(false)
   const summaryLoading = ref(false)
   const stageFunnelLoading = ref(false)
-  const monitoringRollupLoading = ref(false)
   const pipelineLoading = ref(false)
   const greenBookReadinessLoading = ref(false)
   const lenderFinancingMixLoading = ref(false)
   const klPortfolioPerformanceLoading = ref(false)
-  const laDisbursementLoading = ref(false)
   const dataQualityGovernanceLoading = ref(false)
   const filterOptionsLoading = ref(false)
   const error = ref<string | null>(null)
   const summaryError = ref<string | null>(null)
   const stageFunnelError = ref<string | null>(null)
-  const monitoringRollupError = ref<string | null>(null)
   const pipelineError = ref<string | null>(null)
   const greenBookReadinessError = ref<string | null>(null)
   const lenderFinancingMixError = ref<string | null>(null)
   const klPortfolioPerformanceError = ref<string | null>(null)
-  const laDisbursementError = ref<string | null>(null)
   const dataQualityGovernanceError = ref<string | null>(null)
 
   async function fetchSummary(params?: DashboardFilterParams) {
@@ -85,21 +76,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
       return []
     } finally {
       stageFunnelLoading.value = false
-    }
-  }
-
-  async function fetchMonitoringRollup(params?: DashboardFilterParams) {
-    monitoringRollupLoading.value = true
-    monitoringRollupError.value = null
-    try {
-      monitoringRollup.value = await DashboardService.getMonitoringRollup(params)
-      return monitoringRollup.value
-    } catch {
-      monitoringRollupError.value = 'Gagal memuat monitoring rollup'
-      monitoringRollup.value = []
-      return []
-    } finally {
-      monitoringRollupLoading.value = false
     }
   }
 
@@ -191,21 +167,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function fetchLADisbursement(params?: LADisbursementParams) {
-    laDisbursementLoading.value = true
-    laDisbursementError.value = null
-    try {
-      laDisbursement.value = await DashboardService.getLADisbursement(params)
-      return laDisbursement.value
-    } catch {
-      laDisbursementError.value = 'Gagal memuat Loan Agreement & Disbursement'
-      laDisbursement.value = null
-      return null
-    } finally {
-      laDisbursementLoading.value = false
-    }
-  }
-
   async function fetchDataQualityGovernance(params?: DataQualityGovernanceParams) {
     dataQualityGovernanceLoading.value = true
     dataQualityGovernanceError.value = null
@@ -224,82 +185,68 @@ export const useDashboardStore = defineStore('dashboard', () => {
   function $reset() {
     summary.value = null
     stageFunnel.value = []
-    monitoringRollup.value = []
     executivePortfolio.value = null
     pipelineBottleneck.value = null
     pipelineBottleneckMeta.value = null
     greenBookReadiness.value = null
     lenderFinancingMix.value = null
     klPortfolioPerformance.value = null
-    laDisbursement.value = null
     dataQualityGovernance.value = null
     filterOptions.value = {}
     loading.value = false
     summaryLoading.value = false
     stageFunnelLoading.value = false
-    monitoringRollupLoading.value = false
     pipelineLoading.value = false
     greenBookReadinessLoading.value = false
     lenderFinancingMixLoading.value = false
     klPortfolioPerformanceLoading.value = false
-    laDisbursementLoading.value = false
     dataQualityGovernanceLoading.value = false
     filterOptionsLoading.value = false
     error.value = null
     summaryError.value = null
     stageFunnelError.value = null
-    monitoringRollupError.value = null
     pipelineError.value = null
     greenBookReadinessError.value = null
     lenderFinancingMixError.value = null
     klPortfolioPerformanceError.value = null
-    laDisbursementError.value = null
     dataQualityGovernanceError.value = null
   }
 
   return {
     summary,
     stageFunnel,
-    monitoringRollup,
     executivePortfolio,
     pipelineBottleneck,
     pipelineBottleneckMeta,
     greenBookReadiness,
     lenderFinancingMix,
     klPortfolioPerformance,
-    laDisbursement,
     dataQualityGovernance,
     filterOptions,
     loading,
     summaryLoading,
     stageFunnelLoading,
-    monitoringRollupLoading,
     pipelineLoading,
     greenBookReadinessLoading,
     lenderFinancingMixLoading,
     klPortfolioPerformanceLoading,
-    laDisbursementLoading,
     dataQualityGovernanceLoading,
     filterOptionsLoading,
     error,
     summaryError,
     stageFunnelError,
-    monitoringRollupError,
     pipelineError,
     greenBookReadinessError,
     lenderFinancingMixError,
     klPortfolioPerformanceError,
-    laDisbursementError,
     dataQualityGovernanceError,
     fetchSummary,
     fetchStageFunnel,
-    fetchMonitoringRollup,
     fetchExecutivePortfolio,
     fetchPipelineBottleneck,
     fetchGreenBookReadiness,
     fetchLenderFinancingMix,
     fetchKLPortfolioPerformance,
-    fetchLADisbursement,
     fetchDataQualityGovernance,
     fetchFilterOptions,
     $reset,

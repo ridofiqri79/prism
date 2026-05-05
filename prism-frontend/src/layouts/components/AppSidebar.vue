@@ -31,7 +31,6 @@ const isCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
 )
 const expandedGroups = ref<Record<string, boolean>>({
-  Dashboard: true,
   'Dokumen Perencanaan': true,
   Referensi: true,
   'Akses Admin': true,
@@ -66,22 +65,10 @@ function filterNavigation(items: NavigationItem[]) {
 
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
+    { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-chart-bar' },
     { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
     { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
-  ]),
-)
-
-const dashboardItems = computed<NavigationItem[]>(() =>
-  filterNavigation([
-    { label: 'Beranda Dashboard', to: '/dashboard', icon: 'pi pi-chart-bar' },
-    { label: 'Executive Portfolio', to: '/dashboard/executive-portfolio', icon: 'pi pi-briefcase' },
-    { label: 'Pipeline & Bottleneck', to: '/dashboard/pipeline-bottleneck', icon: 'pi pi-sort-amount-down' },
-    { label: 'Green Book Readiness', to: '/dashboard/green-book-readiness', icon: 'pi pi-check-square' },
-    { label: 'Lender & Financing Mix', to: '/dashboard/lender-financing-mix', icon: 'pi pi-building-columns' },
-    { label: 'K/L Portfolio Performance', to: '/dashboard/kl-portfolio-performance', icon: 'pi pi-sitemap' },
-    { label: 'Loan Agreement & Disbursement', to: '/dashboard/la-disbursement', icon: 'pi pi-chart-line' },
-    { label: 'Data Quality & Governance', to: '/dashboard/data-quality-governance', icon: 'pi pi-shield' },
   ]),
 )
 
@@ -100,12 +87,6 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
       to: '/loan-agreements',
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
-    },
-    {
-      label: 'Monitoring Disbursement',
-      to: '/monitoring',
-      icon: 'pi pi-chart-line',
-      module: 'monitoring_disbursement',
     },
   ]),
 )
@@ -158,12 +139,6 @@ const adminAccessItems = computed<NavigationItem[]>(() =>
 
 const navigationGroups = computed<NavigationGroup[]>(() =>
   [
-    {
-      section: 'Utama',
-      label: 'Dashboard',
-      icon: 'pi pi-chart-bar',
-      items: dashboardItems.value,
-    },
     {
       section: 'Perencanaan',
       label: 'Dokumen Perencanaan',

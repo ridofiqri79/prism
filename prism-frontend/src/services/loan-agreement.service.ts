@@ -27,6 +27,7 @@ function toDKProjectLoanOption(dk: DaftarKegiatan, project: DKProject): DKProjec
     financing_details: project.financing_details ?? [],
     loan_allocations: project.loan_allocations ?? [],
     activity_details: project.activity_details ?? [],
+    loan_agreements: project.loan_agreements ?? [],
     label: labelParts.join(' - ') || dk.subject,
   }
 }

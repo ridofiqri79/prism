@@ -20,8 +20,8 @@ const emit = defineEmits<{
   <section class="rounded-lg border border-surface-200 bg-white p-4">
     <div class="mb-3 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
       <div>
-        <h2 class="text-lg font-semibold text-surface-950">Data Quality Issues</h2>
-        <p class="text-sm text-surface-500">Business-rule consistency, integrity, and monitoring compliance.</p>
+      <h2 class="text-lg font-semibold text-surface-950">Data Quality Issues</h2>
+      <p class="text-sm text-surface-500">Business-rule consistency, integrity, and audit readiness.</p>
       </div>
       <p class="text-sm text-surface-500">{{ items.length }} issue</p>
     </div>
