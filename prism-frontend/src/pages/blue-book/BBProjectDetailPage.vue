@@ -11,15 +11,17 @@ import LoITable from '@/components/blue-book/LoITable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
+import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.vue'
+import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
+import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
-import ValueChipList from '@/components/common/ValueChipList.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import type { BBProjectHistoryItem, LoIPayload } from '@/types/blue-book.types'
 import { isRichTextEmpty, sanitizeRichText } from '@/utils/rich-text'
-import { formatDateTime } from '@/utils/formatters'
+import { toNameList } from '@/utils/formatters'
 import { formatBlueBookStatus, toFormErrors, type FormErrors } from './blue-book-page-utils'
 
 type LoIField = keyof LoIPayload
@@ -33,7 +35,6 @@ const { can } = usePermission()
 const blueBookId = computed(() => String(route.params.bbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
 const dialogVisible = ref(false)
-const isRevisionHistoryOpen = ref(false)
 const loiForm = reactive<LoIPayload>({
   lender_id: '',
   subject: '',
@@ -60,6 +61,19 @@ const allowedLenderOptions = computed(
       type: item.lender.type,
     })) ?? [],
 )
+
+const revisionHistoryItems = computed<RevisionHistoryItem[]>(() =>
+  blueBookStore.projectHistory.map((item) => ({
+    id: item.id,
+    label: historyLabel(item),
+    code: item.bb_code,
+    book_status: item.book_status,
+    status_label: formatBlueBookStatus(item.book_status),
+    is_latest: item.is_latest,
+    route: { name: 'bb-project-detail', params: { bbId: item.blue_book_id, id: item.id } },
+  })),
+)
+
 const auditRailItems = computed(() =>
   blueBookStore.projectHistory.flatMap((item) =>
     (item.audit_entries ?? []).map((entry) => ({
@@ -77,10 +91,6 @@ async function loadData() {
   ])
 }
 
-function historyRoute(item: BBProjectHistoryItem) {
-  return { name: 'bb-project-detail', params: { bbId: item.blue_book_id, id: item.id } }
-}
-
 function historyLabel(item: BBProjectHistoryItem) {
   const year = item.revision_year ? ` / ${item.revision_year}` : ''
   return `${item.book_label} - Rev ${item.revision_number}${year}`
@@ -91,28 +101,12 @@ function formatProjectStatus(status: string) {
   return status
 }
 
-function revisionSnapshotLabel(item: BBProjectHistoryItem) {
-  return item.is_latest ? 'Versi terbaru' : 'Historis'
-}
-
-function revisionChangeMeta(item: BBProjectHistoryItem) {
-  const parts = []
-  if (item.last_changed_by) parts.push(item.last_changed_by)
-  if (item.last_changed_at) parts.push(formatDateTime(item.last_changed_at))
-
-  return parts.join(' - ') || 'Belum ada catatan perubahan'
-}
-
 function hasRichText(value?: string | null) {
   return !isRichTextEmpty(value)
 }
 
 function richTextHtml(value?: string | null) {
   return sanitizeRichText(value)
-}
-
-function toNameList(items?: { name?: string; title?: string }[]) {
-  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
 }
 
 function openLoIDialog() {
@@ -179,6 +173,7 @@ onMounted(() => {
     </PageHeader>
 
     <div v-if="project" class="space-y-6">
+      <!-- Top card: Judul Program + Status -->
       <div class="rounded-lg border border-surface-200 bg-white p-5">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div class="min-w-0 space-y-1.5">
@@ -201,137 +196,23 @@ onMounted(() => {
         </div>
       </div>
 
-      <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-            <Tag
-              :value="`${blueBookStore.projectHistory.length} snapshot`"
-              severity="secondary"
-              rounded
-            />
-          </div>
-          <Button
-            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
-            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-            severity="secondary"
-            size="small"
-            outlined
-            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
-          />
-        </div>
-        <ol
-          v-if="isRevisionHistoryOpen"
-          class="mt-4 overflow-hidden rounded-lg border border-surface-200 bg-surface-0"
-        >
-          <li
-            v-for="item in blueBookStore.projectHistory"
-            :key="item.id"
-            class="grid gap-4 border-b border-surface-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_auto]"
-          >
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="min-w-0 font-semibold text-surface-950">{{ historyLabel(item) }}</p>
-                <span
-                  class="rounded border border-surface-200 bg-surface-50 px-2 py-0.5 font-mono text-xs font-semibold text-surface-700"
-                >
-                  {{ item.bb_code }}
-                </span>
-                <StatusBadge
-                  :status="item.book_status"
-                  :label="formatBlueBookStatus(item.book_status)"
-                />
-                <Tag
-                  :value="revisionSnapshotLabel(item)"
-                  :severity="item.is_latest ? 'success' : 'secondary'"
-                  rounded
-                />
-              </div>
-
-              <div class="mt-3 space-y-1.5">
-                <p v-if="item.last_change_summary" class="text-sm font-medium text-surface-900">
-                  {{ item.last_change_summary }}
-                </p>
-                <p v-else class="text-sm text-surface-500">Belum ada catatan perubahan terakhir.</p>
-                <div class="flex flex-wrap items-center gap-2 text-xs text-surface-500">
-                  <span
-                    class="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium"
-                    :class="
-                      item.used_by_downstream
-                        ? 'border-primary-100 bg-primary-50 text-primary-700'
-                        : 'border-surface-200 bg-surface-50 text-surface-600'
-                    "
-                  >
-                    <i class="pi pi-link text-[0.7rem]" />
-                    {{ item.used_by_downstream ? 'Dipakai tahap berikutnya' : 'Belum dipakai downstream' }}
-                  </span>
-                  <span>{{ revisionChangeMeta(item) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-start justify-end">
-              <Button
-                v-tooltip.top="'Lihat detail snapshot'"
-                as="router-link"
-                :to="historyRoute(item)"
-                icon="pi pi-eye"
-                severity="secondary"
-                size="small"
-                outlined
-                rounded
-                aria-label="Lihat detail snapshot"
-              />
-            </div>
-          </li>
-        </ol>
-      </section>
-
+      <!-- Rincian Proyek -->
       <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
         <div class="border-b border-surface-100 px-5 py-4">
           <h2 class="text-lg font-semibold text-surface-950">Rincian Proyek</h2>
         </div>
-        <div class="grid gap-x-8 gap-y-5 border-b border-surface-100 p-5 md:grid-cols-2">
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Executing Agency
-            </p>
-            <ValueChipList :items="executingAgencyNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Implementing Agency
-            </p>
-            <ValueChipList :items="implementingAgencyNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Mitra Kerja Bappenas
-            </p>
-            <ValueChipList :items="bappenasPartnerNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
-            <ValueChipList :items="locationNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Durasi</p>
-            <p class="text-sm font-semibold text-surface-950">
-              {{ project.duration ? `${project.duration} bulan` : '-' }}
-            </p>
-          </div>
-          <div class="min-w-0 space-y-2 md:col-span-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Prioritas Nasional
-            </p>
-            <ValueChipList :items="nationalPriorityNames" />
-          </div>
-        </div>
+        <ProjectInstitutionGrid
+          :executing-agencies="executingAgencyNames"
+          :implementing-agencies="implementingAgencyNames"
+          :bappenas-partners="bappenasPartnerNames"
+          :locations="locationNames"
+          :duration="project.duration"
+          :national-priorities="nationalPriorityNames"
+          class="border-b border-surface-100"
+        />
         <div class="divide-y divide-surface-100">
           <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Objective
-            </p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Objective</p>
             <div
               v-if="hasRichText(project.objective)"
               class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
@@ -340,9 +221,7 @@ onMounted(() => {
             <p v-else class="text-sm text-surface-400">-</p>
           </div>
           <div class="grid gap-3 px-5 py-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Scope of Work
-            </p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Scope of Work</p>
             <div
               v-if="hasRichText(project.scope_of_work)"
               class="rich-text-display max-w-5xl text-sm leading-7 text-surface-800"
@@ -371,6 +250,7 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- Biaya Proyek -->
       <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
         <div class="border-b border-surface-100 px-5 py-4">
           <h2 class="text-lg font-semibold text-surface-950">Biaya Proyek</h2>
@@ -380,6 +260,7 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- Indikasi Lender -->
       <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
         <div class="border-b border-surface-100 px-5 py-4">
           <h2 class="text-lg font-semibold text-surface-950">Indikasi Lender</h2>
@@ -394,6 +275,8 @@ onMounted(() => {
         :can-add="can('bb_project', 'update')"
         @add="openLoIDialog"
       />
+
+      <ProjectRevisionHistory :items="revisionHistoryItems" />
 
       <ProjectAuditRail :items="auditRailItems" />
     </div>
@@ -454,19 +337,3 @@ onMounted(() => {
     </Dialog>
   </section>
 </template>
-
-<style scoped>
-.rich-text-display :deep(p) {
-  margin: 0 0 0.5rem;
-}
-
-.rich-text-display :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.rich-text-display :deep(ol),
-.rich-text-display :deep(ul) {
-  margin: 0.25rem 0;
-  padding-left: 1.25rem;
-}
-</style>

@@ -55,3 +55,15 @@ export function toDateString(value: Date | null | undefined): string {
   const day = String(value.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+/**
+ * Extracts display names from a list of objects that have either a `name` or `title` field.
+ * Used by BB/GB project detail pages to build ValueChipList items.
+ */
+export function toNameList(items?: { name?: string; title?: string }[]): string[] {
+  return (
+    items
+      ?.map((item) => item.name ?? item.title)
+      .filter((item): item is string => Boolean(item)) ?? []
+  )
+}

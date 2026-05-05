@@ -273,3 +273,18 @@
     transform: translateY(4px);
   }
 }
+
+/* Rich text display — project detail pages (Objective, Scope, Outputs, Outcomes) */
+.rich-text-display p {
+  margin: 0 0 0.5rem;
+}
+
+.rich-text-display p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-display ol,
+.rich-text-display ul {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}

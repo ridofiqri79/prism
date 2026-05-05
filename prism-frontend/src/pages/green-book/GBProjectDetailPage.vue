@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -14,12 +14,14 @@ import FundingAllocationTable from '@/components/green-book/FundingAllocationTab
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ProjectAuditRail from '@/components/common/ProjectAuditRail.vue'
+import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.vue'
+import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
+import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
-import ValueChipList from '@/components/common/ValueChipList.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
-import { formatDateTime } from '@/utils/formatters'
+import { toNameList } from '@/utils/formatters'
 import { formatGreenBookStatus } from './green-book-page-utils'
 
 const route = useRoute()
@@ -29,16 +31,26 @@ const { can } = usePermission()
 
 const greenBookId = computed(() => String(route.params.gbId ?? ''))
 const projectId = computed(() => String(route.params.id ?? ''))
-const isRevisionHistoryOpen = ref(false)
 const project = computed(() => greenBookStore.currentProject)
 const executingAgencyNames = computed(() => toNameList(project.value?.executing_agencies))
 const implementingAgencyNames = computed(() => toNameList(project.value?.implementing_agencies))
 const locationNames = computed(() => toNameList(project.value?.locations))
 const bappenasPartnerNames = computed(() => toNameList(project.value?.bappenas_partners))
 const selectedCurrency = computed(() => project.value?.funding_sources[0]?.currency ?? 'USD')
-const programTitleName = computed(
-  () => project.value?.program_title?.title ?? '-',
+const programTitleName = computed(() => project.value?.program_title?.title ?? '-')
+
+const revisionHistoryItems = computed<RevisionHistoryItem[]>(() =>
+  greenBookStore.projectHistory.map((item) => ({
+    id: item.id,
+    label: item.book_label,
+    code: item.gb_code,
+    book_status: item.book_status,
+    status_label: formatGreenBookStatus(item.book_status),
+    is_latest: item.is_latest,
+    route: { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } },
+  })),
 )
+
 const auditRailItems = computed(() =>
   greenBookStore.projectHistory.flatMap((item) =>
     (item.audit_entries ?? []).map((entry) => ({
@@ -47,21 +59,12 @@ const auditRailItems = computed(() =>
     })),
   ),
 )
-const hasAuditRail = computed(() => auditRailItems.value.length > 0)
-
-function toNameList(items?: { name?: string; title?: string }[]) {
-  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
-}
 
 async function loadData() {
   await Promise.all([
     greenBookStore.fetchProject(greenBookId.value, projectId.value),
     greenBookStore.fetchProjectHistory(projectId.value),
   ])
-}
-
-function historyRoute(item: GBProjectHistoryItem) {
-  return { name: 'gb-project-detail', params: { gbId: item.green_book_id, id: item.id } }
 }
 
 function bbProjectRoute(bbProject: BBProjectSummary) {
@@ -101,6 +104,7 @@ onMounted(() => {
     </PageHeader>
 
     <div v-if="project" class="space-y-6">
+      <!-- Top card: Judul Program + Durasi + Status -->
       <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
         <div class="p-5">
           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
@@ -131,32 +135,17 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div class="grid gap-x-8 gap-y-5 border-t border-surface-100 p-5 md:grid-cols-2">
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Executing Agency
-            </p>
-            <ValueChipList :items="executingAgencyNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Implementing Agency
-            </p>
-            <ValueChipList :items="implementingAgencyNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-              Mitra Kerja Bappenas
-            </p>
-            <ValueChipList :items="bappenasPartnerNames" />
-          </div>
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
-            <ValueChipList :items="locationNames" />
-          </div>
-        </div>
+        <!-- Institusi & Lokasi (reusable grid) -->
+        <ProjectInstitutionGrid
+          :executing-agencies="executingAgencyNames"
+          :implementing-agencies="implementingAgencyNames"
+          :bappenas-partners="bappenasPartnerNames"
+          :locations="locationNames"
+          class="border-t border-surface-100"
+        />
       </div>
 
+      <!-- Referensi Proyek Blue Book -->
       <div class="rounded-lg border border-surface-200 bg-white p-5">
         <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Referensi Proyek Blue Book</p>
         <div class="mt-3 flex flex-wrap gap-2">
@@ -178,97 +167,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <section class="space-y-3 rounded-lg border border-surface-200 bg-white p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="text-lg font-semibold text-surface-950">Histori Revisi</h2>
-            <Tag
-              :value="`${greenBookStore.projectHistory.length} snapshot`"
-              severity="secondary"
-              rounded
-            />
-          </div>
-          <Button
-            :label="isRevisionHistoryOpen ? 'Tutup' : 'Detail'"
-            :icon="isRevisionHistoryOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-            severity="secondary"
-            size="small"
-            outlined
-            @click="isRevisionHistoryOpen = !isRevisionHistoryOpen"
-          />
-        </div>
-        <div
-          v-if="isRevisionHistoryOpen"
-          class="overflow-auto rounded-lg border border-surface-200"
-        >
-          <table class="w-full min-w-[60rem] text-left text-sm">
-            <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-              <tr>
-                <th class="px-4 py-3">Green Book</th>
-                <th class="px-4 py-3">Kode</th>
-                <th class="px-4 py-3">Status Dokumen</th>
-                <th class="px-4 py-3">Snapshot</th>
-                <th class="px-4 py-3">Referensi Blue Book</th>
-                <th class="px-4 py-3">Downstream</th>
-                <th v-if="hasAuditRail" class="px-4 py-3">Perubahan Terakhir</th>
-                <th class="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-100">
-              <tr v-for="item in greenBookStore.projectHistory" :key="item.id">
-                <td class="px-4 py-3 font-medium text-surface-900">{{ item.book_label }}</td>
-                <td class="px-4 py-3 text-surface-700">{{ item.gb_code }}</td>
-                <td class="px-4 py-3">
-                  <StatusBadge
-                    :status="item.book_status"
-                    :label="formatGreenBookStatus(item.book_status)"
-                  />
-                </td>
-                <td class="px-4 py-3">
-                  <Tag
-                    :value="item.is_latest ? 'Terbaru' : 'Historis'"
-                    :severity="item.is_latest ? 'success' : 'secondary'"
-                    rounded
-                  />
-                </td>
-                <td class="px-4 py-3 text-surface-700">
-                  {{ item.bb_projects?.map((bbProject) => bbProject.bb_code).join(', ') || '-' }}
-                </td>
-                <td class="px-4 py-3">
-                  <Tag
-                    :value="item.used_by_downstream ? 'Dipakai tahap lanjutan' : 'Belum dipakai'"
-                    :severity="item.used_by_downstream ? 'info' : 'secondary'"
-                    rounded
-                  />
-                </td>
-                <td v-if="hasAuditRail" class="px-4 py-3 text-surface-700">
-                  <div v-if="item.last_change_summary">
-                    <p class="font-medium text-surface-900">{{ item.last_change_summary }}</p>
-                    <p class="text-xs text-surface-500">
-                      {{ item.last_changed_by }} - {{ formatDateTime(item.last_changed_at) }}
-                    </p>
-                  </div>
-                  <span v-else>-</span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <Button
-                    v-tooltip.top="'Lihat detail snapshot'"
-                    as="router-link"
-                    :to="historyRoute(item)"
-                    icon="pi pi-eye"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Lihat detail snapshot"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+      <!-- Tabs: Kegiatan / Funding / Disbursement / Alokasi -->
       <Tabs value="0" class="rounded-lg border border-surface-200 bg-white p-2">
         <TabList>
           <Tab value="0">Kegiatan</Tab>
@@ -312,6 +211,8 @@ onMounted(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      <ProjectRevisionHistory :items="revisionHistoryItems" />
 
       <ProjectAuditRail :items="auditRailItems" />
     </div>
