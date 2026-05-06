@@ -157,11 +157,11 @@ onMounted(() => {
       @remove="listControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tanggal dari</span>
           <InputText v-model="listControls.draftFilters.date_from" type="date" class="w-full" />
         </label>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tanggal sampai</span>
           <InputText v-model="listControls.draftFilters.date_to" type="date" class="w-full" />
         </label>

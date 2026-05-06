@@ -158,7 +158,7 @@ watch(selectedLevels, () => {
       @apply="controls.resetAndLoad(loadData)"
     >
       <template #filters>
-        <label class="col-span-2 block space-y-1 md:col-span-1">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Filter Level</span>
           <MultiSelect
             v-model="selectedLevels"

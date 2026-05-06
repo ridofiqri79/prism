@@ -169,7 +169,7 @@ watch(selectedTypes, () => {
       @reset="selectedTypes = []; loadData()"
     >
       <template #filters>
-        <label class="block space-y-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Tipe Wilayah</span>
           <MultiSelect
             v-model="selectedTypes"

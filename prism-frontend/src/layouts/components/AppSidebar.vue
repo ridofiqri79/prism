@@ -94,6 +94,7 @@ function filterNavigation(items: NavigationItem[]) {
 
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
+    { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-chart-line', module: 'bb_project' },
     { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
     { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },

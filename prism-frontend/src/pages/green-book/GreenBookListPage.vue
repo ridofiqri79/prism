@@ -178,7 +178,7 @@ onMounted(() => {
       @remove="listControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
           <MultiSelect
             v-model="listControls.draftFilters.publish_year"
@@ -189,7 +189,7 @@ onMounted(() => {
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Status</span>
           <MultiSelect
             v-model="listControls.draftFilters.status"

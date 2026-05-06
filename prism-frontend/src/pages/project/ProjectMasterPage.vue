@@ -500,7 +500,7 @@ onUnmounted(() => {
           icon="pi pi-table"
           severity="secondary"
           outlined
-          class="h-12 shrink-0 gap-2"
+          class="h-11 shrink-0 gap-2"
           :badge="String(columnVisibleCount)"
           badge-severity="secondary"
           @click="(e) => columnPopover.toggle(e)"
@@ -522,183 +522,229 @@ onUnmounted(() => {
         </Popover>
       </template>
       <template #filters>
-        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
-          <ToggleSwitch v-model="filters.include_history" />
-          <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
-        </label>
-
-        <div class="contents">
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
-            <MultiSelect
-              v-model="filters.loan_types"
-              :options="loanTypeOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua jenis"
-              filter
-              filter-placeholder="Cari jenis pinjaman"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Indikasi Lender</span>
-            <MultiSelect
-              v-model="filters.indication_lender_ids"
-              :options="lenderOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua indikasi lender"
-              filter
-              filter-placeholder="Cari indikasi lender"
-              display="chip"
-              class="w-full"
+        <div class="xl:col-span-6 space-y-5">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">
+                Mode data
+              </p>
+              <p class="mt-0.5 text-sm font-medium text-surface-800">Snapshot historis</p>
+            </div>
+            <label
+              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 sm:self-center"
             >
-              <template #option="{ option }">
-                <div class="flex w-full items-center justify-between gap-3">
-                  <span>{{ option.label }}</span>
-                  <Tag :value="option.type" severity="info" rounded />
-                </div>
-              </template>
-            </MultiSelect>
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Executing Agency</span>
-            <MultiSelect
-              v-model="filters.executing_agency_ids"
-              :options="institutionOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua executing agency"
-              filter
-              filter-placeholder="Cari executing agency"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Fixed Lender (Green Book)</span>
-            <MultiSelect
-              v-model="filters.fixed_lender_ids"
-              :options="lenderOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua fixed lender"
-              filter
-              filter-placeholder="Cari fixed lender"
-              display="chip"
-              class="w-full"
-            >
-              <template #option="{ option }">
-                <div class="flex w-full items-center justify-between gap-3">
-                  <span>{{ option.label }}</span>
-                  <Tag :value="option.type" severity="info" rounded />
-                </div>
-              </template>
-            </MultiSelect>
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Status Project</span>
-            <MultiSelect
-              v-model="filters.project_statuses"
-              :options="projectStatusOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua status"
-              filter
-              filter-placeholder="Cari status project"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Status Pipeline</span>
-            <MultiSelect
-              v-model="filters.pipeline_statuses"
-              :options="pipelineStatusOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua step"
-              filter
-              filter-placeholder="Cari status pipeline"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Program Title</span>
-            <MultiSelect
-              v-model="filters.program_title_ids"
-              :options="programTitleOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua program title"
-              filter
-              filter-placeholder="Cari program title"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Region/Location</span>
-            <MultiSelect
-              v-model="filters.region_ids"
-              :options="regionOptions"
-              option-label="label"
-              option-value="value"
-              option-disabled="disabled"
-              placeholder="Semua lokasi"
-              filter
-              filter-placeholder="Cari lokasi"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Foreign Loan Min</span>
-              <InputNumber
-                v-model="filters.foreign_loan_min"
-                mode="decimal"
-                :min="0"
-                :min-fraction-digits="0"
-                :max-fraction-digits="2"
-                placeholder="USD minimum"
-                class="w-full"
-              />
-            </label>
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Foreign Loan Max</span>
-              <InputNumber
-                v-model="filters.foreign_loan_max"
-                mode="decimal"
-                :min="0"
-                :min-fraction-digits="0"
-                :max-fraction-digits="2"
-                placeholder="USD maksimum"
-                class="w-full"
-              />
+              <span class="text-sm font-semibold text-surface-700">
+                {{ filters.include_history ? 'Aktif' : 'Nonaktif' }}
+              </span>
+              <ToggleSwitch v-model="filters.include_history" />
             </label>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Dari</span>
-              <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
-            </label>
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Sampai</span>
-              <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
-            </label>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Klasifikasi pipeline
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
+                <MultiSelect
+                  v-model="filters.loan_types"
+                  :options="loanTypeOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua jenis"
+                  filter
+                  filter-placeholder="Cari jenis pinjaman"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Project</span>
+                <MultiSelect
+                  v-model="filters.project_statuses"
+                  :options="projectStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua status"
+                  filter
+                  filter-placeholder="Cari status project"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Pipeline</span>
+                <MultiSelect
+                  v-model="filters.pipeline_statuses"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua step"
+                  filter
+                  filter-placeholder="Cari status pipeline"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Lender, instansi, program
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Indikasi Lender</span>
+                <MultiSelect
+                  v-model="filters.indication_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua indikasi lender"
+                  filter
+                  filter-placeholder="Cari indikasi lender"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Fixed Lender (Green Book)</span>
+                <MultiSelect
+                  v-model="filters.fixed_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua fixed lender"
+                  filter
+                  filter-placeholder="Cari fixed lender"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Executing Agency</span>
+                <MultiSelect
+                  v-model="filters.executing_agency_ids"
+                  :options="institutionOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua executing agency"
+                  filter
+                  filter-placeholder="Cari executing agency"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Program Title</span>
+                <MultiSelect
+                  v-model="filters.program_title_ids"
+                  :options="programTitleOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua program title"
+                  filter
+                  filter-placeholder="Cari program title"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Lokasi, nilai, tanggal
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Region/Location</span>
+                <MultiSelect
+                  v-model="filters.region_ids"
+                  :options="regionOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-disabled="disabled"
+                  placeholder="Semua lokasi"
+                  filter
+                  filter-placeholder="Cari lokasi"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">Loan Min</span>
+                  <InputNumber
+                    v-model="filters.foreign_loan_min"
+                    mode="decimal"
+                    prefix="USD "
+                    :min="0"
+                    :min-fraction-digits="0"
+                    :max-fraction-digits="2"
+                    placeholder="Minimum"
+                    class="w-full"
+                  />
+                </label>
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">Loan Max</span>
+                  <InputNumber
+                    v-model="filters.foreign_loan_max"
+                    mode="decimal"
+                    prefix="USD "
+                    :min="0"
+                    :min-fraction-digits="0"
+                    :max-fraction-digits="2"
+                    placeholder="Maksimum"
+                    class="w-full"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">DK Dari</span>
+                  <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
+                </label>
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">DK Sampai</span>
+                  <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </template>

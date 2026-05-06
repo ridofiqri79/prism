@@ -115,11 +115,11 @@ onMounted(() => {
       @remove="listControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Lender</span>
           <LenderSelect v-model="listControls.draftFilters.lender_id" placeholder="Semua lender" />
         </label>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Status Perpanjangan</span>
           <Select
             v-model="listControls.draftFilters.is_extended"
@@ -129,7 +129,7 @@ onMounted(() => {
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Penutupan Sebelum Tanggal</span>
           <InputText v-model="listControls.draftFilters.closing_date_before" type="date" class="w-full" />
         </label>

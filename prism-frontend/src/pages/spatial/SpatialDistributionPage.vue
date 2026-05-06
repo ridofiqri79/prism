@@ -619,78 +619,104 @@ onUnmounted(() => {
       @remove="removeFilter"
     >
       <template #filters>
-        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
-          <ToggleSwitch v-model="filters.includeHistory" />
-          <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
-        </label>
-
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Metrik</span>
-          <Select
-            v-model="metric"
-            :options="metricOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-          />
-        </label>
-
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Tahap</span>
-          <MultiSelect
-            v-model="filters.pipelineStatuses"
-            :options="pipelineOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari tahap"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensurePipelineSelection"
+        <div class="space-y-5 xl:col-span-6">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
-            <template #value>
-              <span class="block truncate">{{ pipelineSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">
+                Mode data
+              </p>
+              <p class="mt-0.5 text-sm font-medium text-surface-800">Snapshot historis</p>
+            </div>
+            <label
+              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 sm:self-center"
+            >
+              <span class="text-sm font-semibold text-surface-700">
+                {{ filters.includeHistory ? 'Aktif' : 'Nonaktif' }}
+              </span>
+              <ToggleSwitch v-model="filters.includeHistory" />
+            </label>
+          </div>
 
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Status Proyek</span>
-          <MultiSelect
-            v-model="filters.projectStatuses"
-            :options="projectStatusOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari status"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensureProjectStatusSelection"
-          >
-            <template #value>
-              <span class="block truncate">{{ projectStatusSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Tampilan peta
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Metrik</span>
+                <Select
+                  v-model="metric"
+                  :options="metricOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
 
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Tipe Pinjaman</span>
-          <MultiSelect
-            v-model="filters.loanTypes"
-            :options="loanTypeOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari tipe pinjaman"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensureLoanTypeSelection"
-          >
-            <template #value>
-              <span class="block truncate">{{ loanTypeSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Tahap</span>
+                <MultiSelect
+                  v-model="filters.pipelineStatuses"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensurePipelineSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ pipelineSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Proyek</span>
+                <MultiSelect
+                  v-model="filters.projectStatuses"
+                  :options="projectStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  filter
+                  filter-placeholder="Cari status"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensureProjectStatusSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ projectStatusSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Tipe Pinjaman</span>
+                <MultiSelect
+                  v-model="filters.loanTypes"
+                  :options="loanTypeOptions"
+                  option-label="label"
+                  option-value="value"
+                  filter
+                  filter-placeholder="Cari tipe pinjaman"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensureLoanTypeSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ loanTypeSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+            </div>
+          </div>
+        </div>
       </template>
     </SearchFilterBar>
 

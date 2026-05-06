@@ -396,7 +396,7 @@ watch(
       @remove="projectControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Proyek Green Book</span>
           <MultiSelect
             v-model="projectControls.draftFilters.gb_project_ids"
@@ -409,7 +409,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Executing Agency</span>
           <MultiSelect
             v-model="projectControls.draftFilters.executing_agency_ids"
@@ -422,7 +422,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-1">
+        <label class="block min-w-0 space-y-2 xl:col-span-1">
           <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectControls.draftFilters.location_ids"
@@ -436,7 +436,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-1">
+        <label class="block min-w-0 space-y-2 xl:col-span-1">
           <span class="text-sm font-medium text-surface-700">Lender</span>
           <MultiSelect
             v-model="projectControls.draftFilters.lender_ids"
