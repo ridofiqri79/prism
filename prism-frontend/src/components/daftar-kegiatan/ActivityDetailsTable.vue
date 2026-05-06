@@ -25,15 +25,15 @@ function updateName(index: number, activityName: string) {
 
 <template>
   <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[42rem] text-sm">
+    <table class="prism-table min-w-[42rem]">
       <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="w-24 px-4 py-3 text-left">No.</th>
           <th class="px-4 py-3 text-left">Nama Aktivitas</th>
-          <th class="w-20 px-4 py-3"></th>
+          <th class="prism-table-actions w-20 px-4 py-3"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-100">
+      <tbody>
         <tr v-for="(row, index) in rows" :key="index">
           <td class="px-4 py-2.5 text-sm font-semibold text-surface-700">{{ row.activity_number }}</td>
           <td class="px-4 py-2.5 text-sm text-surface-800">
@@ -44,7 +44,7 @@ function updateName(index: number, activityName: string) {
               @update:model-value="updateName(index, String($event ?? ''))"
             />
           </td>
-          <td class="px-4 py-2.5 text-right">
+          <td class="prism-table-actions px-4 py-2.5">
             <Button
               icon="pi pi-trash"
               severity="danger"
@@ -56,7 +56,7 @@ function updateName(index: number, activityName: string) {
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="3" class="px-4 py-6 text-center text-sm text-surface-500">
+          <td colspan="3" class="prism-table-empty px-4 py-6">
             Belum ada rincian kegiatan.
           </td>
         </tr>

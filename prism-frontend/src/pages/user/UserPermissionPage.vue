@@ -93,14 +93,14 @@ onMounted(async () => {
     </PageHeader>
 
     <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-      <table class="w-full border-collapse text-sm">
+      <table class="prism-table w-full">
         <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
           <tr>
             <th class="border-b border-surface-200 px-4 py-3 font-semibold">Modul</th>
             <th
               v-for="action in actions"
               :key="action"
-              class="border-b border-surface-200 px-4 py-3 text-center font-semibold"
+              class="prism-table-align-center border-b border-surface-200 px-4 py-3 font-semibold"
             >
               {{ actionLabels[action] }}
             </th>
@@ -109,7 +109,7 @@ onMounted(async () => {
         <tbody>
           <tr v-for="item in permissionModules" :key="item.module" class="border-b border-surface-100 last:border-b-0">
             <td class="px-4 py-3 font-medium text-surface-800">{{ item.label }}</td>
-            <td v-for="action in actions" :key="action" class="px-4 py-3 text-center">
+            <td v-for="action in actions" :key="action" class="prism-table-align-center px-4 py-3">
               <Checkbox
                 binary
                 :model-value="getPermission(item.module, action)"

@@ -92,7 +92,7 @@ function displayNew(fc: AuditFieldChange, action: string): string | null {
           <!-- ── Alokasi Funding: tampilkan sebagai tabel ringkas ── -->
           <template v-if="isFundingAllocation(item) && item.field_changes?.length">
             <div class="overflow-hidden rounded border border-surface-200">
-              <table class="w-full border-collapse text-xs">
+              <table class="prism-table prism-table-compact w-full">
                 <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
                   <tr>
                     <th class="px-3 py-2 text-left font-semibold uppercase tracking-wide text-surface-500">
@@ -100,28 +100,28 @@ function displayNew(fc: AuditFieldChange, action: string): string | null {
                     </th>
                     <!-- INSERT: hanya kolom "Nilai" -->
                     <template v-if="item.action === 'INSERT'">
-                      <th class="px-3 py-2 text-right font-semibold uppercase tracking-wide text-emerald-600">
+                      <th class="prism-table-currency px-3 py-2 font-semibold uppercase tracking-wide text-emerald-600">
                         Nilai (USD)
                       </th>
                     </template>
                     <!-- DELETE: hanya kolom "Dihapus" -->
                     <template v-else-if="item.action === 'DELETE'">
-                      <th class="px-3 py-2 text-right font-semibold uppercase tracking-wide text-red-500">
+                      <th class="prism-table-currency px-3 py-2 font-semibold uppercase tracking-wide text-red-500">
                         Dihapus (USD)
                       </th>
                     </template>
                     <!-- UPDATE: dua kolom lama → baru -->
                     <template v-else>
-                      <th class="px-3 py-2 text-right font-semibold uppercase tracking-wide text-surface-500">
+                      <th class="prism-table-currency px-3 py-2 font-semibold uppercase tracking-wide text-surface-500">
                         Sebelum (USD)
                       </th>
-                      <th class="px-3 py-2 text-right font-semibold uppercase tracking-wide text-primary">
+                      <th class="prism-table-currency px-3 py-2 font-semibold uppercase tracking-wide text-primary">
                         Sesudah (USD)
                       </th>
                     </template>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-surface-100">
+                <tbody>
                   <tr
                     v-for="fc in item.field_changes"
                     :key="fc.field"
@@ -130,23 +130,23 @@ function displayNew(fc: AuditFieldChange, action: string): string | null {
                     <td class="px-3 py-2 font-medium text-surface-800">{{ fc.label }}</td>
                     <!-- INSERT -->
                     <template v-if="item.action === 'INSERT'">
-                      <td class="px-3 py-2 text-right font-mono text-emerald-700">
+                      <td class="prism-table-currency px-3 py-2 font-mono text-emerald-700">
                         {{ displayNew(fc, item.action) ?? '0' }}
                       </td>
                     </template>
                     <!-- DELETE -->
                     <template v-else-if="item.action === 'DELETE'">
-                      <td class="px-3 py-2 text-right font-mono text-red-600 line-through">
+                      <td class="prism-table-currency px-3 py-2 font-mono text-red-600 line-through">
                         {{ displayOld(fc, item.action) ?? '0' }}
                       </td>
                     </template>
                     <!-- UPDATE -->
                     <template v-else>
-                      <td class="px-3 py-2 text-right font-mono text-surface-500">
+                      <td class="prism-table-currency px-3 py-2 font-mono text-surface-500">
                         {{ displayOld(fc, item.action) ?? '0' }}
                       </td>
                       <td
-                        class="px-3 py-2 text-right font-mono font-semibold"
+                        class="prism-table-currency px-3 py-2 font-mono font-semibold"
                         :class="
                           displayNew(fc, item.action) !== displayOld(fc, item.action)
                             ? 'text-primary-700'

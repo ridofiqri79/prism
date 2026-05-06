@@ -6,6 +6,7 @@ import type { TreeNode } from 'primevue/treenode'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
+import { primeTablePt } from '@/utils/table-styles'
 
 interface SortEvent {
   sortField?: unknown
@@ -46,17 +47,7 @@ const tableSortOrder = computed(() => {
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.value.length === 0)
 const refreshingRows = computed(() => props.loading && props.value.length > 0)
-const tablePt = {
-  thead: {
-    class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500',
-  },
-  headerCell: {
-    class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500',
-  },
-  columnHeaderContent: {
-    class: 'gap-2',
-  },
-}
+const tablePt = primeTablePt
 
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
@@ -104,7 +95,7 @@ function handleExpandedKeys(value: ExpandedKeys) {
           :sort-field="sortField"
           :sort-order="tableSortOrder"
           :pt="tablePt"
-          class="min-w-[48rem] rounded-lg border border-surface-200"
+          class="prism-data-table min-w-[48rem] rounded-lg border border-surface-200"
           @update:expandedKeys="handleExpandedKeys"
           @node-expand="(node) => emit('node-expand', node)"
           @sort="handleSort"

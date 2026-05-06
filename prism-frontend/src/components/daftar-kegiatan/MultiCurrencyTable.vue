@@ -58,7 +58,7 @@ function isUSD(row: T) {
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[90rem] text-sm">
+    <table class="prism-table min-w-[90rem]">
       <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <!--
@@ -69,17 +69,17 @@ function isUSD(row: T) {
             <slot name="first-col-header" />
           </th>
           <th class="px-4 py-3 text-left">Mata Uang</th>
-          <th class="px-4 py-3 text-right">Pinjaman Original</th>
-          <th class="px-4 py-3 text-right">Hibah Original</th>
-          <th class="px-4 py-3 text-right">Counterpart Original</th>
-          <th class="px-4 py-3 text-right">Pinjaman USD</th>
-          <th class="px-4 py-3 text-right">Hibah USD</th>
-          <th class="px-4 py-3 text-right">Counterpart USD</th>
+          <th class="prism-table-currency px-4 py-3">Pinjaman Original</th>
+          <th class="prism-table-currency px-4 py-3">Hibah Original</th>
+          <th class="prism-table-currency px-4 py-3">Counterpart Original</th>
+          <th class="prism-table-currency px-4 py-3">Pinjaman USD</th>
+          <th class="prism-table-currency px-4 py-3">Hibah USD</th>
+          <th class="prism-table-currency px-4 py-3">Counterpart USD</th>
           <th class="px-4 py-3 text-left">Catatan</th>
-          <th class="w-20 px-4 py-3"></th>
+          <th class="prism-table-actions w-20 px-4 py-3"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-100">
+      <tbody>
         <tr v-for="(row, index) in rows" :key="index">
           <!--
             First-column cell — the selector differs per table.
@@ -95,28 +95,28 @@ function isUSD(row: T) {
               @update:model-value="updateRow(index, { currency: String($event ?? '').toUpperCase() })"
             />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.amount_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { amount_original: $event })"
             />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.grant_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { grant_original: $event })"
             />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.counterpart_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { counterpart_original: $event })"
             />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.amount_usd"
@@ -124,7 +124,7 @@ function isUSD(row: T) {
             />
             <CurrencyInput v-else :model-value="row.amount_usd" disabled />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.grant_usd"
@@ -132,7 +132,7 @@ function isUSD(row: T) {
             />
             <CurrencyInput v-else :model-value="row.grant_usd" disabled />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.counterpart_usd"
@@ -147,12 +147,12 @@ function isUSD(row: T) {
               @update:model-value="updateRow(index, { remarks: String($event ?? '') })"
             />
           </td>
-          <td class="px-4 py-2.5 text-right">
+          <td class="prism-table-actions px-4 py-2.5">
             <Button icon="pi pi-trash" severity="danger" text rounded @click="emit('remove', index)" />
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="10" class="px-4 py-6 text-center text-sm text-surface-500">
+          <td colspan="10" class="prism-table-empty px-4 py-6">
             {{ emptyText ?? 'Belum ada data.' }}
           </td>
         </tr>

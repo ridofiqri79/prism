@@ -30,6 +30,7 @@ import type {
   SpatialDistributionRegionMetric,
 } from '@/types/spatial-distribution.types'
 import { getPipelineStatusLabel, getPipelineStatusSeverity } from '@/utils/status-labels'
+import { primeTablePt } from '@/utils/table-styles'
 
 type FilterOption<T extends string> = {
   label: string
@@ -60,12 +61,7 @@ let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 let projectPaginationTimer: ReturnType<typeof window.setTimeout> | undefined
 let searchWatcherPaused = false
 
-const tablePt = {
-  thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
-  headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
-  columnHeaderContent: { class: 'gap-2' },
-  bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
-}
+const tablePt = primeTablePt
 
 const tableSortOrder = computed(() => (projectSortOrder.value === 'asc' ? 1 : -1))
 
@@ -871,7 +867,7 @@ onUnmounted(() => {
           :sort-order="tableSortOrder"
           :table-style="{ minWidth: '62rem', width: '100%', tableLayout: 'auto' }"
           :pt="tablePt"
-          class="w-full"
+          class="prism-data-table w-full"
           @sort="handleSort"
           @row-click="(e) => goToProjectDetail(e.data)"
         >
@@ -968,6 +964,8 @@ onUnmounted(() => {
             header="Pinjaman USD"
             sortable
             :style="{ minWidth: '14rem', width: '14rem' }"
+            header-class="prism-table-currency"
+            body-class="prism-table-currency"
             :header-style="{ textAlign: 'right', justifyContent: 'flex-end' }"
             :body-style="{ textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }"
           >

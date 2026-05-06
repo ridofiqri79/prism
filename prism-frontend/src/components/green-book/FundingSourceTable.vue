@@ -112,21 +112,21 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[88rem] text-sm">
+    <table class="prism-table min-w-[88rem]">
       <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3 text-left">Lender</th>
           <th class="px-4 py-3 text-left">Instansi</th>
-          <th class="px-4 py-3 text-right">Pinjaman ({{ displayCurrency }})</th>
-          <th class="px-4 py-3 text-right">Hibah ({{ displayCurrency }})</th>
-          <th class="px-4 py-3 text-right">Lokal ({{ displayCurrency }})</th>
-          <th class="px-4 py-3 text-right">Pinjaman USD</th>
-          <th class="px-4 py-3 text-right">Hibah USD</th>
-          <th class="px-4 py-3 text-right">Lokal USD</th>
-          <th v-if="editable" class="w-24 px-4 py-3"></th>
+          <th class="prism-table-currency px-4 py-3">Pinjaman ({{ displayCurrency }})</th>
+          <th class="prism-table-currency px-4 py-3">Hibah ({{ displayCurrency }})</th>
+          <th class="prism-table-currency px-4 py-3">Lokal ({{ displayCurrency }})</th>
+          <th class="prism-table-currency px-4 py-3">Pinjaman USD</th>
+          <th class="prism-table-currency px-4 py-3">Hibah USD</th>
+          <th class="prism-table-currency px-4 py-3">Lokal USD</th>
+          <th v-if="editable" class="prism-table-actions w-24 px-4 py-3"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-100">
+      <tbody>
         <tr v-for="(row, index) in rows" :key="index">
           <td class="px-4 py-2.5 text-sm text-surface-800">
             <LenderSelect
@@ -146,7 +146,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <span v-else>{{ rowInstitutionName(row) }}</span>
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="toPayload(row).loan_original"
@@ -155,7 +155,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).loan_original" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="toPayload(row).grant_original"
@@ -164,7 +164,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).grant_original" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="toPayload(row).local_original"
@@ -173,7 +173,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).local_original" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable && !isUSDSelected"
               :model-value="toPayload(row).loan_usd"
@@ -181,7 +181,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).loan_usd" />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable && !isUSDSelected"
               :model-value="toPayload(row).grant_usd"
@@ -189,7 +189,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).grant_usd" />
           </td>
-          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+          <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
             <CurrencyInput
               v-if="editable && !isUSDSelected"
               :model-value="toPayload(row).local_usd"
@@ -197,7 +197,7 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
             />
             <CurrencyDisplay v-else :amount="toPayload(row).local_usd" />
           </td>
-          <td v-if="editable" class="px-4 py-2.5 text-right">
+          <td v-if="editable" class="prism-table-actions px-4 py-2.5">
             <Button
               icon="pi pi-trash"
               severity="danger"
@@ -209,17 +209,17 @@ function updateRow(index: number, patch: Partial<GBFundingSourcePayload>) {
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td :colspan="editable ? 9 : 8" class="px-4 py-6 text-center text-sm text-surface-500">
+          <td :colspan="editable ? 9 : 8" class="prism-table-empty px-4 py-6">
             Belum ada funding source.
           </td>
         </tr>
       </tbody>
-      <tfoot class="border-t border-surface-200 bg-surface-50 text-sm font-semibold">
+      <tfoot>
         <tr>
           <td class="px-4 py-2.5" colspan="5">Total USD</td>
-          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.loan_usd" /></td>
-          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.grant_usd" /></td>
-          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.local_usd" /></td>
+          <td class="prism-table-currency px-4 py-2.5"><CurrencyDisplay :amount="totals.loan_usd" /></td>
+          <td class="prism-table-currency px-4 py-2.5"><CurrencyDisplay :amount="totals.grant_usd" /></td>
+          <td class="prism-table-currency px-4 py-2.5"><CurrencyDisplay :amount="totals.local_usd" /></td>
           <td v-if="editable"></td>
         </tr>
       </tfoot>

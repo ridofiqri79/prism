@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { isNavigationFailure, useRoute, useRouter } from 'vue-router'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { isAxiosError } from 'axios'
@@ -223,6 +223,7 @@ const safeRedirectTarget = computed(() => {
 
   if (
     !target ||
+    target === '/' ||
     !target.startsWith('/') ||
     target.startsWith('//') ||
     target.startsWith('/login')
@@ -238,13 +239,6 @@ const onSubmit = handleSubmit(async (values) => {
 
   try {
     await auth.login(values)
-    await router.push(
-      safeRedirectTarget.value ??
-        resolveDefaultAuthenticatedRoute({
-          user: auth.user,
-          permissions: auth.permissions,
-        }),
-    )
   } catch (err) {
     if (isAxiosError(err) && err.response?.status === 401) {
       loginError.value = 'Username atau password salah'
@@ -252,6 +246,21 @@ const onSubmit = handleSubmit(async (values) => {
     }
 
     loginError.value = 'Login gagal. Silakan coba lagi.'
+    return
+  }
+
+  try {
+    await router.replace(
+      safeRedirectTarget.value ??
+        resolveDefaultAuthenticatedRoute({
+          user: auth.user,
+          permissions: auth.permissions,
+        }),
+    )
+  } catch (err) {
+    if (!isNavigationFailure(err)) {
+      throw err
+    }
   }
 })
 

@@ -223,6 +223,123 @@
     opacity: 0.62;
     filter: saturate(0.92);
   }
+
+  .prism-table-surface {
+    @apply overflow-x-auto rounded-lg border border-surface-200 bg-white;
+  }
+
+  .prism-table {
+    @apply w-full border-separate border-spacing-0 text-left text-sm;
+  }
+
+  .prism-table thead {
+    @apply bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500;
+  }
+
+  .prism-table th {
+    @apply px-4 py-3 text-left align-bottom font-semibold;
+    border-bottom: 1px solid var(--p-surface-200);
+  }
+
+  .prism-table td {
+    @apply px-4 py-2.5 align-top text-sm text-surface-800;
+  }
+
+  .prism-table tbody > tr + tr > td {
+    border-top: 1px solid var(--p-surface-100);
+  }
+
+  .prism-table tbody > tr {
+    @apply transition-colors;
+  }
+
+  .prism-table tbody > tr:hover > td {
+    @apply bg-surface-50/70;
+  }
+
+  .prism-table tfoot {
+    @apply bg-surface-50 text-sm font-semibold text-surface-900;
+  }
+
+  .prism-table tfoot td {
+    border-top: 1px solid var(--p-surface-200);
+  }
+
+  .prism-table-compact th {
+    @apply px-3 py-2;
+  }
+
+  .prism-table-compact td {
+    @apply px-3 py-2 text-xs;
+  }
+
+  .prism-table-empty {
+    @apply text-center text-sm text-surface-500;
+  }
+
+  .prism-table-actions {
+    @apply text-right;
+  }
+
+  .prism-table-align-left {
+    text-align: left;
+  }
+
+  .prism-table-align-center {
+    text-align: center;
+  }
+
+  .prism-table-align-right,
+  .prism-table-currency {
+    text-align: right;
+  }
+
+  .prism-table-currency,
+  .prism-currency-display {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .prism-currency-display {
+    display: inline-block;
+  }
+
+  .prism-table-nowrap {
+    white-space: nowrap;
+  }
+
+  .prism-data-table {
+    @apply text-sm;
+  }
+
+  .prism-data-table .p-datatable-thead > tr > th,
+  .prism-data-table .p-treetable-thead > tr > th {
+    @apply bg-surface-50 px-4 py-3 align-bottom text-xs font-semibold uppercase tracking-wide text-surface-500;
+  }
+
+  .prism-data-table .p-datatable-tbody > tr > td,
+  .prism-data-table .p-treetable-tbody > tr > td {
+    @apply px-4 py-2.5 align-top text-sm text-surface-800;
+  }
+
+  .prism-data-table .p-datatable-column-header-content,
+  .prism-data-table .p-treetable-column-header-content {
+    gap: 0.5rem;
+  }
+
+  .prism-table-align-right .p-datatable-column-header-content,
+  .prism-table-align-right .p-treetable-column-header-content,
+  .prism-table-currency .p-datatable-column-header-content,
+  .prism-table-currency .p-treetable-column-header-content {
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .prism-table-align-center .p-datatable-column-header-content,
+  .prism-table-align-center .p-treetable-column-header-content {
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 

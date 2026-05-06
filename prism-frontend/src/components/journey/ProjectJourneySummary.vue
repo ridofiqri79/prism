@@ -478,11 +478,11 @@ function fundingWidth(value: number) {
         </div>
 
         <div class="overflow-x-auto">
-          <table class="min-w-[56rem] w-full border-separate border-spacing-0 text-left text-sm">
+          <table class="prism-table min-w-[56rem]">
             <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="border-b border-surface-100 px-3 py-2">Proyek</th>
-                <th class="border-b border-surface-100 px-3 py-2">Pendanaan</th>
+                <th class="prism-table-currency border-b border-surface-100 px-3 py-2">Pendanaan</th>
                 <th
                   v-for="stageHeader in matrixRows[0]?.stages ?? []"
                   :key="stageHeader.key"
@@ -498,7 +498,7 @@ function fundingWidth(value: number) {
                   <p class="font-semibold text-surface-900">{{ row.project_label }}</p>
                   <p class="mt-1 line-clamp-2 text-xs text-surface-500">{{ row.project_name }}</p>
                 </td>
-                <td class="border-b border-surface-100 px-3 py-3 font-medium text-surface-700">
+                <td class="prism-table-currency border-b border-surface-100 px-3 py-3 font-medium text-surface-700">
                   <CurrencyDisplay :amount="row.funding_usd" currency="USD" compact />
                 </td>
                 <td

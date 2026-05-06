@@ -569,24 +569,24 @@ watch(
             <div class="space-y-2">
               <h3 class="font-semibold text-surface-950">Rincian Pembiayaan</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
-                <table class="w-full min-w-[56rem] text-sm">
+                <table class="prism-table min-w-[56rem]">
                   <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3 text-left">Lender</th>
                       <th class="px-4 py-3 text-left">Mata Uang</th>
-                      <th class="px-4 py-3 text-right">Nilai Asli</th>
-                      <th class="px-4 py-3 text-right">USD</th>
+                      <th class="prism-table-currency px-4 py-3">Nilai Asli</th>
+                      <th class="prism-table-currency px-4 py-3">USD</th>
                       <th class="px-4 py-3 text-left">Catatan</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-surface-100">
+                  <tbody>
                     <tr v-for="row in project.financing_details" :key="row.id">
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.lender?.name ?? '-' }}</td>
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.currency }}</td>
-                      <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+                      <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
                         <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
                       </td>
-                      <td class="px-4 py-2.5 text-right text-sm text-surface-800"><CurrencyDisplay :amount="row.amount_usd" /></td>
+                      <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800"><CurrencyDisplay :amount="row.amount_usd" /></td>
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.remarks || '-' }}</td>
                     </tr>
                   </tbody>
@@ -597,24 +597,24 @@ watch(
             <div class="space-y-2">
               <h3 class="font-semibold text-surface-950">Alokasi Pinjaman</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
-                <table class="w-full min-w-[56rem] text-sm">
+                <table class="prism-table min-w-[56rem]">
                   <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3 text-left">Instansi</th>
                       <th class="px-4 py-3 text-left">Mata Uang</th>
-                      <th class="px-4 py-3 text-right">Nilai Asli</th>
-                      <th class="px-4 py-3 text-right">USD</th>
+                      <th class="prism-table-currency px-4 py-3">Nilai Asli</th>
+                      <th class="prism-table-currency px-4 py-3">USD</th>
                       <th class="px-4 py-3 text-left">Catatan</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-surface-100">
+                  <tbody>
                     <tr v-for="row in project.loan_allocations" :key="row.id">
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.institution?.name ?? '-' }}</td>
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.currency }}</td>
-                      <td class="px-4 py-2.5 text-right text-sm text-surface-800">
+                      <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
                         <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
                       </td>
-                      <td class="px-4 py-2.5 text-right text-sm text-surface-800"><CurrencyDisplay :amount="row.amount_usd" /></td>
+                      <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800"><CurrencyDisplay :amount="row.amount_usd" /></td>
                       <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.remarks || '-' }}</td>
                     </tr>
                   </tbody>

@@ -34,6 +34,7 @@ import type {
   ProjectStatus,
 } from '@/types/project.types'
 import { getPipelineStatusLabel } from '@/utils/status-labels'
+import { primeTablePt } from '@/utils/table-styles'
 
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
@@ -91,12 +92,7 @@ const visibleColumns = computed(() =>
 const columnVisibleCount = computed(() => visibleColumns.value.length + 1) // +1 for fixed name col
 const columnPopover = ref()
 const tableSortOrder = computed(() => (sortOrder.value === 'asc' ? 1 : -1))
-const tablePt = {
-  thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
-  headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
-  columnHeaderContent: { class: 'gap-2' },
-  bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
-}
+const tablePt = primeTablePt
 const programTitleOptions = computed(() =>
   masterStore.programTitles.map((programTitle) => ({
     label: formatProgramTitle(programTitle),
@@ -733,7 +729,7 @@ onUnmounted(() => {
           :sort-order="tableSortOrder"
           :table-style="{ minWidth: '68rem', width: '100%', tableLayout: 'auto' }"
           :pt="tablePt"
-          class="w-full"
+          class="prism-data-table w-full"
           @sort="handleSort"
         >
           <template #empty>
@@ -765,6 +761,8 @@ onUnmounted(() => {
             :style="column.key === 'foreign_loan_usd'
               ? { minWidth: '11rem', width: '11rem', textAlign: 'right' }
               : { minWidth: '8rem', width: '8rem' }"
+            :header-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
+            :body-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
             :header-style="column.key === 'foreign_loan_usd' ? { textAlign: 'right' } : {}"
             :body-style="column.key === 'foreign_loan_usd'
               ? { textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }
@@ -831,7 +829,7 @@ onUnmounted(() => {
                   <div
                     v-for="(gbCode, i) in project.gb_codes"
                     :key="gbCode"
-                    :class="i > 0 ? 'mt-1.5 border-t border-surface-100 pt-1.5' : ''"
+                    :class="Number(i) > 0 ? 'mt-1.5 border-t border-surface-100 pt-1.5' : ''"
                   >
                     <div class="font-semibold">{{ gbCode }}</div>
                     <div class="mt-0.5 text-xs text-surface-500">{{ project.green_book_revision_labels[i] ?? '-' }}</div>

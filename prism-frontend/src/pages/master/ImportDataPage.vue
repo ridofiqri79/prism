@@ -790,17 +790,17 @@ function filterButtonClass(active: boolean) {
       </div>
 
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-surface-200 text-sm">
+        <table class="prism-table min-w-full">
           <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
             <tr>
               <th class="px-3 py-2 font-semibold">Sheet</th>
               <th class="px-3 py-2 font-semibold">Status</th>
-              <th class="px-3 py-2 font-semibold">Ditambah</th>
-              <th class="px-3 py-2 font-semibold">Skip</th>
-              <th class="px-3 py-2 font-semibold">Gagal</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Ditambah</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Skip</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Gagal</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-surface-100">
+          <tbody>
             <tr v-for="sheet in summary.sheets" :key="sheet.sheet">
               <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(sheet.sheet) }}</td>
               <td class="px-3 py-2">
@@ -810,9 +810,9 @@ function filterButtonClass(active: boolean) {
                   rounded
                 />
               </td>
-              <td class="px-3 py-2">{{ sheet.inserted }}</td>
-              <td class="px-3 py-2">{{ sheet.skipped }}</td>
-              <td class="px-3 py-2">{{ sheet.failed }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.inserted }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.skipped }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.failed }}</td>
             </tr>
           </tbody>
         </table>
@@ -857,23 +857,23 @@ function filterButtonClass(active: boolean) {
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-surface-200">
-          <table class="min-w-full divide-y divide-surface-200 text-sm">
+          <table class="prism-table min-w-full">
             <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="px-3 py-2 font-semibold">Sheet</th>
-                <th class="px-3 py-2 font-semibold">Baris</th>
+                <th class="prism-table-align-right px-3 py-2 font-semibold">Baris</th>
                 <th class="px-3 py-2 font-semibold">Status</th>
                 <th class="px-3 py-2 font-semibold">Data</th>
                 <th class="px-3 py-2 font-semibold">Keterangan</th>
               </tr>
             </thead>
-            <tbody v-if="filteredImportRows.length" class="divide-y divide-surface-100">
+            <tbody v-if="filteredImportRows.length">
               <tr
                 v-for="row in paginatedImportRows"
                 :key="`${row.sheet}-${row.row}-${row.status}-${row.label}`"
               >
                 <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(row.sheet) }}</td>
-                <td class="px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
+                <td class="prism-table-align-right px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
                 <td class="px-3 py-2">
                   <Tag
                     :value="rowStatusLabel(row.status)"
@@ -889,7 +889,7 @@ function filterButtonClass(active: boolean) {
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="5" class="px-3 py-6 text-center text-sm text-surface-500">
+                <td colspan="5" class="prism-table-empty px-3 py-6">
                   Tidak ada baris untuk filter ini.
                 </td>
               </tr>

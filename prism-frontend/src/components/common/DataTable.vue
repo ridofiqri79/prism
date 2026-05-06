@@ -6,6 +6,7 @@ import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
+import { isCurrencyColumn, primeTablePt, tableCellClasses } from '@/utils/table-styles'
 
 export interface ColumnDef {
   field: string
@@ -64,20 +65,7 @@ const tableStyle = computed<CSSProperties>(() => ({
   tableLayout: 'auto',
   width: '100%',
 }))
-const tablePt = {
-  thead: {
-    class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500',
-  },
-  headerCell: {
-    class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500',
-  },
-  columnHeaderContent: {
-    class: 'gap-2',
-  },
-  bodyCell: {
-    class: 'px-4 py-2.5 text-sm text-surface-800',
-  },
-}
+const tablePt = primeTablePt
 
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
@@ -95,12 +83,30 @@ function columnCellStyle(column: ColumnDef): CSSProperties {
     maxWidth: column.maxWidth,
     minWidth: column.minWidth ?? `${defaultColumnMinWidthRem(column)}rem`,
     overflowWrap: column.nowrap ? 'normal' : 'anywhere',
-    textAlign: column.align ?? 'left',
+    textAlign: resolvedColumnAlign(column),
     verticalAlign: 'top',
     whiteSpace: column.nowrap ? 'nowrap' : 'normal',
     width: column.width,
     wordBreak: column.nowrap ? 'normal' : 'break-word',
   }
+}
+
+function resolvedColumnAlign(column: ColumnDef) {
+  if (column.field === 'actions') return column.align ?? 'right'
+
+  return column.align ?? (isColumnCurrency(column) ? 'right' : 'left')
+}
+
+function isColumnCurrency(column: ColumnDef) {
+  return isCurrencyColumn(column.field, column.header)
+}
+
+function columnClass(column: ColumnDef) {
+  return tableCellClasses({
+    align: resolvedColumnAlign(column),
+    currency: isColumnCurrency(column),
+    nowrap: column.nowrap,
+  })
 }
 
 function defaultColumnMinWidthRem(column: ColumnDef) {
@@ -146,7 +152,7 @@ function columnHeaderStyle(column: ColumnDef): CSSProperties {
           :sort-order="tableSortOrder"
           :table-style="tableStyle"
           :pt="tablePt"
-          class="w-full rounded-lg border border-surface-200"
+          class="prism-data-table w-full rounded-lg border border-surface-200"
           @sort="handleSort"
         >
           <PrimeColumn
@@ -155,6 +161,8 @@ function columnHeaderStyle(column: ColumnDef): CSSProperties {
             :field="column.field"
             :header="column.header"
             :sortable="column.sortable"
+            :header-class="columnClass(column)"
+            :body-class="columnClass(column)"
             :style="columnCellStyle(column)"
             :header-style="columnHeaderStyle(column)"
             :body-style="columnCellStyle(column)"

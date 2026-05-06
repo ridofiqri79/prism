@@ -4,6 +4,7 @@ import InputText from 'primevue/inputtext'
 import DataTable, { type DataTableRowReorderEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import type { GBActivity, GBActivityPayload } from '@/types/green-book.types'
+import { primeTablePt } from '@/utils/table-styles'
 
 const props = withDefaults(
   defineProps<{
@@ -50,13 +51,8 @@ function onRowReorder(event: DataTableRowReorderEvent) {
       :value="rows"
       dataKey="sort_order"
       @rowReorder="onRowReorder"
-      class="min-w-[56rem]"
-      :pt="{
-        thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
-        headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
-        columnHeaderContent: { class: 'gap-2' },
-        bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
-      }"
+      class="prism-data-table min-w-[56rem]"
+      :pt="primeTablePt"
     >
       <Column v-if="editable" rowReorder style="width: 3rem" :reorderableColumn="false" />
       <Column header="No" style="width: 4rem">

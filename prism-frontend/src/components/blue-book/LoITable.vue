@@ -25,7 +25,7 @@ const emit = defineEmits<{
       />
     </div>
 
-    <table class="w-full min-w-[44rem] text-sm">
+    <table class="prism-table min-w-[44rem]">
       <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3 text-left">Lender</th>
@@ -34,7 +34,7 @@ const emit = defineEmits<{
           <th class="px-4 py-3 text-left">Letter Number</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-100">
+      <tbody>
         <tr v-for="row in rows" :key="row.id">
           <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.lender.name }}</td>
           <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.subject }}</td>
@@ -42,7 +42,7 @@ const emit = defineEmits<{
           <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.letter_number || '-' }}</td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="4" class="px-4 py-6 text-center text-sm text-surface-500">
+          <td colspan="4" class="prism-table-empty px-4 py-6">
             Belum ada LoI.
           </td>
         </tr>
@@ -50,4 +50,3 @@ const emit = defineEmits<{
     </table>
   </div>
 </template>
-

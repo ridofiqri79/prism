@@ -358,7 +358,7 @@ function handleShow() {
 
         <div class="overflow-hidden rounded-lg border border-surface-200 bg-surface-0">
           <div class="max-h-[22rem] overflow-auto">
-            <table class="min-w-full table-fixed text-sm">
+            <table class="prism-table min-w-full table-fixed">
               <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                 <tr class="border-b border-surface-200">
                   <th class="w-12 px-4 py-3">
@@ -375,22 +375,22 @@ function handleShow() {
               </thead>
               <tbody>
                 <tr v-if="importProjectLoading">
-                  <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                  <td colspan="3" class="prism-table-empty px-4 py-8">
                     Memuat Project Blue Book...
                   </td>
                 </tr>
                 <tr v-else-if="!importForm.source_blue_book_id">
-                  <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                  <td colspan="3" class="prism-table-empty px-4 py-8">
                     Pilih Blue Book sumber untuk melihat Project Blue Book.
                   </td>
                 </tr>
                 <tr v-else-if="importProjectOptions.length === 0">
-                  <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                  <td colspan="3" class="prism-table-empty px-4 py-8">
                     Blue Book sumber ini belum memiliki Project Blue Book.
                   </td>
                 </tr>
                 <tr v-else-if="filteredImportProjectOptions.length === 0">
-                  <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                  <td colspan="3" class="prism-table-empty px-4 py-8">
                     Tidak ada Project Blue Book yang cocok dengan pencarian.
                   </td>
                 </tr>
