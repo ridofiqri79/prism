@@ -2,12 +2,15 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useRouter } from 'vue-router'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar, { type ActiveFilterPill } from '@/components/common/SearchFilterBar.vue'
@@ -56,6 +59,15 @@ const projectSortOrder = ref<ProjectMasterSortOrder>('asc')
 let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 let projectPaginationTimer: ReturnType<typeof window.setTimeout> | undefined
 let searchWatcherPaused = false
+
+const tablePt = {
+  thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
+  headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
+  columnHeaderContent: { class: 'gap-2' },
+  bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
+}
+
+const tableSortOrder = computed(() => (projectSortOrder.value === 'asc' ? 1 : -1))
 
 const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
 const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
@@ -378,14 +390,9 @@ async function setProjectSort(field: ProjectMasterSortField) {
   await loadProjects()
 }
 
-function sortIcon(field: ProjectMasterSortField) {
-  if (projectSortField.value !== field) return 'pi pi-sort-alt'
-  return projectSortOrder.value === 'asc' ? 'pi pi-sort-up' : 'pi pi-sort-down'
-}
-
-function sortAriaLabel(field: ProjectMasterSortField, label: string) {
-  if (projectSortField.value !== field) return `Urutkan ${label}`
-  return `Urutkan ${label} ${projectSortOrder.value === 'asc' ? 'menurun' : 'menaik'}`
+function handleSort(event: { sortField?: unknown; sortOrder?: unknown }) {
+  if (typeof event.sortField !== 'string' || event.sortOrder === 0) return
+  setProjectSort(event.sortField as ProjectMasterSortField)
 }
 
 function selectedFilterValues<T extends string>(selected: T[], allValues: T[]) {
@@ -515,8 +522,8 @@ function statusSeverity(status: ProjectPipelineStatus) {
   return getPipelineStatusSeverity(status)
 }
 
-function goToProjectDetail(projectID: string) {
-  void router.push(`/projects/${projectID}`)
+function goToProjectDetail(project: { id: string; blue_book_id: string }) {
+  void router.push({ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } })
 }
 
 async function focusIndonesia() {
@@ -853,94 +860,122 @@ onUnmounted(() => {
       </p>
 
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[62rem] text-left text-sm">
-          <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
-            <tr>
-              <th class="px-4 py-3">Kode</th>
-              <th class="px-4 py-3">
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-2 rounded-md text-left font-semibold text-surface-500 transition hover:text-prism-teal-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-prism-gold"
-                  :aria-label="sortAriaLabel('project_name', 'nama proyek')"
-                  @click="setProjectSort('project_name')"
-                >
-                  <span>Nama Proyek</span>
-                  <i :class="[sortIcon('project_name'), 'text-[11px]']" />
-                </button>
-              </th>
-              <th class="px-4 py-3">
-                <span class="inline-flex items-center gap-1.5">
-                  <span>Tahap</span>
-                  <i
-                    v-tooltip.top="'BB: Blue Book, GB: Green Book, DK: Daftar Kegiatan, LA: Loan Agreement'"
-                    class="pi pi-info-circle text-[11px] text-surface-400"
-                  />
-                </span>
-              </th>
-              <th class="px-4 py-3">Executing Agency</th>
-              <th class="px-4 py-3">Lender</th>
-              <th class="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  class="ml-auto inline-flex items-center gap-2 rounded-md font-semibold text-surface-500 transition hover:text-prism-teal-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-prism-gold"
-                  :aria-label="sortAriaLabel('foreign_loan_usd', 'pinjaman USD')"
-                  @click="setProjectSort('foreign_loan_usd')"
-                >
-                  <span>Pinjaman USD</span>
-                  <i :class="[sortIcon('foreign_loan_usd'), 'text-[11px]']" />
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-100">
-            <tr v-if="!activeFocusRegion">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">
-                Pilih provinsi atau kabupaten/kota pada peta untuk melihat proyek.
-              </td>
-            </tr>
-            <tr v-else-if="loadingProjects">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">Memuat proyek...</td>
-            </tr>
-            <tr v-else-if="(projectList?.data.length ?? 0) === 0">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">Tidak ada proyek untuk wilayah dan filter ini.</td>
-            </tr>
-            <tr
-              v-for="project in projectList?.data ?? []"
-              :key="project.id"
-              class="group cursor-pointer transition-colors hover:bg-teal-50/45 focus-visible:bg-teal-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-prism-gold"
-              role="link"
-              tabindex="0"
-              @click="goToProjectDetail(project.id)"
-              @keydown.enter.prevent="goToProjectDetail(project.id)"
-              @keydown.space.prevent="goToProjectDetail(project.id)"
-            >
-              <td class="px-4 py-3 font-medium text-surface-700">{{ project.bb_code }}</td>
-              <td class="px-4 py-3">
-                <span class="font-semibold text-prism-teal-dark group-hover:underline">
-                  {{ project.project_name }}
-                </span>
-                <p class="mt-1 text-xs text-surface-500">{{ project.program_title || 'Tanpa judul program' }}</p>
-              </td>
-              <td class="px-4 py-3">
-                <Tag
-                  v-tooltip.top="pipelineStatusLabel(project.pipeline_status)"
-                  :value="project.pipeline_status"
-                  :severity="statusSeverity(project.pipeline_status)"
-                  rounded
+        <DataTable
+          :value="activeFocusRegion ? (projectList?.data ?? []) : []"
+          :loading="loadingProjects"
+          lazy
+          striped-rows
+          removable-sort
+          data-key="id"
+          :sort-field="projectSortField"
+          :sort-order="tableSortOrder"
+          :table-style="{ minWidth: '62rem', width: '100%', tableLayout: 'auto' }"
+          :pt="tablePt"
+          class="w-full"
+          @sort="handleSort"
+          @row-click="(e) => goToProjectDetail(e.data)"
+        >
+          <template #empty>
+            <EmptyState
+              :title="activeFocusRegion ? 'Tidak ada proyek' : 'Pilih wilayah'"
+              :description="activeFocusRegion
+                ? 'Tidak ada proyek untuk wilayah dan filter ini.'
+                : 'Pilih provinsi atau kabupaten/kota pada peta untuk melihat proyek.'"
+            />
+          </template>
+
+          <Column
+            field="bb_code"
+            header="Kode BB"
+            :style="{ minWidth: '8rem', width: '8rem', whiteSpace: 'nowrap' }"
+          >
+            <template #body="{ data: project }">
+            <span class="font-medium text-surface-700">{{ project.bb_code }}</span>
+            </template>
+          </Column>
+
+          <Column
+            field="project_name"
+            header="Nama Proyek"
+            sortable
+            :style="{ minWidth: '16rem', width: '16rem' }"
+          >
+            <template #body="{ data: project }">
+              <RouterLink
+                :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
+                class="block font-semibold text-surface-950 hover:text-primary-600"
+                @click.stop
+              >
+                {{ project.project_name }}
+              </RouterLink>
+              <p v-if="project.program_title" class="mt-0.5 text-xs text-surface-500">
+                {{ project.program_title }}
+              </p>
+            </template>
+          </Column>
+
+          <Column :style="{ minWidth: '5rem', width: '5rem' }">
+            <template #header>
+              <span class="inline-flex items-center gap-1.5">
+                <span>Tahap</span>
+                <i
+                  v-tooltip.top="'BB: Blue Book, GB: Green Book, DK: Daftar Kegiatan, LA: Loan Agreement'"
+                  class="pi pi-info-circle text-[11px] text-surface-400"
                 />
-              </td>
-              <td class="px-4 py-3 text-surface-600">
+              </span>
+            </template>
+            <template #body="{ data: project }">
+              <Tag
+                v-tooltip.top="pipelineStatusLabel(project.pipeline_status)"
+                :value="project.pipeline_status"
+                :severity="statusSeverity(project.pipeline_status)"
+                rounded
+              />
+            </template>
+          </Column>
+
+          <Column
+            field="executing_agencies"
+            header="Executing Agency"
+            :style="{ minWidth: '8rem', width: '8rem' }"
+          >
+            <template #body="{ data: project }">
+              <span
+                class="block max-w-[8rem] truncate text-surface-600"
+                :title="project.executing_agencies.join(', ') || '-'"
+              >
                 {{ project.executing_agencies.join(', ') || '-' }}
-              </td>
-              <td class="px-4 py-3 text-surface-600">
+              </span>
+            </template>
+          </Column>
+
+          <Column
+            header="Lender"
+            :style="{ minWidth: '7rem', width: '7rem' }"
+          >
+            <template #body="{ data: project }">
+              <span
+                class="block max-w-[7rem] truncate text-surface-600"
+                :title="[...project.fixed_lenders, ...project.indication_lenders].filter(Boolean).join(', ') || '-'"
+              >
                 {{ [...project.fixed_lenders, ...project.indication_lenders].filter(Boolean).join(', ') || '-' }}
-              </td>
-              <td class="px-4 py-3 text-right font-medium text-surface-900">
-                <CurrencyDisplay :amount="project.foreign_loan_usd" currency="USD" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+            </template>
+          </Column>
+
+          <Column
+            field="foreign_loan_usd"
+            header="Pinjaman USD"
+            sortable
+            :style="{ minWidth: '14rem', width: '14rem' }"
+            :header-style="{ textAlign: 'right', justifyContent: 'flex-end' }"
+            :body-style="{ textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }"
+          >
+            <template #body="{ data: project }">
+              <CurrencyDisplay :amount="project.foreign_loan_usd" currency="USD" />
+            </template>
+          </Column>
+        </DataTable>
       </div>
 
       <div v-if="activeFocusRegion" class="border-t border-surface-200 p-3">

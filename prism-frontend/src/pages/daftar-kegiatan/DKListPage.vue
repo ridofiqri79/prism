@@ -49,10 +49,10 @@ const form = reactive<DaftarKegiatanPayload>({
 })
 const errors = ref<FormErrors<DKField>>({})
 const columns: ColumnDef[] = [
-  { field: 'subject', header: 'Perihal', sortable: true },
-  { field: 'date', header: 'Tanggal', sortable: true },
-  { field: 'letter_number', header: 'Nomor Surat', sortable: true },
-  { field: 'project_count', header: 'Jumlah Proyek', sortable: true },
+  { field: 'subject', header: 'Perihal Surat', sortable: true },
+  { field: 'date', header: 'Tanggal', sortable: true, nowrap: true },
+  { field: 'letter_number', header: 'Nomor Surat', sortable: true, nowrap: true },
+  { field: 'project_count', header: 'Jumlah Proyek', sortable: true, align: 'right', nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 

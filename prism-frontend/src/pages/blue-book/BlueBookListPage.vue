@@ -69,10 +69,10 @@ const errors = ref<FormErrors<BlueBookField>>({})
 
 const columns: ColumnDef[] = [
   { field: 'period', header: 'Periode', sortable: true },
-  { field: 'publish_date', header: 'Tanggal Terbit', sortable: true },
-  { field: 'revision', header: 'Revision', sortable: true },
-  { field: 'status', header: 'Status', sortable: true },
-  { field: 'project_count', header: 'Project Blue Book', sortable: true },
+  { field: 'publish_date', header: 'Tanggal Terbit', sortable: true, nowrap: true },
+  { field: 'revision', header: 'Revisi', sortable: true, nowrap: true },
+  { field: 'status', header: 'Status', sortable: true, nowrap: true },
+  { field: 'project_count', header: 'Jumlah Proyek', sortable: true, align: 'right', nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [

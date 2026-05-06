@@ -77,6 +77,12 @@ function applyFilters() {
         :aria-expanded="filterPanelOpen"
         @click="filterPanelOpen = !filterPanelOpen"
       />
+      <template v-if="$slots.actions">
+        <span class="hidden h-7 w-px shrink-0 bg-surface-200 md:block" aria-hidden="true" />
+        <div class="flex shrink-0 items-center gap-2">
+          <slot name="actions" />
+        </div>
+      </template>
     </div>
 
     <div v-if="activeFilters.length > 0" class="mt-3 flex flex-wrap gap-2">

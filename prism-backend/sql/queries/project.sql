@@ -189,7 +189,29 @@ WITH project_rows AS (
                 WHEN bb.revision_number > 0 THEN CONCAT(' Revisi ke-', bb.revision_number)
                 ELSE ''
             END
-        )::text AS blue_book_revision_label
+        )::text AS blue_book_revision_label,
+        ARRAY(
+            SELECT DISTINCT gp.gb_code
+            FROM gb_project_bb_project gbp
+            JOIN gb_project gp ON gp.id = gbp.gb_project_id
+            WHERE gbp.bb_project_id = bp.id
+            ORDER BY gp.gb_code
+        )::text[] AS gb_codes,
+        ARRAY(
+            SELECT DISTINCT CONCAT(
+                'GB ',
+                gb_pub.publish_year,
+                CASE
+                    WHEN gb_pub.revision_number > 0 THEN CONCAT(' Revisi ke-', gb_pub.revision_number)
+                    ELSE ''
+                END
+            )
+            FROM gb_project_bb_project gbp
+            JOIN gb_project gp ON gp.id = gbp.gb_project_id
+            JOIN green_book gb_pub ON gb_pub.id = gp.green_book_id
+            WHERE gbp.bb_project_id = bp.id
+            ORDER BY 1
+        )::text[] AS green_book_revision_labels
     FROM bb_project bp
     JOIN blue_book bb ON bb.id = bp.blue_book_id
     JOIN period p ON p.id = bb.period_id
@@ -269,7 +291,9 @@ SELECT
     dk_dates,
     is_latest,
     has_newer_revision,
-    blue_book_revision_label
+    blue_book_revision_label,
+    gb_codes,
+    green_book_revision_labels
 FROM filtered_projects
 ORDER BY
     CASE WHEN sqlc.arg('sort')::text = 'project_name' AND sqlc.arg('order')::text = 'asc' THEN LOWER(project_name) END ASC,

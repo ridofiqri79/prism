@@ -48,18 +48,18 @@ function updateFundingCategory(index: number, value: unknown) {
 
 <template>
   <div class="overflow-visible rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[48rem] text-left text-sm">
-      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
+    <table class="w-full min-w-[48rem] text-sm">
+      <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Tipe Pendanaan</th>
-          <th class="px-4 py-3">Kategori Pendanaan</th>
-          <th class="px-4 py-3">Nilai USD</th>
+          <th class="px-4 py-3 text-left">Tipe Pendanaan</th>
+          <th class="px-4 py-3 text-left">Kategori Pendanaan</th>
+          <th class="px-4 py-3 text-right">Nilai USD</th>
           <th v-if="editable" class="w-28 px-4 py-3"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-100">
         <tr v-for="(row, index) in rows" :key="index">
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-sm text-surface-800">
             <Select
               v-if="editable"
               :model-value="row.funding_type"
@@ -70,7 +70,7 @@ function updateFundingCategory(index: number, value: unknown) {
             />
             <span v-else>{{ row.funding_type }}</span>
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-sm text-surface-800">
             <Select
               v-if="editable"
               :model-value="row.funding_category"
@@ -81,7 +81,7 @@ function updateFundingCategory(index: number, value: unknown) {
             />
             <span v-else>{{ row.funding_category }}</span>
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="row.amount_usd"
@@ -89,7 +89,7 @@ function updateFundingCategory(index: number, value: unknown) {
             />
             <CurrencyDisplay v-else :amount="row.amount_usd" />
           </td>
-          <td v-if="editable" class="px-4 py-3 text-right">
+          <td v-if="editable" class="px-4 py-2.5 text-right">
             <Button
               icon="pi pi-trash"
               severity="danger"
@@ -101,7 +101,7 @@ function updateFundingCategory(index: number, value: unknown) {
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td :colspan="editable ? 4 : 3" class="px-4 py-6 text-center text-surface-500">
+          <td :colspan="editable ? 4 : 3" class="px-4 py-6 text-center text-sm text-surface-500">
             Belum ada biaya proyek.
           </td>
         </tr>

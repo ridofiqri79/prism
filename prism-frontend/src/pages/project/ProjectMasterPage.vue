@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
-import Skeleton from 'primevue/skeleton'
+import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
@@ -13,7 +16,6 @@ import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import SummaryCard from '@/components/common/SummaryCard.vue'
-import TableReloadShell from '@/components/common/TableReloadShell.vue'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -67,27 +69,34 @@ const sortOrder = listControls.order as Ref<ProjectMasterSortOrder>
 const filters = listControls.draftFilters
 const appliedFilters = listControls.appliedFilters
 const columnConfigs: ProjectMasterColumnConfig[] = [
-  { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: true },
+  { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: false },
   { key: 'indication_lenders', label: 'Indikasi Lender', sortField: 'indication_lenders', defaultVisible: false },
   { key: 'executing_agencies', label: 'Executing Agency', sortField: 'executing_agencies', defaultVisible: true },
-  { key: 'fixed_lenders', label: 'Fixed Lender', sortField: 'fixed_lenders', defaultVisible: true },
+  { key: 'fixed_lenders', label: 'Fixed Lender', sortField: 'fixed_lenders', defaultVisible: false },
   { key: 'status', label: 'Status', sortField: 'project_status', defaultVisible: true },
   { key: 'program_title', label: 'Program Title', sortField: 'program_title', defaultVisible: false },
   { key: 'locations', label: 'Region/Location', sortField: 'locations', defaultVisible: false },
   { key: 'foreign_loan_usd', label: 'Nilai Pinjaman', sortField: 'foreign_loan_usd', defaultVisible: true },
   { key: 'dk_dates', label: 'Tanggal Daftar Kegiatan', sortField: 'dk_dates', defaultVisible: false },
+  { key: 'bb_book_ref', label: 'Kode Blue Book', sortField: 'bb_code', defaultVisible: false },
+  { key: 'gb_book_ref', label: 'Kode Green Book', sortField: 'gb_codes', defaultVisible: false },
 ]
 const visibleColumnKeys = ref<ProjectMasterColumnKey[]>(
   columnConfigs.filter((column) => column.defaultVisible).map((column) => column.key),
 )
 
-const skeletonRows = computed(() => Array.from({ length: Math.min(limit.value, 10) }, (_, index) => index))
 const visibleColumns = computed(() =>
   columnConfigs.filter((column) => visibleColumnKeys.value.includes(column.key)),
 )
-const initialTableLoading = computed(() => projectStore.loading && projectStore.projects.length === 0)
-const refreshingExistingRows = computed(() => projectStore.loading && projectStore.projects.length > 0)
-const columnSelectionLabel = computed(() => `${visibleColumns.value.length + 2} kolom tampil`)
+const columnVisibleCount = computed(() => visibleColumns.value.length + 1) // +1 for fixed name col
+const columnPopover = ref()
+const tableSortOrder = computed(() => (sortOrder.value === 'asc' ? 1 : -1))
+const tablePt = {
+  thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
+  headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
+  columnHeaderContent: { class: 'gap-2' },
+  bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
+}
 const programTitleOptions = computed(() =>
   masterStore.programTitles.map((programTitle) => ({
     label: formatProgramTitle(programTitle),
@@ -258,14 +267,10 @@ async function refreshFromFirstPage() {
   await loadProjectMaster()
 }
 
-function sortBy(field: ProjectMasterSortField) {
-  if (sortField.value === field) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortOrder.value = 'asc'
-  }
-
+function handleSort(event: { sortField?: unknown; sortOrder?: unknown }) {
+  if (typeof event.sortField !== 'string' || event.sortOrder === 0) return
+  sortField.value = event.sortField as ProjectMasterSortField
+  sortOrder.value = event.sortOrder === 1 ? 'asc' : 'desc'
   page.value = 1
 }
 
@@ -275,14 +280,6 @@ function listLabel(values: string[]) {
 
 function statusLabel(project: ProjectMasterRow) {
   return `${project.project_status} - ${getPipelineStatusLabel(project.pipeline_status)}`
-}
-
-function sortIcon(field: ProjectMasterSortField) {
-  if (sortField.value !== field) {
-    return 'pi pi-sort-alt text-surface-400'
-  }
-
-  return sortOrder.value === 'asc' ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
 }
 
 function saveBlob(blob: Blob, fileName: string) {
@@ -298,18 +295,6 @@ function saveBlob(blob: Blob, fileName: string) {
 
 function projectExportFileName() {
   return `projects_filtered_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
-}
-
-function headerAlignClass(column?: ProjectMasterColumnConfig) {
-  return column?.key === 'foreign_loan_usd' ? 'justify-end text-right' : 'justify-start text-left'
-}
-
-function bodyCellClass(column: ProjectMasterColumnConfig) {
-  if (column.key === 'foreign_loan_usd') {
-    return 'px-4 py-3 text-right font-medium text-surface-900'
-  }
-
-  return 'px-4 py-3 text-surface-700'
 }
 
 function formatProgramTitle(programTitle: ProgramTitle) {
@@ -488,7 +473,20 @@ onUnmounted(() => {
     <PageHeader
       title="Project"
       subtitle="Master table seluruh Proyek Blue Book beserta status pipeline, lender, instansi, lokasi, dan nilai pinjaman"
-    />
+    >
+      <template #actions>
+        <Button
+          v-tooltip.top="'Export semua project sesuai filter aktif'"
+          label="Export Excel"
+          icon="pi pi-download"
+          severity="secondary"
+          outlined
+          :loading="projectStore.exporting"
+          :disabled="projectStore.total === 0 || projectStore.exporting"
+          @click="exportFilteredProjects"
+        />
+      </template>
+    </PageHeader>
 
     <SearchFilterBar
       v-model:search="listControls.search.value"
@@ -499,6 +497,34 @@ onUnmounted(() => {
       @reset="listControls.resetFilters"
       @remove="listControls.removeFilter"
     >
+      <template #actions>
+        <Button
+          v-tooltip.bottom="'Atur kolom yang ditampilkan'"
+          type="button"
+          icon="pi pi-table"
+          severity="secondary"
+          outlined
+          class="h-12 shrink-0 gap-2"
+          :badge="String(columnVisibleCount)"
+          badge-severity="secondary"
+          @click="(e) => columnPopover.toggle(e)"
+        />
+        <Popover ref="columnPopover">
+          <div class="w-52">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-400">Kolom Tampil</p>
+            <div class="space-y-0.5">
+              <label
+                v-for="column in columnConfigs"
+                :key="column.key"
+                class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-50"
+              >
+                <Checkbox v-model="visibleColumnKeys" :value="column.key" />
+                <span class="text-sm text-surface-700">{{ column.label }}</span>
+              </label>
+            </div>
+          </div>
+        </Popover>
+      </template>
       <template #filters>
         <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
           <ToggleSwitch v-model="filters.include_history" />
@@ -694,220 +720,129 @@ onUnmounted(() => {
       />
     </section>
 
-    <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200 p-4">
-        <div>
-          <h2 class="text-lg font-semibold text-surface-950">Master Table Project</h2>
-          <p class="text-sm text-surface-500">{{ projectStore.total }} project ditemukan.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button
-            v-tooltip.top="'Export semua project sesuai filter aktif'"
-            label="Export Excel"
-            icon="pi pi-download"
-            severity="secondary"
-            outlined
-            :loading="projectStore.exporting"
-            :disabled="projectStore.total === 0 || projectStore.exporting"
-            @click="exportFilteredProjects"
-          />
-          <Tag :value="columnSelectionLabel" severity="secondary" rounded />
-          <MultiSelect
-            v-model="visibleColumnKeys"
-            :options="columnConfigs"
-            option-label="label"
-            option-value="key"
-            placeholder="Kolom tampil"
-            filter
-            filter-placeholder="Cari kolom"
-            class="w-64 max-w-full"
-          />
-        </div>
-      </div>
+    <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+      <div class="overflow-x-auto">
+        <DataTable
+          :value="projectStore.projects"
+          :loading="projectStore.loading"
+          lazy
+          striped-rows
+          removable-sort
+          data-key="id"
+          :sort-field="sortField"
+          :sort-order="tableSortOrder"
+          :table-style="{ minWidth: '68rem', width: '100%', tableLayout: 'auto' }"
+          :pt="tablePt"
+          class="w-full"
+          @sort="handleSort"
+        >
+          <template #empty>
+            <EmptyState title="Tidak ada project" description="Ubah filter atau kata kunci pencarian." />
+          </template>
 
-      <div v-if="initialTableLoading" class="overflow-x-auto">
-        <table class="w-full min-w-[68rem] table-fixed text-left text-sm">
-          <tbody class="divide-y divide-surface-100">
-            <tr v-for="row in skeletonRows" :key="row">
-              <td class="w-[18rem] px-4 py-3">
-                <Skeleton height="2rem" />
-              </td>
-              <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3">
-                <Skeleton height="1.5rem" />
-              </td>
-              <td class="w-32 px-4 py-3">
-                <Skeleton height="1.5rem" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-else-if="projectStore.projects.length === 0" class="p-8">
-        <EmptyState title="Tidak ada project" description="Ubah filter atau kata kunci pencarian." />
-      </div>
-
-      <TableReloadShell v-else :refreshing="refreshingExistingRows" content-class="overflow-x-auto">
-        <table class="w-full min-w-[68rem] table-fixed text-left text-sm">
-          <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
-            <tr>
-              <th class="w-[18rem] px-4 py-3">
-                <button
-                  type="button"
-                  class="inline-flex w-full items-center gap-2 text-left font-semibold"
-                  @click="sortBy('project_name')"
-                >
-                  <span>Nama Proyek</span>
-                  <i :class="sortIcon('project_name')" aria-hidden="true" />
-                </button>
-              </th>
-              <th
-                v-for="column in visibleColumns"
-                :key="column.key"
-                class="px-4 py-3"
-                :class="column.key === 'foreign_loan_usd' ? 'w-44 text-right' : 'w-32'"
+          <!-- Kolom Nama Proyek (fixed) -->
+          <Column field="project_name" header="Nama Proyek" sortable :style="{ minWidth: '18rem', width: '18rem' }">
+            <template #body="{ data: project }">
+              <RouterLink
+                :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
+                class="block whitespace-normal font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
               >
-                <button
-                  type="button"
-                  class="inline-flex w-full items-center gap-2 font-semibold"
-                  :class="headerAlignClass(column)"
-                  @click="sortBy(column.sortField)"
-                >
-                  <span>{{ column.label }}</span>
-                  <i :class="sortIcon(column.sortField)" aria-hidden="true" />
-                </button>
-              </th>
-              <th class="w-32 px-4 py-3 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <TransitionGroup tag="tbody" name="prism-table-row-fade" class="divide-y divide-surface-100">
-            <tr v-for="project in projectStore.projects" :key="project.id" class="align-top hover:bg-surface-50/70">
-              <td class="w-[18rem] px-4 py-3">
-                <RouterLink
-                  :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
-                  class="block whitespace-normal text-sm font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
-                >
-                  {{ project.project_name }}
-                </RouterLink>
-                <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <span class="text-xs font-medium text-surface-500">{{ project.bb_code }}</span>
+                {{ project.project_name }}
+              </RouterLink>
+              <p v-if="project.program_title" class="mt-0.5 whitespace-normal text-xs leading-relaxed text-surface-500">
+                {{ project.program_title }}
+              </p>
+            </template>
+          </Column>
+
+          <!-- Kolom dinamis -->
+          <Column
+            v-for="column in visibleColumns"
+            :key="column.key"
+            :field="column.sortField"
+            :header="column.label"
+            sortable
+            :style="column.key === 'foreign_loan_usd'
+              ? { minWidth: '11rem', width: '11rem', textAlign: 'right' }
+              : { minWidth: '8rem', width: '8rem' }"
+            :header-style="column.key === 'foreign_loan_usd' ? { textAlign: 'right' } : {}"
+            :body-style="column.key === 'foreign_loan_usd'
+              ? { textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }
+              : {}"
+          >
+            <template #body="{ data: project }">
+              <div v-if="column.key === 'loan_types'">
+                <div v-if="project.loan_types.length > 0" class="flex flex-wrap gap-1.5">
                   <Tag
-                    :value="project.blue_book_revision_label"
-                    :severity="project.is_latest ? 'success' : 'secondary'"
-                    rounded
-                  />
-                  <Tag
-                    v-if="project.has_newer_revision"
-                    value="Ada revisi lebih baru"
-                    severity="warn"
+                    v-for="type in project.loan_types"
+                    :key="type"
+                    :value="type"
+                    :severity="loanTypeSeverity(type)"
                     rounded
                   />
                 </div>
-              </td>
-              <td v-for="column in visibleColumns" :key="column.key" :class="bodyCellClass(column)">
-                <div v-if="column.key === 'loan_types'">
-                  <div v-if="project.loan_types.length > 0" class="flex flex-wrap gap-1.5">
-                    <Tag
-                      v-for="type in project.loan_types"
-                      :key="type"
-                      :value="type"
-                      :severity="loanTypeSeverity(type)"
-                      rounded
-                    />
+                <span v-else class="text-surface-400">-</span>
+              </div>
+              <span
+                v-else-if="column.key === 'indication_lenders'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.indication_lenders)"
+              >{{ listLabel(project.indication_lenders) }}</span>
+              <span
+                v-else-if="column.key === 'executing_agencies'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.executing_agencies)"
+              >{{ listLabel(project.executing_agencies) }}</span>
+              <span
+                v-else-if="column.key === 'fixed_lenders'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.fixed_lenders)"
+              >{{ listLabel(project.fixed_lenders) }}</span>
+              <Tag
+                v-else-if="column.key === 'status'"
+                :value="statusLabel(project)"
+                :severity="projectStatusSeverity(project.project_status)"
+                rounded
+              />
+              <span v-else-if="column.key === 'program_title'" class="block whitespace-normal leading-relaxed">
+                {{ project.program_title || '-' }}
+              </span>
+              <span
+                v-else-if="column.key === 'locations'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.locations)"
+              >{{ listLabel(project.locations) }}</span>
+              <CurrencyDisplay
+                v-else-if="column.key === 'foreign_loan_usd'"
+                :amount="project.foreign_loan_usd"
+                currency="USD"
+              />
+              <span
+                v-else-if="column.key === 'dk_dates'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.dk_dates)"
+              >{{ listLabel(project.dk_dates) }}</span>
+              <div v-else-if="column.key === 'bb_book_ref'">
+                <div class="font-semibold">{{ project.bb_code }}</div>
+                <div class="mt-0.5 text-xs text-surface-500">{{ project.blue_book_revision_label }}</div>
+              </div>
+              <div v-else-if="column.key === 'gb_book_ref'">
+                <template v-if="project.gb_codes.length > 0">
+                  <div
+                    v-for="(gbCode, i) in project.gb_codes"
+                    :key="gbCode"
+                    :class="i > 0 ? 'mt-1.5 border-t border-surface-100 pt-1.5' : ''"
+                  >
+                    <div class="font-semibold">{{ gbCode }}</div>
+                    <div class="mt-0.5 text-xs text-surface-500">{{ project.green_book_revision_labels[i] ?? '-' }}</div>
                   </div>
-                  <span v-else class="text-surface-400">-</span>
-                </div>
-                <span
-                  v-else-if="column.key === 'indication_lenders'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.indication_lenders)"
-                >
-                  {{ listLabel(project.indication_lenders) }}
-                </span>
-                <span
-                  v-else-if="column.key === 'executing_agencies'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.executing_agencies)"
-                >
-                  {{ listLabel(project.executing_agencies) }}
-                </span>
-                <span
-                  v-else-if="column.key === 'fixed_lenders'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.fixed_lenders)"
-                >
-                  {{ listLabel(project.fixed_lenders) }}
-                </span>
-                <Tag
-                  v-else-if="column.key === 'status'"
-                  :value="statusLabel(project)"
-                  :severity="projectStatusSeverity(project.project_status)"
-                  rounded
-                />
-                <span v-else-if="column.key === 'program_title'" class="block whitespace-normal leading-relaxed">
-                  {{ project.program_title || '-' }}
-                </span>
-                <span
-                  v-else-if="column.key === 'locations'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.locations)"
-                >
-                  {{ listLabel(project.locations) }}
-                </span>
-                <CurrencyDisplay
-                  v-else-if="column.key === 'foreign_loan_usd'"
-                  :amount="project.foreign_loan_usd"
-                  currency="USD"
-                />
-                <span
-                  v-else-if="column.key === 'dk_dates'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.dk_dates)"
-                >
-                  {{ listLabel(project.dk_dates) }}
-                </span>
-              </td>
-              <td class="w-32 px-4 py-3">
-                <div class="flex justify-end gap-1.5">
-                  <Button
-                    v-tooltip.top="'Detail proyek'"
-                    as="router-link"
-                    :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
-                    icon="pi pi-eye"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Detail proyek"
-                  />
-                  <Button
-                    v-tooltip.top="'Lihat perjalanan proyek'"
-                    as="router-link"
-                    :to="{ name: 'project-journey', params: { bbProjectId: project.id } }"
-                    icon="pi pi-sitemap"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Lihat perjalanan proyek"
-                  />
-                  <Button
-                    v-if="can('bb_project', 'update')"
-                    v-tooltip.top="'Edit proyek'"
-                    as="router-link"
-                    :to="{ name: 'bb-project-edit', params: { bbId: project.blue_book_id, id: project.id } }"
-                    icon="pi pi-pencil"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Edit proyek"
-                  />
-                </div>
-              </td>
-            </tr>
-          </TransitionGroup>
-        </table>
-      </TableReloadShell>
+                </template>
+                <span v-else class="text-surface-400">-</span>
+              </div>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
 
       <div class="border-t border-surface-200 p-3">
         <ListPaginationFooter
@@ -916,6 +851,6 @@ onUnmounted(() => {
           :total="projectStore.total"
         />
       </div>
-    </section>
+    </div>
   </section>
 </template>

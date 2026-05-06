@@ -53,6 +53,9 @@ function onRowReorder(event: DataTableRowReorderEvent) {
       class="min-w-[56rem]"
       :pt="{
         thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
+        headerCell: { class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500' },
+        columnHeaderContent: { class: 'gap-2' },
+        bodyCell: { class: 'px-4 py-2.5 text-sm text-surface-800' },
       }"
     >
       <Column v-if="editable" rowReorder style="width: 3rem" :reorderableColumn="false" />

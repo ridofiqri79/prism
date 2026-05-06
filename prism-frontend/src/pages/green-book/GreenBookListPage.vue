@@ -64,9 +64,9 @@ const form = reactive<GreenBookPayload>({
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'publish_year', header: 'Tahun Terbit', sortable: true },
-  { field: 'revision', header: 'Revisi', sortable: true },
-  { field: 'status', header: 'Status', sortable: true },
+  { field: 'publish_year', header: 'Tahun Terbit', sortable: true, nowrap: true },
+  { field: 'revision', header: 'Revisi', sortable: true, nowrap: true },
+  { field: 'status', header: 'Status', sortable: true, nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [

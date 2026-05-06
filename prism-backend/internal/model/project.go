@@ -35,7 +35,9 @@ type ProjectMasterResponse struct {
 	DKDates               []string `json:"dk_dates"`
 	IsLatest              bool     `json:"is_latest"`
 	HasNewerRevision      bool     `json:"has_newer_revision"`
-	BlueBookRevisionLabel string   `json:"blue_book_revision_label"`
+	BlueBookRevisionLabel      string   `json:"blue_book_revision_label"`
+	GBCodes                    []string `json:"gb_codes"`
+	GreenBookRevisionLabels    []string `json:"green_book_revision_labels"`
 }
 
 type ProjectMasterFundingSummary struct {

@@ -302,7 +302,9 @@ func projectMasterResponse(row queries.ListProjectMasterRow) model.ProjectMaster
 		DKDates:               safeStringSlice(row.DkDates),
 		IsLatest:              row.IsLatest,
 		HasNewerRevision:      row.HasNewerRevision,
-		BlueBookRevisionLabel: row.BlueBookRevisionLabel,
+		BlueBookRevisionLabel:      row.BlueBookRevisionLabel,
+		GBCodes:                    safeStringSlice(row.GbCodes),
+		GreenBookRevisionLabels:    safeStringSlice(row.GreenBookRevisionLabels),
 	}
 }
 

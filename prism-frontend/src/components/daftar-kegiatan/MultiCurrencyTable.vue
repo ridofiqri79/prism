@@ -58,24 +58,24 @@ function isUSD(row: T) {
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[90rem] text-left text-sm">
-      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
+    <table class="w-full min-w-[90rem] text-sm">
+      <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <!--
             First-column header provided by the consumer.
             Usage: <template #first-col-header>Lender</template>
           -->
-          <th class="px-4 py-3">
+          <th class="px-4 py-3 text-left">
             <slot name="first-col-header" />
           </th>
-          <th class="px-4 py-3">Mata Uang</th>
-          <th class="px-4 py-3">Pinjaman Original</th>
-          <th class="px-4 py-3">Hibah Original</th>
-          <th class="px-4 py-3">Counterpart Original</th>
-          <th class="px-4 py-3">Pinjaman USD</th>
-          <th class="px-4 py-3">Hibah USD</th>
-          <th class="px-4 py-3">Counterpart USD</th>
-          <th class="px-4 py-3">Catatan</th>
+          <th class="px-4 py-3 text-left">Mata Uang</th>
+          <th class="px-4 py-3 text-right">Pinjaman Original</th>
+          <th class="px-4 py-3 text-right">Hibah Original</th>
+          <th class="px-4 py-3 text-right">Counterpart Original</th>
+          <th class="px-4 py-3 text-right">Pinjaman USD</th>
+          <th class="px-4 py-3 text-right">Hibah USD</th>
+          <th class="px-4 py-3 text-right">Counterpart USD</th>
+          <th class="px-4 py-3 text-left">Catatan</th>
           <th class="w-20 px-4 py-3"></th>
         </tr>
       </thead>
@@ -85,38 +85,38 @@ function isUSD(row: T) {
             First-column cell — the selector differs per table.
             Usage: <template #first-col="{ row, index }">...</template>
           -->
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-sm text-surface-800">
             <slot name="first-col" :row="row" :index="index" />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-sm text-surface-800">
             <CurrencySelect
               :model-value="row.currency"
               placeholder="Pilih mata uang"
               @update:model-value="updateRow(index, { currency: String($event ?? '').toUpperCase() })"
             />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.amount_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { amount_original: $event })"
             />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.grant_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { grant_original: $event })"
             />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               :model-value="row.counterpart_original"
               :currency="row.currency"
               @update:model-value="updateRow(index, { counterpart_original: $event })"
             />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.amount_usd"
@@ -124,7 +124,7 @@ function isUSD(row: T) {
             />
             <CurrencyInput v-else :model-value="row.amount_usd" disabled />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.grant_usd"
@@ -132,7 +132,7 @@ function isUSD(row: T) {
             />
             <CurrencyInput v-else :model-value="row.grant_usd" disabled />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="!isUSD(row)"
               :model-value="row.counterpart_usd"
@@ -140,19 +140,19 @@ function isUSD(row: T) {
             />
             <CurrencyInput v-else :model-value="row.counterpart_usd" disabled />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-sm text-surface-800">
             <InputText
               :model-value="row.remarks ?? ''"
               class="w-full"
               @update:model-value="updateRow(index, { remarks: String($event ?? '') })"
             />
           </td>
-          <td class="px-4 py-3 text-right">
+          <td class="px-4 py-2.5 text-right">
             <Button icon="pi pi-trash" severity="danger" text rounded @click="emit('remove', index)" />
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="10" class="px-4 py-6 text-center text-surface-500">
+          <td colspan="10" class="px-4 py-6 text-center text-sm text-surface-500">
             {{ emptyText ?? 'Belum ada data.' }}
           </td>
         </tr>

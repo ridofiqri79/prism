@@ -53,14 +53,14 @@ const isExtendedOptions = [
   { label: 'Tidak diperpanjang', value: false },
 ]
 const columns: ColumnDef[] = [
-  { field: 'loan_code', header: 'Kode Pinjaman', sortable: true },
+  { field: 'loan_code', header: 'Kode Pinjaman', sortable: true, nowrap: true },
   { field: 'lender', header: 'Lender', sortable: true },
-  { field: 'effective_date', header: 'Tanggal Efektif', sortable: true },
-  { field: 'closing_date', header: 'Tanggal Penutupan', sortable: true },
-  { field: 'currency', header: 'Mata Uang', sortable: true },
-  { field: 'amount_usd', header: 'Nilai USD', sortable: true },
-  { field: 'cumulative_disbursement', header: 'Cumulative Disbursement', sortable: true },
-  { field: 'status', header: 'Status', sortable: true },
+  { field: 'effective_date', header: 'Tgl. Efektif', sortable: true, nowrap: true },
+  { field: 'closing_date', header: 'Tgl. Penutupan', sortable: true, nowrap: true },
+  { field: 'currency', header: 'Mata Uang', sortable: true, nowrap: true },
+  { field: 'amount_usd', header: 'Nilai USD', sortable: true, align: 'right', nowrap: true },
+  { field: 'cumulative_disbursement', header: 'Realisasi Disbursement', sortable: true, align: 'right', nowrap: true },
+  { field: 'status', header: 'Status', sortable: true, nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 

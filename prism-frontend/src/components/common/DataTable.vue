@@ -74,6 +74,9 @@ const tablePt = {
   columnHeaderContent: {
     class: 'gap-2',
   },
+  bodyCell: {
+    class: 'px-4 py-2.5 text-sm text-surface-800',
+  },
 }
 
 function handleSort(event: SortEvent) {

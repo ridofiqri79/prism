@@ -17,6 +17,7 @@ export type ProjectMasterSortField =
   | 'locations'
   | 'foreign_loan_usd'
   | 'dk_dates'
+  | 'gb_codes'
 export type ProjectMasterColumnKey =
   | 'loan_types'
   | 'indication_lenders'
@@ -27,6 +28,8 @@ export type ProjectMasterColumnKey =
   | 'locations'
   | 'foreign_loan_usd'
   | 'dk_dates'
+  | 'bb_book_ref'
+  | 'gb_book_ref'
 
 export interface ProjectMasterColumnConfig {
   key: ProjectMasterColumnKey
@@ -54,6 +57,8 @@ export interface ProjectMasterRow {
   is_latest: boolean
   has_newer_revision: boolean
   blue_book_revision_label: string
+  gb_codes: string[]
+  green_book_revision_labels: string[]
 }
 
 export interface ProjectMasterFundingSummary {

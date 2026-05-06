@@ -61,23 +61,23 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
-    <table class="w-full min-w-[64rem] text-left text-sm">
-      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
+    <table class="w-full min-w-[64rem] text-sm">
+      <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Kegiatan</th>
-          <th class="px-4 py-3">Jasa ({{ displayCurrency }})</th>
-          <th class="px-4 py-3">Konstruksi ({{ displayCurrency }})</th>
-          <th class="px-4 py-3">Goods ({{ displayCurrency }})</th>
-          <th class="px-4 py-3">Pelatihan ({{ displayCurrency }})</th>
-          <th class="px-4 py-3">Lainnya ({{ displayCurrency }})</th>
+          <th class="px-4 py-3 text-left">Kegiatan</th>
+          <th class="px-4 py-3 text-right">Jasa ({{ displayCurrency }})</th>
+          <th class="px-4 py-3 text-right">Konstruksi ({{ displayCurrency }})</th>
+          <th class="px-4 py-3 text-right">Goods ({{ displayCurrency }})</th>
+          <th class="px-4 py-3 text-right">Pelatihan ({{ displayCurrency }})</th>
+          <th class="px-4 py-3 text-right">Lainnya ({{ displayCurrency }})</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-100">
         <tr v-for="(activity, index) in activities" :key="index">
-          <td class="px-4 py-3 font-medium text-surface-950">
+          <td class="px-4 py-2.5 text-sm font-medium text-surface-950">
             {{ activity.activity_name || `Kegiatan ${index + 1}` }}
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="rows[index]?.services ?? 0"
@@ -86,7 +86,7 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
             />
             <CurrencyDisplay v-else :amount="rows[index]?.services ?? 0" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="rows[index]?.constructions ?? 0"
@@ -95,7 +95,7 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
             />
             <CurrencyDisplay v-else :amount="rows[index]?.constructions ?? 0" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="rows[index]?.goods ?? 0"
@@ -104,7 +104,7 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
             />
             <CurrencyDisplay v-else :amount="rows[index]?.goods ?? 0" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="rows[index]?.trainings ?? 0"
@@ -113,7 +113,7 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
             />
             <CurrencyDisplay v-else :amount="rows[index]?.trainings ?? 0" :currency="displayCurrency" />
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-2.5 text-right text-sm text-surface-800">
             <CurrencyInput
               v-if="editable"
               :model-value="rows[index]?.other ?? 0"
@@ -124,19 +124,19 @@ function updateRow(index: number, patch: Partial<GBAllocationValues>) {
           </td>
         </tr>
         <tr v-if="activities.length === 0">
-          <td colspan="6" class="px-4 py-6 text-center text-surface-500">
+          <td colspan="6" class="px-4 py-6 text-center text-sm text-surface-500">
             Tambahkan activity terlebih dahulu.
           </td>
         </tr>
       </tbody>
-      <tfoot class="border-t border-surface-200 bg-surface-50 font-semibold">
+      <tfoot class="border-t border-surface-200 bg-surface-50 text-sm font-semibold">
         <tr>
-          <td class="px-4 py-3">Total</td>
-          <td class="px-4 py-3"><CurrencyDisplay :amount="totals.services" :currency="displayCurrency" /></td>
-          <td class="px-4 py-3"><CurrencyDisplay :amount="totals.constructions" :currency="displayCurrency" /></td>
-          <td class="px-4 py-3"><CurrencyDisplay :amount="totals.goods" :currency="displayCurrency" /></td>
-          <td class="px-4 py-3"><CurrencyDisplay :amount="totals.trainings" :currency="displayCurrency" /></td>
-          <td class="px-4 py-3"><CurrencyDisplay :amount="totals.other" :currency="displayCurrency" /></td>
+          <td class="px-4 py-2.5">Total</td>
+          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.services" :currency="displayCurrency" /></td>
+          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.constructions" :currency="displayCurrency" /></td>
+          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.goods" :currency="displayCurrency" /></td>
+          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.trainings" :currency="displayCurrency" /></td>
+          <td class="px-4 py-2.5 text-right"><CurrencyDisplay :amount="totals.other" :currency="displayCurrency" /></td>
         </tr>
       </tfoot>
     </table>
