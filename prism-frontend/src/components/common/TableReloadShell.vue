@@ -16,9 +16,11 @@ withDefaults(
 <template>
   <div class="prism-table-reload-shell" :class="{ 'is-refreshing': refreshing }">
     <Transition name="prism-table-reload">
-      <div v-if="refreshing" class="prism-table-reload-indicator" aria-live="polite">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true" />
-        <span>{{ label }}</span>
+      <div v-if="refreshing" class="prism-table-reload-indicator-wrap" aria-live="polite">
+        <div class="prism-table-reload-indicator">
+          <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+          <span>{{ label }}</span>
+        </div>
       </div>
     </Transition>
 

@@ -479,8 +479,8 @@ function fundingWidth(value: number) {
 
         <div class="overflow-x-auto">
           <table class="min-w-[56rem] w-full border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+            <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
+              <tr>
                 <th class="border-b border-surface-100 px-3 py-2">Proyek</th>
                 <th class="border-b border-surface-100 px-3 py-2">Pendanaan</th>
                 <th

@@ -94,7 +94,7 @@ onMounted(async () => {
 
     <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
       <table class="w-full border-collapse text-sm">
-        <thead class="bg-surface-50 text-left text-surface-600">
+        <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
           <tr>
             <th class="border-b border-surface-200 px-4 py-3 font-semibold">Modul</th>
             <th

@@ -68,11 +68,11 @@ const form = reactive<BlueBookPayload>({
 const errors = ref<FormErrors<BlueBookField>>({})
 
 const columns: ColumnDef[] = [
-  { field: 'period', header: 'Periode' },
-  { field: 'publish_date', header: 'Tanggal Terbit' },
-  { field: 'revision', header: 'Revision' },
-  { field: 'status', header: 'Status' },
-  { field: 'project_count', header: 'Project Blue Book' },
+  { field: 'period', header: 'Periode', sortable: true },
+  { field: 'publish_date', header: 'Tanggal Terbit', sortable: true },
+  { field: 'revision', header: 'Revision', sortable: true },
+  { field: 'status', header: 'Status', sortable: true },
+  { field: 'project_count', header: 'Project Blue Book', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [
@@ -179,6 +179,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -250,6 +252,9 @@ onMounted(() => {
       :columns="columns"
       :loading="blueBookStore.loading"
       :total="blueBookStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'period'">{{ (row as BlueBook).period.name }}</span>

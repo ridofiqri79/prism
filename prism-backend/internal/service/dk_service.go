@@ -62,12 +62,20 @@ func buildDaftarKegiatanListParams(filter model.DaftarKegiatanListFilter, params
 	if dateFrom.Valid && dateTo.Valid && dateFrom.Time.After(dateTo.Time) {
 		return queries.ListDaftarKegiatanParams{}, validation("date_to", "harus setelah tanggal mulai")
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "date", "desc", map[string]struct{}{
+		"subject": {}, "date": {}, "letter_number": {}, "project_count": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
 	return queries.ListDaftarKegiatanParams{
-		Search:   nullableText(params.Search),
-		DateFrom: dateFrom,
-		DateTo:   dateTo,
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+		Search:    nullableText(params.Search),
+		DateFrom:  dateFrom,
+		DateTo:    dateTo,
+		SortField: sortField,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
 	}, nil
 }
 
@@ -221,6 +229,12 @@ func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter
 	if err != nil {
 		return queries.ListDKProjectsByDKParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "created_at", "desc", map[string]struct{}{
+		"project_name": {}, "executing_agency": {}, "duration": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
 	return queries.ListDKProjectsByDKParams{
 		DkID:               dkID,
 		Search:             nullableText(params.Search),
@@ -228,6 +242,8 @@ func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter
 		ExecutingAgencyIds: executingAgencyIDs,
 		LocationIds:        locationIDs,
 		LenderIds:          lenderIDs,
+		SortField:          sortField,
+		SortOrder:          sortOrder,
 		Limit:              int32(limit),
 		Offset:             int32(offset),
 	}, nil

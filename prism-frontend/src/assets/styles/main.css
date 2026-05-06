@@ -213,6 +213,12 @@
     position: relative;
   }
 
+  .prism-table-reload-indicator-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+  }
+
   .prism-table-reload-content {
     transition:
       opacity 200ms ease,
@@ -225,11 +231,6 @@
   }
 
   .prism-table-reload-indicator {
-    pointer-events: none;
-    position: absolute;
-    right: 1rem;
-    top: 1rem;
-    z-index: 10;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;

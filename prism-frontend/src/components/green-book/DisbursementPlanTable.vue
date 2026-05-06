@@ -60,7 +60,7 @@ function updateAmount(index: number, amount: number) {
 
     <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
       <table class="w-full min-w-[32rem] text-left text-sm">
-        <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+        <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
           <tr>
             <th class="px-4 py-3">Tahun</th>
             <th class="px-4 py-3">Nilai ({{ displayCurrency }})</th>

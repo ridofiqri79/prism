@@ -26,7 +26,7 @@ function updateName(index: number, activityName: string) {
 <template>
   <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
     <table class="w-full min-w-[42rem] text-left text-sm">
-      <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="w-24 px-4 py-3">No.</th>
           <th class="px-4 py-3">Nama Aktivitas</th>

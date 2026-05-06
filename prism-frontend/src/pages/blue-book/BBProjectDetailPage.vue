@@ -15,7 +15,6 @@ import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.v
 import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
 import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
 import ProjectSnapshotHeader from '@/components/common/ProjectSnapshotHeader.vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { loiSchema } from '@/schemas/blue-book.schema'

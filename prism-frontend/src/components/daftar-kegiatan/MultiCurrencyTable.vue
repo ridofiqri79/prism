@@ -59,7 +59,7 @@ function isUSD(row: T) {
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
     <table class="w-full min-w-[90rem] text-left text-sm">
-      <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <!--
             First-column header provided by the consumer.

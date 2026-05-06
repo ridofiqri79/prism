@@ -64,9 +64,9 @@ const form = reactive<GreenBookPayload>({
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'publish_year', header: 'Tahun Terbit' },
-  { field: 'revision', header: 'Revisi' },
-  { field: 'status', header: 'Status' },
+  { field: 'publish_year', header: 'Tahun Terbit', sortable: true },
+  { field: 'revision', header: 'Revisi', sortable: true },
+  { field: 'status', header: 'Status', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
@@ -140,6 +140,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -209,6 +211,9 @@ onMounted(() => {
       :columns="columns"
       :loading="greenBookStore.loading"
       :total="greenBookStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'revision'">

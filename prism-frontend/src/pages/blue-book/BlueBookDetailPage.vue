@@ -84,10 +84,10 @@ const gbCreateForm = reactive({
 })
 const errors = ref<FormErrors<BlueBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'bb_code', header: 'Kode Blue Book', width: '11rem' },
-  { field: 'project_name', header: 'Nama Proyek', width: '32%' },
-  { field: 'executing_agency', header: 'Executing Agency', width: '24%' },
-  { field: 'location', header: 'Lokasi', width: '21%' },
+  { field: 'bb_code', header: 'Kode Blue Book', sortable: true, width: '11rem' },
+  { field: 'project_name', header: 'Nama Proyek', sortable: true, width: '32%' },
+  { field: 'executing_agency', header: 'Executing Agency', sortable: true, width: '24%' },
+  { field: 'location', header: 'Lokasi', sortable: true, width: '21%' },
   { field: 'actions', header: 'Aksi', align: 'right', width: '12rem' },
 ]
 const statusOptions: Array<{ label: string; value: BlueBookStatus }> = [
@@ -383,6 +383,8 @@ watch(
   [
     projectControls.page,
     projectControls.limit,
+    projectControls.sort,
+    projectControls.order,
     projectControls.debouncedSearch,
     () => JSON.stringify(projectControls.appliedFilters),
   ],
@@ -499,6 +501,9 @@ watch(
       :columns="columns"
       :loading="blueBookStore.loading"
       :total="blueBookStore.projectTotal"
+      :sort-field="projectControls.sort.value"
+      :sort-order="projectControls.order.value"
+      @sort="projectControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'executing_agency'">

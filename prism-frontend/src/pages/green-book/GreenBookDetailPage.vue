@@ -94,10 +94,10 @@ const importForm = reactive<ImportGBProjectsFromGreenBookPayload>({
   project_ids: [],
 })
 const columns: ColumnDef[] = [
-  { field: 'gb_code', header: 'Kode Green Book' },
-  { field: 'project_name', header: 'Nama Proyek' },
-  { field: 'bb_projects', header: 'Proyek Blue Book' },
-  { field: 'status', header: 'Status' },
+  { field: 'gb_code', header: 'Kode Green Book', sortable: true },
+  { field: 'project_name', header: 'Nama Proyek', sortable: true },
+  { field: 'bb_projects', header: 'Proyek Blue Book', sortable: true },
+  { field: 'status', header: 'Status', sortable: true },
   { field: 'actions', header: 'Aksi', align: 'right' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
@@ -579,6 +579,8 @@ watch(
   [
     projectControls.page,
     projectControls.limit,
+    projectControls.sort,
+    projectControls.order,
     projectControls.debouncedSearch,
     () => JSON.stringify(projectControls.appliedFilters),
   ],
@@ -700,6 +702,9 @@ watch(
       :columns="columns"
       :loading="greenBookStore.loading"
       :total="greenBookStore.projectTotal"
+      :sort-field="projectControls.sort.value"
+      :sort-order="projectControls.order.value"
+      @sort="projectControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'bb_projects'">{{ joinNames((row as GBProject).bb_projects) }}</span>
@@ -802,7 +807,7 @@ watch(
           <div class="overflow-hidden rounded-lg border border-surface-200 bg-surface-0">
             <div class="max-h-[22rem] overflow-auto">
               <table class="min-w-full table-fixed text-sm">
-                <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold text-surface-600">
+                <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                   <tr class="border-b border-surface-200">
                     <th class="w-12 px-4 py-3">
                       <Checkbox

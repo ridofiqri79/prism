@@ -18,10 +18,9 @@ import ProjectInstitutionGrid from '@/components/common/ProjectInstitutionGrid.v
 import ProjectRevisionHistory from '@/components/common/ProjectRevisionHistory.vue'
 import type { RevisionHistoryItem } from '@/components/common/ProjectRevisionHistory.vue'
 import ProjectSnapshotHeader from '@/components/common/ProjectSnapshotHeader.vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useGreenBookStore } from '@/stores/green-book.store'
-import type { BBProjectSummary, GBProjectHistoryItem } from '@/types/green-book.types'
+import type { BBProjectSummary } from '@/types/green-book.types'
 import { toNameList, formatBookStatus } from '@/utils/formatters'
 
 const route = useRoute()

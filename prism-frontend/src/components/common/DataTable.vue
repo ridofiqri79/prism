@@ -54,10 +54,28 @@ const tableSortOrder = computed(() => {
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.data.length === 0)
 const refreshingRows = computed(() => props.loading && props.data.length > 0)
-const tableStyle: CSSProperties = {
-  tableLayout: 'fixed',
+const tableMinWidth = computed(() => {
+  const total = props.columns.reduce((sum, column) => sum + defaultColumnMinWidthRem(column), 0)
+
+  return `${Math.max(total, 42)}rem`
+})
+const tableStyle = computed<CSSProperties>(() => ({
+  minWidth: tableMinWidth.value,
+  tableLayout: 'auto',
   width: '100%',
+}))
+const tablePt = {
+  thead: {
+    class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500',
+  },
+  headerCell: {
+    class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500',
+  },
+  columnHeaderContent: {
+    class: 'gap-2',
+  },
 }
+
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
     return
@@ -72,13 +90,26 @@ function handleSort(event: SortEvent) {
 function columnCellStyle(column: ColumnDef): CSSProperties {
   return {
     maxWidth: column.maxWidth,
-    minWidth: column.minWidth,
+    minWidth: column.minWidth ?? `${defaultColumnMinWidthRem(column)}rem`,
     overflowWrap: column.nowrap ? 'normal' : 'anywhere',
     textAlign: column.align ?? 'left',
     verticalAlign: 'top',
     whiteSpace: column.nowrap ? 'nowrap' : 'normal',
     width: column.width,
     wordBreak: column.nowrap ? 'normal' : 'break-word',
+  }
+}
+
+function defaultColumnMinWidthRem(column: ColumnDef) {
+  return column.field === 'actions' ? 14 : 8
+}
+
+function columnHeaderStyle(column: ColumnDef): CSSProperties {
+  return {
+    ...columnCellStyle(column),
+    overflowWrap: 'normal',
+    whiteSpace: 'nowrap',
+    wordBreak: 'normal',
   }
 }
 </script>
@@ -99,37 +130,40 @@ function columnCellStyle(column: ColumnDef): CSSProperties {
     <EmptyState v-else-if="data.length === 0" compact />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
-      <PrimeDataTable
-        :value="data"
-        lazy
-        striped-rows
-        removable-sort
-        resizable-columns
-        column-resize-mode="fit"
-        data-key="id"
-        :sort-field="sortField"
-        :sort-order="tableSortOrder"
-        :table-style="tableStyle"
-        class="w-full overflow-hidden rounded-lg border border-surface-200"
-        @sort="handleSort"
-      >
-        <PrimeColumn
-          v-for="column in columns"
-          :key="column.field"
-          :field="column.field"
-          :header="column.header"
-          :sortable="column.sortable"
-          :style="columnCellStyle(column)"
-          :header-style="columnCellStyle(column)"
-          :body-style="columnCellStyle(column)"
+      <div class="overflow-x-auto">
+        <PrimeDataTable
+          :value="data"
+          lazy
+          striped-rows
+          removable-sort
+          resizable-columns
+          column-resize-mode="fit"
+          data-key="id"
+          :sort-field="sortField"
+          :sort-order="tableSortOrder"
+          :table-style="tableStyle"
+          :pt="tablePt"
+          class="w-full rounded-lg border border-surface-200"
+          @sort="handleSort"
         >
-          <template #body="{ data: row }">
-            <slot name="body-row" :row="row" :column="column">
-              {{ row[column.field] }}
-            </slot>
-          </template>
-        </PrimeColumn>
-      </PrimeDataTable>
+          <PrimeColumn
+            v-for="column in columns"
+            :key="column.field"
+            :field="column.field"
+            :header="column.header"
+            :sortable="column.sortable"
+            :style="columnCellStyle(column)"
+            :header-style="columnHeaderStyle(column)"
+            :body-style="columnCellStyle(column)"
+          >
+            <template #body="{ data: row }">
+              <slot name="body-row" :row="row" :column="column">
+                {{ row[column.field] }}
+              </slot>
+            </template>
+          </PrimeColumn>
+        </PrimeDataTable>
+      </div>
     </TableReloadShell>
 
     <ListPaginationFooter

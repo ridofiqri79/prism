@@ -791,7 +791,7 @@ function filterButtonClass(active: boolean) {
 
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-surface-200 text-sm">
-          <thead class="bg-surface-50 text-left text-xs uppercase text-surface-500">
+          <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
             <tr>
               <th class="px-3 py-2 font-semibold">Sheet</th>
               <th class="px-3 py-2 font-semibold">Status</th>
@@ -858,7 +858,7 @@ function filterButtonClass(active: boolean) {
 
         <div class="overflow-x-auto rounded-lg border border-surface-200">
           <table class="min-w-full divide-y divide-surface-200 text-sm">
-            <thead class="bg-surface-50 text-left text-xs uppercase text-surface-500">
+            <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="px-3 py-2 font-semibold">Sheet</th>
                 <th class="px-3 py-2 font-semibold">Baris</th>

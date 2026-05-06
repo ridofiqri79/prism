@@ -93,8 +93,8 @@ function displayNew(fc: AuditFieldChange, action: string): string | null {
           <template v-if="isFundingAllocation(item) && item.field_changes?.length">
             <div class="overflow-hidden rounded border border-surface-200">
               <table class="w-full border-collapse text-xs">
-                <thead>
-                  <tr class="bg-surface-50">
+                <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
+                  <tr>
                     <th class="px-3 py-2 text-left font-semibold uppercase tracking-wide text-surface-500">
                       Komponen
                     </th>

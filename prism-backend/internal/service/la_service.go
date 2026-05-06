@@ -70,11 +70,19 @@ func buildLoanAgreementListParams(filter model.LoanAgreementListFilter, params m
 	if err != nil {
 		return queries.ListLoanAgreementsParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "created_at", "desc", map[string]struct{}{
+		"loan_code": {}, "lender": {}, "effective_date": {}, "closing_date": {}, "currency": {}, "amount_usd": {}, "cumulative_disbursement": {}, "status": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListLoanAgreementsParams{}, err
+	}
 	return queries.ListLoanAgreementsParams{
 		Search:            nullableText(params.Search),
 		LenderID:          lenderID,
 		IsExtended:        isExtended,
 		ClosingDateBefore: closingDateBefore,
+		SortField:         sortField,
+		SortOrder:         sortOrder,
 		Limit:             int32(limit),
 		Offset:            int32(offset),
 	}, nil

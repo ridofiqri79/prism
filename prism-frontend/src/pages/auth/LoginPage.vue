@@ -290,8 +290,8 @@ onBeforeUnmount(() => {
             >
               <img src="/prism-logo.png" alt="Logo PRISM" class="h-11 w-11 object-contain" />
             </div>
-            <p class="text-[1.55rem] font-extrabold leading-none tracking-wide text-surface-900">PRISM</p>
-            <h1 class="mt-3 text-[0.62rem] font-semibold uppercase tracking-[0.32em] text-surface-700">
+            <p class="text-2xl font-extrabold leading-none tracking-wide text-surface-900">PRISM</p>
+            <h1 class="mt-3 text-xs font-semibold uppercase tracking-[0.28em] text-surface-700">
               Project Loan Integrated Monitoring System
             </h1>
           </div>

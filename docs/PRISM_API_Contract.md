@@ -545,6 +545,8 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `search` | string | Cari berdasarkan nama periode, tanggal terbit, tahun revisi, atau status |
 | `period_id` | multi-value UUID | Filter periode Blue Book |
 | `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+| `sort` | enum | `period`, `publish_date`, `revision`, `status`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list Blue Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -682,6 +684,8 @@ Contoh response ketika masih dipakai downstream:
 | `search` | string | Cari berdasarkan `project_name` atau nama/nama singkat Executing Agency |
 | `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
+| `sort` | enum | `bb_code`, `project_name`, `executing_agency`, `location`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /blue-books/:bb_id/projects` Request:**
 ```json
@@ -838,6 +842,8 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 | `search` | string | Cari berdasarkan tahun terbit, nomor revisi, status teknis, atau label status |
 | `publish_year` | multi-value number | Filter tahun terbit Green Book |
 | `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+| `sort` | enum | `publish_year`, `revision`, `status`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list dan detail Green Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -940,6 +946,8 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 | `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
 | `status` | multi-value enum | `active` saja; Project Green Book yang dihapus tidak tersedia karena hard delete |
+| `sort` | enum | `gb_code`, `project_name`, `bb_projects`, `status`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /green-books/:gb_id/projects` Request:**
 ```json
@@ -1153,6 +1161,8 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `search` | string | Cari berdasarkan `subject`, `letter_number`, atau tanggal surat |
 | `date_from` | date `YYYY-MM-DD` | Batas awal tanggal surat |
 | `date_to` | date `YYYY-MM-DD` | Batas akhir tanggal surat |
+| `sort` | enum | `subject`, `date`, `letter_number`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -1188,6 +1198,8 @@ Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menen
 | `executing_agency_ids` | multi-value UUID | Filter institution/executing agency DK Project |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
 | `lender_ids` | multi-value UUID | Filter lender financing detail |
+| `sort` | enum | `project_name`, `executing_agency`, `duration`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /daftar-kegiatan/:dk_id/projects` Request:**
 ```json
@@ -1356,6 +1368,8 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `lender_id` | Filter by lender |
 | `is_extended` | Filter: `true` / `false` |
 | `closing_date_before` | Filter LA yang akan berakhir sebelum tanggal ini |
+| `sort` | `loan_code`, `lender`, `effective_date`, `closing_date`, `currency`, `amount_usd`, `cumulative_disbursement`, `status`, `created_at` |
+| `order` | `asc` atau `desc` |
 
 ---
 

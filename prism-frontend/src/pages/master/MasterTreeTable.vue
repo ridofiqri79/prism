@@ -46,6 +46,17 @@ const tableSortOrder = computed(() => {
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.value.length === 0)
 const refreshingRows = computed(() => props.loading && props.value.length > 0)
+const tablePt = {
+  thead: {
+    class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500',
+  },
+  headerCell: {
+    class: 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-surface-500',
+  },
+  columnHeaderContent: {
+    class: 'gap-2',
+  },
+}
 
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
@@ -81,23 +92,26 @@ function handleExpandedKeys(value: ExpandedKeys) {
     <EmptyState v-else-if="value.length === 0" />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
-      <TreeTable
-        :value="value"
-        lazy
-        :expanded-keys="expandedKeys"
-        sort-mode="single"
-        removable-sort
-        resizable-columns
-        column-resize-mode="fit"
-        :sort-field="sortField"
-        :sort-order="tableSortOrder"
-        class="overflow-hidden rounded-lg border border-surface-200"
-        @update:expandedKeys="handleExpandedKeys"
-        @node-expand="(node) => emit('node-expand', node)"
-        @sort="handleSort"
-      >
-        <slot />
-      </TreeTable>
+      <div class="overflow-x-auto">
+        <TreeTable
+          :value="value"
+          lazy
+          :expanded-keys="expandedKeys"
+          sort-mode="single"
+          removable-sort
+          resizable-columns
+          column-resize-mode="fit"
+          :sort-field="sortField"
+          :sort-order="tableSortOrder"
+          :pt="tablePt"
+          class="min-w-[48rem] rounded-lg border border-surface-200"
+          @update:expandedKeys="handleExpandedKeys"
+          @node-expand="(node) => emit('node-expand', node)"
+          @sort="handleSort"
+        >
+          <slot />
+        </TreeTable>
+      </div>
     </TableReloadShell>
 
     <ListPaginationFooter

@@ -67,10 +67,18 @@ func buildBlueBookListParams(filter model.BlueBookListFilter, params model.Pagin
 	if err != nil {
 		return queries.ListBlueBooksParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "created_at", "desc", map[string]struct{}{
+		"period": {}, "publish_date": {}, "revision": {}, "status": {}, "project_count": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListBlueBooksParams{}, err
+	}
 	return queries.ListBlueBooksParams{
 		Search:    nullableText(params.Search),
 		PeriodIds: periodIDs,
 		Statuses:  statuses,
+		SortField: sortField,
+		SortOrder: sortOrder,
 		Limit:     int32(limit),
 		Offset:    int32(offset),
 	}, nil
@@ -310,12 +318,20 @@ func buildBBProjectListParams(bbID pgtype.UUID, filter model.BBProjectListFilter
 	if err != nil {
 		return queries.ListBBProjectsByBlueBookParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "bb_code", "asc", map[string]struct{}{
+		"bb_code": {}, "project_name": {}, "executing_agency": {}, "location": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListBBProjectsByBlueBookParams{}, err
+	}
 
 	return queries.ListBBProjectsByBlueBookParams{
 		BlueBookID:         bbID,
 		Search:             nullableText(params.Search),
 		ExecutingAgencyIds: executingAgencyIDs,
 		LocationIds:        locationIDs,
+		SortField:          sortField,
+		SortOrder:          sortOrder,
 		Limit:              int32(limit),
 		Offset:             int32(offset),
 	}, nil

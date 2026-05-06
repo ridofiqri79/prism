@@ -52,7 +52,7 @@ function onRowReorder(event: DataTableRowReorderEvent) {
       @rowReorder="onRowReorder"
       class="min-w-[56rem]"
       :pt="{
-        thead: { class: 'bg-surface-50 text-xs uppercase tracking-wide text-surface-500' },
+        thead: { class: 'bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500' },
       }"
     >
       <Column v-if="editable" rowReorder style="width: 3rem" :reorderableColumn="false" />

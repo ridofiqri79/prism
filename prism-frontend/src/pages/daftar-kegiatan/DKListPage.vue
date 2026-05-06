@@ -49,10 +49,10 @@ const form = reactive<DaftarKegiatanPayload>({
 })
 const errors = ref<FormErrors<DKField>>({})
 const columns: ColumnDef[] = [
-  { field: 'subject', header: 'Perihal' },
-  { field: 'date', header: 'Tanggal' },
-  { field: 'letter_number', header: 'Nomor Surat' },
-  { field: 'project_count', header: 'Jumlah Proyek' },
+  { field: 'subject', header: 'Perihal', sortable: true },
+  { field: 'date', header: 'Tanggal', sortable: true },
+  { field: 'letter_number', header: 'Nomor Surat', sortable: true },
+  { field: 'project_count', header: 'Jumlah Proyek', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
@@ -119,6 +119,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -173,6 +175,9 @@ onMounted(() => {
       :columns="columns"
       :loading="dkStore.loading"
       :total="dkStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'date'">{{ formatDate(String(row.date ?? '')) }}</span>

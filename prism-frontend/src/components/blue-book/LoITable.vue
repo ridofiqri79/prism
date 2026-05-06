@@ -26,7 +26,7 @@ const emit = defineEmits<{
     </div>
 
     <table class="w-full min-w-[44rem] text-left text-sm">
-      <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3">Lender</th>
           <th class="px-4 py-3">Subject</th>

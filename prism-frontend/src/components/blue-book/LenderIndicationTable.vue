@@ -48,7 +48,7 @@ function updateRow(index: number, patch: Partial<LenderIndicationPayload>) {
 <template>
   <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
     <table class="w-full min-w-[42rem] text-left text-sm">
-      <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+      <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
           <th class="px-4 py-3">Lender</th>
           <th class="px-4 py-3">Remarks</th>

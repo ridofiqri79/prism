@@ -570,7 +570,7 @@ watch(
               <h3 class="font-semibold text-surface-950">Rincian Pembiayaan</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
                 <table class="w-full min-w-[56rem] text-left text-sm">
-                  <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+                  <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3">Lender</th>
                       <th class="px-4 py-3">Mata Uang</th>
@@ -598,7 +598,7 @@ watch(
               <h3 class="font-semibold text-surface-950">Alokasi Pinjaman</h3>
               <div class="overflow-auto rounded-lg border border-surface-200">
                 <table class="w-full min-w-[56rem] text-left text-sm">
-                  <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+                  <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                     <tr>
                       <th class="px-4 py-3">Instansi</th>
                       <th class="px-4 py-3">Mata Uang</th>

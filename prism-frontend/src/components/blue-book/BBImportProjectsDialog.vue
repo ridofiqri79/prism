@@ -359,7 +359,7 @@ function handleShow() {
         <div class="overflow-hidden rounded-lg border border-surface-200 bg-surface-0">
           <div class="max-h-[22rem] overflow-auto">
             <table class="min-w-full table-fixed text-sm">
-              <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold text-surface-600">
+              <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                 <tr class="border-b border-surface-200">
                   <th class="w-12 px-4 py-3">
                     <Checkbox

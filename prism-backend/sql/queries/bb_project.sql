@@ -35,7 +35,29 @@ AND (
     COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
     OR bb.status = ANY(sqlc.arg('statuses')::text[])
 )
-ORDER BY bb.created_at DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'period' AND sqlc.arg('sort_order')::text = 'asc' THEN p.name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'period' AND sqlc.arg('sort_order')::text = 'desc' THEN p.name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'publish_date' AND sqlc.arg('sort_order')::text = 'asc' THEN bb.publish_date END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'publish_date' AND sqlc.arg('sort_order')::text = 'desc' THEN bb.publish_date END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'revision' AND sqlc.arg('sort_order')::text = 'asc' THEN bb.revision_number END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'revision' AND sqlc.arg('sort_order')::text = 'desc' THEN bb.revision_number END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'asc' THEN bb.status END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'desc' THEN bb.status END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT COUNT(*)
+        FROM bb_project bp
+        WHERE bp.blue_book_id = bb.id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN bb.created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN bb.created_at END DESC,
+    bb.created_at DESC,
+    bb.id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountBlueBooks :one
@@ -199,7 +221,41 @@ WHERE blue_book_id = sqlc.arg('blue_book_id')
             AND bpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
       )
   )
-ORDER BY bb_code ASC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'bb_code' AND sqlc.arg('sort_order')::text = 'asc' THEN bb_code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'bb_code' AND sqlc.arg('sort_order')::text = 'desc' THEN bb_code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'asc' THEN project_name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'desc' THEN project_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'executing_agency' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT string_agg(COALESCE(i.short_name, i.name), ', ' ORDER BY COALESCE(i.short_name, i.name))
+        FROM bb_project_institution bpi
+        JOIN institution i ON i.id = bpi.institution_id
+        WHERE bpi.bb_project_id = bb_project.id
+          AND bpi.role = 'Executing Agency'
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'executing_agency' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT string_agg(COALESCE(i.short_name, i.name), ', ' ORDER BY COALESCE(i.short_name, i.name))
+        FROM bb_project_institution bpi
+        JOIN institution i ON i.id = bpi.institution_id
+        WHERE bpi.bb_project_id = bb_project.id
+          AND bpi.role = 'Executing Agency'
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'location' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT string_agg(r.name, ', ' ORDER BY r.name)
+        FROM bb_project_location bpl
+        JOIN region r ON r.id = bpl.region_id
+        WHERE bpl.bb_project_id = bb_project.id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'location' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT string_agg(r.name, ', ' ORDER BY r.name)
+        FROM bb_project_location bpl
+        JOIN region r ON r.id = bpl.region_id
+        WHERE bpl.bb_project_id = bb_project.id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN created_at END DESC,
+    bb_code ASC,
+    id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountBBProjectsByBlueBook :one

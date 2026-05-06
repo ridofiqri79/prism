@@ -53,14 +53,14 @@ const isExtendedOptions = [
   { label: 'Tidak diperpanjang', value: false },
 ]
 const columns: ColumnDef[] = [
-  { field: 'loan_code', header: 'Kode Pinjaman' },
-  { field: 'lender', header: 'Lender' },
-  { field: 'effective_date', header: 'Tanggal Efektif' },
-  { field: 'closing_date', header: 'Tanggal Penutupan' },
-  { field: 'currency', header: 'Mata Uang' },
-  { field: 'amount_usd', header: 'Nilai USD' },
-  { field: 'cumulative_disbursement', header: 'Cumulative Disbursement' },
-  { field: 'status', header: 'Status' },
+  { field: 'loan_code', header: 'Kode Pinjaman', sortable: true },
+  { field: 'lender', header: 'Lender', sortable: true },
+  { field: 'effective_date', header: 'Tanggal Efektif', sortable: true },
+  { field: 'closing_date', header: 'Tanggal Penutupan', sortable: true },
+  { field: 'currency', header: 'Mata Uang', sortable: true },
+  { field: 'amount_usd', header: 'Nilai USD', sortable: true },
+  { field: 'cumulative_disbursement', header: 'Cumulative Disbursement', sortable: true },
+  { field: 'status', header: 'Status', sortable: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
@@ -76,6 +76,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -141,6 +143,9 @@ onMounted(() => {
       :columns="columns"
       :loading="loanAgreementStore.loading"
       :total="loanAgreementStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'lender'">{{ (row as LoanAgreement).lender?.name || '-' }}</span>

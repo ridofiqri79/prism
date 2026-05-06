@@ -726,16 +726,16 @@ onUnmounted(() => {
       </div>
 
       <div v-if="initialTableLoading" class="overflow-x-auto">
-        <table class="w-full min-w-[72rem] table-fixed text-left text-sm">
+        <table class="w-full min-w-[68rem] table-fixed text-left text-sm">
           <tbody class="divide-y divide-surface-100">
             <tr v-for="row in skeletonRows" :key="row">
-              <td class="w-[28rem] px-4 py-3">
+              <td class="w-[18rem] px-4 py-3">
                 <Skeleton height="2rem" />
               </td>
               <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3">
                 <Skeleton height="1.5rem" />
               </td>
-              <td class="w-40 px-4 py-3">
+              <td class="w-32 px-4 py-3">
                 <Skeleton height="1.5rem" />
               </td>
             </tr>
@@ -748,10 +748,10 @@ onUnmounted(() => {
       </div>
 
       <TableReloadShell v-else :refreshing="refreshingExistingRows" content-class="overflow-x-auto">
-        <table class="w-full min-w-[72rem] table-fixed text-left text-sm">
-          <thead class="bg-surface-50 text-xs uppercase text-surface-500">
+        <table class="w-full min-w-[68rem] table-fixed text-left text-sm">
+          <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
             <tr>
-              <th class="w-[28rem] px-4 py-3">
+              <th class="w-[18rem] px-4 py-3">
                 <button
                   type="button"
                   class="inline-flex w-full items-center gap-2 text-left font-semibold"
@@ -765,7 +765,7 @@ onUnmounted(() => {
                 v-for="column in visibleColumns"
                 :key="column.key"
                 class="px-4 py-3"
-                :class="column.key === 'foreign_loan_usd' ? 'w-48 text-right' : 'w-60'"
+                :class="column.key === 'foreign_loan_usd' ? 'w-44 text-right' : 'w-32'"
               >
                 <button
                   type="button"
@@ -777,12 +777,12 @@ onUnmounted(() => {
                   <i :class="sortIcon(column.sortField)" aria-hidden="true" />
                 </button>
               </th>
-              <th class="w-40 px-4 py-3 text-right">Aksi</th>
+              <th class="w-32 px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <TransitionGroup tag="tbody" name="prism-table-row-fade" class="divide-y divide-surface-100">
             <tr v-for="project in projectStore.projects" :key="project.id" class="align-top hover:bg-surface-50/70">
-              <td class="w-[28rem] px-4 py-3">
+              <td class="w-[18rem] px-4 py-3">
                 <RouterLink
                   :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
                   class="block whitespace-normal text-sm font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
@@ -867,7 +867,7 @@ onUnmounted(() => {
                   {{ listLabel(project.dk_dates) }}
                 </span>
               </td>
-              <td class="w-40 px-4 py-3">
+              <td class="w-32 px-4 py-3">
                 <div class="flex justify-end gap-1.5">
                   <Button
                     v-tooltip.top="'Detail proyek'"

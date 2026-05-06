@@ -54,7 +54,7 @@ function applyFilters() {
 
 <template>
   <section class="rounded-lg border border-primary-100 bg-white p-4 shadow-sm shadow-surface-200/50">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center">
       <label class="relative min-w-0 flex-1">
         <span class="sr-only">{{ searchPlaceholder }}</span>
         <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
@@ -73,7 +73,7 @@ function applyFilters() {
         :icon="filterPanelOpen ? 'pi pi-chevron-up' : 'pi pi-sliders-h'"
         severity="secondary"
         outlined
-        class="h-12 shrink-0"
+        class="h-12 w-full shrink-0 md:w-auto"
         :aria-expanded="filterPanelOpen"
         @click="filterPanelOpen = !filterPanelOpen"
       />

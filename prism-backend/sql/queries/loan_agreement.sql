@@ -36,7 +36,27 @@ AND (
     sqlc.narg('closing_date_before')::date IS NULL
     OR la.closing_date <= sqlc.narg('closing_date_before')::date
 )
-ORDER BY la.created_at DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'loan_code' AND sqlc.arg('sort_order')::text = 'asc' THEN la.loan_code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'loan_code' AND sqlc.arg('sort_order')::text = 'desc' THEN la.loan_code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'lender' AND sqlc.arg('sort_order')::text = 'asc' THEN COALESCE(l.short_name, l.name) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'lender' AND sqlc.arg('sort_order')::text = 'desc' THEN COALESCE(l.short_name, l.name) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'effective_date' AND sqlc.arg('sort_order')::text = 'asc' THEN la.effective_date END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'effective_date' AND sqlc.arg('sort_order')::text = 'desc' THEN la.effective_date END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'closing_date' AND sqlc.arg('sort_order')::text = 'asc' THEN la.closing_date END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'closing_date' AND sqlc.arg('sort_order')::text = 'desc' THEN la.closing_date END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'currency' AND sqlc.arg('sort_order')::text = 'asc' THEN la.currency END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'currency' AND sqlc.arg('sort_order')::text = 'desc' THEN la.currency END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'amount_usd' AND sqlc.arg('sort_order')::text = 'asc' THEN la.amount_usd END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'amount_usd' AND sqlc.arg('sort_order')::text = 'desc' THEN la.amount_usd END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'cumulative_disbursement' AND sqlc.arg('sort_order')::text = 'asc' THEN la.cumulative_disbursement END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'cumulative_disbursement' AND sqlc.arg('sort_order')::text = 'desc' THEN la.cumulative_disbursement END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'asc' THEN (la.original_closing_date IS NOT NULL AND la.closing_date <> la.original_closing_date) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'desc' THEN (la.original_closing_date IS NOT NULL AND la.closing_date <> la.original_closing_date) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN la.created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN la.created_at END DESC,
+    la.created_at DESC,
+    la.id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountLoanAgreements :one

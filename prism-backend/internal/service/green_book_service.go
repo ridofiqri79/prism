@@ -60,10 +60,18 @@ func buildGreenBookListParams(filter model.GreenBookListFilter, params model.Pag
 	if err != nil {
 		return queries.ListGreenBooksParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "publish_year", "desc", map[string]struct{}{
+		"publish_year": {}, "revision": {}, "status": {}, "project_count": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListGreenBooksParams{}, err
+	}
 	return queries.ListGreenBooksParams{
 		Search:       nullableText(params.Search),
 		PublishYears: publishYears,
 		Statuses:     statuses,
+		SortField:    sortField,
+		SortOrder:    sortOrder,
 		Limit:        int32(limit),
 		Offset:       int32(offset),
 	}, nil
@@ -309,6 +317,12 @@ func buildGBProjectListParams(gbID pgtype.UUID, filter model.GBProjectListFilter
 	if err != nil {
 		return queries.ListGBProjectsByGreenBookParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "gb_code", "asc", map[string]struct{}{
+		"gb_code": {}, "project_name": {}, "bb_projects": {}, "status": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListGBProjectsByGreenBookParams{}, err
+	}
 	return queries.ListGBProjectsByGreenBookParams{
 		GreenBookID:        gbID,
 		Search:             nullableText(params.Search),
@@ -316,6 +330,8 @@ func buildGBProjectListParams(gbID pgtype.UUID, filter model.GBProjectListFilter
 		ExecutingAgencyIds: executingAgencyIDs,
 		LocationIds:        locationIDs,
 		Statuses:           statuses,
+		SortField:          sortField,
+		SortOrder:          sortOrder,
 		Limit:              int32(limit),
 		Offset:             int32(offset),
 	}, nil
