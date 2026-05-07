@@ -1,13 +1,17 @@
 package model
 
 type SpatialDistributionFilter struct {
-	Level            string
-	ProvinceCode     *string
-	LoanTypes        []string
-	ProjectStatuses  []string
-	PipelineStatuses []string
-	Search           *string
-	IncludeHistory   bool
+	Level               string
+	ProvinceCode        *string
+	LoanTypes           []string
+	ProjectStatuses     []string
+	PipelineStatuses    []string
+	ReachedStages       []string
+	MissingStages       []string
+	HasLoI              *string
+	HasLenderIndication *string
+	Search              *string
+	IncludeHistory      bool
 }
 
 type SpatialDistributionProjectFilter struct {

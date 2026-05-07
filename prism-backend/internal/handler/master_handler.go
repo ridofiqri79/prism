@@ -137,6 +137,55 @@ func (h *MasterHandler) DeleteCurrency(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *MasterHandler) ListKursTengah(c echo.Context) error {
+	res, err := h.service.ListKursTengah(
+		c.Request().Context(),
+		paginationParams(c),
+		queryStrings(c, "currency_id"),
+		c.QueryParam("cut_off_date_from"),
+		c.QueryParam("cut_off_date_to"),
+	)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *MasterHandler) BulkCreateKursTengah(c echo.Context) error {
+	var req model.KursTengahBulkRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.BulkCreateKursTengah(c.Request().Context(), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, model.DataResponse[[]model.KursTengahResponse]{Data: res})
+}
+
+func (h *MasterHandler) BulkUpdateKursTengah(c echo.Context) error {
+	var req model.KursTengahBulkRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	res, err := h.service.BulkUpdateKursTengah(c.Request().Context(), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, model.DataResponse[[]model.KursTengahResponse]{Data: res})
+}
+
+func (h *MasterHandler) BulkDeleteKursTengah(c echo.Context) error {
+	var req model.KursTengahBulkDeleteRequest
+	if err := bind(c, &req); err != nil {
+		return err
+	}
+	if err := h.service.BulkDeleteKursTengah(c.Request().Context(), req); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *MasterHandler) ListLenders(c echo.Context) error {
 	res, err := h.service.ListLenders(c.Request().Context(), paginationParams(c), queryStrings(c, "type"))
 	if err != nil {

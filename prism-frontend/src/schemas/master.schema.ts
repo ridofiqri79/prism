@@ -27,6 +27,24 @@ export const currencySchema = z.object({
   sort_order: z.number().int().min(0, 'Urutan tidak boleh negatif'),
 })
 
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Tanggal harus format YYYY-MM-DD')
+
+export const kursTengahSchema = z.object({
+  id: z.string().uuid().optional(),
+  currency_id: z.string().uuid('Currency wajib dipilih'),
+  kurs: z.number().positive('Kurs harus lebih dari 0'),
+  kurs_tengah_bi: z.number().positive('Kurs Tengah BI harus lebih dari 0'),
+  cut_off_date: isoDateSchema,
+})
+
+export const kursTengahCreateSchema = kursTengahSchema.omit({ id: true })
+export const kursTengahUpdateSchema = kursTengahSchema.extend({
+  id: z.string().uuid('ID kurs tengah tidak valid'),
+})
+
 export const lenderSchema = z
   .object({
     name: z.string().min(1, 'Nama wajib diisi'),

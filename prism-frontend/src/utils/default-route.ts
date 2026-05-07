@@ -21,6 +21,7 @@ const authenticatedRouteCandidates: RouteCandidate[] = [
   { route: { name: 'master-countries' }, module: 'country', action: 'read' },
   { route: { name: 'master-lenders' }, module: 'lender', action: 'read' },
   { route: { name: 'master-currencies' }, module: 'currency', action: 'read' },
+  { route: { name: 'master-kurs-tengah' }, module: 'currency', action: 'read' },
   { route: { name: 'master-institutions' }, module: 'institution', action: 'read' },
   { route: { name: 'master-regions' }, module: 'region', action: 'read' },
   { route: { name: 'master-program-titles' }, module: 'program_title', action: 'read' },

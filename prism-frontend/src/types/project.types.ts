@@ -80,8 +80,15 @@ export interface ProjectMasterListParams {
   indication_lender_ids?: string[]
   executing_agency_ids?: string[]
   fixed_lender_ids?: string[]
+  dk_lender_ids?: string[]
+  loan_agreement_lender_ids?: string[]
+  dk_executing_agency_ids?: string[]
   project_statuses?: ProjectStatus[]
   pipeline_statuses?: ProjectPipelineStatus[]
+  reached_stages?: ProjectPipelineStatus[]
+  missing_stages?: ProjectPipelineStatus[]
+  has_loi?: boolean
+  has_lender_indication?: boolean
   program_title_ids?: string[]
   region_ids?: string[]
   foreign_loan_min?: number
@@ -97,8 +104,15 @@ export interface ProjectMasterFilterState {
   indication_lender_ids: string[]
   executing_agency_ids: string[]
   fixed_lender_ids: string[]
+  dk_lender_ids: string[]
+  loan_agreement_lender_ids: string[]
+  dk_executing_agency_ids: string[]
   project_statuses: ProjectStatus[]
   pipeline_statuses: ProjectPipelineStatus[]
+  reached_stages: ProjectPipelineStatus[]
+  missing_stages: ProjectPipelineStatus[]
+  has_loi: boolean | null
+  has_lender_indication: boolean | null
   program_title_ids: string[]
   region_ids: string[]
   foreign_loan_min: number | null

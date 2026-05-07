@@ -38,6 +38,41 @@ type CurrencyResponse struct {
 	UpdatedAt string  `json:"updated_at,omitempty"`
 }
 
+type CurrencyInfo struct {
+	ID       string  `json:"id"`
+	Code     string  `json:"code"`
+	Name     string  `json:"name"`
+	Symbol   *string `json:"symbol,omitempty"`
+	IsActive bool    `json:"is_active"`
+}
+
+type KursTengahRequest struct {
+	ID           *string `json:"id,omitempty"`
+	CurrencyID   string  `json:"currency_id" validate:"required"`
+	Kurs         float64 `json:"kurs" validate:"required"`
+	KursTengahBI float64 `json:"kurs_tengah_bi" validate:"required"`
+	CutOffDate   string  `json:"cut_off_date" validate:"required"`
+}
+
+type KursTengahBulkRequest struct {
+	Items []KursTengahRequest `json:"items" validate:"required"`
+}
+
+type KursTengahBulkDeleteRequest struct {
+	IDs []string `json:"ids" validate:"required"`
+}
+
+type KursTengahResponse struct {
+	ID           string       `json:"id"`
+	CurrencyID   string       `json:"currency_id"`
+	Currency     CurrencyInfo `json:"currency"`
+	Kurs         float64      `json:"kurs"`
+	KursTengahBI float64      `json:"kurs_tengah_bi"`
+	CutOffDate   string       `json:"cut_off_date"`
+	CreatedAt    string       `json:"created_at,omitempty"`
+	UpdatedAt    string       `json:"updated_at,omitempty"`
+}
+
 type CreateLenderRequest struct {
 	CountryID *string `json:"country_id"`
 	Name      string  `json:"name" validate:"required"`

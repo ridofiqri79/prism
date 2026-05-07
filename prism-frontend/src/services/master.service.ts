@@ -9,6 +9,11 @@ import type {
   CurrencyPayload,
   Institution,
   InstitutionPayload,
+  KursTengah,
+  KursTengahBulkDeletePayload,
+  KursTengahBulkPayload,
+  KursTengahPayload,
+  KursTengahUpdatePayload,
   Lender,
   LenderPayload,
   ListParams,
@@ -26,6 +31,7 @@ import type {
 type MasterCollection =
   | Country
   | Currency
+  | KursTengah
   | Lender
   | Institution
   | Region
@@ -58,6 +64,12 @@ async function updateItem<T extends MasterCollection, TPayload>(
 
 async function deleteItem(endpoint: string, id: string) {
   await http.delete(`${endpoint}/${id}`)
+}
+
+async function bulkMutation<TResponse, TPayload>(method: 'post' | 'put', endpoint: string, data: TPayload) {
+  const response = await http[method]<ApiResponse<TResponse>>(endpoint, data)
+
+  return response.data.data
 }
 
 export const MasterService = {
@@ -117,6 +129,27 @@ export const MasterService = {
   },
   deleteCurrency(id: string) {
     return deleteItem('/master/currencies', id)
+  },
+
+  getKursTengah(params?: ListParams) {
+    return getList<KursTengah>('/master/kurs-tengah', params)
+  },
+  createKursTengahBulk(data: KursTengahBulkPayload<KursTengahPayload>) {
+    return bulkMutation<KursTengah[], KursTengahBulkPayload<KursTengahPayload>>(
+      'post',
+      '/master/kurs-tengah/bulk',
+      data,
+    )
+  },
+  updateKursTengahBulk(data: KursTengahBulkPayload<KursTengahUpdatePayload>) {
+    return bulkMutation<KursTengah[], KursTengahBulkPayload<KursTengahUpdatePayload>>(
+      'put',
+      '/master/kurs-tengah/bulk',
+      data,
+    )
+  },
+  async deleteKursTengahBulk(data: KursTengahBulkDeletePayload) {
+    await http.delete('/master/kurs-tengah/bulk', { data })
   },
 
   getLenders(params?: ListParams) {

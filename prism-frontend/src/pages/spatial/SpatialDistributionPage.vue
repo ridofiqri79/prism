@@ -8,7 +8,7 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
@@ -29,6 +29,14 @@ import type {
   SpatialDistributionParams,
   SpatialDistributionRegionMetric,
 } from '@/types/spatial-distribution.types'
+import {
+  hasQueryParam,
+  queryBoolean,
+  queryEnum,
+  queryEnumArray,
+  queryNumber,
+  queryString,
+} from '@/utils/route-query'
 import { getPipelineStatusLabel, getPipelineStatusSeverity } from '@/utils/status-labels'
 import { primeTablePt } from '@/utils/table-styles'
 
@@ -39,12 +47,17 @@ type FilterOption<T extends string> = {
 
 interface SpatialFilterState {
   pipelineStatuses: ProjectPipelineStatus[]
+  reachedStages: ProjectPipelineStatus[]
+  missingStages: ProjectPipelineStatus[]
   projectStatuses: ProjectStatus[]
   loanTypes: LenderType[]
+  hasLoI: boolean | null
+  hasLenderIndication: boolean | null
   includeHistory: boolean
 }
 
 const store = useSpatialDistributionStore()
+const route = useRoute()
 const router = useRouter()
 const { choropleth, error, loadingMap, loadingProjects, projectError, projectList } = storeToRefs(store)
 
@@ -52,6 +65,7 @@ const level = ref<SpatialDistributionLevel>('province')
 const provinceCode = ref<string | undefined>()
 const provinceName = ref<string | undefined>()
 const selectedRegion = ref<SpatialDistributionRegionMetric | null>(null)
+const pendingRegionCode = ref<string | null>(null)
 const metric = ref<SpatialDistributionMetric>('count')
 const projectPage = ref(1)
 const projectLimit = ref(10)
@@ -68,22 +82,34 @@ const tableSortOrder = computed(() => (projectSortOrder.value === 'asc' ? 1 : -1
 const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
 const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
 const loanTypeValues: LenderType[] = ['Bilateral', 'Multilateral', 'KSA']
+const spatialLevelValues: SpatialDistributionLevel[] = ['province', 'city']
+const metricValues: SpatialDistributionMetric[] = ['count', 'value']
+const projectSortFieldValues: ProjectMasterSortField[] = ['project_name', 'foreign_loan_usd']
+const projectSortOrderValues: ProjectMasterSortOrder[] = ['asc', 'desc']
 const indonesiaRegionCode = 'ID'
 
 const filters = reactive<SpatialFilterState & {
   search: string
 }>({
   pipelineStatuses: [...pipelineStatusValues],
+  reachedStages: [],
+  missingStages: [],
   projectStatuses: [...projectStatusValues],
   loanTypes: [...loanTypeValues],
+  hasLoI: null,
+  hasLenderIndication: null,
   search: '',
   includeHistory: false,
 })
 
 const appliedFilters = reactive<SpatialFilterState>({
   pipelineStatuses: [...pipelineStatusValues],
+  reachedStages: [],
+  missingStages: [],
   projectStatuses: [...projectStatusValues],
   loanTypes: [...loanTypeValues],
+  hasLoI: null,
+  hasLenderIndication: null,
   includeHistory: false,
 })
 
@@ -109,6 +135,12 @@ const loanTypeOptions: Array<FilterOption<LenderType>> = [
   { label: 'Bilateral', value: 'Bilateral' },
   { label: 'Multilateral', value: 'Multilateral' },
   { label: 'KSA', value: 'KSA' },
+]
+
+const presenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua', value: null },
+  { label: 'Ada', value: true },
+  { label: 'Tidak ada', value: false },
 ]
 
 const numberFormatter = new Intl.NumberFormat('id-ID')
@@ -194,6 +226,14 @@ const pipelineSelectionLabel = computed(() =>
   selectionControlLabel(filters.pipelineStatuses, pipelineOptions, 'Semua Tahap', 'tahap'),
 )
 
+const reachedStageSelectionLabel = computed(() =>
+  selectionControlLabel(filters.reachedStages, pipelineOptions, 'Semua tahap', 'tahap'),
+)
+
+const missingStageSelectionLabel = computed(() =>
+  selectionControlLabel(filters.missingStages, pipelineOptions, 'Tidak ada bottleneck', 'tahap'),
+)
+
 const projectStatusSelectionLabel = computed(() =>
   selectionControlLabel(filters.projectStatuses, projectStatusOptions, 'Semua Status', 'status'),
 )
@@ -214,6 +254,20 @@ const activeFilterPills = computed<ActiveFilterPill[]>(() => {
       value: selectionPillValue(appliedFilters.pipelineStatuses, pipelineOptions),
     })
   }
+  if (appliedFilters.reachedStages.length > 0) {
+    pills.push({
+      key: 'reachedStages',
+      label: 'Sudah mencapai',
+      value: selectionPillValue(appliedFilters.reachedStages, pipelineOptions),
+    })
+  }
+  if (appliedFilters.missingStages.length > 0) {
+    pills.push({
+      key: 'missingStages',
+      label: 'Belum mencapai',
+      value: selectionPillValue(appliedFilters.missingStages, pipelineOptions),
+    })
+  }
   if (isFilteredSelection(appliedFilters.projectStatuses, projectStatusValues)) {
     pills.push({
       key: 'projectStatuses',
@@ -231,6 +285,16 @@ const activeFilterPills = computed<ActiveFilterPill[]>(() => {
   if (appliedFilters.includeHistory) {
     pills.push({ key: 'includeHistory', label: 'Riwayat revisi', value: 'Ditampilkan' })
   }
+  if (appliedFilters.hasLoI !== null) {
+    pills.push({ key: 'hasLoI', label: 'LoI', value: presencePillValue(appliedFilters.hasLoI) })
+  }
+  if (appliedFilters.hasLenderIndication !== null) {
+    pills.push({
+      key: 'hasLenderIndication',
+      label: 'Indikasi lender',
+      value: presencePillValue(appliedFilters.hasLenderIndication),
+    })
+  }
   return pills
 })
 
@@ -241,8 +305,12 @@ function buildParams(): SpatialDistributionParams {
     level: level.value,
     province_code: level.value === 'city' ? provinceCode.value : undefined,
     pipeline_statuses: selectedFilterValues(appliedFilters.pipelineStatuses, pipelineStatusValues),
+    reached_stages: selectedExactFilterValues(appliedFilters.reachedStages),
+    missing_stages: selectedExactFilterValues(appliedFilters.missingStages),
     project_statuses: selectedFilterValues(appliedFilters.projectStatuses, projectStatusValues),
     loan_types: selectedFilterValues(appliedFilters.loanTypes, loanTypeValues),
+    has_loi: appliedFilters.hasLoI ?? undefined,
+    has_lender_indication: appliedFilters.hasLenderIndication ?? undefined,
     search: filters.search.trim() || undefined,
     include_history: appliedFilters.includeHistory || undefined,
   }
@@ -250,6 +318,27 @@ function buildParams(): SpatialDistributionParams {
 
 async function loadMap() {
   await store.fetchChoropleth(buildParams())
+
+  const pendingCode = pendingRegionCode.value
+  if (pendingCode) {
+    pendingRegionCode.value = null
+
+    const pendingRegion = choropleth.value.regions.find(
+      (region) => region.region_code === pendingCode,
+    )
+
+    if (pendingRegion) {
+      selectedRegion.value = pendingRegion
+      await loadProjects()
+      return
+    }
+
+    if (level.value === 'province' && pendingCode === indonesiaRegionCode) {
+      selectedRegion.value = null
+      await loadProjects()
+      return
+    }
+  }
 
   if (!selectedRegion.value) {
     if (level.value === 'province') {
@@ -318,8 +407,12 @@ async function resetFilters() {
 
   try {
     filters.pipelineStatuses = [...pipelineStatusValues]
+    filters.reachedStages = []
+    filters.missingStages = []
     filters.projectStatuses = [...projectStatusValues]
     filters.loanTypes = [...loanTypeValues]
+    filters.hasLoI = null
+    filters.hasLenderIndication = null
     filters.search = ''
     filters.includeHistory = false
     syncAppliedFiltersFromDraft()
@@ -396,8 +489,84 @@ function selectedFilterValues<T extends string>(selected: T[], allValues: T[]) {
   return [...selected]
 }
 
+function selectedExactFilterValues<T extends string>(selected: T[]) {
+  return selected.length > 0 ? [...selected] : undefined
+}
+
 function isFilteredSelection<T extends string>(selected: T[], allValues: T[]) {
   return selected.length > 0 && selected.length < allValues.length
+}
+
+function routeSelectionOrDefault<T extends string>(
+  key: string,
+  allowedValues: T[],
+  defaultValues: T[],
+) {
+  if (!hasQueryParam(route.query, key, `${key}[]`)) return [...defaultValues]
+
+  const values = queryEnumArray(route.query, allowedValues, key, `${key}[]`)
+  return values.length > 0 ? values : [...defaultValues]
+}
+
+function positiveInteger(value: number | undefined) {
+  if (value === undefined || value < 1) return undefined
+  return Math.floor(value)
+}
+
+function hydrateSpatialRouteQuery() {
+  searchWatcherPaused = true
+  clearSearchTimer()
+
+  try {
+    const routeLevel = queryEnum(route.query, spatialLevelValues, 'level') ?? 'province'
+    const routeProvinceCode = queryString(route.query, 'province_code')
+    const routePage = positiveInteger(queryNumber(route.query, 'page'))
+    const routeLimit = positiveInteger(queryNumber(route.query, 'limit'))
+
+    level.value = routeLevel === 'city' && routeProvinceCode ? 'city' : 'province'
+    provinceCode.value = level.value === 'city' ? routeProvinceCode : undefined
+    provinceName.value = undefined
+    selectedRegion.value = null
+    pendingRegionCode.value = queryString(route.query, 'region_code') ?? null
+    metric.value = queryEnum(route.query, metricValues, 'metric') ?? 'count'
+    projectPage.value = routePage ?? 1
+    projectLimit.value = routeLimit ?? 10
+    projectSortField.value = queryEnum(route.query, projectSortFieldValues, 'sort') ?? 'project_name'
+    projectSortOrder.value = queryEnum(route.query, projectSortOrderValues, 'order') ?? 'asc'
+
+    filters.pipelineStatuses = routeSelectionOrDefault(
+      'pipeline_statuses',
+      pipelineStatusValues,
+      pipelineStatusValues,
+    )
+    filters.projectStatuses = routeSelectionOrDefault(
+      'project_statuses',
+      projectStatusValues,
+      projectStatusValues,
+    )
+    filters.loanTypes = routeSelectionOrDefault('loan_types', loanTypeValues, loanTypeValues)
+    filters.reachedStages = queryEnumArray(
+      route.query,
+      pipelineStatusValues,
+      'reached_stages',
+      'reached_stages[]',
+    )
+    filters.missingStages = queryEnumArray(
+      route.query,
+      pipelineStatusValues,
+      'missing_stages',
+      'missing_stages[]',
+    )
+    filters.hasLoI = queryBoolean(route.query, 'has_loi')
+    filters.hasLenderIndication = queryBoolean(route.query, 'has_lender_indication')
+    filters.search = queryString(route.query, 'search') ?? ''
+    filters.includeHistory = queryBoolean(route.query, 'include_history') === true
+    syncAppliedFiltersFromDraft()
+  } finally {
+    window.setTimeout(() => {
+      searchWatcherPaused = false
+    }, 0)
+  }
 }
 
 function selectionControlLabel<T extends string>(
@@ -424,6 +593,10 @@ function selectionPillValue<T extends string>(
 
   if (labels.length <= 2) return labels.join(', ')
   return `${labels.length} dipilih`
+}
+
+function presencePillValue(value: boolean) {
+  return value ? 'Ada' : 'Tidak ada'
 }
 
 function averagePerRegion(total: number) {
@@ -493,8 +666,12 @@ function clearProjectPaginationTimer() {
 
 function syncAppliedFiltersFromDraft() {
   appliedFilters.pipelineStatuses = [...filters.pipelineStatuses]
+  appliedFilters.reachedStages = [...filters.reachedStages]
+  appliedFilters.missingStages = [...filters.missingStages]
   appliedFilters.projectStatuses = [...filters.projectStatuses]
   appliedFilters.loanTypes = [...filters.loanTypes]
+  appliedFilters.hasLoI = filters.hasLoI
+  appliedFilters.hasLenderIndication = filters.hasLenderIndication
   appliedFilters.includeHistory = filters.includeHistory
 }
 
@@ -534,6 +711,14 @@ async function removeFilter(key: string) {
     filters.pipelineStatuses = [...pipelineStatusValues]
     appliedFilters.pipelineStatuses = [...pipelineStatusValues]
   }
+  if (key === 'reachedStages') {
+    filters.reachedStages = []
+    appliedFilters.reachedStages = []
+  }
+  if (key === 'missingStages') {
+    filters.missingStages = []
+    appliedFilters.missingStages = []
+  }
   if (key === 'projectStatuses') {
     filters.projectStatuses = [...projectStatusValues]
     appliedFilters.projectStatuses = [...projectStatusValues]
@@ -545,6 +730,14 @@ async function removeFilter(key: string) {
   if (key === 'includeHistory') {
     filters.includeHistory = false
     appliedFilters.includeHistory = false
+  }
+  if (key === 'hasLoI') {
+    filters.hasLoI = null
+    appliedFilters.hasLoI = null
+  }
+  if (key === 'hasLenderIndication') {
+    filters.hasLenderIndication = null
+    appliedFilters.hasLenderIndication = null
   }
 
   projectPage.value = 1
@@ -564,7 +757,16 @@ watch(
   },
 )
 
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateSpatialRouteQuery()
+    void loadMap()
+  },
+)
+
 onMounted(() => {
+  hydrateSpatialRouteQuery()
   void loadMap()
 })
 
@@ -678,6 +880,42 @@ onUnmounted(() => {
               </label>
 
               <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.reachedStages"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ reachedStageSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Belum Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.missingStages"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ missingStageSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
                 <span class="text-sm font-medium text-surface-700">Status Proyek</span>
                 <MultiSelect
                   v-model="filters.projectStatuses"
@@ -694,6 +932,28 @@ onUnmounted(() => {
                     <span class="block truncate">{{ projectStatusSelectionLabel }}</span>
                   </template>
                 </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">LoI</span>
+                <Select
+                  v-model="filters.hasLoI"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">Indikasi</span>
+                <Select
+                  v-model="filters.hasLenderIndication"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
               </label>
 
               <label class="block min-w-0 space-y-2 xl:col-span-2">

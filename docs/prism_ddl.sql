@@ -32,6 +32,20 @@ CREATE TABLE currency (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE kurs_tengah (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    currency_id     UUID NOT NULL REFERENCES currency(id),
+    kurs            NUMERIC(20, 6) NOT NULL CHECK (kurs > 0),
+    kurs_tengah_bi  NUMERIC(20, 6) NOT NULL CHECK (kurs_tengah_bi > 0),
+    cut_off_date    DATE NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_kurs_tengah_currency_cutoff UNIQUE (currency_id, cut_off_date)
+);
+
+CREATE INDEX idx_kurs_tengah_currency_cutoff
+    ON kurs_tengah(currency_id, cut_off_date DESC);
+
 INSERT INTO currency (code, name, symbol, is_active, sort_order) VALUES
 ('USD', 'United States Dollar', '$', TRUE, 10),
 ('EUR', 'Euro', 'EUR', TRUE, 20),
@@ -703,6 +717,10 @@ CREATE TRIGGER trg_audit_country
 
 CREATE TRIGGER trg_audit_currency
     AFTER INSERT OR UPDATE OR DELETE ON currency
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_kurs_tengah
+    AFTER INSERT OR UPDATE OR DELETE ON kurs_tengah
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
 
 CREATE TRIGGER trg_audit_lender

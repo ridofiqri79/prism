@@ -152,7 +152,7 @@ Response meta:
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, dan `Lenders` |
+| `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, `Lenders`, dan `Kurs Tengah` |
 
 **Template:**
 `GET /master/import-data/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, header sheet import, dropdown Excel untuk kolom yang punya pilihan master data, dan sheet `Master Data Snapshot` berisi data master yang ada di database saat template dibuat. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown. Response memakai `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dan `Content-Disposition: attachment`.
@@ -202,7 +202,7 @@ Response meta:
 }
 ```
 
-Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. `Parent Name` dapat diisi dengan nama jika unik, UUID institution, atau path `Nama Child; Nama Parent; Nama Root;`. Jika `Parent Name` hanya berisi nama polos dan mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Sheet `Panduan` pada template menjelaskan fallback referensi Institution: path dropdown sebagai prioritas utama, UUID dari sheet Master Data sebagai fallback paling spesifik, dan nama polos hanya jika unik. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
+Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. `Parent Name` dapat diisi dengan nama jika unik, UUID institution, atau path `Nama Child; Nama Parent; Nama Root;`. Jika `Parent Name` hanya berisi nama polos dan mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Sheet `Kurs Tengah` memakai kolom `Currency`, `Kurs`, `Kurs Tengah BI`, dan `Cut Off Date`; kombinasi currency dan cut off date yang sudah ada akan di-skip. Sheet `Panduan` pada template menjelaskan fallback referensi Institution: path dropdown sebagai prioritas utama, UUID dari sheet Master Data sebagai fallback paling spesifik, dan nama polos hanya jika unik. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
 
 ### Country
 
@@ -287,6 +287,85 @@ Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek se
 ```
 
 Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar aktif di Master Currency. Seed awal mengikuti mata uang negara donor/lender dan mata uang yang umum digunakan lembaga multilateral.
+
+---
+
+### Kurs Tengah BI
+
+Kurs Tengah BI memakai permission module `currency` karena merupakan turunan master mata uang. Operasi tulis hanya tersedia dalam bentuk bulk.
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/master/kurs-tengah` | read: `currency` |
+| `POST` | `/master/kurs-tengah/bulk` | create: `currency` |
+| `PUT` | `/master/kurs-tengah/bulk` | update: `currency` |
+| `DELETE` | `/master/kurs-tengah/bulk` | delete: `currency` |
+
+**`GET /master/kurs-tengah` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `currency_id` | Filter multi-value UUID Master Currency |
+| `cut_off_date_from` | Filter tanggal mulai, format `YYYY-MM-DD` |
+| `cut_off_date_to` | Filter tanggal akhir, format `YYYY-MM-DD` |
+| `search` | Cari berdasarkan kode atau nama currency |
+| `sort` | `currency`, `cut_off_date`, `kurs`, `kurs_tengah_bi` |
+
+**`GET /master/kurs-tengah` Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "currency_id": "uuid-currency-jpy",
+      "currency": {
+        "id": "uuid-currency-jpy",
+        "code": "JPY",
+        "name": "Japanese Yen",
+        "symbol": "JPY",
+        "is_active": true
+      },
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
+}
+```
+
+**`POST /master/kurs-tengah/bulk` Request:**
+```json
+{
+  "items": [
+    {
+      "currency_id": "uuid-currency-jpy",
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ]
+}
+```
+
+**`PUT /master/kurs-tengah/bulk` Request:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid-kurs-tengah",
+      "currency_id": "uuid-currency-jpy",
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ]
+}
+```
+
+Response bulk create/update membungkus array data yang tersimpan dalam `data`. `DELETE /master/kurs-tengah/bulk` menerima body `{"ids":["uuid-kurs-tengah"]}` dan mengembalikan `204`.
+
+Validasi: `currency_id` wajib merujuk Master Currency, `kurs` dan `kurs_tengah_bi` wajib lebih dari 0, `cut_off_date` wajib format `YYYY-MM-DD`, dan kombinasi `(currency_id, cut_off_date)` unik.
 
 ---
 
@@ -1622,6 +1701,10 @@ Mengembalikan data peta choropleth provinsi atau kabupaten/kota. Cakupan lokasi 
 | `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
 | `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
 | `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `reached_stages` | Multi value tahap yang sudah dicapai. `GB` mencakup project dengan status `GB`, `DK`, `LA`, atau `Monitoring`; `DK` mencakup `DK`, `LA`, atau `Monitoring`; `LA` mencakup `LA` atau `Monitoring`; `Monitoring` hanya `Monitoring`; `BB` mencakup seluruh project aktif |
+| `missing_stages` | Multi value tahap yang belum dicapai untuk analisa bottleneck. Contoh: `missing_stages=GB` hanya project yang masih di `BB`; `missing_stages=LA` mencakup project `BB`, `GB`, atau `DK` |
+| `has_loi` | Boolean `true`/`false`; filter keberadaan LoI pada BB Project |
+| `has_lender_indication` | Boolean `true`/`false`; filter keberadaan indikasi lender pada BB Project |
 | `search` | Cari berdasarkan kode atau nama proyek |
 | `include_history` | `true` untuk menghitung snapshot historis, default latest snapshot saja |
 
@@ -1670,7 +1753,7 @@ Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi 
 | `region_code` | Kode nasional (`ID`), provinsi, atau kabupaten/kota yang dipilih |
 | `province_code` | Konteks parent saat `level=city` |
 | `page`, `limit`, `sort`, `order` | Pagination dan sorting standar project master |
-| `loan_types`, `project_statuses`, `pipeline_statuses`, `search`, `include_history` | Sama dengan choropleth |
+| `loan_types`, `project_statuses`, `pipeline_statuses`, `reached_stages`, `missing_stages`, `has_loi`, `has_lender_indication`, `search`, `include_history` | Sama dengan choropleth |
 
 **Response `200`:**
 ```json
@@ -1700,6 +1783,143 @@ Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi 
 
 ---
 
+### `GET /dashboard/blue-book-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Blue Book untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` agar revisi lama tidak double-count. Relasi K/L dihitung dari role `Executing Agency`, lalu setiap institution dinaikkan ke ancestor level tertinggi (`parent_id IS NULL`). Distribusi Program memakai `program_title_id` exact pada Project Blue Book agar item dashboard dapat deep-link ke Project Master dengan `program_title_ids`.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "agency_groups": [
+      {
+        "label": "Kementerian/Lembaga",
+        "level": "Kementerian/Lembaga",
+        "project_count": 85,
+        "foreign_loan_usd": 25550770000
+      }
+    ],
+    "top_agencies": [
+      {
+        "id": "uuid-root-institution",
+        "label": "Kemen PU",
+        "level": "Kementerian/Badan/Lembaga",
+        "project_count": 27,
+        "foreign_loan_usd": 12055300000
+      }
+    ],
+    "programs": [
+      {
+        "id": "uuid-program-title",
+        "label": "Konektivitas & Transportasi",
+        "level": "Program Title",
+        "project_count": 38,
+        "foreign_loan_usd": 12100000000
+      }
+    ]
+  }
+}
+```
+
+Catatan: satu proyek dapat memiliki lebih dari satu Executing Agency pada root berbeda. Karena itu total `project_count` pada distribusi K/L dapat lebih besar dari total proyek Blue Book.
+
+---
+
+### `GET /dashboard/green-book-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Green Book untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah memiliki relasi Green Book. Tipe lender dan top lender dihitung dari `gb_funding_source`; top K/L dihitung dari role `Executing Agency` pada Project Blue Book lalu dinaikkan ke institution level tertinggi agar deep link memakai `executing_agency_ids` exact.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "lender_types": [
+      {
+        "label": "Bilateral",
+        "level": "Lender Type",
+        "project_count": 16,
+        "foreign_loan_usd": 8700000000
+      }
+    ],
+    "top_lenders": [
+      {
+        "id": "uuid-lender",
+        "label": "JICA",
+        "level": "Bilateral",
+        "project_count": 10,
+        "foreign_loan_usd": 4100000000
+      }
+    ],
+    "top_agencies": [
+      {
+        "id": "uuid-root-institution",
+        "label": "Kemen PU",
+        "level": "Kementerian/Badan/Lembaga",
+        "project_count": 11,
+        "foreign_loan_usd": 5100000000
+      }
+    ]
+  }
+}
+```
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=GB&loan_types=Bilateral`
+- `/projects?reached_stages=GB&fixed_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=GB&executing_agency_ids=<uuid-root-institution>`
+
+Catatan: satu proyek Green Book dapat memiliki lebih dari satu lender atau Executing Agency root. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Green Book.
+
+---
+
+### `GET /dashboard/daftar-kegiatan-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Daftar Kegiatan untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah mencapai Daftar Kegiatan. Tipe lender dan top lender dihitung dari `dk_financing_detail`; top K/L dihitung dari `dk_project.institution_id` lalu dinaikkan ke institution level tertinggi agar deep link memakai `dk_executing_agency_ids` exact.
+
+Response shape sama dengan `GET /dashboard/green-book-distribution`:
+- `lender_types[]`
+- `top_lenders[]`
+- `top_agencies[]`
+- `programs[]`
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=DK&loan_types=Bilateral`
+- `/projects?reached_stages=DK&dk_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=DK&dk_executing_agency_ids=<uuid-root-institution>`
+- `/projects?reached_stages=DK&program_title_ids=<uuid-program-title>`
+
+Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu lender. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Daftar Kegiatan.
+
+---
+
+### `GET /dashboard/loan-agreement-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Loan Agreement untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah memiliki Loan Agreement. Tipe lender dan top lender dihitung dari `loan_agreement.lender_id`; top K/L tetap mengikuti Executing Agency pada `dk_project.institution_id` lalu dinaikkan ke institution level tertinggi agar deep link memakai `dk_executing_agency_ids` exact.
+
+Response shape sama dengan `GET /dashboard/green-book-distribution`:
+- `lender_types[]`
+- `top_lenders[]`
+- `top_agencies[]`
+- `programs[]`
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=LA&loan_types=Bilateral`
+- `/projects?reached_stages=LA&loan_agreement_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=LA&dk_executing_agency_ids=<uuid-root-institution>`
+- `/projects?reached_stages=LA&program_title_ids=<uuid-program-title>`
+
+Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu Loan Agreement. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Loan Agreement.
+
+---
+
 ### `GET /projects`
 
 **Permission:** read: `bb_project`
@@ -1716,10 +1936,17 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `sort`, `order` | Sorting standar. `sort`: `project_name`, `bb_code`, `loan_types`, `indication_lenders`, `executing_agencies`, `fixed_lenders`, `project_status`, `pipeline_status`, `program_title`, `locations`, `foreign_loan_usd`, `dk_dates`. `order`: `asc` atau `desc` |
 | `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
 | `indication_lender_ids` | Multi value UUID lender dari `lender_indication` BB |
-| `executing_agency_ids` | Multi value UUID institution role `Executing Agency` |
+| `executing_agency_ids` | Multi value UUID institution role `Executing Agency`. Jika UUID adalah institution level tertinggi, filter juga mencakup EA turunan di bawah root tersebut |
 | `fixed_lender_ids` | Multi value UUID lender dari `gb_funding_source` Green Book |
+| `dk_lender_ids` | Multi value UUID lender dari `dk_financing_detail` Daftar Kegiatan |
+| `loan_agreement_lender_ids` | Multi value UUID lender dari `loan_agreement.lender_id` |
+| `dk_executing_agency_ids` | Multi value UUID institution dari `dk_project.institution_id`. Jika UUID adalah institution level tertinggi, filter juga mencakup EA DK turunan di bawah root tersebut |
 | `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
 | `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `reached_stages` | Multi value tahap yang sudah dicapai. `GB` mencakup project dengan status `GB`, `DK`, `LA`, atau `Monitoring`; `DK` mencakup `DK`, `LA`, atau `Monitoring`; `LA` mencakup `LA` atau `Monitoring`; `Monitoring` hanya `Monitoring`; `BB` mencakup seluruh project aktif |
+| `missing_stages` | Multi value tahap yang belum dicapai untuk analisa bottleneck. Contoh: `missing_stages=GB` hanya project yang masih di `BB`; `missing_stages=LA` mencakup project `BB`, `GB`, atau `DK` |
+| `has_loi` | Boolean `true`/`false`; filter keberadaan LoI pada BB Project |
+| `has_lender_indication` | Boolean `true`/`false`; filter keberadaan indikasi lender pada BB Project |
 | `program_title_ids` | Multi value UUID program title |
 | `region_ids` | Multi value UUID region/location |
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
@@ -1728,6 +1955,19 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `include_history` | `true` untuk menampilkan semua snapshot, default `false` |
 
 Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&loan_types=KSA`), comma-separated value, atau format array query string (`loan_types[]=Bilateral`).
+
+Contoh deep link dari dashboard:
+- `/projects?reached_stages=GB`
+- `/projects?reached_stages=GB&fixed_lender_ids=<uuid>`
+- `/projects?reached_stages=GB&executing_agency_ids=<uuid>`
+- `/projects?reached_stages=DK&dk_lender_ids=<uuid>`
+- `/projects?reached_stages=DK&dk_executing_agency_ids=<uuid>`
+- `/projects?reached_stages=LA&loan_agreement_lender_ids=<uuid>`
+- `/projects?reached_stages=LA&dk_executing_agency_ids=<uuid>`
+- `/projects?reached_stages=BB&missing_stages=GB&has_loi=true`
+- `/projects?reached_stages=BB&missing_stages=GB&has_lender_indication=false`
+- `/projects?reached_stages=BB&program_title_ids=<uuid>`
+- `/spatial-distribution?level=province&region_code=ID&reached_stages=BB&metric=count`
 
 **Response `200`:**
 ```json
@@ -1767,7 +2007,7 @@ Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&lo
 
 **Permission:** read: `bb_project`
 
-Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filter aktif. Endpoint memakai query param yang sama dengan `GET /projects`; `page` dan `limit` diabaikan karena export selalu mengambil semua hasil filter. Sorting tetap mengikuti `sort` dan `order`. Sheet `Ringkasan` berisi total pendanaan serta daftar filter aktif yang dipakai saat export.
+Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filter aktif. Endpoint memakai query param yang sama dengan `GET /projects`, termasuk `reached_stages`, `missing_stages`, `has_loi`, `has_lender_indication`, `dk_lender_ids`, `loan_agreement_lender_ids`, dan `dk_executing_agency_ids`; `page` dan `limit` diabaikan karena export selalu mengambil semua hasil filter. Sorting tetap mengikuti `sort` dan `order`. Sheet `Ringkasan` berisi total pendanaan serta daftar filter aktif yang dipakai saat export.
 
 **Response `200`:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dengan `Content-Disposition: attachment`.
 

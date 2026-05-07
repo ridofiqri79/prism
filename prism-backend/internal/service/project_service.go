@@ -141,6 +141,22 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
 	}
+	reachedStages, err := allowedValues(filter.ReachedStages, map[string]struct{}{"BB": {}, "GB": {}, "DK": {}, "LA": {}, "Monitoring": {}}, "reached_stages")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	missingStages, err := allowedValues(filter.MissingStages, map[string]struct{}{"BB": {}, "GB": {}, "DK": {}, "LA": {}, "Monitoring": {}}, "missing_stages")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	hasLoI, err := optionalBool(filter.HasLoI, "has_loi")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	hasLenderIndication, err := optionalBool(filter.HasLenderIndication, "has_lender_indication")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
 	indicationLenderIDs, err := uuidArray(filter.IndicationLenderIDs, "indication_lender_ids")
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
@@ -150,6 +166,18 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 		return queries.ListProjectMasterParams{}, err
 	}
 	fixedLenderIDs, err := uuidArray(filter.FixedLenderIDs, "fixed_lender_ids")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	dkLenderIDs, err := uuidArray(filter.DKLenderIDs, "dk_lender_ids")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	loanAgreementLenderIDs, err := uuidArray(filter.LoanAgreementLenderIDs, "loan_agreement_lender_ids")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
+	dkExecutingAgencyIDs, err := uuidArray(filter.DKExecutingAgencyIDs, "dk_executing_agency_ids")
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
 	}
@@ -189,62 +217,83 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 	}
 
 	return queries.ListProjectMasterParams{
-		Sort:                sortField,
-		Order:               sortOrder,
-		Offset:              int32(offset),
-		Limit:               int32(limit),
-		IncludeHistory:      filter.IncludeHistory,
-		LoanTypes:           loanTypes,
-		IndicationLenderIds: indicationLenderIDs,
-		ExecutingAgencyIds:  executingAgencyIDs,
-		FixedLenderIds:      fixedLenderIDs,
-		ProjectStatuses:     projectStatuses,
-		PipelineStatuses:    pipelineStatuses,
-		ProgramTitleIds:     programTitleIDs,
-		RegionIds:           regionIDs,
-		ForeignLoanMin:      foreignLoanMin,
-		ForeignLoanMax:      foreignLoanMax,
-		DkDateFrom:          dkDateFrom,
-		DkDateTo:            dkDateTo,
-		Search:              optionalText(filter.Search),
+		Sort:                   sortField,
+		Order:                  sortOrder,
+		Offset:                 int32(offset),
+		Limit:                  int32(limit),
+		IncludeHistory:         filter.IncludeHistory,
+		LoanTypes:              loanTypes,
+		IndicationLenderIds:    indicationLenderIDs,
+		ExecutingAgencyIds:     executingAgencyIDs,
+		FixedLenderIds:         fixedLenderIDs,
+		DkLenderIds:            dkLenderIDs,
+		LoanAgreementLenderIds: loanAgreementLenderIDs,
+		DkExecutingAgencyIds:   dkExecutingAgencyIDs,
+		ProjectStatuses:        projectStatuses,
+		PipelineStatuses:       pipelineStatuses,
+		ReachedStages:          reachedStages,
+		MissingStages:          missingStages,
+		HasLoi:                 hasLoI,
+		HasLenderIndication:    hasLenderIndication,
+		ProgramTitleIds:        programTitleIDs,
+		RegionIds:              regionIDs,
+		ForeignLoanMin:         foreignLoanMin,
+		ForeignLoanMax:         foreignLoanMax,
+		DkDateFrom:             dkDateFrom,
+		DkDateTo:               dkDateTo,
+		Search:                 optionalText(filter.Search),
 	}, nil
 }
 
 func countProjectMasterParams(params queries.ListProjectMasterParams) queries.CountProjectMasterParams {
 	return queries.CountProjectMasterParams{
-		LoanTypes:           params.LoanTypes,
-		IndicationLenderIds: params.IndicationLenderIds,
-		ExecutingAgencyIds:  params.ExecutingAgencyIds,
-		FixedLenderIds:      params.FixedLenderIds,
-		ProjectStatuses:     params.ProjectStatuses,
-		PipelineStatuses:    params.PipelineStatuses,
-		ProgramTitleIds:     params.ProgramTitleIds,
-		RegionIds:           params.RegionIds,
-		ForeignLoanMin:      params.ForeignLoanMin,
-		ForeignLoanMax:      params.ForeignLoanMax,
-		DkDateFrom:          params.DkDateFrom,
-		DkDateTo:            params.DkDateTo,
-		Search:              params.Search,
-		IncludeHistory:      params.IncludeHistory,
+		LoanTypes:              params.LoanTypes,
+		IndicationLenderIds:    params.IndicationLenderIds,
+		ExecutingAgencyIds:     params.ExecutingAgencyIds,
+		FixedLenderIds:         params.FixedLenderIds,
+		DkLenderIds:            params.DkLenderIds,
+		LoanAgreementLenderIds: params.LoanAgreementLenderIds,
+		DkExecutingAgencyIds:   params.DkExecutingAgencyIds,
+		ProjectStatuses:        params.ProjectStatuses,
+		PipelineStatuses:       params.PipelineStatuses,
+		ReachedStages:          params.ReachedStages,
+		MissingStages:          params.MissingStages,
+		HasLoi:                 params.HasLoi,
+		HasLenderIndication:    params.HasLenderIndication,
+		ProgramTitleIds:        params.ProgramTitleIds,
+		RegionIds:              params.RegionIds,
+		ForeignLoanMin:         params.ForeignLoanMin,
+		ForeignLoanMax:         params.ForeignLoanMax,
+		DkDateFrom:             params.DkDateFrom,
+		DkDateTo:               params.DkDateTo,
+		Search:                 params.Search,
+		IncludeHistory:         params.IncludeHistory,
 	}
 }
 
 func summaryProjectMasterParams(params queries.ListProjectMasterParams) queries.GetProjectMasterFundingSummaryParams {
 	return queries.GetProjectMasterFundingSummaryParams{
-		LoanTypes:           params.LoanTypes,
-		IndicationLenderIds: params.IndicationLenderIds,
-		ExecutingAgencyIds:  params.ExecutingAgencyIds,
-		FixedLenderIds:      params.FixedLenderIds,
-		ProjectStatuses:     params.ProjectStatuses,
-		PipelineStatuses:    params.PipelineStatuses,
-		ProgramTitleIds:     params.ProgramTitleIds,
-		RegionIds:           params.RegionIds,
-		ForeignLoanMin:      params.ForeignLoanMin,
-		ForeignLoanMax:      params.ForeignLoanMax,
-		DkDateFrom:          params.DkDateFrom,
-		DkDateTo:            params.DkDateTo,
-		Search:              params.Search,
-		IncludeHistory:      params.IncludeHistory,
+		LoanTypes:              params.LoanTypes,
+		IndicationLenderIds:    params.IndicationLenderIds,
+		ExecutingAgencyIds:     params.ExecutingAgencyIds,
+		FixedLenderIds:         params.FixedLenderIds,
+		DkLenderIds:            params.DkLenderIds,
+		LoanAgreementLenderIds: params.LoanAgreementLenderIds,
+		DkExecutingAgencyIds:   params.DkExecutingAgencyIds,
+		ProjectStatuses:        params.ProjectStatuses,
+		PipelineStatuses:       params.PipelineStatuses,
+		ReachedStages:          params.ReachedStages,
+		MissingStages:          params.MissingStages,
+		HasLoi:                 params.HasLoi,
+		HasLenderIndication:    params.HasLenderIndication,
+		ProgramTitleIds:        params.ProgramTitleIds,
+		RegionIds:              params.RegionIds,
+		ForeignLoanMin:         params.ForeignLoanMin,
+		ForeignLoanMax:         params.ForeignLoanMax,
+		DkDateFrom:             params.DkDateFrom,
+		DkDateTo:               params.DkDateTo,
+		Search:                 params.Search,
+		IncludeHistory:         params.IncludeHistory,
 	}
 }
 
@@ -285,26 +334,26 @@ func normalizeProjectMasterSort(sortField, sortOrder string) (string, string, er
 
 func projectMasterResponse(row queries.ListProjectMasterRow) model.ProjectMasterResponse {
 	return model.ProjectMasterResponse{
-		ID:                    model.UUIDToString(row.ID),
-		BlueBookID:            model.UUIDToString(row.BlueBookID),
-		ProjectIdentityID:     model.UUIDToString(row.ProjectIdentityID),
-		BBCode:                row.BbCode,
-		ProjectName:           row.ProjectName,
-		LoanTypes:             safeStringSlice(row.LoanTypes),
-		IndicationLenders:     safeStringSlice(row.IndicationLenders),
-		ExecutingAgencies:     safeStringSlice(row.ExecutingAgencies),
-		FixedLenders:          safeStringSlice(row.FixedLenders),
-		ProjectStatus:         row.ProjectStatus,
-		PipelineStatus:        row.PipelineStatus,
-		ProgramTitle:          row.ProgramTitle,
-		Locations:             safeStringSlice(row.Locations),
-		ForeignLoanUSD:        floatFromNumeric(row.ForeignLoanUsd),
-		DKDates:               safeStringSlice(row.DkDates),
-		IsLatest:              row.IsLatest,
-		HasNewerRevision:      row.HasNewerRevision,
-		BlueBookRevisionLabel:      row.BlueBookRevisionLabel,
-		GBCodes:                    safeStringSlice(row.GbCodes),
-		GreenBookRevisionLabels:    safeStringSlice(row.GreenBookRevisionLabels),
+		ID:                      model.UUIDToString(row.ID),
+		BlueBookID:              model.UUIDToString(row.BlueBookID),
+		ProjectIdentityID:       model.UUIDToString(row.ProjectIdentityID),
+		BBCode:                  row.BbCode,
+		ProjectName:             row.ProjectName,
+		LoanTypes:               safeStringSlice(row.LoanTypes),
+		IndicationLenders:       safeStringSlice(row.IndicationLenders),
+		ExecutingAgencies:       safeStringSlice(row.ExecutingAgencies),
+		FixedLenders:            safeStringSlice(row.FixedLenders),
+		ProjectStatus:           row.ProjectStatus,
+		PipelineStatus:          row.PipelineStatus,
+		ProgramTitle:            row.ProgramTitle,
+		Locations:               safeStringSlice(row.Locations),
+		ForeignLoanUSD:          floatFromNumeric(row.ForeignLoanUsd),
+		DKDates:                 safeStringSlice(row.DkDates),
+		IsLatest:                row.IsLatest,
+		HasNewerRevision:        row.HasNewerRevision,
+		BlueBookRevisionLabel:   row.BlueBookRevisionLabel,
+		GBCodes:                 safeStringSlice(row.GbCodes),
+		GreenBookRevisionLabels: safeStringSlice(row.GreenBookRevisionLabels),
 	}
 }
 
@@ -421,8 +470,19 @@ func (s *ProjectService) projectMasterExportFilters(ctx context.Context, params 
 	addFilter("Indikasi Lender", joinExportValues(s.projectLenderLabels(ctx, params.IndicationLenderIds)))
 	addFilter("Executing Agency", joinExportValues(s.projectInstitutionLabels(ctx, params.ExecutingAgencyIds)))
 	addFilter("Fixed Lender", joinExportValues(s.projectLenderLabels(ctx, params.FixedLenderIds)))
+	addFilter("Lender Daftar Kegiatan", joinExportValues(s.projectLenderLabels(ctx, params.DkLenderIds)))
+	addFilter("Lender Loan Agreement", joinExportValues(s.projectLenderLabels(ctx, params.LoanAgreementLenderIds)))
+	addFilter("Executing Agency Daftar Kegiatan", joinExportValues(s.projectInstitutionLabels(ctx, params.DkExecutingAgencyIds)))
 	addFilter("Status Project", joinExportFilterValues(params.ProjectStatuses))
 	addFilter("Status Pipeline", joinExportFilterValues(projectPipelineLabels(params.PipelineStatuses)))
+	addFilter("Sudah mencapai tahap", joinExportFilterValues(projectPipelineLabels(params.ReachedStages)))
+	addFilter("Belum mencapai tahap", joinExportFilterValues(projectPipelineLabels(params.MissingStages)))
+	if params.HasLoi.Valid {
+		addFilter("LoI", boolFilterLabel(params.HasLoi.Bool, "Ada", "Tidak ada"))
+	}
+	if params.HasLenderIndication.Valid {
+		addFilter("Status Indikasi Lender", boolFilterLabel(params.HasLenderIndication.Bool, "Ada", "Tidak ada"))
+	}
 	addFilter("Program Title", joinExportValues(s.projectProgramTitleLabels(ctx, params.ProgramTitleIds)))
 	addFilter("Region/Location", joinExportValues(s.projectRegionLabels(ctx, params.RegionIds)))
 
@@ -579,6 +639,13 @@ func boolExportLabel(value bool) string {
 		return "Ya"
 	}
 	return "Tidak"
+}
+
+func boolFilterLabel(value bool, trueLabel string, falseLabel string) string {
+	if value {
+		return trueLabel
+	}
+	return falseLabel
 }
 
 func projectPipelineLabel(status string) string {

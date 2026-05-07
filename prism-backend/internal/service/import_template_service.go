@@ -91,6 +91,7 @@ type importTemplateReferenceData struct {
 	NationalPriorities []queries.ListNationalPrioritiesRow
 	Lenders            []queries.ListLendersRow
 	Currencies         []queries.Currency
+	KursTengah         []queries.ListKursTengahRow
 	Countries          []queries.Country
 	BBProjects         []queries.ListActiveBBProjectReferencesRow
 	GBProjects         []queries.ListActiveGBProjectReferencesRow
@@ -288,6 +289,10 @@ func (s *MasterService) buildMasterImportTemplateWorkbook(ctx context.Context) (
 		templateInputSheet("Lenders", []string{"Name (*)", "Short Name", "Type (*)", "Country Name"}, []float64{42, 18, 22, 34}, []simpleXLSXValidation{
 			listValidation("C2:C"+inputLastRow(), "ddLenderTypes", "Type", "Pilih Bilateral, Multilateral, atau KSA. Bilateral dan KSA wajib memiliki Country Name."),
 			listValidation("D2:D"+inputLastRow(), "ddCountries", "Country Name", "Pilih country untuk Bilateral atau KSA. Kosongkan untuk Multilateral."),
+		}),
+		templateInputSheet("Kurs Tengah", []string{"Currency (*)", "Kurs (*)", "Kurs Tengah BI (*)", "Cut Off Date (*)"}, []float64{16, 18, 22, 18}, []simpleXLSXValidation{
+			listValidation("A2:A"+inputLastRow(), "ddCurrencies", "Currency", "Pilih kode currency dari Master Currency."),
+			decimalValidation("B2:C"+inputLastRow(), "Kurs", "Isi angka lebih dari 0. Backend akan menolak nilai 0 atau negatif."),
 		}),
 		buildMasterDataSnapshotSheet("Master Data Snapshot", reference),
 		dropdowns,
@@ -576,6 +581,20 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		return nil, apperrors.Internal("Gagal membaca snapshot currency")
 	}
 
+	kursTengahRows, err := s.queries.ListKursTengah(ctx, queries.ListKursTengahParams{
+		Limit:             masterImportListLimit,
+		Offset:            0,
+		CurrencyIDFilters: nil,
+		CutOffDateFrom:    pgtype.Date{},
+		CutOffDateTo:      pgtype.Date{},
+		Search:            pgtype.Text{},
+		SortField:         "cut_off_date",
+		SortOrder:         "desc",
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca snapshot kurs tengah")
+	}
+
 	countries, err := s.queries.ListCountries(ctx, queries.ListCountriesParams{Limit: masterImportListLimit, Offset: 0, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
 	if err != nil {
 		return nil, apperrors.Internal("Gagal membaca snapshot country")
@@ -624,6 +643,7 @@ func (s *MasterService) loadImportTemplateReferenceData(ctx context.Context, per
 		NationalPriorities: priorities,
 		Lenders:            lenders,
 		Currencies:         currencies,
+		KursTengah:         kursTengahRows,
 		Countries:          countries,
 		BBProjects:         bbProjects,
 		GBProjects:         gbProjects,
@@ -680,6 +700,9 @@ func buildMasterDataSnapshotSheet(name string, reference *importTemplateReferenc
 			status = "Aktif"
 		}
 		rows = append(rows, textRow("Currency", item.Code, item.Name, status, strconv.FormatInt(int64(item.SortOrder), 10), textFromPg(item.Symbol)))
+	}
+	for _, item := range reference.KursTengah {
+		rows = append(rows, textRow("Kurs Tengah", model.UUIDToString(item.ID), item.CurrencyCode, dateString(item.CutOffDate), formatImportTemplateFloat(floatFromNumeric(item.Kurs)), formatImportTemplateFloat(floatFromNumeric(item.KursTengahBi))))
 	}
 	for _, item := range reference.Countries {
 		rows = append(rows, textRow("Country", item.Code, item.Name, "", "", ""))
@@ -785,6 +808,7 @@ func buildMasterGuideSheet() simpleXLSXSheet {
 		textRow("Periods", "Name (*), Year Start (*), Year End (*)", "Year End harus lebih besar dari Year Start."),
 		textRow("National Priorities", "Period Name (*), Title (*)", "Period Name pilih dari sheet Periods atau period yang sudah ada di database."),
 		textRow("Lenders", "Name (*), Type (*)", "Bilateral dan KSA wajib Country Name; Multilateral harus dikosongkan Country Name."),
+		textRow("Kurs Tengah", "Currency (*), Kurs (*), Kurs Tengah BI (*), Cut Off Date (*)", "Currency memakai kode Master Currency. Cut Off Date isi format YYYY-MM-DD; kombinasi Currency + Cut Off Date yang sudah ada akan dilewati."),
 		textRow(""),
 	}
 	rows = append(rows, institutionFallbackGuideRows()...)
@@ -1252,6 +1276,10 @@ func currencyValues(items []queries.Currency) []string {
 		}
 	}
 	return values
+}
+
+func formatImportTemplateFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
 func bbProjectCodeValues(items []queries.ListActiveBBProjectReferencesRow) []string {

@@ -28,6 +28,8 @@
 - Pencatatan currency dimulai dari Green Book Funding Source. DK melakukan autofill currency dan nilai original/USD dari Funding Source GB, lalu tetap dapat diedit sebelum disimpan.
 - Jika currency adalah `USD`, user tidak perlu mengisi nilai USD terpisah. Backend menyimpan nilai USD sama dengan nilai original.
 - Seed awal Master Currency berisi mata uang negara donor/lender dan mata uang yang lazim dipakai lembaga multilateral. `XDR` disediakan nonaktif sebagai referensi Special Drawing Rights.
+- Master Kurs Tengah BI disimpan per currency dan `cut_off_date`; kombinasi currency dan cut off date harus unik.
+- CRUD Kurs Tengah BI dilakukan bulk agar operator dapat mengisi banyak tanggal/currency dalam satu transaksi.
 - Konversi ke USD dan IDR tetap manual oleh Staff. Sistem tidak melakukan konversi otomatis.
 
 ---

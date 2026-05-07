@@ -53,6 +53,7 @@ func main() {
 	journeyService := service.NewJourneyService(q)
 	projectService := service.NewProjectService(q)
 	spatialDistributionService := service.NewSpatialDistributionService(q, projectService)
+	dashboardService := service.NewDashboardService(q)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	masterHandler := handler.NewMasterHandler(masterService)
@@ -63,6 +64,7 @@ func main() {
 	journeyHandler := handler.NewJourneyHandler(journeyService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	spatialDistributionHandler := handler.NewSpatialDistributionHandler(spatialDistributionService)
+	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -109,6 +111,11 @@ func main() {
 	master.POST("/currencies", masterHandler.CreateCurrency, middleware.Require("currency", "create"))
 	master.PUT("/currencies/:id", masterHandler.UpdateCurrency, middleware.Require("currency", "update"))
 	master.DELETE("/currencies/:id", masterHandler.DeleteCurrency, middleware.Require("currency", "delete"))
+
+	master.GET("/kurs-tengah", masterHandler.ListKursTengah, middleware.Require("currency", "read"))
+	master.POST("/kurs-tengah/bulk", masterHandler.BulkCreateKursTengah, middleware.Require("currency", "create"))
+	master.PUT("/kurs-tengah/bulk", masterHandler.BulkUpdateKursTengah, middleware.Require("currency", "update"))
+	master.DELETE("/kurs-tengah/bulk", masterHandler.BulkDeleteKursTengah, middleware.Require("currency", "delete"))
 
 	master.GET("/lenders", masterHandler.ListLenders, middleware.Require("lender", "read"))
 	master.GET("/lenders/:id", masterHandler.GetLender, middleware.Require("lender", "read"))
@@ -230,6 +237,12 @@ func main() {
 	api.GET("/projects", projectHandler.ListMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/export", projectHandler.ExportMaster, middleware.Require("bb_project", "read"))
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
+
+	dashboard := api.Group("/dashboard", middleware.Require("bb_project", "read"))
+	dashboard.GET("/blue-book-distribution", dashboardHandler.BlueBookDistribution)
+	dashboard.GET("/green-book-distribution", dashboardHandler.GreenBookDistribution)
+	dashboard.GET("/daftar-kegiatan-distribution", dashboardHandler.DaftarKegiatanDistribution)
+	dashboard.GET("/loan-agreement-distribution", dashboardHandler.LoanAgreementDistribution)
 
 	spatialDistribution := api.Group("/spatial-distribution", middleware.Require("bb_project", "read"))
 	spatialDistribution.GET("/choropleth", spatialDistributionHandler.Choropleth)

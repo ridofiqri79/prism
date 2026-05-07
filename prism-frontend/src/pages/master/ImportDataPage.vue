@@ -70,7 +70,7 @@ const importKindOptions: ImportKindOption[] = [
   {
     value: 'master',
     label: 'Master Data',
-    description: 'Program title, instansi, wilayah, periode, prioritas, lender',
+    description: 'Program title, instansi, wilayah, periode, prioritas, lender, dan kurs tengah',
   },
   {
     value: 'blue_book',
@@ -102,6 +102,7 @@ const masterWorkbookSheets = [
   'Periods',
   'National Priorities',
   'Lenders',
+  'Kurs Tengah',
 ]
 
 const blueBookWorkbookSheets = [

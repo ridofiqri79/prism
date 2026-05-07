@@ -109,6 +109,93 @@ RETURNING *;
 DELETE FROM currency
 WHERE id = $1;
 
+-- ===== KURS TENGAH =====
+-- name: ListKursTengah :many
+SELECT
+    kt.id,
+    kt.currency_id,
+    kt.kurs,
+    kt.kurs_tengah_bi,
+    kt.cut_off_date,
+    kt.created_at,
+    kt.updated_at,
+    c.code AS currency_code,
+    c.name AS currency_name,
+    c.symbol AS currency_symbol,
+    c.is_active AS currency_is_active
+FROM kurs_tengah kt
+JOIN currency c ON c.id = kt.currency_id
+WHERE (COALESCE(cardinality(sqlc.arg('currency_id_filters')::uuid[]), 0) = 0 OR kt.currency_id = ANY(sqlc.arg('currency_id_filters')::uuid[]))
+  AND (sqlc.narg('cut_off_date_from')::date IS NULL OR kt.cut_off_date >= sqlc.narg('cut_off_date_from')::date)
+  AND (sqlc.narg('cut_off_date_to')::date IS NULL OR kt.cut_off_date <= sqlc.narg('cut_off_date_to')::date)
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR c.code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR c.name ILIKE '%' || sqlc.narg('search')::text || '%'
+  )
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'currency' AND sqlc.arg('sort_order')::text = 'asc' THEN c.code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'currency' AND sqlc.arg('sort_order')::text = 'desc' THEN c.code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'cut_off_date' AND sqlc.arg('sort_order')::text = 'asc' THEN kt.cut_off_date END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'cut_off_date' AND sqlc.arg('sort_order')::text = 'desc' THEN kt.cut_off_date END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'kurs' AND sqlc.arg('sort_order')::text = 'asc' THEN kt.kurs END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'kurs' AND sqlc.arg('sort_order')::text = 'desc' THEN kt.kurs END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'kurs_tengah_bi' AND sqlc.arg('sort_order')::text = 'asc' THEN kt.kurs_tengah_bi END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'kurs_tengah_bi' AND sqlc.arg('sort_order')::text = 'desc' THEN kt.kurs_tengah_bi END DESC,
+    kt.cut_off_date DESC,
+    c.code ASC
+LIMIT $1 OFFSET $2;
+
+-- name: CountKursTengah :one
+SELECT COUNT(*)
+FROM kurs_tengah kt
+JOIN currency c ON c.id = kt.currency_id
+WHERE (COALESCE(cardinality(sqlc.arg('currency_id_filters')::uuid[]), 0) = 0 OR kt.currency_id = ANY(sqlc.arg('currency_id_filters')::uuid[]))
+  AND (sqlc.narg('cut_off_date_from')::date IS NULL OR kt.cut_off_date >= sqlc.narg('cut_off_date_from')::date)
+  AND (sqlc.narg('cut_off_date_to')::date IS NULL OR kt.cut_off_date <= sqlc.narg('cut_off_date_to')::date)
+  AND (
+    sqlc.narg('search')::text IS NULL
+    OR c.code ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR c.name ILIKE '%' || sqlc.narg('search')::text || '%'
+  );
+
+-- name: GetKursTengah :one
+SELECT
+    kt.id,
+    kt.currency_id,
+    kt.kurs,
+    kt.kurs_tengah_bi,
+    kt.cut_off_date,
+    kt.created_at,
+    kt.updated_at,
+    c.code AS currency_code,
+    c.name AS currency_name,
+    c.symbol AS currency_symbol,
+    c.is_active AS currency_is_active
+FROM kurs_tengah kt
+JOIN currency c ON c.id = kt.currency_id
+WHERE kt.id = $1;
+
+-- name: CreateKursTengah :one
+INSERT INTO kurs_tengah (currency_id, kurs, kurs_tengah_bi, cut_off_date)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: UpdateKursTengah :one
+UPDATE kurs_tengah
+SET currency_id = $2,
+    kurs = $3,
+    kurs_tengah_bi = $4,
+    cut_off_date = $5,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: DeleteKursTengahByIDs :many
+DELETE FROM kurs_tengah
+WHERE id = ANY($1::uuid[])
+RETURNING id;
+
 -- ===== LENDER =====
 -- name: ListLenders :many
 SELECT

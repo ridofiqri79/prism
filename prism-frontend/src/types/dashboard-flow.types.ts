@@ -2,9 +2,30 @@ export type DashboardStageKey = 'BB' | 'GB' | 'DK' | 'LA'
 
 export type DashboardMetricTone = 'neutral' | 'good' | 'warning' | 'danger'
 
+export type DashboardInsightTargetName = 'project-master' | 'spatial-distribution'
+
+export type DashboardInsightQueryValue =
+  | string
+  | string[]
+  | number
+  | number[]
+  | boolean
+  | boolean[]
+  | null
+  | undefined
+
+export interface DashboardInsightTarget {
+  name: DashboardInsightTargetName
+  query: Record<string, DashboardInsightQueryValue>
+  label?: string
+  exact: true
+}
+
 export type DashboardPanelKind =
   | 'bars'
+  | 'card'
   | 'donut'
+  | 'donutbar'
   | 'regions'
   | 'stack'
   | 'table'
@@ -21,22 +42,6 @@ export interface DashboardKpi {
   tone?: DashboardMetricTone
 }
 
-export type DashboardHeaderActionSeverity =
-  | 'secondary'
-  | 'success'
-  | 'info'
-  | 'warn'
-  | 'danger'
-  | 'help'
-  | 'contrast'
-
-export interface DashboardHeaderAction {
-  key: string
-  label: string
-  icon: string
-  severity?: DashboardHeaderActionSeverity
-  outlined?: boolean
-}
 
 export interface DashboardStageCounter {
   tab: string
@@ -44,6 +49,7 @@ export interface DashboardStageCounter {
   value: string
   meta: string
   tone?: DashboardMetricTone
+  target?: DashboardInsightTarget
 }
 
 export interface DashboardDatum {
@@ -51,8 +57,10 @@ export interface DashboardDatum {
   value: number
   valueLabel?: string
   amountLabel?: string
+  description?: string
   color?: string
   tone?: DashboardMetricTone
+  target?: DashboardInsightTarget
 }
 
 export interface DashboardTableRow {
@@ -74,9 +82,11 @@ export interface DashboardStagePanel {
   hint: string
   kind: DashboardPanelKind
   span?: DashboardPanelSpan
+  description?: string
   data?: DashboardDatum[]
   rows?: DashboardTableRow[]
   pairs?: DashboardFlowPair[]
+  target?: DashboardInsightTarget
 }
 
 export interface DashboardStageTab {
@@ -103,5 +113,6 @@ export interface DashboardStage {
   finalLabel?: string
   conversionLabel?: string
   blockedLabel?: string
+  target?: DashboardInsightTarget
   details: DashboardStageDetail
 }

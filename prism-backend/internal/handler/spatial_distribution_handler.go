@@ -43,12 +43,16 @@ func (h *SpatialDistributionHandler) RegionProjects(c echo.Context) error {
 
 func spatialDistributionFilter(c echo.Context) model.SpatialDistributionFilter {
 	return model.SpatialDistributionFilter{
-		Level:            c.QueryParam("level"),
-		ProvinceCode:     queryStringPtr(c, "province_code"),
-		LoanTypes:        queryValues(c, "loan_types", "loan_types[]"),
-		ProjectStatuses:  queryValues(c, "project_statuses", "project_statuses[]"),
-		PipelineStatuses: queryValues(c, "pipeline_statuses", "pipeline_statuses[]"),
-		Search:           queryStringPtr(c, "search"),
-		IncludeHistory:   strings.EqualFold(c.QueryParam("include_history"), "true"),
+		Level:               c.QueryParam("level"),
+		ProvinceCode:        queryStringPtr(c, "province_code"),
+		LoanTypes:           queryValues(c, "loan_types", "loan_types[]"),
+		ProjectStatuses:     queryValues(c, "project_statuses", "project_statuses[]"),
+		PipelineStatuses:    queryValues(c, "pipeline_statuses", "pipeline_statuses[]"),
+		ReachedStages:       queryValues(c, "reached_stages", "reached_stages[]"),
+		MissingStages:       queryValues(c, "missing_stages", "missing_stages[]"),
+		HasLoI:              queryStringPtr(c, "has_loi"),
+		HasLenderIndication: queryStringPtr(c, "has_lender_indication"),
+		Search:              queryStringPtr(c, "search"),
+		IncludeHistory:      strings.EqualFold(c.QueryParam("include_history"), "true"),
 	}
 }

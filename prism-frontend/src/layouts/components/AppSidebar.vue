@@ -130,6 +130,12 @@ const referenceItems = computed<NavigationItem[]>(() =>
       module: 'lender',
     },
     { label: 'Mata Uang', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
+    {
+      label: 'Kurs Tengah BI',
+      to: '/master/kurs-tengah',
+      icon: 'pi pi-chart-line',
+      module: 'currency',
+    },
     { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
     { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {

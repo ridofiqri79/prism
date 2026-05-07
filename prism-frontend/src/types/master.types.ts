@@ -17,6 +17,34 @@ export interface Currency {
 
 export type CurrencyPayload = Omit<Currency, 'id'>
 
+export interface KursTengah {
+  id: string
+  currency_id: string
+  currency: Currency
+  kurs: number
+  kurs_tengah_bi: number
+  cut_off_date: string
+}
+
+export interface KursTengahPayload {
+  currency_id: string
+  kurs: number
+  kurs_tengah_bi: number
+  cut_off_date: string
+}
+
+export interface KursTengahUpdatePayload extends KursTengahPayload {
+  id: string
+}
+
+export interface KursTengahBulkPayload<TItem extends KursTengahPayload = KursTengahPayload> {
+  items: TItem[]
+}
+
+export interface KursTengahBulkDeletePayload {
+  ids: string[]
+}
+
 export type LenderType = 'Bilateral' | 'Multilateral' | 'KSA'
 
 export interface Lender {

@@ -1,7 +1,23 @@
 -- ===== PROJECT MASTER =====
 
 -- name: ListProjectMaster :many
-WITH project_rows AS (
+WITH RECURSIVE institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+project_rows AS (
     SELECT
         bp.id,
         bp.blue_book_id,
@@ -85,6 +101,14 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                JOIN lender l ON l.id = dfd.lender_id
+                WHERE gbp.bb_project_id = bp.id
+                  AND dfd.lender_id IS NOT NULL
+                UNION
+                SELECT l.type AS type_label
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
@@ -113,6 +137,21 @@ WITH project_rows AS (
             ORDER BY bpi.institution_id
         )::uuid[] AS executing_agency_ids,
         ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM bb_project_institution bpi
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = bpi.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE bpi.bb_project_id = bp.id
+              AND bpi.role = 'Executing Agency'
+            ORDER BY root.ancestor_id
+        )::uuid[] AS executing_agency_root_ids,
+        ARRAY(
             SELECT DISTINCT COALESCE(i.short_name, i.name)
             FROM bb_project_institution bpi
             JOIN institution i ON i.id = bpi.institution_id
@@ -127,6 +166,49 @@ WITH project_rows AS (
             WHERE gbp.bb_project_id = bp.id
             ORDER BY gfs.lender_id
         )::uuid[] AS fixed_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dfd.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dfd.lender_id IS NOT NULL
+            ORDER BY dfd.lender_id
+        )::uuid[] AS dk_lender_ids,
+        ARRAY(
+            SELECT DISTINCT la.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+            ORDER BY la.lender_id
+        )::uuid[] AS loan_agreement_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dp.institution_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY dp.institution_id
+        )::uuid[] AS dk_executing_agency_ids,
+        ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = dp.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY root.ancestor_id
+        )::uuid[] AS dk_executing_agency_root_ids,
         ARRAY(
             SELECT DISTINCT COALESCE(l.short_name, l.name)
             FROM gb_project_bb_project gbp
@@ -232,13 +314,55 @@ WITH project_rows AS (
 ),
 filtered_projects AS (
     SELECT *
-    FROM project_rows
+    FROM project_rows pr
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
-      AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
+      AND (
+          COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+          OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[]
+          OR executing_agency_root_ids && sqlc.arg('executing_agency_ids')::uuid[]
+      )
       AND (COALESCE(cardinality(sqlc.arg('fixed_lender_ids')::uuid[]), 0) = 0 OR fixed_lender_ids && sqlc.arg('fixed_lender_ids')::uuid[])
+      AND (COALESCE(cardinality(sqlc.arg('dk_lender_ids')::uuid[]), 0) = 0 OR dk_lender_ids && sqlc.arg('dk_lender_ids')::uuid[])
+      AND (COALESCE(cardinality(sqlc.arg('loan_agreement_lender_ids')::uuid[]), 0) = 0 OR loan_agreement_lender_ids && sqlc.arg('loan_agreement_lender_ids')::uuid[])
+      AND (
+          COALESCE(cardinality(sqlc.arg('dk_executing_agency_ids')::uuid[]), 0) = 0
+          OR dk_executing_agency_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+          OR dk_executing_agency_root_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+      )
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('reached_stages')::text[]), 0) = 0
+          OR 'BB' = ANY(sqlc.arg('reached_stages')::text[])
+          OR ('GB' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('GB', 'DK', 'LA', 'Monitoring'))
+          OR ('DK' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('DK', 'LA', 'Monitoring'))
+          OR ('LA' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('LA', 'Monitoring'))
+          OR ('Monitoring' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status = 'Monitoring')
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('missing_stages')::text[]), 0) = 0
+          OR ('GB' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status = 'BB')
+          OR ('DK' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB'))
+          OR ('LA' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK'))
+          OR ('Monitoring' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK', 'LA'))
+      )
+      AND (
+          sqlc.narg('has_loi')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM loi loi_filter
+              WHERE loi_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_loi')::boolean
+      )
+      AND (
+          sqlc.narg('has_lender_indication')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM lender_indication li_filter
+              WHERE li_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_lender_indication')::boolean
+      )
       AND (COALESCE(cardinality(sqlc.arg('program_title_ids')::uuid[]), 0) = 0 OR program_title_id = ANY(sqlc.arg('program_title_ids')::uuid[]))
       AND (COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0 OR region_ids && sqlc.arg('region_ids')::uuid[])
       AND (sqlc.narg('foreign_loan_min')::numeric IS NULL OR foreign_loan_usd >= sqlc.narg('foreign_loan_min')::numeric)
@@ -325,7 +449,23 @@ ORDER BY
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountProjectMaster :one
-WITH project_rows AS (
+WITH RECURSIVE institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+project_rows AS (
     SELECT
         bp.id,
         bp.project_identity_id,
@@ -407,6 +547,14 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                JOIN lender l ON l.id = dfd.lender_id
+                WHERE gbp.bb_project_id = bp.id
+                  AND dfd.lender_id IS NOT NULL
+                UNION
+                SELECT l.type AS type_label
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
@@ -435,6 +583,21 @@ WITH project_rows AS (
             ORDER BY bpi.institution_id
         )::uuid[] AS executing_agency_ids,
         ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM bb_project_institution bpi
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = bpi.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE bpi.bb_project_id = bp.id
+              AND bpi.role = 'Executing Agency'
+            ORDER BY root.ancestor_id
+        )::uuid[] AS executing_agency_root_ids,
+        ARRAY(
             SELECT DISTINCT COALESCE(i.short_name, i.name)
             FROM bb_project_institution bpi
             JOIN institution i ON i.id = bpi.institution_id
@@ -449,6 +612,49 @@ WITH project_rows AS (
             WHERE gbp.bb_project_id = bp.id
             ORDER BY gfs.lender_id
         )::uuid[] AS fixed_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dfd.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dfd.lender_id IS NOT NULL
+            ORDER BY dfd.lender_id
+        )::uuid[] AS dk_lender_ids,
+        ARRAY(
+            SELECT DISTINCT la.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+            ORDER BY la.lender_id
+        )::uuid[] AS loan_agreement_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dp.institution_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY dp.institution_id
+        )::uuid[] AS dk_executing_agency_ids,
+        ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = dp.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY root.ancestor_id
+        )::uuid[] AS dk_executing_agency_root_ids,
         ARRAY(
             SELECT DISTINCT COALESCE(l.short_name, l.name)
             FROM gb_project_bb_project gbp
@@ -488,13 +694,55 @@ WITH project_rows AS (
       )
 )
 SELECT COUNT(*)::bigint
-FROM project_rows
+FROM project_rows pr
 WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
   AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
-  AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
+  AND (
+      COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+      OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[]
+      OR executing_agency_root_ids && sqlc.arg('executing_agency_ids')::uuid[]
+  )
   AND (COALESCE(cardinality(sqlc.arg('fixed_lender_ids')::uuid[]), 0) = 0 OR fixed_lender_ids && sqlc.arg('fixed_lender_ids')::uuid[])
+  AND (COALESCE(cardinality(sqlc.arg('dk_lender_ids')::uuid[]), 0) = 0 OR dk_lender_ids && sqlc.arg('dk_lender_ids')::uuid[])
+  AND (COALESCE(cardinality(sqlc.arg('loan_agreement_lender_ids')::uuid[]), 0) = 0 OR loan_agreement_lender_ids && sqlc.arg('loan_agreement_lender_ids')::uuid[])
+  AND (
+      COALESCE(cardinality(sqlc.arg('dk_executing_agency_ids')::uuid[]), 0) = 0
+      OR dk_executing_agency_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+      OR dk_executing_agency_root_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+  )
   AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
   AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+  AND (
+      COALESCE(cardinality(sqlc.arg('reached_stages')::text[]), 0) = 0
+      OR 'BB' = ANY(sqlc.arg('reached_stages')::text[])
+      OR ('GB' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('GB', 'DK', 'LA', 'Monitoring'))
+      OR ('DK' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('DK', 'LA', 'Monitoring'))
+      OR ('LA' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('LA', 'Monitoring'))
+      OR ('Monitoring' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status = 'Monitoring')
+  )
+  AND (
+      COALESCE(cardinality(sqlc.arg('missing_stages')::text[]), 0) = 0
+      OR ('GB' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status = 'BB')
+      OR ('DK' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB'))
+      OR ('LA' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK'))
+      OR ('Monitoring' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK', 'LA'))
+  )
+  AND (
+      sqlc.narg('has_loi')::boolean IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM loi loi_filter
+          WHERE loi_filter.bb_project_id = pr.id
+      ) = sqlc.narg('has_loi')::boolean
+  )
+  AND (
+      sqlc.narg('has_lender_indication')::boolean IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM lender_indication li_filter
+          WHERE li_filter.bb_project_id = pr.id
+      ) = sqlc.narg('has_lender_indication')::boolean
+  )
   AND (COALESCE(cardinality(sqlc.arg('program_title_ids')::uuid[]), 0) = 0 OR program_title_id = ANY(sqlc.arg('program_title_ids')::uuid[]))
   AND (COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0 OR region_ids && sqlc.arg('region_ids')::uuid[])
   AND (sqlc.narg('foreign_loan_min')::numeric IS NULL OR foreign_loan_usd >= sqlc.narg('foreign_loan_min')::numeric)
@@ -530,7 +778,23 @@ WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_type
   );
 
 -- name: GetProjectMasterFundingSummary :one
-WITH project_rows AS (
+WITH RECURSIVE institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+project_rows AS (
     SELECT
         bp.id,
         bp.project_identity_id,
@@ -649,6 +913,14 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                JOIN lender l ON l.id = dfd.lender_id
+                WHERE gbp.bb_project_id = bp.id
+                  AND dfd.lender_id IS NOT NULL
+                UNION
+                SELECT l.type AS type_label
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
                 JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
@@ -677,6 +949,21 @@ WITH project_rows AS (
             ORDER BY bpi.institution_id
         )::uuid[] AS executing_agency_ids,
         ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM bb_project_institution bpi
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = bpi.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE bpi.bb_project_id = bp.id
+              AND bpi.role = 'Executing Agency'
+            ORDER BY root.ancestor_id
+        )::uuid[] AS executing_agency_root_ids,
+        ARRAY(
             SELECT DISTINCT COALESCE(i.short_name, i.name)
             FROM bb_project_institution bpi
             JOIN institution i ON i.id = bpi.institution_id
@@ -691,6 +978,49 @@ WITH project_rows AS (
             WHERE gbp.bb_project_id = bp.id
             ORDER BY gfs.lender_id
         )::uuid[] AS fixed_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dfd.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dfd.lender_id IS NOT NULL
+            ORDER BY dfd.lender_id
+        )::uuid[] AS dk_lender_ids,
+        ARRAY(
+            SELECT DISTINCT la.lender_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+            ORDER BY la.lender_id
+        )::uuid[] AS loan_agreement_lender_ids,
+        ARRAY(
+            SELECT DISTINCT dp.institution_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY dp.institution_id
+        )::uuid[] AS dk_executing_agency_ids,
+        ARRAY(
+            SELECT DISTINCT root.ancestor_id
+            FROM gb_project_bb_project gbp
+            JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+            JOIN dk_project dp ON dp.id = dpg.dk_project_id
+            JOIN LATERAL (
+                SELECT ia.ancestor_id
+                FROM institution_ancestors ia
+                WHERE ia.institution_id = dp.institution_id
+                  AND ia.parent_id IS NULL
+                ORDER BY ia.depth DESC
+                LIMIT 1
+            ) root ON TRUE
+            WHERE gbp.bb_project_id = bp.id
+              AND dp.institution_id IS NOT NULL
+            ORDER BY root.ancestor_id
+        )::uuid[] AS dk_executing_agency_root_ids,
         ARRAY(
             SELECT DISTINCT COALESCE(l.short_name, l.name)
             FROM gb_project_bb_project gbp
@@ -731,13 +1061,55 @@ WITH project_rows AS (
 ),
 filtered_projects AS (
     SELECT *
-    FROM project_rows
+    FROM project_rows pr
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
-      AND (COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0 OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[])
+      AND (
+          COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
+          OR executing_agency_ids && sqlc.arg('executing_agency_ids')::uuid[]
+          OR executing_agency_root_ids && sqlc.arg('executing_agency_ids')::uuid[]
+      )
       AND (COALESCE(cardinality(sqlc.arg('fixed_lender_ids')::uuid[]), 0) = 0 OR fixed_lender_ids && sqlc.arg('fixed_lender_ids')::uuid[])
+      AND (COALESCE(cardinality(sqlc.arg('dk_lender_ids')::uuid[]), 0) = 0 OR dk_lender_ids && sqlc.arg('dk_lender_ids')::uuid[])
+      AND (COALESCE(cardinality(sqlc.arg('loan_agreement_lender_ids')::uuid[]), 0) = 0 OR loan_agreement_lender_ids && sqlc.arg('loan_agreement_lender_ids')::uuid[])
+      AND (
+          COALESCE(cardinality(sqlc.arg('dk_executing_agency_ids')::uuid[]), 0) = 0
+          OR dk_executing_agency_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+          OR dk_executing_agency_root_ids && sqlc.arg('dk_executing_agency_ids')::uuid[]
+      )
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('reached_stages')::text[]), 0) = 0
+          OR 'BB' = ANY(sqlc.arg('reached_stages')::text[])
+          OR ('GB' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('GB', 'DK', 'LA', 'Monitoring'))
+          OR ('DK' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('DK', 'LA', 'Monitoring'))
+          OR ('LA' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('LA', 'Monitoring'))
+          OR ('Monitoring' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status = 'Monitoring')
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('missing_stages')::text[]), 0) = 0
+          OR ('GB' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status = 'BB')
+          OR ('DK' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB'))
+          OR ('LA' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK'))
+          OR ('Monitoring' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK', 'LA'))
+      )
+      AND (
+          sqlc.narg('has_loi')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM loi loi_filter
+              WHERE loi_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_loi')::boolean
+      )
+      AND (
+          sqlc.narg('has_lender_indication')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM lender_indication li_filter
+              WHERE li_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_lender_indication')::boolean
+      )
       AND (COALESCE(cardinality(sqlc.arg('program_title_ids')::uuid[]), 0) = 0 OR program_title_id = ANY(sqlc.arg('program_title_ids')::uuid[]))
       AND (COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0 OR region_ids && sqlc.arg('region_ids')::uuid[])
       AND (sqlc.narg('foreign_loan_min')::numeric IS NULL OR foreign_loan_usd >= sqlc.narg('foreign_loan_min')::numeric)
@@ -777,3 +1149,871 @@ SELECT
     COALESCE(SUM(foreign_grant_usd), 0)::numeric AS total_grant_usd,
     COALESCE(SUM(counterpart_usd), 0)::numeric AS total_counterpart_usd
 FROM filtered_projects;
+
+-- name: ListBlueBookTopLevelExecutingAgencyGroups :many
+WITH RECURSIVE latest_projects AS (
+    SELECT
+        bp.id,
+        CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(gfs.loan_usd)
+                FROM gb_project_bb_project gbp
+                JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ), 0)
+            ELSE COALESCE((
+                SELECT SUM(pc.amount_usd)
+                FROM bb_project_cost pc
+                WHERE pc.bb_project_id = bp.id
+                  AND pc.funding_type = 'Foreign'
+                  AND pc.funding_category = 'Loan'
+            ), 0)
+        END::numeric AS foreign_loan_usd
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+),
+institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        i.name AS ancestor_name,
+        i.short_name AS ancestor_short_name,
+        i.level AS ancestor_level,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        parent.name AS ancestor_name,
+        parent.short_name AS ancestor_short_name,
+        parent.level AS ancestor_level,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+executing_agency_roots AS (
+    SELECT DISTINCT
+        lp.id AS bb_project_id,
+        lp.foreign_loan_usd,
+        CASE
+            WHEN root.ancestor_level = 'Kementerian/Badan/Lembaga' THEN 'Kementerian/Lembaga'
+            WHEN root.ancestor_level IN ('Pemerintah Daerah Tk. I', 'Pemerintah Daerah Tk. II') THEN 'Pemerintah Daerah'
+            ELSE root.ancestor_level
+        END::text AS group_label
+    FROM latest_projects lp
+    JOIN bb_project_institution bpi ON bpi.bb_project_id = lp.id
+    JOIN LATERAL (
+        SELECT
+            ia.ancestor_id,
+            ia.ancestor_name,
+            ia.ancestor_short_name,
+            ia.ancestor_level
+        FROM institution_ancestors ia
+        WHERE ia.institution_id = bpi.institution_id
+          AND ia.parent_id IS NULL
+        ORDER BY ia.depth DESC
+        LIMIT 1
+    ) root ON TRUE
+    WHERE bpi.role = 'Executing Agency'
+),
+executing_agency_groups AS (
+    SELECT DISTINCT
+        bb_project_id,
+        foreign_loan_usd,
+        group_label
+    FROM executing_agency_roots
+)
+SELECT
+    ''::text AS id,
+    group_label::text AS label,
+    group_label::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM executing_agency_groups
+GROUP BY group_label
+ORDER BY project_count DESC, label ASC;
+
+-- name: ListBlueBookTopLevelExecutingAgencies :many
+WITH RECURSIVE latest_projects AS (
+    SELECT
+        bp.id,
+        CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(gfs.loan_usd)
+                FROM gb_project_bb_project gbp
+                JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ), 0)
+            ELSE COALESCE((
+                SELECT SUM(pc.amount_usd)
+                FROM bb_project_cost pc
+                WHERE pc.bb_project_id = bp.id
+                  AND pc.funding_type = 'Foreign'
+                  AND pc.funding_category = 'Loan'
+            ), 0)
+        END::numeric AS foreign_loan_usd
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+),
+institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        i.name AS ancestor_name,
+        i.short_name AS ancestor_short_name,
+        i.level AS ancestor_level,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        parent.name AS ancestor_name,
+        parent.short_name AS ancestor_short_name,
+        parent.level AS ancestor_level,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+executing_agency_roots AS (
+    SELECT DISTINCT
+        lp.id AS bb_project_id,
+        lp.foreign_loan_usd,
+        root.ancestor_id::text AS id,
+        COALESCE(root.ancestor_short_name, root.ancestor_name)::text AS label,
+        root.ancestor_level::text AS level
+    FROM latest_projects lp
+    JOIN bb_project_institution bpi ON bpi.bb_project_id = lp.id
+    JOIN LATERAL (
+        SELECT
+            ia.ancestor_id,
+            ia.ancestor_name,
+            ia.ancestor_short_name,
+            ia.ancestor_level
+        FROM institution_ancestors ia
+        WHERE ia.institution_id = bpi.institution_id
+          AND ia.parent_id IS NULL
+        ORDER BY ia.depth DESC
+        LIMIT 1
+    ) root ON TRUE
+    WHERE bpi.role = 'Executing Agency'
+)
+SELECT
+    id,
+    label,
+    level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM executing_agency_roots
+GROUP BY id, label, level
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListDaftarKegiatanLenderTypes :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lender_types AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.type::text AS lender_type,
+        COALESCE(SUM(dfd.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+    JOIN lender l ON l.id = dfd.lender_id
+    WHERE dfd.lender_id IS NOT NULL
+    GROUP BY lp.id, l.type
+)
+SELECT
+    ''::text AS id,
+    lender_type AS label,
+    'Lender Type'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lender_types
+GROUP BY lender_type
+ORDER BY project_count DESC, label ASC;
+
+-- name: ListDaftarKegiatanTopLenders :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lenders AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.id AS lender_id,
+        COALESCE(l.short_name, l.name)::text AS lender_label,
+        l.type::text AS lender_type,
+        COALESCE(SUM(dfd.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+    JOIN lender l ON l.id = dfd.lender_id
+    WHERE dfd.lender_id IS NOT NULL
+    GROUP BY lp.id, l.id, lender_label, l.type
+)
+SELECT
+    lender_id::text AS id,
+    lender_label AS label,
+    lender_type AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lenders
+GROUP BY lender_id, lender_label, lender_type
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListDaftarKegiatanTopLevelExecutingAgencies :many
+WITH RECURSIVE latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        i.name AS ancestor_name,
+        i.short_name AS ancestor_short_name,
+        i.level AS ancestor_level,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        parent.name AS ancestor_name,
+        parent.short_name AS ancestor_short_name,
+        parent.level AS ancestor_level,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+project_agencies AS (
+    SELECT
+        lp.id AS bb_project_id,
+        dp.id AS dk_project_id,
+        dp.institution_id,
+        COALESCE((
+            SELECT SUM(dfd.amount_usd)
+            FROM dk_financing_detail dfd
+            WHERE dfd.dk_project_id = dp.id
+        ), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN dk_project dp ON dp.id = dpg.dk_project_id
+    WHERE dp.institution_id IS NOT NULL
+),
+executing_agency_roots AS (
+    SELECT
+        pa.bb_project_id,
+        pa.dk_project_id,
+        pa.foreign_loan_usd,
+        root.ancestor_id::text AS id,
+        COALESCE(root.ancestor_short_name, root.ancestor_name)::text AS label,
+        root.ancestor_level::text AS level
+    FROM project_agencies pa
+    JOIN LATERAL (
+        SELECT
+            ia.ancestor_id,
+            ia.ancestor_name,
+            ia.ancestor_short_name,
+            ia.ancestor_level
+        FROM institution_ancestors ia
+        WHERE ia.institution_id = pa.institution_id
+          AND ia.parent_id IS NULL
+        ORDER BY ia.depth DESC
+        LIMIT 1
+    ) root ON TRUE
+)
+SELECT
+    id,
+    label,
+    level,
+    COUNT(DISTINCT bb_project_id)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM executing_agency_roots
+GROUP BY id, label, level
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListDaftarKegiatanPrograms :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.program_title_id IS NOT NULL
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_programs AS (
+    SELECT
+        lp.id AS bb_project_id,
+        bp.program_title_id,
+        pt.title::text AS program_title,
+        COALESCE(SUM(dfd.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN bb_project bp ON bp.id = lp.id
+    JOIN program_title pt ON pt.id = bp.program_title_id
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    LEFT JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+    GROUP BY lp.id, bp.program_title_id, pt.title
+)
+SELECT
+    program_title_id::text AS id,
+    program_title AS label,
+    'Program Title'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_programs
+GROUP BY program_title_id, program_title
+ORDER BY project_count DESC, label ASC
+LIMIT 8;
+
+-- name: ListLoanAgreementLenderTypes :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lender_types AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.type::text AS lender_type,
+        COALESCE(SUM(la.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+    JOIN lender l ON l.id = la.lender_id
+    GROUP BY lp.id, l.type
+)
+SELECT
+    ''::text AS id,
+    lender_type AS label,
+    'Lender Type'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lender_types
+GROUP BY lender_type
+ORDER BY project_count DESC, label ASC;
+
+-- name: ListLoanAgreementTopLenders :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lenders AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.id AS lender_id,
+        COALESCE(l.short_name, l.name)::text AS lender_label,
+        l.type::text AS lender_type,
+        COALESCE(SUM(la.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+    JOIN lender l ON l.id = la.lender_id
+    GROUP BY lp.id, l.id, lender_label, l.type
+)
+SELECT
+    lender_id::text AS id,
+    lender_label AS label,
+    lender_type AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lenders
+GROUP BY lender_id, lender_label, lender_type
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListLoanAgreementTopLevelExecutingAgencies :many
+WITH RECURSIVE latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        i.name AS ancestor_name,
+        i.short_name AS ancestor_short_name,
+        i.level AS ancestor_level,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        parent.name AS ancestor_name,
+        parent.short_name AS ancestor_short_name,
+        parent.level AS ancestor_level,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+project_agencies AS (
+    SELECT
+        lp.id AS bb_project_id,
+        dp.id AS dk_project_id,
+        dp.institution_id,
+        COALESCE(SUM(la.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN dk_project dp ON dp.id = dpg.dk_project_id
+    JOIN loan_agreement la ON la.dk_project_id = dp.id
+    WHERE dp.institution_id IS NOT NULL
+    GROUP BY lp.id, dp.id, dp.institution_id
+),
+executing_agency_roots AS (
+    SELECT
+        pa.bb_project_id,
+        pa.dk_project_id,
+        pa.foreign_loan_usd,
+        root.ancestor_id::text AS id,
+        COALESCE(root.ancestor_short_name, root.ancestor_name)::text AS label,
+        root.ancestor_level::text AS level
+    FROM project_agencies pa
+    JOIN LATERAL (
+        SELECT
+            ia.ancestor_id,
+            ia.ancestor_name,
+            ia.ancestor_short_name,
+            ia.ancestor_level
+        FROM institution_ancestors ia
+        WHERE ia.institution_id = pa.institution_id
+          AND ia.parent_id IS NULL
+        ORDER BY ia.depth DESC
+        LIMIT 1
+    ) root ON TRUE
+)
+SELECT
+    id,
+    label,
+    level,
+    COUNT(DISTINCT bb_project_id)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM executing_agency_roots
+GROUP BY id, label, level
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListLoanAgreementPrograms :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.program_title_id IS NOT NULL
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+          JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_programs AS (
+    SELECT
+        lp.id AS bb_project_id,
+        bp.program_title_id,
+        pt.title::text AS program_title,
+        COALESCE(SUM(la.amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN bb_project bp ON bp.id = lp.id
+    JOIN program_title pt ON pt.id = bp.program_title_id
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+    JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+    GROUP BY lp.id, bp.program_title_id, pt.title
+)
+SELECT
+    program_title_id::text AS id,
+    program_title AS label,
+    'Program Title'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_programs
+GROUP BY program_title_id, program_title
+ORDER BY project_count DESC, label ASC
+LIMIT 8;
+
+-- name: ListBlueBookPrograms :many
+WITH latest_projects AS (
+    SELECT
+        bp.id,
+        bp.program_title_id,
+        pt.title::text AS program_title,
+        CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(gfs.loan_usd)
+                FROM gb_project_bb_project gbp
+                JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ), 0)
+            ELSE COALESCE((
+                SELECT SUM(pc.amount_usd)
+                FROM bb_project_cost pc
+                WHERE pc.bb_project_id = bp.id
+                  AND pc.funding_type = 'Foreign'
+                  AND pc.funding_category = 'Loan'
+            ), 0)
+        END::numeric AS foreign_loan_usd
+    FROM bb_project bp
+    JOIN program_title pt ON pt.id = bp.program_title_id
+    WHERE bp.status = 'active'
+      AND bp.program_title_id IS NOT NULL
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+)
+SELECT
+    program_title_id::text AS id,
+    program_title::text AS label,
+    'Program Title'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM latest_projects
+GROUP BY program_title_id, program_title
+ORDER BY project_count DESC, label ASC
+LIMIT 8;
+
+-- name: ListGreenBookLenderTypes :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lender_types AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.type::text AS lender_type,
+        COALESCE(SUM(gfs.loan_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+    JOIN lender l ON l.id = gfs.lender_id
+    GROUP BY lp.id, l.type
+)
+SELECT
+    ''::text AS id,
+    lender_type AS label,
+    'Lender Type'::text AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lender_types
+GROUP BY lender_type
+ORDER BY project_count DESC, label ASC;
+
+-- name: ListGreenBookTopLenders :many
+WITH latest_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+project_lenders AS (
+    SELECT
+        lp.id AS bb_project_id,
+        l.id AS lender_id,
+        COALESCE(l.short_name, l.name)::text AS lender_label,
+        l.type::text AS lender_type,
+        COALESCE(SUM(gfs.loan_usd), 0)::numeric AS foreign_loan_usd
+    FROM latest_projects lp
+    JOIN gb_project_bb_project gbp ON gbp.bb_project_id = lp.id
+    JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+    JOIN lender l ON l.id = gfs.lender_id
+    GROUP BY lp.id, l.id, lender_label, l.type
+)
+SELECT
+    lender_id::text AS id,
+    lender_label AS label,
+    lender_type AS level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM project_lenders
+GROUP BY lender_id, lender_label, lender_type
+ORDER BY project_count DESC, label ASC
+LIMIT 6;
+
+-- name: ListGreenBookTopLevelExecutingAgencies :many
+WITH RECURSIVE latest_projects AS (
+    SELECT
+        bp.id,
+        COALESCE((
+            SELECT SUM(gfs.loan_usd)
+            FROM gb_project_bb_project gbp
+            JOIN gb_funding_source gfs ON gfs.gb_project_id = gbp.gb_project_id
+            WHERE gbp.bb_project_id = bp.id
+        ), 0)::numeric AS foreign_loan_usd
+    FROM bb_project bp
+    WHERE bp.status = 'active'
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM gb_project_bb_project gbp
+          WHERE gbp.bb_project_id = bp.id
+      )
+),
+institution_ancestors AS (
+    SELECT
+        i.id AS institution_id,
+        i.id AS ancestor_id,
+        i.parent_id,
+        i.name AS ancestor_name,
+        i.short_name AS ancestor_short_name,
+        i.level AS ancestor_level,
+        0::int AS depth
+    FROM institution i
+    UNION ALL
+    SELECT
+        ia.institution_id,
+        parent.id AS ancestor_id,
+        parent.parent_id,
+        parent.name AS ancestor_name,
+        parent.short_name AS ancestor_short_name,
+        parent.level AS ancestor_level,
+        ia.depth + 1 AS depth
+    FROM institution_ancestors ia
+    JOIN institution parent ON parent.id = ia.parent_id
+),
+executing_agency_roots AS (
+    SELECT DISTINCT
+        lp.id AS bb_project_id,
+        lp.foreign_loan_usd,
+        root.ancestor_id::text AS id,
+        COALESCE(root.ancestor_short_name, root.ancestor_name)::text AS label,
+        root.ancestor_level::text AS level
+    FROM latest_projects lp
+    JOIN bb_project_institution bpi ON bpi.bb_project_id = lp.id
+    JOIN LATERAL (
+        SELECT
+            ia.ancestor_id,
+            ia.ancestor_name,
+            ia.ancestor_short_name,
+            ia.ancestor_level
+        FROM institution_ancestors ia
+        WHERE ia.institution_id = bpi.institution_id
+          AND ia.parent_id IS NULL
+        ORDER BY ia.depth DESC
+        LIMIT 1
+    ) root ON TRUE
+    WHERE bpi.role = 'Executing Agency'
+)
+SELECT
+    id,
+    label,
+    level,
+    COUNT(*)::int AS project_count,
+    COALESCE(SUM(foreign_loan_usd), 0)::numeric AS foreign_loan_usd
+FROM executing_agency_roots
+GROUP BY id, label, level
+ORDER BY project_count DESC, label ASC
+LIMIT 6;

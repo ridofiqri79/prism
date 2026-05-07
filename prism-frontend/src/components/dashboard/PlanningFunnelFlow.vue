@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import Tag from 'primevue/tag'
 import type {
   DashboardDatum,
+  DashboardInsightTarget,
   DashboardMetricTone,
   DashboardPanelSpan,
   DashboardStage,
@@ -11,15 +13,14 @@ import type {
 
 const props = defineProps<{
   stages: DashboardStage[]
-  lastSyncLabel: string
 }>()
 
 const expandedStages = ref<DashboardStageKey[]>(['BB'])
 const activeTabs = ref<Record<DashboardStageKey, string>>({
-  BB: 'Status & Lender Readiness',
-  GB: 'Relasi BB -> GB',
-  DK: 'Relasi GB -> DK',
-  LA: 'Status & Effectiveness',
+  BB: 'Status Pipeline',
+  GB: 'Lender & Funding',
+  DK: 'Lender & Funding',
+  LA: 'Kondisi Pinjaman',
 })
 
 const countFormatter = new Intl.NumberFormat('id-ID', {
@@ -30,6 +31,9 @@ const percentFormatter = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 1,
   minimumFractionDigits: 1,
 })
+
+const funnelTitleId = 'planning-funnel-title'
+const funnelSummaryId = 'planning-funnel-summary'
 
 const chartAriaLabel = computed(() =>
   props.stages
@@ -57,6 +61,57 @@ function setActiveTab(stageKey: DashboardStageKey, label: string) {
   }
 }
 
+function slugifyLabel(label: string) {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  return slug || 'tab'
+}
+
+function tabId(stage: DashboardStage, label: string) {
+  return `planning-funnel-${stage.key.toLowerCase()}-${slugifyLabel(label)}-tab`
+}
+
+function tabPanelId(stage: DashboardStage, label: string) {
+  return `planning-funnel-${stage.key.toLowerCase()}-${slugifyLabel(label)}-panel`
+}
+
+function moveActiveTab(stage: DashboardStage, direction: number) {
+  const labels = stage.details.tabs.map((tab) => tab.label)
+  if (!labels.length) return
+
+  const currentIndex = Math.max(labels.indexOf(activeTabLabel(stage)), 0)
+  const nextIndex = (currentIndex + direction + labels.length) % labels.length
+  setActiveTab(stage.key, labels[nextIndex] ?? labels[0] ?? '')
+}
+
+function handleTabKeydown(event: KeyboardEvent, stage: DashboardStage) {
+  if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    moveActiveTab(stage, 1)
+    return
+  }
+
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    moveActiveTab(stage, -1)
+    return
+  }
+
+  if (event.key === 'Home') {
+    event.preventDefault()
+    setActiveTab(stage.key, stage.details.tabs[0]?.label ?? '')
+    return
+  }
+
+  if (event.key === 'End') {
+    event.preventDefault()
+    setActiveTab(stage.key, stage.details.tabs.at(-1)?.label ?? '')
+  }
+}
+
 function activeTabLabel(stage: DashboardStage) {
   const current = activeTabs.value[stage.key]
   if (stage.details.tabs.some((tab) => tab.label === current)) return current
@@ -78,7 +133,7 @@ function visiblePanels(stage: DashboardStage) {
 }
 
 function stageBarWidth(stage: DashboardStage) {
-  if (stage.count === 0) return '9rem'
+  if (stage.count === 0) return '12rem'
   return `${Math.min(Math.max(stage.pipelineShare, 16), 100)}%`
 }
 
@@ -160,24 +215,99 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
 
   return spanClasses[span]
 }
+
+function normalizedTargetQuery(target: DashboardInsightTarget) {
+  const query: Record<string, string | string[]> = {}
+
+  Object.entries(target.query).forEach(([key, value]) => {
+    if (value === null || value === undefined) return
+
+    if (Array.isArray(value)) {
+      const values = value
+        .filter((item) => item !== null && item !== undefined)
+        .map((item) => String(item))
+
+      if (values.length > 0) query[key] = values
+      return
+    }
+
+    query[key] = String(value)
+  })
+
+  return query
+}
+
+function targetLocation(target: DashboardInsightTarget): RouteLocationRaw {
+  return {
+    name: target.name,
+    query: normalizedTargetQuery(target),
+  }
+}
+
+function isClickableTarget(target: DashboardInsightTarget | undefined, value: number) {
+  return Boolean(target?.exact && value > 0)
+}
+
+function isClickableStage(stage: DashboardStage) {
+  return isClickableTarget(stage.target, stage.count)
+}
+
+function isClickableDatum(item: DashboardDatum) {
+  return isClickableTarget(item.target, item.value)
+}
+
+function stageLinkProps(stage: DashboardStage) {
+  if (!stage.target || !isClickableStage(stage)) return {}
+  return {
+    to: targetLocation(stage.target),
+    'aria-label': stage.target.label ?? `Buka ${stage.title}`,
+  }
+}
+
+function datumComponent(item: DashboardDatum) {
+  return isClickableDatum(item) ? RouterLink : 'div'
+}
+
+function datumLinkProps(item: DashboardDatum, fallbackLabel: string) {
+  if (!item.target || !isClickableDatum(item)) return {}
+  return {
+    to: targetLocation(item.target),
+    'aria-label': item.target.label ?? `Buka ${fallbackLabel}`,
+  }
+}
+
+function clickableDatumClass(item: DashboardDatum) {
+  if (!isClickableDatum(item)) return ''
+  return 'cursor-pointer no-underline transition hover:border-primary-200 hover:bg-primary-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
+}
+
+function clickableStageClass(stage: DashboardStage) {
+  if (!isClickableStage(stage)) return ''
+  return 'no-underline transition hover:ring-2 hover:ring-primary-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
+}
+
+function clickableRegionClass(item: DashboardDatum) {
+  if (!isClickableDatum(item)) return ''
+  return 'cursor-pointer no-underline transition hover:ring-2 hover:ring-primary-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
+}
 </script>
 
 <template>
   <section
     class="overflow-hidden rounded-lg border border-surface-200 bg-white shadow-sm"
-    role="img"
-    :aria-label="chartAriaLabel"
+    :aria-labelledby="funnelTitleId"
+    :aria-describedby="funnelSummaryId"
   >
     <header
       class="flex flex-col gap-4 border-b border-surface-100 px-4 py-4 sm:px-5 xl:flex-row xl:items-center xl:justify-between"
     >
       <div class="min-w-0">
-        <p class="text-xs font-semibold uppercase text-primary-700">Funnel perencanaan</p>
-        <h2 class="mt-1 text-base font-semibold text-surface-950">
-          Sankey Alur Proyek Perencanaan
+        <p class="text-xs font-semibold uppercase text-primary-700">Ringkasan portofolio</p>
+        <h2 :id="funnelTitleId" class="mt-1 text-base font-semibold text-surface-950">
+          Alur Proyek Pinjaman Luar Negeri
         </h2>
         <p class="mt-1 max-w-3xl text-sm leading-5 text-surface-500">
-          Tahap dapat dibuka untuk membaca antrian, sebaran K/L, lender, wilayah, dan program.
+          Ringkasan tahapan proyek dari perencanaan hingga perjanjian pinjaman.
         </p>
       </div>
 
@@ -196,55 +326,63 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
         </span>
       </div>
     </header>
+    <p :id="funnelSummaryId" class="sr-only">{{ chartAriaLabel }}</p>
 
     <div class="hidden grid-cols-[12.5rem_minmax(0,1fr)_14rem] gap-0 px-5 py-3 lg:grid">
       <p class="text-[11px] font-semibold uppercase text-surface-400">Tahap</p>
-      <p class="text-[11px] font-semibold uppercase text-surface-400">Volume dan nilai</p>
+      <p class="text-[11px] font-semibold uppercase text-surface-400">Portofolio</p>
       <p class="text-right text-[11px] font-semibold uppercase text-surface-400">
-        Konversi berikutnya
+        Progres berikutnya
       </p>
     </div>
 
     <div class="divide-y divide-surface-100">
       <template v-for="(stage, stageIndex) in stages" :key="stage.key">
         <article class="bg-white">
-          <button
-            type="button"
-            class="group grid w-full text-left transition hover:bg-surface-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary lg:grid-cols-[12.5rem_minmax(0,1fr)_14rem]"
-            :aria-expanded="isExpanded(stage.key)"
-            @click="toggleStage(stage.key)"
+          <div
+            class="grid w-full text-left transition hover:bg-surface-50 lg:grid-cols-[12.5rem_minmax(0,1fr)_14rem]"
           >
             <div class="border-surface-100 px-4 py-4 sm:px-5 lg:border-r">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase text-surface-400">
+              <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                :aria-expanded="isExpanded(stage.key)"
+                @click="toggleStage(stage.key)"
+              >
+                <span class="min-w-0">
+                  <span class="block text-xs font-semibold uppercase text-surface-400">
                     {{ stage.stepLabel }}
-                  </p>
-                  <p class="mt-2 flex items-center gap-2 text-sm font-semibold text-surface-950">
+                  </span>
+                  <span class="mt-2 flex items-center gap-2 text-sm font-semibold text-surface-950">
                     <span
                       class="h-2.5 w-2.5 shrink-0 rounded-sm"
                       :style="{ backgroundColor: stage.color }"
                       aria-hidden="true"
                     />
                     {{ stage.title }}
-                  </p>
-                </div>
+                  </span>
+                </span>
                 <i
                   class="pi pi-angle-right mt-0.5 shrink-0 text-xs text-surface-400 transition-transform"
                   :class="isExpanded(stage.key) ? 'rotate-90 text-primary-700' : ''"
                   aria-hidden="true"
                 />
-              </div>
+              </button>
             </div>
 
             <div class="px-4 pb-4 sm:px-5 lg:py-4">
               <p class="text-sm leading-5 text-surface-600">{{ stage.subtitle }}</p>
-              <div class="mt-3 rounded-md bg-surface-50 p-1">
+              <component
+                :is="isClickableStage(stage) ? RouterLink : 'div'"
+                v-bind="stageLinkProps(stage)"
+                class="mt-3 block rounded-md bg-surface-50 p-1"
+                :class="clickableStageClass(stage)"
+              >
                 <div
                   class="flex min-h-16 max-w-full items-center justify-between gap-4 rounded-md px-4 text-white shadow-sm transition-[width] duration-500"
                   :style="{
                     width: stageBarWidth(stage),
-                    minWidth: stage.count > 0 ? '12rem' : '9rem',
+                    minWidth: '12rem',
                     background: `linear-gradient(90deg, ${stage.color}, ${stage.colorSoft})`,
                   }"
                 >
@@ -261,7 +399,7 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                     {{ percentFormatter.format(stage.pipelineShare) }}%
                   </p>
                 </div>
-              </div>
+              </component>
             </div>
 
             <div
@@ -288,7 +426,7 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                 </p>
               </template>
             </div>
-          </button>
+          </div>
 
           <Transition name="dashboard-stage">
             <div v-if="isExpanded(stage.key)" class="border-t border-surface-100 bg-surface-50/80">
@@ -296,11 +434,17 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                 <div class="rounded-lg border border-surface-200 bg-white">
                   <div
                     class="flex overflow-x-auto border-b border-surface-100 bg-surface-50/70 px-3"
+                    role="tablist"
+                    :aria-label="`Detail ${stage.title}`"
                   >
                     <button
                       v-for="tab in stage.details.tabs"
                       :key="tab.label"
                       type="button"
+                      role="tab"
+                      :id="tabId(stage, tab.label)"
+                      :aria-selected="isActiveTab(stage, tab.label)"
+                      :aria-controls="tabPanelId(stage, tab.label)"
                       class="shrink-0 border-b-2 px-3 py-3 text-xs font-semibold text-surface-500 transition"
                       :class="
                         isActiveTab(stage, tab.label)
@@ -308,13 +452,19 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                           : 'border-transparent hover:text-surface-800'
                       "
                       @click.stop="setActiveTab(stage.key, tab.label)"
+                      @keydown="handleTabKeydown($event, stage)"
                     >
                       {{ tab.label }}
                     </button>
                   </div>
 
-                  <div class="p-4 sm:p-5">
-                    <div v-if="visibleCounters(stage).length" class="grid gap-3 md:grid-cols-3">
+                  <div
+                    class="p-4 sm:p-5"
+                    role="tabpanel"
+                    :id="tabPanelId(stage, activeTabLabel(stage))"
+                    :aria-labelledby="tabId(stage, activeTabLabel(stage))"
+                  >
+                    <div v-if="visibleCounters(stage).length" class="grid gap-3 md:grid-cols-4">
                       <section
                         v-for="counter in visibleCounters(stage)"
                         :key="counter.label"
@@ -353,7 +503,14 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                         </div>
 
                         <div v-if="panel.kind === 'bars'" class="mt-4 space-y-3">
-                          <div v-for="item in panel.data" :key="item.label">
+                          <component
+                            :is="datumComponent(item)"
+                            v-for="item in panel.data"
+                            :key="item.label"
+                            v-bind="datumLinkProps(item, item.label)"
+                            class="-mx-2 block rounded-md px-2 py-1"
+                            :class="clickableDatumClass(item)"
+                          >
                             <div class="flex items-center justify-between gap-3 text-sm">
                               <span class="min-w-0 truncate text-surface-700">
                                 {{ item.label }}
@@ -371,6 +528,52 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                                 }"
                               />
                             </div>
+                          </component>
+                        </div>
+
+                        <div
+                          v-else-if="panel.kind === 'card'"
+                          class="mt-4"
+                        >
+                          <div class="min-w-0">
+                            <p class="text-base font-semibold leading-7 text-surface-900">
+                              {{ panel.description }}
+                            </p>
+                          </div>
+
+                          <div
+                            class="mt-5 grid border-y border-surface-100 xl:grid-cols-2 xl:gap-x-8"
+                          >
+                            <component
+                              :is="datumComponent(item)"
+                              v-for="item in panel.data"
+                              :key="item.label"
+                              v-bind="datumLinkProps(item, item.label)"
+                              class="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 border-b border-surface-100 py-3 last:border-b-0 even:xl:border-l even:xl:pl-8 xl:[&:nth-last-child(-n+2)]:border-b-0"
+                              :class="clickableDatumClass(item)"
+                            >
+                              <span
+                                class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-sm"
+                                :style="{ backgroundColor: item.color ?? stage.color }"
+                                aria-hidden="true"
+                              />
+                              <div class="min-w-0">
+                                <p class="text-sm font-semibold leading-5 text-surface-800">
+                                  {{ item.label }}
+                                </p>
+                                <p class="mt-1 text-xs leading-5 text-surface-500">
+                                  {{ item.description }}
+                                </p>
+                              </div>
+                              <div class="text-right">
+                                <p class="text-sm font-semibold leading-5" :class="metricToneClass(item.tone)">
+                                  {{ item.valueLabel ?? countFormatter.format(item.value) }}
+                                </p>
+                                <p class="mt-1 text-[11px] font-semibold text-surface-400">
+                                  {{ percentFormatter.format(itemPercent(panel.data, item)) }}%
+                                </p>
+                              </div>
+                            </component>
                           </div>
                         </div>
 
@@ -392,10 +595,13 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                             </div>
                           </div>
                           <div class="min-w-0 flex-1 space-y-2">
-                            <div
+                            <component
+                              :is="datumComponent(item)"
                               v-for="item in panel.data"
                               :key="item.label"
-                              class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm"
+                              v-bind="datumLinkProps(item, item.label)"
+                              class="-mx-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1 text-sm"
+                              :class="clickableDatumClass(item)"
                             >
                               <span
                                 class="h-2.5 w-2.5 rounded-sm"
@@ -409,7 +615,70 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                                   {{ percentFormatter.format(itemPercent(panel.data, item)) }}%
                                 </span>
                               </span>
+                            </component>
+                          </div>
+                        </div>
+
+                        <div
+                          v-else-if="panel.kind === 'donutbar'"
+                          class="mt-4 grid gap-6 sm:items-center"
+                          style="grid-template-columns: 1fr 3fr"
+                        >
+                          <!-- Donut chart (left half, centered) -->
+                          <div class="flex items-center justify-center">
+                            <div
+                              class="relative h-40 w-40 shrink-0 rounded-full"
+                              :style="{ background: donutBackground(panel.data) }"
+                            >
+                              <div
+                                class="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-sm"
+                              >
+                                <span class="text-lg font-semibold text-surface-950">
+                                  {{ countFormatter.format(sumValue(panel.data)) }}
+                                </span>
+                                <span class="text-[10px] leading-tight text-surface-500">proyek</span>
+                              </div>
                             </div>
+                          </div>
+
+                          <!-- Bar list (right half) -->
+                          <div class="min-w-0 space-y-2.5">
+                            <component
+                              :is="datumComponent(item)"
+                              v-for="item in panel.data"
+                              :key="item.label"
+                              v-bind="datumLinkProps(item, item.label)"
+                              class="-mx-2 block rounded-md px-2 py-1"
+                              :class="clickableDatumClass(item)"
+                            >
+                              <div class="flex items-center justify-between gap-3 text-sm">
+                                <span
+                                  class="inline-flex min-w-0 items-center gap-2 truncate text-surface-700"
+                                >
+                                  <span
+                                    class="h-2 w-2 shrink-0 rounded-sm"
+                                    :style="{ backgroundColor: item.color ?? stage.color }"
+                                    aria-hidden="true"
+                                  />
+                                  {{ item.label }}
+                                </span>
+                                <span class="shrink-0 font-semibold text-surface-950">
+                                  {{ item.valueLabel ?? countFormatter.format(item.value) }}
+                                  <span class="ml-1 font-normal text-surface-400">
+                                    {{ percentFormatter.format(itemPercent(panel.data, item)) }}%
+                                  </span>
+                                </span>
+                              </div>
+                              <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-100">
+                                <div
+                                  class="h-full rounded-full transition-[width] duration-500"
+                                  :style="{
+                                    width: barWidth(panel.data, item),
+                                    backgroundColor: item.color ?? stage.color,
+                                  }"
+                                />
+                              </div>
+                            </component>
                           </div>
                         </div>
 
@@ -417,17 +686,19 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                           v-else-if="panel.kind === 'regions'"
                           class="mt-4 grid grid-cols-6 gap-1.5"
                         >
-                          <div
+                          <component
+                            :is="datumComponent(item)"
                             v-for="item in panel.data"
                             :key="item.label"
+                            v-bind="datumLinkProps(item, item.label)"
                             class="flex min-h-16 flex-col justify-end rounded-md px-2 py-2 text-white"
-                            :class="regionClass(item.value)"
+                            :class="[regionClass(item.value), clickableRegionClass(item)]"
                           >
                             <span class="truncate text-xs font-semibold">{{ item.label }}</span>
                             <span class="mt-1 text-base font-semibold">
                               {{ countFormatter.format(item.value) }}
                             </span>
-                          </div>
+                          </component>
                         </div>
 
                         <div v-else-if="panel.kind === 'stack'" class="mt-4">
@@ -443,10 +714,13 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                             />
                           </div>
                           <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-surface-600">
-                            <span
+                            <component
+                              :is="datumComponent(item)"
                               v-for="item in panel.data"
                               :key="item.label"
-                              class="inline-flex items-center gap-2"
+                              v-bind="datumLinkProps(item, item.label)"
+                              class="inline-flex items-center gap-2 rounded-md px-1.5 py-1"
+                              :class="clickableDatumClass(item)"
                             >
                               <span
                                 class="h-2.5 w-2.5 rounded-sm"
@@ -455,7 +729,7 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                               />
                               {{ item.label }} ·
                               {{ item.valueLabel ?? countFormatter.format(item.value) }}
-                            </span>
+                            </component>
                           </div>
                         </div>
 
@@ -535,10 +809,13 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                             </span>
                           </div>
                           <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-surface-600">
-                            <span
+                            <component
+                              :is="datumComponent(item)"
                               v-for="item in panel.data"
                               :key="item.label"
-                              class="inline-flex items-center gap-2"
+                              v-bind="datumLinkProps(item, item.label)"
+                              class="inline-flex items-center gap-2 rounded-md px-1.5 py-1"
+                              :class="clickableDatumClass(item)"
                             >
                               <span
                                 class="h-2.5 w-2.5 rounded-sm"
@@ -546,7 +823,7 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
                                 aria-hidden="true"
                               />
                               {{ item.label }} · {{ item.amountLabel }}
-                            </span>
+                            </component>
                           </div>
                         </div>
                       </section>
@@ -583,12 +860,6 @@ function panelSpanClass(span: DashboardPanelSpan = 'medium') {
       </template>
     </div>
 
-    <footer
-      class="flex flex-col gap-2 border-t border-surface-100 bg-surface-50/80 px-4 py-3 text-xs text-surface-600 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-    >
-      <span>Sumber data: snapshot desain PRISM · Direktorat PPLN, Bappenas</span>
-      <Tag :value="`Last sync ${lastSyncLabel}`" severity="secondary" rounded />
-    </footer>
   </section>
 </template>
 

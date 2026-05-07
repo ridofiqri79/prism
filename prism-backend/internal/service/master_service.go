@@ -200,6 +200,139 @@ func (s *MasterService) DeleteCurrency(ctx context.Context, id pgtype.UUID) erro
 	})
 }
 
+func (s *MasterService) ListKursTengah(ctx context.Context, params model.PaginationParams, currencyIDs []string, cutOffDateFrom, cutOffDateTo string) (*model.ListResponse[model.KursTengahResponse], error) {
+	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "cut_off_date", "desc", "currency", "cut_off_date", "kurs", "kurs_tengah_bi")
+	currencyFilters, err := uuidFilters(currencyIDs, "currency_id")
+	if err != nil {
+		return nil, err
+	}
+	fromDate, err := nullableDate(cutOffDateFrom, "cut_off_date_from")
+	if err != nil {
+		return nil, err
+	}
+	toDate, err := nullableDate(cutOffDateTo, "cut_off_date_to")
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListKursTengah(ctx, queries.ListKursTengahParams{
+		Limit:             int32(limit),
+		Offset:            int32(offset),
+		CurrencyIDFilters: currencyFilters,
+		CutOffDateFrom:    fromDate,
+		CutOffDateTo:      toDate,
+		Search:            search,
+		SortField:         sortField,
+		SortOrder:         sortOrder,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil daftar kurs tengah")
+	}
+	total, err := s.queries.CountKursTengah(ctx, queries.CountKursTengahParams{
+		CurrencyIDFilters: currencyFilters,
+		CutOffDateFrom:    fromDate,
+		CutOffDateTo:      toDate,
+		Search:            search,
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal menghitung kurs tengah")
+	}
+	data := make([]model.KursTengahResponse, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, toKursTengahListResponse(row))
+	}
+	return listResponse(data, page, limit, total), nil
+}
+
+func (s *MasterService) BulkCreateKursTengah(ctx context.Context, req model.KursTengahBulkRequest) ([]model.KursTengahResponse, error) {
+	items, err := parseKursTengahBulkRequest(req.Items, false)
+	if err != nil {
+		return nil, err
+	}
+	created := make([]model.KursTengahResponse, 0, len(items))
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		for _, item := range items {
+			if _, err := qtx.GetCurrency(ctx, item.CurrencyID); err != nil {
+				return mapNotFound(err, "Currency tidak ditemukan")
+			}
+			row, err := qtx.CreateKursTengah(ctx, queries.CreateKursTengahParams{
+				CurrencyID:   item.CurrencyID,
+				Kurs:         numericFromFloat(item.Kurs),
+				KursTengahBi: numericFromFloat(item.KursTengahBI),
+				CutOffDate:   item.CutOffDate,
+			})
+			if err != nil {
+				return fromPg(err)
+			}
+			detail, err := qtx.GetKursTengah(ctx, row.ID)
+			if err != nil {
+				return mapNotFound(err, "Kurs tengah tidak ditemukan")
+			}
+			created = append(created, toKursTengahResponse(detail))
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+func (s *MasterService) BulkUpdateKursTengah(ctx context.Context, req model.KursTengahBulkRequest) ([]model.KursTengahResponse, error) {
+	items, err := parseKursTengahBulkRequest(req.Items, true)
+	if err != nil {
+		return nil, err
+	}
+	updated := make([]model.KursTengahResponse, 0, len(items))
+	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
+		for _, item := range items {
+			if _, err := qtx.GetCurrency(ctx, item.CurrencyID); err != nil {
+				return mapNotFound(err, "Currency tidak ditemukan")
+			}
+			row, err := qtx.UpdateKursTengah(ctx, queries.UpdateKursTengahParams{
+				ID:           item.ID,
+				CurrencyID:   item.CurrencyID,
+				Kurs:         numericFromFloat(item.Kurs),
+				KursTengahBi: numericFromFloat(item.KursTengahBI),
+				CutOffDate:   item.CutOffDate,
+			})
+			if err != nil {
+				if err == pgx.ErrNoRows {
+					return apperrors.NotFound("Kurs tengah tidak ditemukan")
+				}
+				return fromPg(err)
+			}
+			detail, err := qtx.GetKursTengah(ctx, row.ID)
+			if err != nil {
+				return mapNotFound(err, "Kurs tengah tidak ditemukan")
+			}
+			updated = append(updated, toKursTengahResponse(detail))
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+func (s *MasterService) BulkDeleteKursTengah(ctx context.Context, req model.KursTengahBulkDeleteRequest) error {
+	if len(req.IDs) == 0 {
+		return validation("ids", "minimal satu ID wajib dipilih")
+	}
+	ids, err := uuidFilters(req.IDs, "ids")
+	if err != nil {
+		return err
+	}
+	return s.withTx(ctx, func(qtx *queries.Queries) error {
+		deleted, err := qtx.DeleteKursTengahByIDs(ctx, ids)
+		if err != nil {
+			return fromPg(err)
+		}
+		if len(deleted) != len(ids) {
+			return apperrors.NotFound("Sebagian kurs tengah tidak ditemukan")
+		}
+		return nil
+	})
+}
+
 func (s *MasterService) ListLenders(ctx context.Context, params model.PaginationParams, lenderTypes []string) (*model.ListResponse[model.LenderResponse], error) {
 	page, limit, offset, search, sortField, sortOrder := normalizeMasterList(params, "name", "asc", "name", "short_name", "type", "country")
 	rows, err := s.queries.ListLenders(ctx, queries.ListLendersParams{
@@ -1069,6 +1202,78 @@ func validateCurrency(req model.CurrencyRequest) error {
 	return nil
 }
 
+type parsedKursTengahRequest struct {
+	ID           pgtype.UUID
+	CurrencyID   pgtype.UUID
+	Kurs         float64
+	KursTengahBI float64
+	CutOffDate   pgtype.Date
+}
+
+func parseKursTengahBulkRequest(items []model.KursTengahRequest, requireID bool) ([]parsedKursTengahRequest, error) {
+	if len(items) == 0 {
+		return nil, validation("items", "minimal satu kurs tengah wajib diisi")
+	}
+	if len(items) > 1000 {
+		return nil, validation("items", "maksimal 1000 kurs tengah per request")
+	}
+
+	parsedItems := make([]parsedKursTengahRequest, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		parsed, err := parseKursTengahRequest(item, requireID)
+		if err != nil {
+			return nil, err
+		}
+		key := kursTengahUniqueKey(parsed.CurrencyID, parsed.CutOffDate)
+		if _, exists := seen[key]; exists {
+			return nil, validation("items", "currency dan cut_off_date tidak boleh duplikat dalam request")
+		}
+		seen[key] = struct{}{}
+		parsedItems = append(parsedItems, parsed)
+	}
+	return parsedItems, nil
+}
+
+func parseKursTengahRequest(req model.KursTengahRequest, requireID bool) (parsedKursTengahRequest, error) {
+	id := pgtype.UUID{}
+	if req.ID != nil && strings.TrimSpace(*req.ID) != "" {
+		parsedID, err := model.ParseUUID(*req.ID)
+		if err != nil {
+			return parsedKursTengahRequest{}, validation("id", "UUID tidak valid")
+		}
+		id = parsedID
+	} else if requireID {
+		return parsedKursTengahRequest{}, validation("id", "wajib diisi untuk bulk update")
+	}
+	if !requireID && req.ID != nil && strings.TrimSpace(*req.ID) != "" {
+		return parsedKursTengahRequest{}, validation("id", "harus kosong untuk bulk create")
+	}
+
+	currencyID, err := model.ParseUUID(req.CurrencyID)
+	if err != nil {
+		return parsedKursTengahRequest{}, validation("currency_id", "UUID tidak valid")
+	}
+	if req.Kurs <= 0 {
+		return parsedKursTengahRequest{}, validation("kurs", "harus lebih dari 0")
+	}
+	if req.KursTengahBI <= 0 {
+		return parsedKursTengahRequest{}, validation("kurs_tengah_bi", "harus lebih dari 0")
+	}
+	cutOffDate, err := parseDate(req.CutOffDate, "cut_off_date")
+	if err != nil {
+		return parsedKursTengahRequest{}, err
+	}
+
+	return parsedKursTengahRequest{
+		ID:           id,
+		CurrencyID:   currencyID,
+		Kurs:         req.Kurs,
+		KursTengahBI: req.KursTengahBI,
+		CutOffDate:   cutOffDate,
+	}, nil
+}
+
 func validateLender(req model.CreateLenderRequest) error {
 	if req.Type != "Bilateral" && req.Type != "Multilateral" && req.Type != "KSA" {
 		return validation("type", "harus Bilateral, Multilateral, atau KSA")
@@ -1205,6 +1410,17 @@ func nullableBool(value string) (pgtype.Bool, error) {
 	}
 }
 
+func nullableDate(value, field string) (pgtype.Date, error) {
+	if strings.TrimSpace(value) == "" {
+		return pgtype.Date{}, nil
+	}
+	return parseDate(value, field)
+}
+
+func kursTengahUniqueKey(currencyID pgtype.UUID, cutOffDate pgtype.Date) string {
+	return model.UUIDToString(currencyID) + "|" + dateString(cutOffDate)
+}
+
 func stringPtrFromText(value pgtype.Text) *string {
 	if !value.Valid {
 		return nil
@@ -1233,6 +1449,42 @@ func toCountryResponse(row queries.Country) model.CountryResponse {
 
 func toCurrencyResponse(row queries.Currency) model.CurrencyResponse {
 	return model.CurrencyResponse{ID: model.UUIDToString(row.ID), Code: row.Code, Name: row.Name, Symbol: stringPtrFromText(row.Symbol), IsActive: row.IsActive, SortOrder: row.SortOrder, CreatedAt: formatMasterTime(row.CreatedAt), UpdatedAt: formatMasterTime(row.UpdatedAt)}
+}
+
+func toKursTengahListResponse(row queries.ListKursTengahRow) model.KursTengahResponse {
+	return model.KursTengahResponse{
+		ID:           model.UUIDToString(row.ID),
+		CurrencyID:   model.UUIDToString(row.CurrencyID),
+		Currency:     kursTengahCurrencyInfo(row.CurrencyID, row.CurrencyCode, row.CurrencyName, row.CurrencySymbol, row.CurrencyIsActive),
+		Kurs:         floatFromNumeric(row.Kurs),
+		KursTengahBI: floatFromNumeric(row.KursTengahBi),
+		CutOffDate:   dateString(row.CutOffDate),
+		CreatedAt:    formatMasterTime(row.CreatedAt),
+		UpdatedAt:    formatMasterTime(row.UpdatedAt),
+	}
+}
+
+func toKursTengahResponse(row queries.GetKursTengahRow) model.KursTengahResponse {
+	return model.KursTengahResponse{
+		ID:           model.UUIDToString(row.ID),
+		CurrencyID:   model.UUIDToString(row.CurrencyID),
+		Currency:     kursTengahCurrencyInfo(row.CurrencyID, row.CurrencyCode, row.CurrencyName, row.CurrencySymbol, row.CurrencyIsActive),
+		Kurs:         floatFromNumeric(row.Kurs),
+		KursTengahBI: floatFromNumeric(row.KursTengahBi),
+		CutOffDate:   dateString(row.CutOffDate),
+		CreatedAt:    formatMasterTime(row.CreatedAt),
+		UpdatedAt:    formatMasterTime(row.UpdatedAt),
+	}
+}
+
+func kursTengahCurrencyInfo(id pgtype.UUID, code, name string, symbol pgtype.Text, isActive bool) model.CurrencyInfo {
+	return model.CurrencyInfo{
+		ID:       model.UUIDToString(id),
+		Code:     code,
+		Name:     name,
+		Symbol:   stringPtrFromText(symbol),
+		IsActive: isActive,
+	}
 }
 
 func toLenderListResponse(row queries.ListLendersRow) model.LenderResponse {

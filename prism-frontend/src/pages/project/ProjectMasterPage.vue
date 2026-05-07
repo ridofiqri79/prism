@@ -8,8 +8,10 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
 import Popover from 'primevue/popover'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import { useRoute } from 'vue-router'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
@@ -33,13 +35,23 @@ import type {
   ProjectPipelineStatus,
   ProjectStatus,
 } from '@/types/project.types'
+import {
+  queryBoolean,
+  queryEnum,
+  queryEnumArray,
+  queryNumber,
+  queryString,
+  queryStringValues,
+} from '@/utils/route-query'
 import { getPipelineStatusLabel } from '@/utils/status-labels'
 import { primeTablePt } from '@/utils/table-styles'
 
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
+const route = useRoute()
 const { can } = usePermission()
 const toast = useToast()
+let routeHydrating = false
 
 const listControls = useListControls<ProjectMasterFilterState>({
   initialFilters: createDefaultFilters(),
@@ -51,8 +63,15 @@ const listControls = useListControls<ProjectMasterFilterState>({
     indication_lender_ids: 'Indikasi Lender',
     executing_agency_ids: 'Executing Agency',
     fixed_lender_ids: 'Fixed Lender',
+    dk_lender_ids: 'Lender Daftar Kegiatan',
+    loan_agreement_lender_ids: 'Lender Loan Agreement',
+    dk_executing_agency_ids: 'EA Daftar Kegiatan',
     project_statuses: 'Status Project',
     pipeline_statuses: 'Status Pipeline',
+    reached_stages: 'Sudah mencapai tahap',
+    missing_stages: 'Belum mencapai tahap',
+    has_loi: 'LoI',
+    has_lender_indication: 'Indikasi Lender',
     program_title_ids: 'Program Title',
     region_ids: 'Region/Location',
     foreign_loan_min: 'Foreign Loan Min',
@@ -132,11 +151,30 @@ const regionOptions = computed(() =>
   })),
 )
 
-const loanTypeOptions: Array<{ label: string; value: LenderType }> = [
-  { label: 'Bilateral', value: 'Bilateral' },
-  { label: 'Multilateral', value: 'Multilateral' },
-  { label: 'KSA', value: 'KSA' },
+const loanTypeValues: LenderType[] = ['Bilateral', 'Multilateral', 'KSA']
+const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
+const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
+const projectSortFieldValues: ProjectMasterSortField[] = [
+  'bb_code',
+  'project_name',
+  'loan_types',
+  'indication_lenders',
+  'executing_agencies',
+  'fixed_lenders',
+  'project_status',
+  'pipeline_status',
+  'program_title',
+  'locations',
+  'foreign_loan_usd',
+  'dk_dates',
+  'gb_codes',
 ]
+const sortOrderValues: ProjectMasterSortOrder[] = ['asc', 'desc']
+
+const loanTypeOptions: Array<{ label: string; value: LenderType }> = loanTypeValues.map((value) => ({
+  label: value,
+  value,
+}))
 const projectStatusOptions: Array<{ label: string; value: ProjectStatus }> = [
   { label: 'Pipeline (Blue Book-Daftar Kegiatan)', value: 'Pipeline' },
   { label: 'Ongoing (Loan Agreement-Monitoring)', value: 'Ongoing' },
@@ -147,6 +185,11 @@ const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus
   { label: 'Daftar Kegiatan', value: 'DK' },
   { label: 'Loan Agreement', value: 'LA' },
   { label: 'Monitoring', value: 'Monitoring' },
+]
+const presenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua', value: null },
+  { label: 'Ada', value: true },
+  { label: 'Tidak ada', value: false },
 ]
 
 const fundingSummaryCards = computed(() => [
@@ -170,8 +213,15 @@ function createDefaultFilters(): ProjectMasterFilterState {
     indication_lender_ids: [],
     executing_agency_ids: [],
     fixed_lender_ids: [],
+    dk_lender_ids: [],
+    loan_agreement_lender_ids: [],
+    dk_executing_agency_ids: [],
     project_statuses: [],
     pipeline_statuses: [],
+    reached_stages: [],
+    missing_stages: [],
+    has_loi: null,
+    has_lender_indication: null,
     program_title_ids: [],
     region_ids: [],
     foreign_loan_min: null,
@@ -206,11 +256,30 @@ function buildParams(): ProjectMasterListParams {
   if (appliedFilters.fixed_lender_ids.length > 0) {
     params.fixed_lender_ids = [...appliedFilters.fixed_lender_ids]
   }
+  if (appliedFilters.dk_lender_ids.length > 0) {
+    params.dk_lender_ids = [...appliedFilters.dk_lender_ids]
+  }
+  if (appliedFilters.loan_agreement_lender_ids.length > 0) {
+    params.loan_agreement_lender_ids = [...appliedFilters.loan_agreement_lender_ids]
+  }
+  if (appliedFilters.dk_executing_agency_ids.length > 0) {
+    params.dk_executing_agency_ids = [...appliedFilters.dk_executing_agency_ids]
+  }
   if (appliedFilters.project_statuses.length > 0) {
     params.project_statuses = [...appliedFilters.project_statuses]
   }
   if (appliedFilters.pipeline_statuses.length > 0) {
     params.pipeline_statuses = [...appliedFilters.pipeline_statuses]
+  }
+  if (appliedFilters.reached_stages.length > 0) {
+    params.reached_stages = [...appliedFilters.reached_stages]
+  }
+  if (appliedFilters.missing_stages.length > 0) {
+    params.missing_stages = [...appliedFilters.missing_stages]
+  }
+  if (appliedFilters.has_loi !== null) params.has_loi = appliedFilters.has_loi
+  if (appliedFilters.has_lender_indication !== null) {
+    params.has_lender_indication = appliedFilters.has_lender_indication
   }
   if (appliedFilters.program_title_ids.length > 0) {
     params.program_title_ids = [...appliedFilters.program_title_ids]
@@ -230,6 +299,85 @@ function buildParams(): ProjectMasterListParams {
   params.search = textParam(listControls.debouncedSearch.value)
 
   return params
+}
+
+function positiveInteger(value: number | undefined) {
+  if (value === undefined || value < 1) return undefined
+  return Math.floor(value)
+}
+
+function hydrateProjectMasterRouteQuery() {
+  routeHydrating = true
+
+  try {
+    const query = route.query
+    const nextFilters = createDefaultFilters()
+    const queryPage = positiveInteger(queryNumber(query, 'page'))
+    const queryLimit = positiveInteger(queryNumber(query, 'limit'))
+    const minLoan = queryNumber(query, 'foreign_loan_min')
+    const maxLoan = queryNumber(query, 'foreign_loan_max')
+    const searchValue = queryString(query, 'search') ?? ''
+
+    page.value = queryPage ?? 1
+    limit.value = queryLimit ?? 20
+    sortField.value = queryEnum(query, projectSortFieldValues, 'sort') ?? 'project_name'
+    sortOrder.value = queryEnum(query, sortOrderValues, 'order') ?? 'asc'
+
+    nextFilters.loan_types = queryEnumArray(query, loanTypeValues, 'loan_types', 'loan_types[]')
+    nextFilters.indication_lender_ids = queryStringValues(
+      query,
+      'indication_lender_ids',
+      'indication_lender_ids[]',
+    )
+    nextFilters.executing_agency_ids = queryStringValues(
+      query,
+      'executing_agency_ids',
+      'executing_agency_ids[]',
+    )
+    nextFilters.fixed_lender_ids = queryStringValues(query, 'fixed_lender_ids', 'fixed_lender_ids[]')
+    nextFilters.dk_lender_ids = queryStringValues(query, 'dk_lender_ids', 'dk_lender_ids[]')
+    nextFilters.loan_agreement_lender_ids = queryStringValues(
+      query,
+      'loan_agreement_lender_ids',
+      'loan_agreement_lender_ids[]',
+    )
+    nextFilters.dk_executing_agency_ids = queryStringValues(
+      query,
+      'dk_executing_agency_ids',
+      'dk_executing_agency_ids[]',
+    )
+    nextFilters.project_statuses = queryEnumArray(
+      query,
+      projectStatusValues,
+      'project_statuses',
+      'project_statuses[]',
+    )
+    nextFilters.pipeline_statuses = queryEnumArray(
+      query,
+      pipelineStatusValues,
+      'pipeline_statuses',
+      'pipeline_statuses[]',
+    )
+    nextFilters.reached_stages = queryEnumArray(query, pipelineStatusValues, 'reached_stages', 'reached_stages[]')
+    nextFilters.missing_stages = queryEnumArray(query, pipelineStatusValues, 'missing_stages', 'missing_stages[]')
+    nextFilters.has_loi = queryBoolean(query, 'has_loi')
+    nextFilters.has_lender_indication = queryBoolean(query, 'has_lender_indication')
+    nextFilters.program_title_ids = queryStringValues(query, 'program_title_ids', 'program_title_ids[]')
+    nextFilters.region_ids = queryStringValues(query, 'region_ids', 'region_ids[]')
+    nextFilters.foreign_loan_min = minLoan ?? null
+    nextFilters.foreign_loan_max = maxLoan ?? null
+    nextFilters.dk_date_from = queryString(query, 'dk_date_from') ?? ''
+    nextFilters.dk_date_to = queryString(query, 'dk_date_to') ?? ''
+    nextFilters.include_history = queryBoolean(query, 'include_history') === true
+
+    Object.assign(filters, nextFilters)
+    Object.assign(appliedFilters, nextFilters)
+    listControls.setSearchSilently(searchValue)
+  } finally {
+    window.setTimeout(() => {
+      routeHydrating = false
+    }, 0)
+  }
 }
 
 async function loadProjectMaster() {
@@ -359,7 +507,12 @@ function selectedLabelSummary(labels: string[]) {
 
 function formatProjectFilterValue(key: string, value: unknown) {
   if (Array.isArray(value)) {
-    if (key === 'indication_lender_ids' || key === 'fixed_lender_ids') {
+    if (
+      key === 'indication_lender_ids' ||
+      key === 'fixed_lender_ids' ||
+      key === 'dk_lender_ids' ||
+      key === 'loan_agreement_lender_ids'
+    ) {
       const selected = new Set(value)
       return selectedLabelSummary(
         masterStore.lenders
@@ -368,7 +521,7 @@ function formatProjectFilterValue(key: string, value: unknown) {
       )
     }
 
-    if (key === 'executing_agency_ids') {
+    if (key === 'executing_agency_ids' || key === 'dk_executing_agency_ids') {
       const selected = new Set(value)
       return selectedLabelSummary(
         masterStore.institutions
@@ -393,7 +546,7 @@ function formatProjectFilterValue(key: string, value: unknown) {
       )
     }
 
-    if (key === 'pipeline_statuses') {
+    if (key === 'pipeline_statuses' || key === 'reached_stages' || key === 'missing_stages') {
       return selectedLabelSummary(value.map((item) => getPipelineStatusLabel(item as ProjectPipelineStatus)))
     }
 
@@ -401,6 +554,8 @@ function formatProjectFilterValue(key: string, value: unknown) {
   }
 
   if (typeof value === 'boolean') {
+    if (key === 'has_loi') return value ? 'Ada' : 'Tidak ada'
+    if (key === 'has_lender_indication') return value ? 'Ada' : 'Tidak ada'
     return value ? 'Ditampilkan' : 'Tidak'
   }
 
@@ -439,17 +594,29 @@ function expandRegionFilterIds(regionIds: string[]) {
 }
 
 watch([page, limit], () => {
+  if (routeHydrating) return
   void loadProjectMaster()
 })
 
 watch(
   [listControls.debouncedSearch, () => JSON.stringify(appliedFilters), sortField, sortOrder],
   () => {
+    if (routeHydrating) return
     void refreshFromFirstPage()
   },
 )
 
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateProjectMasterRouteQuery()
+    void loadProjectMaster()
+  },
+)
+
 onMounted(() => {
+  hydrateProjectMasterRouteQuery()
+
   void Promise.all([
     masterStore.fetchLenders(true, { limit: 1000, sort: 'name', order: 'asc' }),
     masterStore.fetchInstitutions(true, { limit: 1000, sort: 'name', order: 'asc' }),
@@ -486,7 +653,7 @@ onUnmounted(() => {
 
     <SearchFilterBar
       v-model:search="listControls.search.value"
-      search-placeholder="Cari nama proyek, indikasi lender, fixed lender, atau executing agency"
+      search-placeholder="Cari nama proyek, lender, executing agency, atau program"
       :active-filters="listControls.activeFilterPills.value"
       :filter-count="listControls.activeFilterCount.value"
       @apply="listControls.applyFilters"
@@ -594,6 +761,58 @@ onUnmounted(() => {
                   class="w-full"
                 />
               </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.reached_stages"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua tahap"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Belum Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.missing_stages"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Tidak ada bottleneck"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">LoI</span>
+                <Select
+                  v-model="filters.has_loi"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">Indikasi</span>
+                <Select
+                  v-model="filters.has_lender_indication"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
             </div>
           </div>
 
@@ -650,6 +869,50 @@ onUnmounted(() => {
               </label>
 
               <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Lender Daftar Kegiatan</span>
+                <MultiSelect
+                  v-model="filters.dk_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua lender DK"
+                  filter
+                  filter-placeholder="Cari lender DK"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Lender Loan Agreement</span>
+                <MultiSelect
+                  v-model="filters.loan_agreement_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua lender LA"
+                  filter
+                  filter-placeholder="Cari lender LA"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
                 <span class="text-sm font-medium text-surface-700">Executing Agency</span>
                 <MultiSelect
                   v-model="filters.executing_agency_ids"
@@ -659,6 +922,21 @@ onUnmounted(() => {
                   placeholder="Semua executing agency"
                   filter
                   filter-placeholder="Cari executing agency"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">EA Daftar Kegiatan</span>
+                <MultiSelect
+                  v-model="filters.dk_executing_agency_ids"
+                  :options="institutionOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua EA DK"
+                  filter
+                  filter-placeholder="Cari EA DK"
                   display="chip"
                   class="w-full"
                 />

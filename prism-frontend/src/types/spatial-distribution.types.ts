@@ -57,6 +57,10 @@ export interface SpatialDistributionParams {
   loan_types?: LenderType[]
   project_statuses?: ProjectStatus[]
   pipeline_statuses?: ProjectPipelineStatus[]
+  reached_stages?: ProjectPipelineStatus[]
+  missing_stages?: ProjectPipelineStatus[]
+  has_loi?: boolean
+  has_lender_indication?: boolean
   search?: string
   include_history?: boolean
 }
