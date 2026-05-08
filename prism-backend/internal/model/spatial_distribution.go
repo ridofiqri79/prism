@@ -3,6 +3,7 @@ package model
 type SpatialDistributionFilter struct {
 	Level               string
 	ProvinceCode        *string
+	PeriodIDs           []string
 	LoanTypes           []string
 	ProjectStatuses     []string
 	PipelineStatuses    []string

@@ -1,5 +1,308 @@
 -- ===== PROJECT MASTER =====
 
+-- name: ListDashboardStageSummaries :many
+WITH latest_bb_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
+    WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+),
+stage_entities AS (
+    SELECT
+        'BB'::text AS stage,
+        lbp.id AS entity_id,
+        COALESCE((
+            SELECT SUM(pc.amount_usd)
+            FROM bb_project_cost pc
+            WHERE pc.bb_project_id = lbp.id
+              AND pc.funding_type = 'Foreign'
+              AND pc.funding_category = 'Loan'
+        ), 0)::numeric AS amount_usd
+    FROM latest_bb_projects lbp
+
+    UNION ALL
+
+    SELECT
+        'GB'::text AS stage,
+        gp.id AS entity_id,
+        COALESCE((
+            SELECT SUM(gfs.loan_usd)
+            FROM gb_funding_source gfs
+            WHERE gfs.gb_project_id = gp.id
+        ), 0)::numeric AS amount_usd
+    FROM gb_project gp
+    WHERE gp.status = 'active'
+      AND (
+          COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_bb_project gbp
+              JOIN bb_project bp ON bp.id = gbp.bb_project_id
+              JOIN blue_book bb ON bb.id = bp.blue_book_id
+              WHERE gbp.gb_project_id = gp.id
+                AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+          )
+      )
+
+    UNION ALL
+
+    SELECT
+        'DK'::text AS stage,
+        dp.id AS entity_id,
+        COALESCE((
+            SELECT SUM(dfd.amount_usd)
+            FROM dk_financing_detail dfd
+            WHERE dfd.dk_project_id = dp.id
+        ), 0)::numeric AS amount_usd
+    FROM dk_project dp
+    WHERE (
+        COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+        )
+    )
+
+    UNION ALL
+
+    SELECT
+        'LA'::text AS stage,
+        la.id AS entity_id,
+        la.amount_usd::numeric AS amount_usd
+    FROM loan_agreement la
+    WHERE (
+        COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = la.dk_project_id
+              AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+        )
+    )
+),
+stage_order AS (
+    SELECT 'BB'::text AS stage, 1::int AS sort_order
+    UNION ALL
+    SELECT 'GB'::text AS stage, 2::int AS sort_order
+    UNION ALL
+    SELECT 'DK'::text AS stage, 3::int AS sort_order
+    UNION ALL
+    SELECT 'LA'::text AS stage, 4::int AS sort_order
+)
+SELECT
+    so.stage,
+    COUNT(se.entity_id)::int AS project_count,
+    COALESCE(SUM(se.amount_usd), 0)::numeric AS total_loan_usd
+FROM stage_order so
+LEFT JOIN stage_entities se ON se.stage = so.stage
+GROUP BY so.stage, so.sort_order
+ORDER BY so.sort_order;
+
+-- name: ListDashboardStageRegionGroups :many
+WITH latest_bb_projects AS (
+    SELECT bp.id
+    FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
+    WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND bp.id = (
+          SELECT latest.id
+          FROM bb_project latest
+          JOIN blue_book latest_bb ON latest_bb.id = latest.blue_book_id
+          WHERE latest.project_identity_id = bp.project_identity_id
+            AND latest.status = 'active'
+          ORDER BY latest_bb.revision_number DESC, COALESCE(latest_bb.revision_year, 0) DESC, latest_bb.created_at DESC
+          LIMIT 1
+      )
+),
+stage_entities AS (
+    SELECT
+        'BB'::text AS stage,
+        lbp.id AS entity_id,
+        lbp.id AS location_owner_id,
+        COALESCE((
+            SELECT SUM(pc.amount_usd)
+            FROM bb_project_cost pc
+            WHERE pc.bb_project_id = lbp.id
+              AND pc.funding_type = 'Foreign'
+              AND pc.funding_category = 'Loan'
+        ), 0)::numeric AS amount_usd
+    FROM latest_bb_projects lbp
+
+    UNION ALL
+
+    SELECT
+        'GB'::text AS stage,
+        gp.id AS entity_id,
+        gp.id AS location_owner_id,
+        COALESCE((
+            SELECT SUM(gfs.loan_usd)
+            FROM gb_funding_source gfs
+            WHERE gfs.gb_project_id = gp.id
+        ), 0)::numeric AS amount_usd
+    FROM gb_project gp
+    WHERE gp.status = 'active'
+      AND (
+          COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_bb_project gbp
+              JOIN bb_project bp ON bp.id = gbp.bb_project_id
+              JOIN blue_book bb ON bb.id = bp.blue_book_id
+              WHERE gbp.gb_project_id = gp.id
+                AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+          )
+      )
+
+    UNION ALL
+
+    SELECT
+        'DK'::text AS stage,
+        dp.id AS entity_id,
+        dp.id AS location_owner_id,
+        COALESCE((
+            SELECT SUM(dfd.amount_usd)
+            FROM dk_financing_detail dfd
+            WHERE dfd.dk_project_id = dp.id
+        ), 0)::numeric AS amount_usd
+    FROM dk_project dp
+    WHERE (
+        COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = dp.id
+              AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+        )
+    )
+
+    UNION ALL
+
+    SELECT
+        'LA'::text AS stage,
+        la.id AS entity_id,
+        la.dk_project_id AS location_owner_id,
+        la.amount_usd::numeric AS amount_usd
+    FROM loan_agreement la
+    WHERE (
+        COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
+        OR EXISTS (
+            SELECT 1
+            FROM dk_project_gb_project dpg
+            JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
+            JOIN bb_project bp ON bp.id = gbp.bb_project_id
+            JOIN blue_book bb ON bb.id = bp.blue_book_id
+            WHERE dpg.dk_project_id = la.dk_project_id
+              AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
+        )
+    )
+),
+stage_locations AS (
+    SELECT se.stage, se.entity_id, se.amount_usd, bpl.region_id
+    FROM stage_entities se
+    JOIN bb_project_location bpl ON bpl.bb_project_id = se.location_owner_id
+    WHERE se.stage = 'BB'
+
+    UNION ALL
+
+    SELECT se.stage, se.entity_id, se.amount_usd, gpl.region_id
+    FROM stage_entities se
+    JOIN gb_project_location gpl ON gpl.gb_project_id = se.location_owner_id
+    WHERE se.stage = 'GB'
+
+    UNION ALL
+
+    SELECT se.stage, se.entity_id, se.amount_usd, dkpl.region_id
+    FROM stage_entities se
+    JOIN dk_project_location dkpl ON dkpl.dk_project_id = se.location_owner_id
+    WHERE se.stage IN ('DK', 'LA')
+),
+normalized_region_groups AS (
+    SELECT DISTINCT
+        sl.stage,
+        sl.entity_id,
+        CASE
+            WHEN r.type = 'COUNTRY' THEN 'Indonesia'
+            WHEN r.type = 'PROVINCE' THEN COALESCE(r.region_group, r.name)
+            ELSE COALESCE(parent_province.region_group, r.name)
+        END::text AS label,
+        CASE
+            WHEN r.type = 'COUNTRY' THEN 'Nasional'
+            ELSE 'Region Group'
+        END::text AS level,
+        sl.amount_usd
+    FROM stage_locations sl
+    JOIN region r ON r.id = sl.region_id
+    LEFT JOIN region parent_province ON parent_province.code = r.parent_code
+        AND parent_province.type = 'PROVINCE'
+),
+aggregated_region_groups AS (
+    SELECT
+        stage,
+        ''::text AS id,
+        label,
+        level,
+        COUNT(*)::int AS project_count,
+        COALESCE(SUM(amount_usd), 0)::numeric AS foreign_loan_usd
+    FROM normalized_region_groups
+    WHERE label IS NOT NULL
+    GROUP BY stage, label, level
+),
+ranked_region_groups AS (
+    SELECT
+        stage,
+        id,
+        label,
+        level,
+        project_count,
+        foreign_loan_usd,
+        ROW_NUMBER() OVER (
+            PARTITION BY stage
+            ORDER BY project_count DESC, label ASC
+        ) AS rank_number
+    FROM aggregated_region_groups
+)
+SELECT
+    stage,
+    id,
+    label,
+    level,
+    project_count,
+    foreign_loan_usd
+FROM ranked_region_groups
+WHERE rank_number <= 6
+ORDER BY
+    CASE stage
+        WHEN 'BB' THEN 1
+        WHEN 'GB' THEN 2
+        WHEN 'DK' THEN 3
+        WHEN 'LA' THEN 4
+        ELSE 5
+    END,
+    project_count DESC,
+    label ASC;
+
 -- name: ListProjectMaster :many
 WITH RECURSIVE institution_ancestors AS (
     SELECT
@@ -21,6 +324,7 @@ project_rows AS (
     SELECT
         bp.id,
         bp.blue_book_id,
+        bb.period_id,
         bp.project_identity_id,
         bp.bb_code,
         bp.project_name,
@@ -238,8 +542,17 @@ project_rows AS (
             JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
             WHERE gbp.bb_project_id = bp.id
             ORDER BY dk.date::text
-        )::text[] AS dk_dates
-        ,
+        )::text[] AS dk_dates,
+        EXISTS (
+            SELECT 1
+            FROM loi loi_flag
+            WHERE loi_flag.bb_project_id = bp.id
+        )::boolean AS has_loi,
+        EXISTS (
+            SELECT 1
+            FROM lender_indication li_flag
+            WHERE li_flag.bb_project_id = bp.id
+        )::boolean AS has_lender_indication,
         (bp.id = (
             SELECT latest.id
             FROM bb_project latest
@@ -316,6 +629,7 @@ filtered_projects AS (
     SELECT *
     FROM project_rows pr
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
       AND (
           COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
@@ -413,6 +727,8 @@ SELECT
     locations,
     foreign_loan_usd,
     dk_dates,
+    has_loi,
+    has_lender_indication,
     is_latest,
     has_newer_revision,
     blue_book_revision_label,
@@ -469,6 +785,7 @@ project_rows AS (
     SELECT
         bp.id,
         bp.project_identity_id,
+        bb.period_id,
         bp.program_title_id,
         bp.bb_code,
         bp.project_name,
@@ -679,6 +996,7 @@ project_rows AS (
             ORDER BY dk.date::text
         )::text[] AS dk_dates
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -696,6 +1014,7 @@ project_rows AS (
 SELECT COUNT(*)::bigint
 FROM project_rows pr
 WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+  AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
   AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
   AND (
       COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
@@ -798,6 +1117,7 @@ project_rows AS (
     SELECT
         bp.id,
         bp.project_identity_id,
+        bb.period_id,
         bp.program_title_id,
         bp.bb_code,
         bp.project_name,
@@ -1045,6 +1365,7 @@ project_rows AS (
             ORDER BY dk.date::text
         )::text[] AS dk_dates
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -1063,6 +1384,7 @@ filtered_projects AS (
     SELECT *
     FROM project_rows pr
     WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND (COALESCE(cardinality(sqlc.arg('indication_lender_ids')::uuid[]), 0) = 0 OR indication_lender_ids && sqlc.arg('indication_lender_ids')::uuid[])
       AND (
           COALESCE(cardinality(sqlc.arg('executing_agency_ids')::uuid[]), 0) = 0
@@ -1174,7 +1496,9 @@ WITH RECURSIVE latest_projects AS (
             ), 0)
         END::numeric AS foreign_loan_usd
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1273,7 +1597,9 @@ WITH RECURSIVE latest_projects AS (
             ), 0)
         END::numeric AS foreign_loan_usd
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1344,7 +1670,9 @@ LIMIT 6;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1388,7 +1716,9 @@ ORDER BY project_count DESC, label ASC;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1435,7 +1765,9 @@ LIMIT 6;
 WITH RECURSIVE latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1527,7 +1859,9 @@ LIMIT 6;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.program_title_id IS NOT NULL
       AND bp.id = (
           SELECT latest.id
@@ -1574,7 +1908,9 @@ LIMIT 8;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1618,7 +1954,9 @@ ORDER BY project_count DESC, label ASC;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1665,7 +2003,9 @@ LIMIT 6;
 WITH RECURSIVE latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1756,7 +2096,9 @@ LIMIT 6;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.program_title_id IS NOT NULL
       AND bp.id = (
           SELECT latest.id
@@ -1826,8 +2168,10 @@ WITH latest_projects AS (
             ), 0)
         END::numeric AS foreign_loan_usd
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     JOIN program_title pt ON pt.id = bp.program_title_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.program_title_id IS NOT NULL
       AND bp.id = (
           SELECT latest.id
@@ -1854,7 +2198,9 @@ LIMIT 8;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1895,7 +2241,9 @@ ORDER BY project_count DESC, label ASC;
 WITH latest_projects AS (
     SELECT bp.id
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -1946,7 +2294,9 @@ WITH RECURSIVE latest_projects AS (
             WHERE gbp.bb_project_id = bp.id
         ), 0)::numeric AS foreign_loan_usd
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
+      AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest

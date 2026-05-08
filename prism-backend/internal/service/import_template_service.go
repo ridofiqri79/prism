@@ -494,11 +494,11 @@ func (s *LAService) buildLAImportTemplateWorkbook(ctx context.Context) (simpleXL
 	sheets := []simpleXLSXSheet{
 		buildLAGuideSheet(),
 		buildLAMasterDataSnapshotSheet("Master Data", reference),
-		templateInputSheet(laImportSheetInput, []string{"DK Project Ref (*)", "Lender Name (*)", "Loan Code (*)", "Agreement Date (*)", "Effective Date (*)", "Original Closing Date", "Closing Date (*)", "Currency (*)", "Amount Original (*)", "Amount USD", "Cumulative Disbursement"}, []float64{78, 42, 24, 20, 20, 24, 20, 14, 20, 20, 28}, []simpleXLSXValidation{
+		templateInputSheet(laImportSheetInput, []string{"DK Project Ref (*)", "Lender Name (*)", "Loan Code (*)", "Agreement Date (*)", "Effective Date (*)", "Original Closing Date", "Closing Date (*)", "Currency (*)", "Amount Original (*)", "Cumulative Disbursement"}, []float64{78, 42, 24, 20, 20, 24, 20, 14, 20, 28}, []simpleXLSXValidation{
 			listValidation("A2:A"+inputLastRow(), "ddDKProjectRefs", "DK Project Ref", "Pilih DK Project eligible untuk Loan Agreement."),
 			listValidation("B2:B"+inputLastRow(), "ddLenders", "Lender Name", "Pilih lender dari master data. Backend memvalidasi lender terhadap Financing Detail DK Project terkait."),
 			listValidation("H2:H"+inputLastRow(), "ddCurrencies", "Currency", "Wajib memakai kode ISO 4217 aktif dari Master Currency."),
-			decimalValidation("I2:K"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Amount Original wajib lebih dari 0. Untuk USD, Amount USD boleh kosong dan akan disamakan dengan Amount Original. Cumulative Disbursement memakai Currency yang dipilih."),
+			decimalValidation("I2:J"+inputLastRow(), "Amount", "Isi angka 0 atau lebih. Amount Original wajib lebih dari 0. Backend menghitung USD dari Kurs Tengah BI terbaru. Cumulative Disbursement memakai Currency yang dipilih."),
 		}),
 		dropdowns,
 	}
@@ -931,13 +931,13 @@ func buildLAGuideSheet() simpleXLSXSheet {
 		textRow("1. Isi Loan Agreement", "Satu baris mewakili satu Loan Agreement baru untuk DK Project.", "DK Project Ref dari dropdown sudah menyertakan UUID agar tidak ambigu."),
 		textRow("2. Pilih lender", "Lender harus berasal dari Financing Detail DK Project terkait.", "Cek referensi Allowed Loan Agreement Lender di sheet Master Data."),
 		textRow("3. Isi tanggal", "Agreement Date, Effective Date, dan Closing Date wajib memakai format YYYY-MM-DD.", "Original Closing Date opsional; isi hanya jika pinjaman diperpanjang."),
-		textRow("4. Isi nilai", "Currency wajib kode aktif Master Currency. Amount Original wajib lebih dari 0.", "Amount USD wajib untuk non-USD. Jika Currency USD, Amount USD kosong akan disamakan dengan Amount Original. Cumulative Disbursement memakai Currency yang dipilih dan boleh kosong."),
+		textRow("4. Isi nilai", "Currency wajib kode aktif Master Currency. Amount Original wajib lebih dari 0.", "Amount USD dihitung backend dari Kurs Tengah BI terbaru. Cumulative Disbursement memakai currency yang dipilih dan boleh kosong."),
 		textRow("5. Preview dan Eksekusi", "Upload workbook lalu Preview untuk melihat create, skip, dan failed. Eksekusi hanya jika failed = 0.", "Preview tidak menyimpan data; eksekusi menyimpan dalam satu transaksi."),
 		textRow(""),
 		styledTextRow(xlsxStyleSection, "Sheet", "Kolom Wajib", "Panduan Pengisian"),
 		textRow("Loan Agreement", "DK Project Ref (*), Lender Name (*), Loan Code (*)", "Import create-only. Loan Code harus unik. DK Project boleh digunakan lebih dari sekali."),
 		textRow("Loan Agreement", "Agreement Date (*), Effective Date (*), Closing Date (*)", "Original Closing Date opsional. Jika diisi, Closing Date tidak boleh lebih awal."),
-		textRow("Loan Agreement", "Currency (*), Amount Original (*)", "Amount USD wajib untuk non-USD dan opsional untuk USD. Cumulative Disbursement opsional dan memakai currency yang dipilih."),
+		textRow("Loan Agreement", "Currency (*), Amount Original (*)", "Backend menghitung Amount USD dari Kurs Tengah BI terbaru. Cumulative Disbursement opsional dan memakai currency yang dipilih."),
 		textRow(""),
 	}
 	rows = append(rows, lenderFallbackGuideRows()...)

@@ -133,6 +133,10 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
 	}
+	periodIDs, err := uuidArray(filter.PeriodIDs, "period_ids")
+	if err != nil {
+		return queries.ListProjectMasterParams{}, err
+	}
 	projectStatuses, err := allowedValues(filter.ProjectStatuses, map[string]struct{}{"Pipeline": {}, "Ongoing": {}}, "project_statuses")
 	if err != nil {
 		return queries.ListProjectMasterParams{}, err
@@ -223,6 +227,7 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 		Limit:                  int32(limit),
 		IncludeHistory:         filter.IncludeHistory,
 		LoanTypes:              loanTypes,
+		PeriodIds:              periodIDs,
 		IndicationLenderIds:    indicationLenderIDs,
 		ExecutingAgencyIds:     executingAgencyIDs,
 		FixedLenderIds:         fixedLenderIDs,
@@ -248,6 +253,7 @@ func buildProjectMasterParams(filter model.ProjectMasterFilter, params model.Pag
 func countProjectMasterParams(params queries.ListProjectMasterParams) queries.CountProjectMasterParams {
 	return queries.CountProjectMasterParams{
 		LoanTypes:              params.LoanTypes,
+		PeriodIds:              params.PeriodIds,
 		IndicationLenderIds:    params.IndicationLenderIds,
 		ExecutingAgencyIds:     params.ExecutingAgencyIds,
 		FixedLenderIds:         params.FixedLenderIds,
@@ -274,6 +280,7 @@ func countProjectMasterParams(params queries.ListProjectMasterParams) queries.Co
 func summaryProjectMasterParams(params queries.ListProjectMasterParams) queries.GetProjectMasterFundingSummaryParams {
 	return queries.GetProjectMasterFundingSummaryParams{
 		LoanTypes:              params.LoanTypes,
+		PeriodIds:              params.PeriodIds,
 		IndicationLenderIds:    params.IndicationLenderIds,
 		ExecutingAgencyIds:     params.ExecutingAgencyIds,
 		FixedLenderIds:         params.FixedLenderIds,
@@ -349,6 +356,8 @@ func projectMasterResponse(row queries.ListProjectMasterRow) model.ProjectMaster
 		Locations:               safeStringSlice(row.Locations),
 		ForeignLoanUSD:          floatFromNumeric(row.ForeignLoanUsd),
 		DKDates:                 safeStringSlice(row.DkDates),
+		HasLoI:                  row.HasLoi,
+		HasLenderIndication:     row.HasLenderIndication,
 		IsLatest:                row.IsLatest,
 		HasNewerRevision:        row.HasNewerRevision,
 		BlueBookRevisionLabel:   row.BlueBookRevisionLabel,
@@ -467,6 +476,7 @@ func (s *ProjectService) projectMasterExportFilters(ctx context.Context, params 
 		addFilter("Pencarian", params.Search.String)
 	}
 	addFilter("Jenis Pinjaman", joinExportFilterValues(params.LoanTypes))
+	addFilter("Periode", joinExportValues(s.projectPeriodLabels(ctx, params.PeriodIds)))
 	addFilter("Indikasi Lender", joinExportValues(s.projectLenderLabels(ctx, params.IndicationLenderIds)))
 	addFilter("Executing Agency", joinExportValues(s.projectInstitutionLabels(ctx, params.ExecutingAgencyIds)))
 	addFilter("Fixed Lender", joinExportValues(s.projectLenderLabels(ctx, params.FixedLenderIds)))
@@ -670,6 +680,20 @@ func projectPipelineLabels(statuses []string) []string {
 	for _, status := range statuses {
 		labels = append(labels, projectPipelineLabel(status))
 	}
+	return labels
+}
+
+func (s *ProjectService) projectPeriodLabels(ctx context.Context, ids []pgtype.UUID) []string {
+	labels := make([]string, 0, minInt(len(ids), projectMasterExportFilterLabelLimit))
+	for _, id := range ids[:minInt(len(ids), projectMasterExportFilterLabelLimit)] {
+		row, err := s.queries.GetPeriod(ctx, id)
+		if err != nil {
+			labels = append(labels, model.UUIDToString(id))
+			continue
+		}
+		labels = append(labels, row.Name)
+	}
+	labels = appendRemainingLabel(labels, len(ids))
 	return labels
 }
 

@@ -4,6 +4,7 @@
 WITH project_rows AS (
     SELECT
         bp.id,
+        bb.period_id,
         bp.bb_code,
         bp.project_name,
         CASE
@@ -89,6 +90,7 @@ WITH project_rows AS (
             ORDER BY type_label
         )::text[] AS loan_types
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -106,7 +108,8 @@ WITH project_rows AS (
 filtered_projects AS (
     SELECT *
     FROM project_rows pr
-    WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+    WHERE (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
       AND (
@@ -203,6 +206,7 @@ ORDER BY dr.name ASC;
 WITH project_rows AS (
     SELECT
         bp.id,
+        bb.period_id,
         bp.bb_code,
         bp.project_name,
         CASE
@@ -288,6 +292,7 @@ WITH project_rows AS (
             ORDER BY type_label
         )::text[] AS loan_types
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -305,7 +310,8 @@ WITH project_rows AS (
 filtered_projects AS (
     SELECT *
     FROM project_rows pr
-    WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+    WHERE (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
       AND (

@@ -102,7 +102,6 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 		"closing_date",
 		"currency",
 		"amount_original",
-		"amount_usd",
 		"cumulative_disbursement",
 	})
 	if !ok {
@@ -298,15 +297,14 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 	if err != nil {
 		addMessage(err.Error())
 	}
-	amountUSD, err := parseLAImportAmount(row.value("amount_usd"), "Amount USD", currency != "USD")
-	if err != nil {
-		addMessage(err.Error())
-	}
 	cumulativeDisbursement, err := parseLAImportAmount(row.value("cumulative_disbursement"), "Cumulative Disbursement", false)
 	if err != nil {
 		addMessage(err.Error())
 	}
-	amountOriginal, amountUSD = normalizeCurrencyAmountPair(currency, amountOriginal, amountUSD)
+	amountUSD, err := calculateLoanAgreementAmountUSD(ctx, qtx, currency, amountOriginal)
+	if err != nil {
+		addMessage(err.Error())
+	}
 	parsed.AmountOriginal = numericFromFloat(amountOriginal)
 	parsed.AmountUsd = numericFromFloat(amountUSD)
 	parsed.CumulativeDisbursement = numericFromFloat(cumulativeDisbursement)

@@ -176,6 +176,16 @@ FROM kurs_tengah kt
 JOIN currency c ON c.id = kt.currency_id
 WHERE kt.id = $1;
 
+-- name: GetLatestKursTengahByCurrencyCode :one
+SELECT
+    kt.kurs_tengah_bi,
+    kt.cut_off_date
+FROM kurs_tengah kt
+JOIN currency c ON c.id = kt.currency_id
+WHERE UPPER(TRIM(c.code)) = UPPER(TRIM($1))
+ORDER BY kt.cut_off_date DESC, kt.updated_at DESC, kt.id DESC
+LIMIT 1;
+
 -- name: CreateKursTengah :one
 INSERT INTO kurs_tengah (currency_id, kurs, kurs_tengah_bi, cut_off_date)
 VALUES ($1, $2, $3, $4)

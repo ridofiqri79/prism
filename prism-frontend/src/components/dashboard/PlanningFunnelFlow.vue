@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import type {
   DashboardDatum,
@@ -76,6 +77,14 @@ function tabId(stage: DashboardStage, label: string) {
 
 function tabPanelId(stage: DashboardStage, label: string) {
   return `planning-funnel-${stage.key.toLowerCase()}-${slugifyLabel(label)}-panel`
+}
+
+function stageDetailId(stage: DashboardStage) {
+  return `planning-funnel-${stage.key.toLowerCase()}-details`
+}
+
+function stageToggleLabel(stage: DashboardStage) {
+  return `Tampilkan atau sembunyikan detail ${stage.title}`
 }
 
 function moveActiveTab(stage: DashboardStage, direction: number) {
@@ -257,10 +266,11 @@ function isClickableDatum(item: DashboardDatum) {
 }
 
 function stageLinkProps(stage: DashboardStage) {
-  if (!stage.target || !isClickableStage(stage)) return {}
+  const target = stage.target
+
   return {
-    to: targetLocation(stage.target),
-    'aria-label': stage.target.label ?? `Buka ${stage.title}`,
+    to: target ? targetLocation(target) : { name: 'project-master' },
+    'aria-label': target?.label ?? `Buka ${stage.title}`,
   }
 }
 
@@ -279,11 +289,6 @@ function datumLinkProps(item: DashboardDatum, fallbackLabel: string) {
 function clickableDatumClass(item: DashboardDatum) {
   if (!isClickableDatum(item)) return ''
   return 'cursor-pointer no-underline transition hover:border-primary-200 hover:bg-primary-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
-}
-
-function clickableStageClass(stage: DashboardStage) {
-  if (!isClickableStage(stage)) return ''
-  return 'no-underline transition hover:ring-2 hover:ring-primary-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary'
 }
 
 function clickableRegionClass(item: DashboardDatum) {
@@ -339,97 +344,118 @@ function clickableRegionClass(item: DashboardDatum) {
     <div class="divide-y divide-surface-100">
       <template v-for="(stage, stageIndex) in stages" :key="stage.key">
         <article class="bg-white">
-          <div
-            class="grid w-full text-left transition hover:bg-surface-50 lg:grid-cols-[12.5rem_minmax(0,1fr)_14rem]"
-          >
-            <div class="border-surface-100 px-4 py-4 sm:px-5 lg:border-r">
-              <button
-                type="button"
-                class="flex w-full items-start justify-between gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                :aria-expanded="isExpanded(stage.key)"
-                @click="toggleStage(stage.key)"
-              >
-                <span class="min-w-0">
-                  <span class="block text-xs font-semibold uppercase text-surface-400">
-                    {{ stage.stepLabel }}
-                  </span>
-                  <span class="mt-2 flex items-center gap-2 text-sm font-semibold text-surface-950">
+          <div class="grid w-full text-left lg:grid-cols-[minmax(0,1fr)_14rem]">
+            <button
+              type="button"
+              class="group grid w-full cursor-pointer text-left transition hover:bg-surface-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:grid-cols-[12.5rem_minmax(0,1fr)]"
+              :aria-expanded="isExpanded(stage.key)"
+              :aria-controls="stageDetailId(stage)"
+              :aria-label="stageToggleLabel(stage)"
+              @click="toggleStage(stage.key)"
+            >
+              <span class="border-surface-100 px-4 py-4 sm:px-5 lg:border-r">
+                <span class="block text-xs font-semibold uppercase text-surface-400">
+                  {{ stage.stepLabel }}
+                </span>
+                <span
+                  class="mt-2 flex items-center justify-between gap-3 text-sm font-semibold text-surface-950"
+                >
+                  <span class="inline-flex min-w-0 items-center gap-2">
                     <span
                       class="h-2.5 w-2.5 shrink-0 rounded-sm"
                       :style="{ backgroundColor: stage.color }"
                       aria-hidden="true"
                     />
-                    {{ stage.title }}
+                    <span class="truncate">{{ stage.title }}</span>
+                  </span>
+                  <i
+                    class="pi pi-angle-right shrink-0 text-xs text-surface-400 transition-transform group-hover:text-primary-700"
+                    :class="isExpanded(stage.key) ? 'rotate-90 text-primary-700' : ''"
+                    aria-hidden="true"
+                  />
+                </span>
+              </span>
+
+              <span class="px-4 pb-4 sm:px-5 lg:py-4">
+                <span class="block text-sm leading-5 text-surface-600">{{ stage.subtitle }}</span>
+                <span
+                  class="mt-3 block rounded-md bg-surface-50 p-1 transition group-hover:ring-2 group-hover:ring-primary-100"
+                >
+                  <span
+                    class="flex min-h-16 max-w-full items-center justify-between gap-4 rounded-md px-4 text-white shadow-sm transition-[width] duration-500"
+                    :style="{
+                      width: stageBarWidth(stage),
+                      minWidth: '12rem',
+                      background: `linear-gradient(90deg, ${stage.color}, ${stage.colorSoft})`,
+                    }"
+                  >
+                    <span class="min-w-0">
+                      <span class="block truncate text-2xl font-semibold leading-none">
+                        {{ countFormatter.format(stage.count) }}
+                        <span class="text-sm font-medium opacity-85">proyek</span>
+                      </span>
+                      <span class="mt-1 block truncate text-xs font-semibold opacity-90">
+                        {{ stage.amountLabel }}
+                      </span>
+                    </span>
+                    <span class="hidden shrink-0 text-xs font-semibold opacity-85 sm:block">
+                      {{ percentFormatter.format(stage.pipelineShare) }}%
+                    </span>
                   </span>
                 </span>
-                <i
-                  class="pi pi-angle-right mt-0.5 shrink-0 text-xs text-surface-400 transition-transform"
-                  :class="isExpanded(stage.key) ? 'rotate-90 text-primary-700' : ''"
-                  aria-hidden="true"
-                />
-              </button>
-            </div>
-
-            <div class="px-4 pb-4 sm:px-5 lg:py-4">
-              <p class="text-sm leading-5 text-surface-600">{{ stage.subtitle }}</p>
-              <component
-                :is="isClickableStage(stage) ? RouterLink : 'div'"
-                v-bind="stageLinkProps(stage)"
-                class="mt-3 block rounded-md bg-surface-50 p-1"
-                :class="clickableStageClass(stage)"
-              >
-                <div
-                  class="flex min-h-16 max-w-full items-center justify-between gap-4 rounded-md px-4 text-white shadow-sm transition-[width] duration-500"
-                  :style="{
-                    width: stageBarWidth(stage),
-                    minWidth: '12rem',
-                    background: `linear-gradient(90deg, ${stage.color}, ${stage.colorSoft})`,
-                  }"
-                >
-                  <div class="min-w-0">
-                    <p class="truncate text-2xl font-semibold leading-none">
-                      {{ countFormatter.format(stage.count) }}
-                      <span class="text-sm font-medium opacity-85">proyek</span>
-                    </p>
-                    <p class="mt-1 truncate text-xs font-semibold opacity-90">
-                      {{ stage.amountLabel }}
-                    </p>
-                  </div>
-                  <p class="hidden shrink-0 text-xs font-semibold opacity-85 sm:block">
-                    {{ percentFormatter.format(stage.pipelineShare) }}%
-                  </p>
-                </div>
-              </component>
-            </div>
+              </span>
+            </button>
 
             <div
               class="border-surface-100 bg-surface-50/70 px-4 py-4 sm:px-5 lg:border-l lg:bg-white lg:text-right"
             >
-              <template v-if="stage.nextLabel">
-                <p
-                  class="text-2xl font-semibold leading-none"
-                  :class="stage.conversionLabel === '0,0%' ? 'text-red-600' : 'text-surface-950'"
-                >
-                  {{ stage.conversionLabel }}
-                </p>
-                <p class="mt-1 text-xs font-semibold uppercase text-surface-400">
-                  ke {{ stage.nextLabel }}
-                </p>
-                <p class="mt-2 text-xs font-medium leading-5 text-red-600">
-                  {{ stage.blockedLabel }}
-                </p>
-              </template>
-              <template v-else>
-                <p class="text-xs font-semibold uppercase text-surface-400">Tahap akhir</p>
-                <p class="mt-2 text-sm font-semibold leading-5 text-surface-800">
-                  {{ stage.finalLabel }}
-                </p>
-              </template>
+              <div
+                class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between lg:flex-col lg:items-end lg:justify-start"
+              >
+                <div class="min-w-0 lg:ml-auto">
+                  <template v-if="stage.nextLabel">
+                    <p
+                      class="text-2xl font-semibold leading-none"
+                      :class="
+                        stage.conversionLabel === '0,0%' ? 'text-red-600' : 'text-surface-950'
+                      "
+                    >
+                      {{ stage.conversionLabel }}
+                    </p>
+                    <p class="mt-1 text-xs font-semibold text-surface-400">
+                      {{ stage.progressLabel ?? `ke ${stage.nextLabel}` }}
+                    </p>
+                  </template>
+                  <template v-else>
+                    <p class="text-xs font-semibold uppercase text-surface-400">Tahap akhir</p>
+                    <p class="mt-2 text-sm font-semibold leading-5 text-surface-800">
+                      {{ stage.finalLabel }}
+                    </p>
+                  </template>
+                </div>
+                <Button
+                  v-if="isClickableStage(stage)"
+                  :as="RouterLink"
+                  v-bind="stageLinkProps(stage)"
+                  label="Lihat proyek"
+                  icon="pi pi-arrow-up-right"
+                  icon-pos="right"
+                  severity="secondary"
+                  outlined
+                  rounded
+                  size="small"
+                  class="shrink-0 lg:ml-auto"
+                />
+              </div>
             </div>
           </div>
 
           <Transition name="dashboard-stage">
-            <div v-if="isExpanded(stage.key)" class="border-t border-surface-100 bg-surface-50/80">
+            <div
+              v-if="isExpanded(stage.key)"
+              :id="stageDetailId(stage)"
+              class="border-t border-surface-100 bg-surface-50/80"
+            >
               <div class="px-4 py-4 sm:px-5">
                 <div class="rounded-lg border border-surface-200 bg-white">
                   <div
@@ -531,10 +557,7 @@ function clickableRegionClass(item: DashboardDatum) {
                           </component>
                         </div>
 
-                        <div
-                          v-else-if="panel.kind === 'card'"
-                          class="mt-4"
-                        >
+                        <div v-else-if="panel.kind === 'card'" class="mt-4">
                           <div class="min-w-0">
                             <p class="text-base font-semibold leading-7 text-surface-900">
                               {{ panel.description }}
@@ -566,7 +589,10 @@ function clickableRegionClass(item: DashboardDatum) {
                                 </p>
                               </div>
                               <div class="text-right">
-                                <p class="text-sm font-semibold leading-5" :class="metricToneClass(item.tone)">
+                                <p
+                                  class="text-sm font-semibold leading-5"
+                                  :class="metricToneClass(item.tone)"
+                                >
                                   {{ item.valueLabel ?? countFormatter.format(item.value) }}
                                 </p>
                                 <p class="mt-1 text-[11px] font-semibold text-surface-400">
@@ -636,7 +662,9 @@ function clickableRegionClass(item: DashboardDatum) {
                                 <span class="text-lg font-semibold text-surface-950">
                                   {{ countFormatter.format(sumValue(panel.data)) }}
                                 </span>
-                                <span class="text-[10px] leading-tight text-surface-500">proyek</span>
+                                <span class="text-[10px] leading-tight text-surface-500"
+                                  >proyek</span
+                                >
                               </div>
                             </div>
                           </div>
@@ -850,16 +878,15 @@ function clickableRegionClass(item: DashboardDatum) {
         <div v-if="stageIndex < stages.length - 1" class="relative bg-white py-3">
           <div class="mx-4 border-t border-dashed border-surface-200 lg:mx-[13rem]" />
           <Tag
-            severity="secondary"
+            severity="warn"
             rounded
-            class="absolute left-1/2 top-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 truncate bg-white"
+            class="absolute left-1/2 top-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 truncate border border-amber-200 bg-amber-50 px-3 text-amber-700"
           >
             {{ stage.blockedLabel }}
           </Tag>
         </div>
       </template>
     </div>
-
   </section>
 </template>
 

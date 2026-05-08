@@ -45,6 +45,7 @@ func spatialDistributionFilter(c echo.Context) model.SpatialDistributionFilter {
 	return model.SpatialDistributionFilter{
 		Level:               c.QueryParam("level"),
 		ProvinceCode:        queryStringPtr(c, "province_code"),
+		PeriodIDs:           queryValues(c, "period_ids", "period_ids[]", "period_id"),
 		LoanTypes:           queryValues(c, "loan_types", "loan_types[]"),
 		ProjectStatuses:     queryValues(c, "project_statuses", "project_statuses[]"),
 		PipelineStatuses:    queryValues(c, "pipeline_statuses", "pipeline_statuses[]"),

@@ -14,13 +14,16 @@ export const loanAgreementSchema = z
       .min(3, 'Kode mata uang minimal 3 karakter (ISO 4217)')
       .max(3, 'Kode mata uang maksimal 3 karakter (ISO 4217)'),
     amount_original: z.number().positive('Nilai pinjaman harus lebih dari 0'),
-    amount_usd: z.number().positive('Nilai pinjaman USD harus lebih dari 0'),
+    amount_usd: z.number().nonnegative('Nilai pinjaman USD tidak boleh negatif').default(0),
     cumulative_disbursement: z.number().nonnegative('Cumulative disbursement tidak boleh negatif'),
   })
-  .refine((data) => {
-    if (!data.original_closing_date) return true
-    return new Date(data.closing_date) >= new Date(data.original_closing_date)
-  }, {
-    message: 'Tanggal closing tidak boleh lebih awal dari tanggal closing awal',
-    path: ['closing_date'],
-  })
+  .refine(
+    (data) => {
+      if (!data.original_closing_date) return true
+      return new Date(data.closing_date) >= new Date(data.original_closing_date)
+    },
+    {
+      message: 'Tanggal closing tidak boleh lebih awal dari tanggal closing awal',
+      path: ['closing_date'],
+    },
+  )

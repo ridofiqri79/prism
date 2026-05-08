@@ -30,7 +30,7 @@
 - Seed awal Master Currency berisi mata uang negara donor/lender dan mata uang yang lazim dipakai lembaga multilateral. `XDR` disediakan nonaktif sebagai referensi Special Drawing Rights.
 - Master Kurs Tengah BI disimpan per currency dan `cut_off_date`; kombinasi currency dan cut off date harus unik.
 - CRUD Kurs Tengah BI dilakukan bulk agar operator dapat mengisi banyak tanggal/currency dalam satu transaksi.
-- Konversi ke USD dan IDR tetap manual oleh Staff. Sistem tidak melakukan konversi otomatis.
+- Konversi ke USD dan IDR tetap manual oleh Staff, kecuali perhitungan tampilan Loan Agreement yang memakai Kurs Tengah BI terbaru untuk menghitung nilai USD, Disbursement Ratio, Estimated Time Ratio, PV (DR/ETR), dan status kinerja.
 
 ---
 
@@ -96,8 +96,13 @@
 - `original_closing_date` opsional; jika diisi, `closing_date >= original_closing_date` (enforced di DDL).
 - `is_extended` dan `extension_days` adalah computed, tidak disimpan di DB.
 - Saat `closing_date` diupdate → kirim SSE `loan_agreement.extended`.
-- `currency`: kode ISO 4217. Konversi ke USD dilakukan manual oleh Staff — sistem tidak konversi otomatis.
-- `cumulative_disbursement` diinput manual mengikuti `currency` Loan Agreement yang dipilih, tidak dikonversi otomatis.
+- `currency`: kode ISO 4217. `amount_usd` dihitung dari `amount_original / kurs_tengah_bi` terbaru untuk currency non-USD; currency `USD` memakai `amount_original` apa adanya.
+- `cumulative_disbursement` diinput manual mengikuti `currency` Loan Agreement yang dipilih. Tampilan `cumulative_disbursement_usd` dihitung dari `cumulative_disbursement / kurs_tengah_bi` terbaru untuk currency non-USD.
+- Tampilan kinerja Loan Agreement dihitung sebagai:
+  - `disbursement_ratio = MAX(0, MIN(100, cumulative_disbursement_usd / amount_usd * 100))`; jika `amount_usd = 0`, hasil kosong.
+  - `estimated_time_ratio = (cut_off_date_kurs - effective_date) / (closing_date - effective_date) * 100`.
+  - `performance_value = disbursement_ratio / estimated_time_ratio`.
+  - `performance_status`: jika `disbursement_ratio != 0`, maka `performance_value <= 0.3` = `At-Risk`, `< 1` = `Behind Schedule`, selain itu `On Schedule`; jika `disbursement_ratio = 0`, maka `estimated_time_ratio > 71` = `At-Risk`, selain itu `Behind Schedule`.
 
 ---
 

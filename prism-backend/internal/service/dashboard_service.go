@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/ridofiqri79/prism-backend/internal/database/queries"
 	"github.com/ridofiqri79/prism-backend/internal/model"
 )
@@ -15,18 +17,58 @@ func NewDashboardService(q *queries.Queries) *DashboardService {
 	return &DashboardService{queries: q}
 }
 
-func (s *DashboardService) GetBlueBookDistribution(ctx context.Context) (*model.DashboardBlueBookDistributionResponse, error) {
-	groupRows, err := s.queries.ListBlueBookTopLevelExecutingAgencyGroups(ctx)
+func (s *DashboardService) GetStageOverview(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardStageOverviewResponse, error) {
+	summaryRows, err := s.queries.ListDashboardStageSummaries(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	agencyRows, err := s.queries.ListBlueBookTopLevelExecutingAgencies(ctx)
+	regionRows, err := s.queries.ListDashboardStageRegionGroups(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	programRows, err := s.queries.ListBlueBookPrograms(ctx)
+	regionsByStage := make(map[string][]model.DashboardDistributionItem)
+	for _, row := range regionRows {
+		regionsByStage[row.Stage] = append(regionsByStage[row.Stage], model.DashboardDistributionItem{
+			ID:             row.ID,
+			Label:          row.Label,
+			Level:          row.Level,
+			ProjectCount:   int(row.ProjectCount),
+			ForeignLoanUSD: floatFromNumeric(row.ForeignLoanUsd),
+		})
+	}
+
+	stages := make([]model.DashboardStageOverviewItem, 0, len(summaryRows))
+	for _, row := range summaryRows {
+		regions := regionsByStage[row.Stage]
+		if regions == nil {
+			regions = []model.DashboardDistributionItem{}
+		}
+
+		stages = append(stages, model.DashboardStageOverviewItem{
+			Stage:        row.Stage,
+			ProjectCount: int(row.ProjectCount),
+			TotalLoanUSD: floatFromNumeric(row.TotalLoanUsd),
+			Regions:      regions,
+		})
+	}
+
+	return &model.DashboardStageOverviewResponse{Stages: stages}, nil
+}
+
+func (s *DashboardService) GetBlueBookDistribution(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardBlueBookDistributionResponse, error) {
+	groupRows, err := s.queries.ListBlueBookTopLevelExecutingAgencyGroups(ctx, periodIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	agencyRows, err := s.queries.ListBlueBookTopLevelExecutingAgencies(ctx, periodIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	programRows, err := s.queries.ListBlueBookPrograms(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -71,18 +113,18 @@ func (s *DashboardService) GetBlueBookDistribution(ctx context.Context) (*model.
 	}, nil
 }
 
-func (s *DashboardService) GetGreenBookDistribution(ctx context.Context) (*model.DashboardGreenBookDistributionResponse, error) {
-	lenderTypeRows, err := s.queries.ListGreenBookLenderTypes(ctx)
+func (s *DashboardService) GetGreenBookDistribution(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardGreenBookDistributionResponse, error) {
+	lenderTypeRows, err := s.queries.ListGreenBookLenderTypes(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	lenderRows, err := s.queries.ListGreenBookTopLenders(ctx)
+	lenderRows, err := s.queries.ListGreenBookTopLenders(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	agencyRows, err := s.queries.ListGreenBookTopLevelExecutingAgencies(ctx)
+	agencyRows, err := s.queries.ListGreenBookTopLevelExecutingAgencies(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -127,23 +169,23 @@ func (s *DashboardService) GetGreenBookDistribution(ctx context.Context) (*model
 	}, nil
 }
 
-func (s *DashboardService) GetDaftarKegiatanDistribution(ctx context.Context) (*model.DashboardDaftarKegiatanDistributionResponse, error) {
-	lenderTypeRows, err := s.queries.ListDaftarKegiatanLenderTypes(ctx)
+func (s *DashboardService) GetDaftarKegiatanDistribution(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardDaftarKegiatanDistributionResponse, error) {
+	lenderTypeRows, err := s.queries.ListDaftarKegiatanLenderTypes(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	lenderRows, err := s.queries.ListDaftarKegiatanTopLenders(ctx)
+	lenderRows, err := s.queries.ListDaftarKegiatanTopLenders(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	agencyRows, err := s.queries.ListDaftarKegiatanTopLevelExecutingAgencies(ctx)
+	agencyRows, err := s.queries.ListDaftarKegiatanTopLevelExecutingAgencies(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	programRows, err := s.queries.ListDaftarKegiatanPrograms(ctx)
+	programRows, err := s.queries.ListDaftarKegiatanPrograms(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -200,23 +242,23 @@ func (s *DashboardService) GetDaftarKegiatanDistribution(ctx context.Context) (*
 	}, nil
 }
 
-func (s *DashboardService) GetLoanAgreementDistribution(ctx context.Context) (*model.DashboardLoanAgreementDistributionResponse, error) {
-	lenderTypeRows, err := s.queries.ListLoanAgreementLenderTypes(ctx)
+func (s *DashboardService) GetLoanAgreementDistribution(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardLoanAgreementDistributionResponse, error) {
+	lenderTypeRows, err := s.queries.ListLoanAgreementLenderTypes(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	lenderRows, err := s.queries.ListLoanAgreementTopLenders(ctx)
+	lenderRows, err := s.queries.ListLoanAgreementTopLenders(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	agencyRows, err := s.queries.ListLoanAgreementTopLevelExecutingAgencies(ctx)
+	agencyRows, err := s.queries.ListLoanAgreementTopLevelExecutingAgencies(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	programRows, err := s.queries.ListLoanAgreementPrograms(ctx)
+	programRows, err := s.queries.ListLoanAgreementPrograms(ctx, periodIDs)
 	if err != nil {
 		return nil, err
 	}

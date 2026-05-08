@@ -54,6 +54,8 @@ export interface ProjectMasterRow {
   locations: string[]
   foreign_loan_usd: number
   dk_dates: string[]
+  has_loi: boolean
+  has_lender_indication: boolean
   is_latest: boolean
   has_newer_revision: boolean
   blue_book_revision_label: string
@@ -76,6 +78,7 @@ export interface ProjectMasterListParams {
   limit?: number
   sort?: ProjectMasterSortField
   order?: ProjectMasterSortOrder
+  period_ids?: string[]
   loan_types?: LenderType[]
   indication_lender_ids?: string[]
   executing_agency_ids?: string[]

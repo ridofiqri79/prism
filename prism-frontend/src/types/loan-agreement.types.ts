@@ -25,6 +25,13 @@ export interface LoanAgreement {
   amount_original: number
   amount_usd: number
   cumulative_disbursement: number
+  cumulative_disbursement_usd: number | null
+  disbursement_ratio: number | null
+  estimated_time_ratio: number | null
+  performance_value: number | null
+  performance_status: string | null
+  kurs_tengah_bi: number | null
+  kurs_cut_off_date: string | null
   created_at?: string
   updated_at?: string
 }
@@ -44,6 +51,7 @@ export interface LoanAgreementPayload {
 }
 
 export interface LoanAgreementListParams extends ListParams {
+  period_ids?: string[]
   search?: string
   lender_id?: string
   is_extended?: boolean

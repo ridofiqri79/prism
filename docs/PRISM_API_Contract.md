@@ -1376,13 +1376,13 @@ Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail
 Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru. DK Project boleh muncul lebih dari satu kali selama setiap baris memakai `Loan Code` berbeda; `Loan Code` yang sudah dipakai oleh record lain masuk status `failed`.
 
 **Template:**
-`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, dan currency aktif saat template dibuat.
+`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, currency aktif, dan Kurs Tengah BI saat template dibuat.
 
 **Kolom workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Amount USD`, `Cumulative Disbursement` |
+| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Cumulative Disbursement` |
 
 **Preview:**
 `POST /loan-agreements/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -1393,7 +1393,7 @@ Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`; `Amount USD` wajib lebih dari `0` untuk non-USD. Jika `Currency` adalah `USD`, `Amount USD` boleh kosong dan backend menyimpan nilai USD sama dengan `Amount Original`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih.
+`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`. Backend menghitung `amount_usd` dari Kurs Tengah BI terbaru untuk currency non-USD; jika Kurs Tengah BI untuk currency tersebut belum tersedia, preview/import berstatus `failed`. Jika `Currency` adalah `USD`, `amount_usd` disamakan dengan `Amount Original`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih.
 
 **`POST /loan-agreements` Request:**
 `original_closing_date` boleh dikosongkan/diomit untuk pinjaman yang belum diperpanjang. `is_extended=false` dan `extension_days=0` saat field ini kosong.
@@ -1408,10 +1408,11 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
   "closing_date": "2030-12-31",
   "currency": "JPY",
   "amount_original": 45000000000,
-  "amount_usd": 300000000,
   "cumulative_disbursement": 12500000000
 }
 ```
+
+`amount_usd` pada request diabaikan untuk perhitungan baru dan dipertahankan hanya untuk kompatibilitas client lama; backend selalu menghitung nilai USD dari `amount_original` dan Kurs Tengah BI terbaru.
 
 **`GET /loan-agreements/:id` Response `200`:**
 ```json
@@ -1431,13 +1432,20 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
     "amount_original": 45000000000,
     "amount_usd": 300000000,
     "cumulative_disbursement": 12500000000,
+    "cumulative_disbursement_usd": 83333333.33,
+    "disbursement_ratio": 27.78,
+    "estimated_time_ratio": 41.67,
+    "performance_value": 0.67,
+    "performance_status": "Behind Schedule",
+    "kurs_tengah_bi": 150,
+    "kurs_cut_off_date": "2026-05-07",
     "created_at": "2025-03-15T08:00:00Z",
     "updated_at": "2025-03-15T08:00:00Z"
   }
 }
 ```
 
-`cumulative_disbursement` adalah nilai kumulatif dalam `currency` Loan Agreement yang dipilih. Sistem tidak melakukan konversi otomatis ke USD atau IDR.
+`amount_usd` dan `cumulative_disbursement_usd` dihitung dari Kurs Tengah BI terbaru untuk currency non-USD. `cumulative_disbursement` tetap nilai input manual dalam `currency` Loan Agreement yang dipilih. `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, dan `performance_status` adalah field tampilan dan tidak disimpan sebagai kolom DB.
 
 **`GET /loan-agreements` Query Params tambahan:**
 
@@ -1447,7 +1455,7 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `lender_id` | Filter by lender |
 | `is_extended` | Filter: `true` / `false` |
 | `closing_date_before` | Filter LA yang akan berakhir sebelum tanggal ini |
-| `sort` | `loan_code`, `lender`, `effective_date`, `closing_date`, `currency`, `amount_usd`, `cumulative_disbursement`, `status`, `created_at` |
+| `sort` | `loan_code`, `lender`, `effective_date`, `closing_date`, `currency`, `amount_usd`, `cumulative_disbursement_usd`, `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, `performance_status`, `status`, `created_at` |
 | `order` | `asc` atau `desc` |
 
 ---
@@ -1777,6 +1785,43 @@ Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi 
     "total_loan_usd": 2500000000,
     "total_grant_usd": 0,
     "total_counterpart_usd": 300000000
+  }
+}
+```
+
+---
+
+### `GET /dashboard/stage-overview`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan ringkasan tahap untuk funnel dashboard. Hitungan memakai entitas pada tahap masing-masing: Project Blue Book terbaru per `project_identity_id`, Project Green Book, Project Daftar Kegiatan, dan Loan Agreement. Sebaran `regions[]` memakai `region.region_group`: lokasi `CITY` dinaikkan ke provinsi induknya lalu dihitung satu kali per proyek per grup, lokasi `PROVINCE` masuk ke `region_group`, dan lokasi nasional tampil sebagai `Indonesia`.
+
+**Query Params:**
+
+| Param | Keterangan |
+|-------|------------|
+| `period_ids` | Multi-value UUID periode Blue Book untuk membatasi seluruh tahap berdasarkan relasi BB |
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "stages": [
+      {
+        "stage": "GB",
+        "project_count": 36,
+        "total_loan_usd": 1970815490,
+        "regions": [
+          {
+            "label": "Jawa",
+            "level": "Region Group",
+            "project_count": 18,
+            "foreign_loan_usd": 900000000
+          }
+        ]
+      }
+    ]
   }
 }
 ```

@@ -39,6 +39,7 @@ func (h *ProjectHandler) ExportMaster(c echo.Context) error {
 func projectMasterFilter(c echo.Context) model.ProjectMasterFilter {
 	return model.ProjectMasterFilter{
 		LoanTypes:              queryValues(c, "loan_types", "loan_types[]"),
+		PeriodIDs:              queryValues(c, "period_ids", "period_ids[]"),
 		IndicationLenderIDs:    queryValues(c, "indication_lender_ids", "indication_lender_ids[]"),
 		ExecutingAgencyIDs:     queryValues(c, "executing_agency_ids", "executing_agency_ids[]"),
 		FixedLenderIDs:         queryValues(c, "fixed_lender_ids", "fixed_lender_ids[]"),

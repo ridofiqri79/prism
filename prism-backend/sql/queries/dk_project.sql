@@ -382,6 +382,7 @@ SELECT
     r.name,
     r.type,
     r.parent_code,
+    r.region_group,
     r.created_at,
     r.updated_at
 FROM dk_project_location dkpl

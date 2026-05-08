@@ -84,8 +84,10 @@ CREATE TABLE region (
     name         VARCHAR(255) NOT NULL,
     type         VARCHAR(20) NOT NULL CHECK (type IN ('COUNTRY', 'PROVINCE', 'CITY')),
     parent_code  VARCHAR(10) REFERENCES region(code),
+    region_group VARCHAR(20) CHECK (region_group IN ('Sumatera', 'Jawa', 'Bali & Nusa Tenggara', 'Kalimantan', 'Sulawesi', 'Maluku', 'Papua')),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_region_group_province_only CHECK (type = 'PROVINCE' OR region_group IS NULL)
 );
 
 CREATE TABLE program_title (
@@ -457,7 +459,7 @@ CREATE TABLE loan_agreement (
     closing_date          DATE NOT NULL,
     currency              VARCHAR(10) NOT NULL,        -- kode ISO mata uang lender
     amount_original       NUMERIC(20, 2) NOT NULL,     -- dalam mata uang lender
-    amount_usd            NUMERIC(20, 2) NOT NULL,     -- ekuivalen USD, dikonversi manual
+    amount_usd            NUMERIC(20, 2) NOT NULL,     -- ekuivalen USD, dihitung dari Kurs Tengah BI terbaru untuk non-USD
     cumulative_disbursement NUMERIC(20, 2) NOT NULL DEFAULT 0, -- cumulative disbursement dalam currency yang dipilih
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

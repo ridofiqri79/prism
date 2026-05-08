@@ -88,6 +88,9 @@ const DOMAIN_MAP: Partial<Record<StatusDomain, Record<string, StatusMeta>>> = {
     active: { label: 'Aktif', severity: 'success' },
     extended: { label: 'Diperpanjang', severity: 'warn' },
     closed: { label: 'Ditutup', severity: 'secondary' },
+    'at-risk': { label: 'At-Risk', severity: 'danger' },
+    'behind schedule': { label: 'Behind Schedule', severity: 'warn' },
+    'on schedule': { label: 'On Schedule', severity: 'success' },
   },
   user: {
     active: { label: 'Aktif', severity: 'success' },

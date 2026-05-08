@@ -15,17 +15,31 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import { useLAForm } from '@/composables/forms/useLAForm'
 import { useToast } from '@/composables/useToast'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
+import { useMasterStore } from '@/stores/master.store'
 import type { DKProjectLoanOption, LoanAgreementPayload } from '@/types/loan-agreement.types'
 import { formatApiError } from '@/utils/api-error'
-import { formatDate, formatDKProjectLabel, parseDateModel, toDateString } from './loan-agreement-page-utils'
+import {
+  formatDate,
+  formatDKProjectLabel,
+  formatPercent,
+  formatRatio,
+  parseDateModel,
+  toDateString,
+} from './loan-agreement-page-utils'
 
 const route = useRoute()
 const router = useRouter()
 const loanAgreementStore = useLoanAgreementStore()
+const masterStore = useMasterStore()
 const toast = useToast()
 
 interface DraftLoanAgreement extends LoanAgreementPayload {
   local_id: string
+  cumulative_disbursement_usd: number | null
+  disbursement_ratio: number | null
+  estimated_time_ratio: number | null
+  performance_value: number | null
+  performance_status: string | null
 }
 
 const loanAgreementId = computed(() => String(route.params.id ?? ''))
@@ -44,6 +58,7 @@ const backRoute = computed(() =>
 )
 const form = useLAForm(null, {
   dkProjects: () => loanAgreementStore.dkProjectOptions,
+  kursTengah: () => masterStore.kursTengah,
 })
 const dkProjectModel = computed<DKProjectLoanOption | null>({
   get: () => loanAgreementStore.dkProjectOptionMap.get(form.values.dk_project_id) ?? null,
@@ -115,7 +130,15 @@ function nextDraftId() {
 }
 
 function createDraft(values: LoanAgreementPayload): DraftLoanAgreement {
-  return { ...values, local_id: nextDraftId() }
+  return {
+    ...values,
+    local_id: nextDraftId(),
+    cumulative_disbursement_usd: form.calculatedCumulativeDisbursementUSD.value,
+    disbursement_ratio: form.disbursementRatio.value,
+    estimated_time_ratio: form.estimatedTimeRatio.value,
+    performance_value: form.performanceValue.value,
+    performance_status: form.performanceStatus.value,
+  }
 }
 
 function toPayload(draft: DraftLoanAgreement): LoanAgreementPayload {
@@ -136,8 +159,8 @@ function toPayload(draft: DraftLoanAgreement): LoanAgreementPayload {
 
 function lenderNameForDraft(draft: DraftLoanAgreement) {
   return (
-    selectedProject.value?.financing_details.find((detail) => detail.lender?.id === draft.lender_id)?.lender
-      ?.name ?? '-'
+    selectedProject.value?.financing_details.find((detail) => detail.lender?.id === draft.lender_id)
+      ?.lender?.name ?? '-'
   )
 }
 
@@ -196,7 +219,8 @@ const addDraftToStack = form.submit(async (values) => {
   const normalizedLoanCode = values.loan_code.trim().toLowerCase()
   const duplicateIndex = draftLoanAgreements.value.findIndex(
     (draft, index) =>
-      index !== editingDraftIndex.value && draft.loan_code.trim().toLowerCase() === normalizedLoanCode,
+      index !== editingDraftIndex.value &&
+      draft.loan_code.trim().toLowerCase() === normalizedLoanCode,
   )
   const duplicatePersisted = persistedLoanAgreements.value.some(
     (loanAgreement) => loanAgreement.loan_code.trim().toLowerCase() === normalizedLoanCode,
@@ -271,7 +295,7 @@ async function onSubmit() {
 }
 
 onMounted(() => {
-  void loadData()
+  void Promise.all([masterStore.fetchKursTengah(true, { limit: 1000 }), loadData()])
 })
 </script>
 
@@ -279,12 +303,7 @@ onMounted(() => {
   <section class="space-y-6">
     <PageHeader :title="pageTitle" subtitle="Lengkapi data Loan Agreement">
       <template #actions>
-        <Button
-          label="Kembali"
-          icon="pi pi-arrow-left"
-          outlined
-          @click="router.push(backRoute)"
-        />
+        <Button label="Kembali" icon="pi pi-arrow-left" outlined @click="router.push(backRoute)" />
       </template>
     </PageHeader>
 
@@ -293,7 +312,8 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Referensi Daftar Kegiatan</h2>
           <p class="text-sm text-surface-500">
-            Pilih Proyek Daftar Kegiatan sebagai referensi untuk semua Loan Agreement yang akan ditambahkan.
+            Pilih Proyek Daftar Kegiatan sebagai referensi untuk semua Loan Agreement yang akan
+            ditambahkan.
           </p>
         </div>
 
@@ -318,7 +338,9 @@ onMounted(() => {
                 </div>
               </template>
             </AutoComplete>
-            <small v-if="form.errors.dk_project_id" class="text-red-600">{{ form.errors.dk_project_id }}</small>
+            <small v-if="form.errors.dk_project_id" class="text-red-600">{{
+              form.errors.dk_project_id
+            }}</small>
           </label>
         </div>
       </section>
@@ -328,7 +350,8 @@ onMounted(() => {
           <div>
             <h2 class="text-lg font-semibold text-surface-950">Informasi Pinjaman</h2>
             <p class="text-sm text-surface-500">
-              Lengkapi lender, tanggal, mata uang, dan nilai pinjaman untuk satu record Loan Agreement.
+              Lengkapi lender, tanggal, mata uang, dan nilai pinjaman untuk satu record Loan
+              Agreement.
             </p>
           </div>
           <Button
@@ -351,12 +374,16 @@ onMounted(() => {
                 :disabled="!form.values.dk_project_id"
                 placeholder="Pilih Proyek Daftar Kegiatan dulu"
               />
-              <small v-if="form.errors.lender_id" class="text-red-600">{{ form.errors.lender_id }}</small>
+              <small v-if="form.errors.lender_id" class="text-red-600">{{
+                form.errors.lender_id
+              }}</small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Kode Loan</span>
               <InputText v-model="form.values.loan_code" class="w-full" placeholder="IP-603" />
-              <small v-if="form.errors.loan_code" class="text-red-600">{{ form.errors.loan_code }}</small>
+              <small v-if="form.errors.loan_code" class="text-red-600">{{
+                form.errors.loan_code
+              }}</small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Mata Uang</span>
@@ -365,30 +392,60 @@ onMounted(() => {
                 :invalid="Boolean(form.errors.currency)"
                 placeholder="Pilih mata uang pinjaman"
               />
-              <small v-if="form.errors.currency" class="text-red-600">{{ form.errors.currency }}</small>
+              <small v-if="form.errors.currency" class="text-red-600">{{
+                form.errors.currency
+              }}</small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Tanggal Agreement</span>
-              <DatePicker v-model="agreementDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
-              <small v-if="form.errors.agreement_date" class="text-red-600">{{ form.errors.agreement_date }}</small>
+              <DatePicker
+                v-model="agreementDateModel"
+                date-format="yy-mm-dd"
+                show-icon
+                class="w-full"
+              />
+              <small v-if="form.errors.agreement_date" class="text-red-600">{{
+                form.errors.agreement_date
+              }}</small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Tanggal Efektif</span>
-              <DatePicker v-model="effectiveDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
-              <small v-if="form.errors.effective_date" class="text-red-600">{{ form.errors.effective_date }}</small>
+              <DatePicker
+                v-model="effectiveDateModel"
+                date-format="yy-mm-dd"
+                show-icon
+                class="w-full"
+              />
+              <small v-if="form.errors.effective_date" class="text-red-600">{{
+                form.errors.effective_date
+              }}</small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Tanggal Closing Awal</span>
-              <DatePicker v-model="originalClosingDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
-              <small class="text-surface-500">Opsional. Isi hanya jika pinjaman mengalami perpanjangan.</small>
+              <DatePicker
+                v-model="originalClosingDateModel"
+                date-format="yy-mm-dd"
+                show-icon
+                class="w-full"
+              />
+              <small class="text-surface-500"
+                >Opsional. Isi hanya jika pinjaman mengalami perpanjangan.</small
+              >
               <small v-if="form.errors.original_closing_date" class="text-red-600">
                 {{ form.errors.original_closing_date }}
               </small>
             </label>
             <label class="block space-y-2">
               <span class="text-sm font-medium text-surface-700">Tanggal Closing</span>
-              <DatePicker v-model="closingDateModel" date-format="yy-mm-dd" show-icon class="w-full" />
-              <small v-if="form.errors.closing_date" class="text-red-600">{{ form.errors.closing_date }}</small>
+              <DatePicker
+                v-model="closingDateModel"
+                date-format="yy-mm-dd"
+                show-icon
+                class="w-full"
+              />
+              <small v-if="form.errors.closing_date" class="text-red-600">{{
+                form.errors.closing_date
+              }}</small>
             </label>
           </div>
 
@@ -400,7 +457,8 @@ onMounted(() => {
             <div>
               <h3 class="font-semibold text-surface-950">Nilai Pinjaman</h3>
               <p class="text-sm text-surface-500">
-                Konversi ke USD diisi manual oleh staf untuk mata uang selain USD.
+                Konversi ke USD dihitung dari Kurs Tengah BI terbaru. Cumulative Disbursement tetap
+                diinput dalam mata uang pinjaman.
               </p>
             </div>
 
@@ -409,8 +467,13 @@ onMounted(() => {
                 <span class="text-sm font-medium text-surface-700">
                   {{ form.values.currency || 'Mata uang pinjaman' }} (mata uang lender)
                 </span>
-                <CurrencyInput v-model="form.values.amount_original" :currency="form.values.currency || 'USD'" />
-                <small v-if="form.errors.amount_original" class="text-red-600">{{ form.errors.amount_original }}</small>
+                <CurrencyInput
+                  v-model="form.values.amount_original"
+                  :currency="form.values.currency || 'USD'"
+                />
+                <small v-if="form.errors.amount_original" class="text-red-600">{{
+                  form.errors.amount_original
+                }}</small>
               </label>
               <label class="block space-y-2">
                 <span class="text-sm font-medium text-surface-700">
@@ -427,11 +490,66 @@ onMounted(() => {
                   {{ form.errors.cumulative_disbursement }}
                 </small>
               </label>
-              <label v-if="!form.isUSD.value" class="block space-y-2">
-                <span class="text-sm font-medium text-surface-700">USD</span>
-                <CurrencyInput v-model="form.values.amount_usd" currency="USD" />
-                <small v-if="form.errors.amount_usd" class="text-red-600">{{ form.errors.amount_usd }}</small>
-              </label>
+            </div>
+
+            <Message
+              v-if="!form.isUSD.value && !form.latestKursTengah.value"
+              severity="warn"
+              :closable="false"
+            >
+              Kurs Tengah BI terbaru untuk {{ form.values.currency }} belum tersedia. Simpan akan
+              ditolak sampai kurs diisi di Master Data.
+            </Message>
+
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">Nilai USD</p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  <CurrencyDisplay
+                    v-if="form.calculatedAmountUSD.value !== null"
+                    :amount="form.calculatedAmountUSD.value"
+                    currency="USD"
+                  />
+                  <span v-else>-</span>
+                </p>
+              </div>
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">
+                  Cumulative Disbursement USD
+                </p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  <CurrencyDisplay
+                    v-if="form.calculatedCumulativeDisbursementUSD.value !== null"
+                    :amount="form.calculatedCumulativeDisbursementUSD.value"
+                    currency="USD"
+                  />
+                  <span v-else>-</span>
+                </p>
+              </div>
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">Disbursement Ratio</p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  {{ formatPercent(form.disbursementRatio.value) }}
+                </p>
+              </div>
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">Estimated Time Ratio</p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  {{ formatPercent(form.estimatedTimeRatio.value) }}
+                </p>
+              </div>
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">PV (DR/ETR)</p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  {{ formatRatio(form.performanceValue.value) }}
+                </p>
+              </div>
+              <div class="rounded-md border border-surface-200 p-3">
+                <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+                <p class="mt-1 font-semibold text-surface-950">
+                  {{ form.performanceStatus.value ?? '-' }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -516,9 +634,14 @@ onMounted(() => {
                   </p>
                 </div>
                 <div>
-                  <p class="text-xs uppercase tracking-wide text-surface-500">Cumulative Disbursement</p>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">
+                    Cumulative Disbursement
+                  </p>
                   <p class="font-medium text-surface-900">
-                    <CurrencyDisplay :amount="draft.cumulative_disbursement" :currency="draft.currency" />
+                    <CurrencyDisplay
+                      :amount="draft.cumulative_disbursement"
+                      :currency="draft.currency"
+                    />
                   </p>
                 </div>
                 <div>
@@ -528,14 +651,39 @@ onMounted(() => {
                   </p>
                 </div>
                 <div>
-                  <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Cumulative USD</p>
                   <p class="font-medium text-surface-900">
-                    {{
-                      draft.original_closing_date && draft.original_closing_date !== draft.closing_date
-                        ? 'Perpanjangan'
-                        : 'Normal'
-                    }}
+                    <CurrencyDisplay
+                      v-if="draft.cumulative_disbursement_usd !== null"
+                      :amount="draft.cumulative_disbursement_usd"
+                      currency="USD"
+                    />
+                    <span v-else>-</span>
                   </p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Disbursement Ratio</p>
+                  <p class="font-medium text-surface-900">
+                    {{ formatPercent(draft.disbursement_ratio) }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">
+                    Estimated Time Ratio
+                  </p>
+                  <p class="font-medium text-surface-900">
+                    {{ formatPercent(draft.estimated_time_ratio) }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">PV (DR/ETR)</p>
+                  <p class="font-medium text-surface-900">
+                    {{ formatRatio(draft.performance_value) }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+                  <p class="font-medium text-surface-900">{{ draft.performance_status ?? '-' }}</p>
                 </div>
               </div>
             </article>
@@ -544,7 +692,11 @@ onMounted(() => {
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-2">
               <h3 class="font-semibold text-surface-950">Yang Sudah Tersimpan</h3>
-              <Tag :value="`${persistedLoanAgreements.length} Tersimpan`" severity="success" rounded />
+              <Tag
+                :value="`${persistedLoanAgreements.length} Tersimpan`"
+                severity="success"
+                rounded
+              />
             </div>
             <div
               v-if="persistedLoanAgreements.length === 0"
@@ -560,7 +712,9 @@ onMounted(() => {
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 space-y-1">
                   <p class="font-semibold text-surface-950">{{ loanAgreement.loan_code }}</p>
-                  <p class="text-xs uppercase tracking-wide text-surface-500">Cumulative Disbursement</p>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">
+                    Cumulative Disbursement
+                  </p>
                   <p class="text-sm font-medium text-surface-700">
                     <CurrencyDisplay
                       :amount="loanAgreement.cumulative_disbursement"
@@ -583,8 +737,16 @@ onMounted(() => {
         </div>
       </section>
 
-      <div class="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur">
-        <Button type="button" label="Batal" severity="secondary" outlined @click="router.push(backRoute)" />
+      <div
+        class="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
+      >
+        <Button
+          type="button"
+          label="Batal"
+          severity="secondary"
+          outlined
+          @click="router.push(backRoute)"
+        />
         <Button
           v-if="isEditMode"
           type="submit"

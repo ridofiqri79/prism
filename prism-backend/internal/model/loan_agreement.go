@@ -15,22 +15,29 @@ type LoanAgreementRequest struct {
 }
 
 type LoanAgreementResponse struct {
-	ID                     string     `json:"id"`
-	DKProjectID            string     `json:"dk_project_id"`
-	Lender                 LenderInfo `json:"lender"`
-	LoanCode               string     `json:"loan_code"`
-	AgreementDate          string     `json:"agreement_date"`
-	EffectiveDate          string     `json:"effective_date"`
-	OriginalClosingDate    string     `json:"original_closing_date"`
-	ClosingDate            string     `json:"closing_date"`
-	IsExtended             bool       `json:"is_extended"`
-	ExtensionDays          int        `json:"extension_days"`
-	Currency               string     `json:"currency"`
-	AmountOriginal         float64    `json:"amount_original"`
-	AmountUSD              float64    `json:"amount_usd"`
-	CumulativeDisbursement float64    `json:"cumulative_disbursement"`
-	CreatedAt              string     `json:"created_at,omitempty"`
-	UpdatedAt              string     `json:"updated_at,omitempty"`
+	ID                        string     `json:"id"`
+	DKProjectID               string     `json:"dk_project_id"`
+	Lender                    LenderInfo `json:"lender"`
+	LoanCode                  string     `json:"loan_code"`
+	AgreementDate             string     `json:"agreement_date"`
+	EffectiveDate             string     `json:"effective_date"`
+	OriginalClosingDate       string     `json:"original_closing_date"`
+	ClosingDate               string     `json:"closing_date"`
+	IsExtended                bool       `json:"is_extended"`
+	ExtensionDays             int        `json:"extension_days"`
+	Currency                  string     `json:"currency"`
+	AmountOriginal            float64    `json:"amount_original"`
+	AmountUSD                 float64    `json:"amount_usd"`
+	CumulativeDisbursement    float64    `json:"cumulative_disbursement"`
+	CumulativeDisbursementUSD *float64   `json:"cumulative_disbursement_usd"`
+	DisbursementRatio         *float64   `json:"disbursement_ratio"`
+	EstimatedTimeRatio        *float64   `json:"estimated_time_ratio"`
+	PerformanceValue          *float64   `json:"performance_value"`
+	PerformanceStatus         *string    `json:"performance_status"`
+	KursTengahBI              *float64   `json:"kurs_tengah_bi"`
+	KursCutOffDate            *string    `json:"kurs_cut_off_date"`
+	CreatedAt                 string     `json:"created_at,omitempty"`
+	UpdatedAt                 string     `json:"updated_at,omitempty"`
 }
 
 type LoanAgreementSummary struct {
@@ -41,6 +48,7 @@ type LoanAgreementSummary struct {
 }
 
 type LoanAgreementListFilter struct {
+	PeriodIDs         []string
 	LenderID          *string
 	IsExtended        *string
 	ClosingDateBefore *string

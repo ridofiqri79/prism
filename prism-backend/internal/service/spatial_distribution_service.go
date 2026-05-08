@@ -35,6 +35,11 @@ func (s *SpatialDistributionService) Choropleth(ctx context.Context, filter mode
 		return nil, err
 	}
 
+	periodIDs, err := parseUUIDList(filter.PeriodIDs, "period_ids")
+	if err != nil {
+		return nil, err
+	}
+
 	loanTypes, projectStatuses, pipelineStatuses, reachedStages, missingStages, hasLoI, hasLenderIndication, err := normalizeSpatialProjectFilters(filter)
 	if err != nil {
 		return nil, err
@@ -43,6 +48,7 @@ func (s *SpatialDistributionService) Choropleth(ctx context.Context, filter mode
 	params := queries.ListSpatialRegionMetricsParams{
 		Level:               level,
 		ProvinceCode:        provinceCode,
+		PeriodIds:           periodIDs,
 		IncludeHistory:      filter.IncludeHistory,
 		LoanTypes:           loanTypes,
 		ProjectStatuses:     projectStatuses,
@@ -138,6 +144,7 @@ func (s *SpatialDistributionService) RegionProjects(ctx context.Context, filter 
 	}
 
 	projectList, err := s.projectService.ListProjectMaster(ctx, model.ProjectMasterFilter{
+		PeriodIDs:           filter.PeriodIDs,
 		LoanTypes:           loanTypes,
 		ProjectStatuses:     projectStatuses,
 		PipelineStatuses:    pipelineStatuses,

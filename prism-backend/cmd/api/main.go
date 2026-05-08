@@ -239,6 +239,7 @@ func main() {
 	api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, middleware.Require("bb_project", "read"))
 
 	dashboard := api.Group("/dashboard", middleware.Require("bb_project", "read"))
+	dashboard.GET("/stage-overview", dashboardHandler.StageOverview)
 	dashboard.GET("/blue-book-distribution", dashboardHandler.BlueBookDistribution)
 	dashboard.GET("/green-book-distribution", dashboardHandler.GreenBookDistribution)
 	dashboard.GET("/daftar-kegiatan-distribution", dashboardHandler.DaftarKegiatanDistribution)

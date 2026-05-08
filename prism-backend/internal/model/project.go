@@ -2,6 +2,7 @@ package model
 
 type ProjectMasterFilter struct {
 	LoanTypes              []string
+	PeriodIDs              []string
 	IndicationLenderIDs    []string
 	ExecutingAgencyIDs     []string
 	FixedLenderIDs         []string
@@ -40,6 +41,8 @@ type ProjectMasterResponse struct {
 	Locations               []string `json:"locations"`
 	ForeignLoanUSD          float64  `json:"foreign_loan_usd"`
 	DKDates                 []string `json:"dk_dates"`
+	HasLoI                  bool     `json:"has_loi"`
+	HasLenderIndication     bool     `json:"has_lender_indication"`
 	IsLatest                bool     `json:"is_latest"`
 	HasNewerRevision        bool     `json:"has_newer_revision"`
 	BlueBookRevisionLabel   string   `json:"blue_book_revision_label"`

@@ -8,6 +8,17 @@ type DashboardDistributionItem struct {
 	ForeignLoanUSD float64 `json:"foreign_loan_usd"`
 }
 
+type DashboardStageOverviewItem struct {
+	Stage        string                      `json:"stage"`
+	ProjectCount int                         `json:"project_count"`
+	TotalLoanUSD float64                     `json:"total_loan_usd"`
+	Regions      []DashboardDistributionItem `json:"regions"`
+}
+
+type DashboardStageOverviewResponse struct {
+	Stages []DashboardStageOverviewItem `json:"stages"`
+}
+
 type DashboardBlueBookDistributionResponse struct {
 	AgencyGroups []DashboardDistributionItem `json:"agency_groups"`
 	TopAgencies  []DashboardDistributionItem `json:"top_agencies"`

@@ -732,6 +732,7 @@ SELECT
     r.name,
     r.type,
     r.parent_code,
+    r.region_group,
     r.created_at,
     r.updated_at
 FROM gb_project_location gpl

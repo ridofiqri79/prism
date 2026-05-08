@@ -5,36 +5,54 @@ import type {
   DashboardDaftarKegiatanDistribution,
   DashboardGreenBookDistribution,
   DashboardLoanAgreementDistribution,
+  DashboardStageOverview,
 } from '@/types/dashboard.types'
 
+interface DashboardDistributionParams {
+  period_ids?: string[]
+}
+
 export const DashboardService = {
-  async getBlueBookDistribution() {
+  async getStageOverview(params?: DashboardDistributionParams) {
+    const response = await http.get<ApiResponse<DashboardStageOverview>>(
+      '/dashboard/stage-overview',
+      { params },
+    )
+
+    return response.data.data
+  },
+
+  async getBlueBookDistribution(params?: DashboardDistributionParams) {
     const response = await http.get<ApiResponse<DashboardBlueBookDistribution>>(
       '/dashboard/blue-book-distribution',
+      { params },
     )
 
     return response.data.data
   },
 
-  async getGreenBookDistribution() {
+  async getGreenBookDistribution(params?: DashboardDistributionParams) {
     const response = await http.get<ApiResponse<DashboardGreenBookDistribution>>(
       '/dashboard/green-book-distribution',
+      { params },
     )
 
     return response.data.data
   },
 
-  async getDaftarKegiatanDistribution() {
+  async getDaftarKegiatanDistribution(params?: DashboardDistributionParams) {
     const response = await http.get<ApiResponse<DashboardDaftarKegiatanDistribution>>(
       '/dashboard/daftar-kegiatan-distribution',
+      { params },
     )
 
     return response.data.data
   },
 
-  async getLoanAgreementDistribution() {
+  async getLoanAgreementDistribution(params?: DashboardDistributionParams) {
     const response = await http.get<ApiResponse<DashboardLoanAgreementDistribution>>(
       '/dashboard/loan-agreement-distribution',
+      { params },
     )
 
     return response.data.data

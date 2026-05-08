@@ -14,7 +14,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
 import type { LoanAgreement, LoanAgreementListParams } from '@/types/loan-agreement.types'
-import { formatDate } from './loan-agreement-page-utils'
+import { formatDate, formatPercent, formatRatio } from './loan-agreement-page-utils'
 
 const loanAgreementStore = useLoanAgreementStore()
 const masterStore = useMasterStore()
@@ -59,8 +59,18 @@ const columns: ColumnDef[] = [
   { field: 'closing_date', header: 'Tgl. Penutupan', sortable: true, nowrap: true },
   { field: 'currency', header: 'Mata Uang', sortable: true, nowrap: true },
   { field: 'amount_usd', header: 'Nilai USD', sortable: true, align: 'right', nowrap: true },
-  { field: 'cumulative_disbursement', header: 'Realisasi Disbursement', sortable: true, align: 'right', nowrap: true },
-  { field: 'status', header: 'Status', sortable: true, nowrap: true },
+  {
+    field: 'cumulative_disbursement_usd',
+    header: 'Realisasi USD',
+    sortable: true,
+    align: 'right',
+    nowrap: true,
+  },
+  { field: 'disbursement_ratio', header: 'DR', sortable: true, align: 'right', nowrap: true },
+  { field: 'estimated_time_ratio', header: 'ETR', sortable: true, align: 'right', nowrap: true },
+  { field: 'performance_value', header: 'PV', sortable: true, align: 'right', nowrap: true },
+  { field: 'performance_status', header: 'Status Kinerja', sortable: true, nowrap: true },
+  { field: 'extension_status', header: 'Perpanjangan', nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
@@ -131,7 +141,11 @@ onMounted(() => {
         </label>
         <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Penutupan Sebelum Tanggal</span>
-          <InputText v-model="listControls.draftFilters.closing_date_before" type="date" class="w-full" />
+          <InputText
+            v-model="listControls.draftFilters.closing_date_before"
+            type="date"
+            class="w-full"
+          />
         </label>
       </template>
     </SearchFilterBar>
@@ -148,9 +162,15 @@ onMounted(() => {
       @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
-        <span v-if="column.field === 'lender'">{{ (row as LoanAgreement).lender?.name || '-' }}</span>
-        <span v-else-if="column.field === 'effective_date'">{{ formatDate(String(row.effective_date)) }}</span>
-        <span v-else-if="column.field === 'closing_date'">{{ formatDate(String(row.closing_date)) }}</span>
+        <span v-if="column.field === 'lender'">{{
+          (row as LoanAgreement).lender?.name || '-'
+        }}</span>
+        <span v-else-if="column.field === 'effective_date'">{{
+          formatDate(String(row.effective_date))
+        }}</span>
+        <span v-else-if="column.field === 'closing_date'">{{
+          formatDate(String(row.closing_date))
+        }}</span>
         <CurrencyDisplay
           v-else-if="column.field === 'amount_usd'"
           :amount="Number(row.amount_usd)"
@@ -161,11 +181,38 @@ onMounted(() => {
           :amount="Number(row.cumulative_disbursement)"
           :currency="String((row as LoanAgreement).currency || 'USD')"
         />
-        <StatusBadge
-          v-else-if="column.field === 'status' && (row as LoanAgreement).is_extended"
-          status="extended"
+        <CurrencyDisplay
+          v-else-if="
+            column.field === 'cumulative_disbursement_usd' &&
+            (row as LoanAgreement).cumulative_disbursement_usd !== null
+          "
+          :amount="Number((row as LoanAgreement).cumulative_disbursement_usd)"
+          currency="USD"
         />
-        <span v-else-if="column.field === 'status'">Normal</span>
+        <span v-else-if="column.field === 'cumulative_disbursement_usd'">-</span>
+        <span v-else-if="column.field === 'disbursement_ratio'">
+          {{ formatPercent((row as LoanAgreement).disbursement_ratio) }}
+        </span>
+        <span v-else-if="column.field === 'estimated_time_ratio'">
+          {{ formatPercent((row as LoanAgreement).estimated_time_ratio) }}
+        </span>
+        <span v-else-if="column.field === 'performance_value'">
+          {{ formatRatio((row as LoanAgreement).performance_value) }}
+        </span>
+        <StatusBadge
+          v-else-if="
+            column.field === 'performance_status' && (row as LoanAgreement).performance_status
+          "
+          :status="String((row as LoanAgreement).performance_status)"
+          domain="loan_agreement"
+        />
+        <span v-else-if="column.field === 'performance_status'">-</span>
+        <StatusBadge
+          v-else-if="column.field === 'extension_status' && (row as LoanAgreement).is_extended"
+          status="extended"
+          domain="loan_agreement"
+        />
+        <span v-else-if="column.field === 'extension_status'">Normal</span>
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             as="router-link"

@@ -681,6 +681,7 @@ SELECT
     r.name,
     r.type,
     r.parent_code,
+    r.region_group,
     r.created_at,
     r.updated_at
 FROM bb_project_location bpl

@@ -112,6 +112,7 @@ export interface DashboardStage {
   nextLabel?: string
   finalLabel?: string
   conversionLabel?: string
+  progressLabel?: string
   blockedLabel?: string
   target?: DashboardInsightTarget
   details: DashboardStageDetail

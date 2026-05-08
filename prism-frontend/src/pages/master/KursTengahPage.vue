@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, type CSSProperties } from 'vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import PrimeColumn from 'primevue/column'
@@ -7,6 +7,7 @@ import PrimeDataTable from 'primevue/datatable'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
+import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
@@ -18,11 +19,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { kursTengahCreateSchema, kursTengahUpdateSchema } from '@/schemas/master.schema'
 import { useMasterStore } from '@/stores/master.store'
-import type {
-  KursTengah,
-  KursTengahPayload,
-  KursTengahUpdatePayload,
-} from '@/types/master.types'
+import type { KursTengah, KursTengahPayload, KursTengahUpdatePayload } from '@/types/master.types'
 import { primeTablePt } from '@/utils/table-styles'
 import { toFormErrors, useMasterListControls, type FormErrors } from './master-page-utils'
 
@@ -53,7 +50,20 @@ const saving = ref(false)
 const deleting = ref(false)
 const nextDraftID = ref(1)
 
+const tableStyle: CSSProperties = {
+  minWidth: '64rem',
+  tableLayout: 'auto',
+  width: '100%',
+}
+const selectionColumnStyle: CSSProperties = {
+  minWidth: '3.25rem',
+  textAlign: 'center',
+  width: '3.25rem',
+}
 const tableSortOrder = computed(() => (controls.pagination.order.value === 'asc' ? 1 : -1))
+const skeletonRows = computed(() =>
+  Array.from({ length: controls.pagination.limit.value }, (_, index) => index),
+)
 const refreshingRows = computed(() => controls.loading.value && rows.value.length > 0)
 const initialLoading = computed(() => controls.loading.value && rows.value.length === 0)
 const selectedRows = computed(() => rows.value.filter((row) => row.selected))
@@ -153,7 +163,12 @@ function toISODate(value: Date) {
 function validateCreateRow(row: KursTengahDraft): KursTengahPayload | null {
   const parsed = kursTengahCreateSchema.safeParse(rowPayload(row))
   if (!parsed.success) {
-    row.errors = toFormErrors(parsed.error, ['currency_id', 'kurs', 'kurs_tengah_bi', 'cut_off_date'])
+    row.errors = toFormErrors(parsed.error, [
+      'currency_id',
+      'kurs',
+      'kurs_tengah_bi',
+      'cut_off_date',
+    ])
     return null
   }
   row.errors = {}
@@ -211,11 +226,11 @@ async function saveBulk() {
     return
   }
   if (createPayloads.length > 0 && !can('currency', 'create')) {
-    toast.error('Akses ditolak', 'Anda tidak memiliki akses tambah currency')
+    toast.error('Akses ditolak', 'Anda tidak memiliki akses tambah Kurs Tengah BI')
     return
   }
   if (updatePayloads.length > 0 && !can('currency', 'update')) {
-    toast.error('Akses ditolak', 'Anda tidak memiliki akses ubah currency')
+    toast.error('Akses ditolak', 'Anda tidak memiliki akses ubah Kurs Tengah BI')
     return
   }
 
@@ -248,9 +263,7 @@ function deleteSelected() {
     return
   }
 
-  const existingIDs = selected
-    .filter((row) => !row.is_new && row.id)
-    .map((row) => row.id as string)
+  const existingIDs = selected.filter((row) => !row.is_new && row.id).map((row) => row.id as string)
   const localKeys = selected.filter((row) => row.is_new).map((row) => row.row_key)
 
   if (existingIDs.length === 0) {
@@ -258,7 +271,7 @@ function deleteSelected() {
     return
   }
   if (!can('currency', 'delete')) {
-    toast.error('Akses ditolak', 'Anda tidak memiliki akses hapus currency')
+    toast.error('Akses ditolak', 'Anda tidak memiliki akses hapus Kurs Tengah BI')
     return
   }
 
@@ -303,17 +316,20 @@ watch(controls.search, () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Kurs Tengah BI" subtitle="Master kurs tengah per mata uang dan tanggal cut off">
+    <PageHeader
+      title="Kurs Tengah BI"
+      subtitle="Kelola nilai kurs per mata uang dan tanggal cut off"
+    >
       <template #actions>
         <Button
           v-if="can('currency', 'create')"
-          label="Tambah Baris"
+          label="Tambah"
           icon="pi pi-plus"
           outlined
           @click="addRow"
         />
         <Button
-          label="Simpan Bulk"
+          label="Simpan Perubahan"
           icon="pi pi-save"
           :disabled="!hasPendingChanges || saving || deleting"
           :loading="saving"
@@ -324,14 +340,16 @@ watch(controls.search, () => {
 
     <SearchFilterBar
       v-model:search="controls.search.value"
-      search-placeholder="Cari kode atau nama currency"
+      search-placeholder="Cari kode atau nama mata uang"
     />
 
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex flex-wrap gap-2">
-        <Tag :value="`${pendingCreateRows.length} baris baru`" severity="info" rounded />
-        <Tag :value="`${pendingUpdateRows.length} perubahan`" severity="warning" rounded />
-        <Tag :value="`${selectedRows.length} dipilih`" severity="secondary" rounded />
+    <div
+      class="flex flex-col gap-3 rounded-lg border border-surface-200 bg-white px-4 py-3 shadow-sm shadow-surface-200/60 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex min-w-0 flex-wrap gap-2">
+        <Tag :value="`${pendingCreateRows.length} Baru`" severity="info" rounded />
+        <Tag :value="`${pendingUpdateRows.length} Diubah`" severity="warning" rounded />
+        <Tag :value="`${selectedRows.length} Dipilih`" severity="secondary" rounded />
       </div>
       <Button
         label="Hapus Terpilih"
@@ -344,8 +362,17 @@ watch(controls.search, () => {
       />
     </div>
 
-    <div v-if="initialLoading" class="rounded-lg border border-surface-200 bg-white p-6 text-sm text-surface-500">
-      Memuat kurs tengah...
+    <div
+      v-if="initialLoading"
+      class="overflow-hidden rounded-lg border border-surface-200 bg-white"
+    >
+      <div
+        v-for="row in skeletonRows"
+        :key="row"
+        class="grid grid-cols-[2rem_minmax(14rem,1.6fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(10rem,1fr)_minmax(7rem,0.7fr)_minmax(4rem,0.4fr)] gap-4 border-b border-surface-100 p-4 last:border-b-0"
+      >
+        <Skeleton v-for="column in 7" :key="column" height="1.5rem" />
+      </div>
     </div>
 
     <EmptyState v-else-if="rows.length === 0" compact />
@@ -362,17 +389,26 @@ watch(controls.search, () => {
           data-key="row_key"
           :sort-field="controls.pagination.sort.value"
           :sort-order="tableSortOrder"
+          :table-style="tableStyle"
           :pt="primeTablePt"
-          class="prism-data-table min-w-[64rem] rounded-lg border border-surface-200"
+          class="prism-data-table w-full rounded-lg border border-surface-200"
           @sort="handleSort"
         >
-          <PrimeColumn header="" class="w-12">
+          <PrimeColumn
+            header=""
+            header-class="prism-table-align-center"
+            body-class="prism-table-align-center"
+            :header-style="selectionColumnStyle"
+            :body-style="selectionColumnStyle"
+          >
             <template #body="{ data }">
-              <Checkbox v-model="(data as KursTengahDraft).selected" binary />
+              <div class="flex items-center justify-center">
+                <Checkbox v-model="(data as KursTengahDraft).selected" binary />
+              </div>
             </template>
           </PrimeColumn>
 
-          <PrimeColumn field="currency" header="Currency" sortable>
+          <PrimeColumn field="currency" header="Mata Uang" sortable>
             <template #body="{ data }">
               <div class="min-w-64 space-y-1">
                 <Select
@@ -381,7 +417,7 @@ watch(controls.search, () => {
                   option-label="label"
                   option-value="value"
                   filter
-                  placeholder="Pilih currency"
+                  placeholder="Pilih mata uang"
                   class="w-full"
                   :invalid="Boolean((data as KursTengahDraft).errors.currency_id)"
                   @update:model-value="
@@ -439,7 +475,7 @@ watch(controls.search, () => {
             </template>
           </PrimeColumn>
 
-          <PrimeColumn field="cut_off_date" header="Cut Off Date" sortable>
+          <PrimeColumn field="cut_off_date" header="Tanggal Cut Off" sortable>
             <template #body="{ data }">
               <div class="min-w-48 space-y-1">
                 <DatePicker
@@ -459,19 +495,14 @@ watch(controls.search, () => {
 
           <PrimeColumn header="Status">
             <template #body="{ data }">
-              <Tag
-                v-if="(data as KursTengahDraft).is_new"
-                value="Baru"
-                severity="info"
-                rounded
-              />
+              <Tag v-if="(data as KursTengahDraft).is_new" value="Baru" severity="info" rounded />
               <Tag
                 v-else-if="(data as KursTengahDraft).dirty"
                 value="Diubah"
                 severity="warning"
                 rounded
               />
-              <Tag v-else value="Tersimpan" severity="success" rounded />
+              <Tag v-else value="Tersimpan" severity="secondary" rounded />
             </template>
           </PrimeColumn>
 

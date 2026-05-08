@@ -35,12 +35,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const loadingLoanAgreementDistribution = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchBlueBookDistribution() {
+  async function fetchBlueBookDistribution(periodIds?: string[]) {
     loadingBlueBookDistribution.value = true
     error.value = null
 
     try {
-      blueBookDistribution.value = await DashboardService.getBlueBookDistribution()
+      blueBookDistribution.value = await DashboardService.getBlueBookDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
       return blueBookDistribution.value
     } catch (err) {
       error.value = 'Gagal mengambil distribusi Blue Book'
@@ -50,12 +52,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function fetchGreenBookDistribution() {
+  async function fetchGreenBookDistribution(periodIds?: string[]) {
     loadingGreenBookDistribution.value = true
     error.value = null
 
     try {
-      greenBookDistribution.value = await DashboardService.getGreenBookDistribution()
+      greenBookDistribution.value = await DashboardService.getGreenBookDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
       return greenBookDistribution.value
     } catch (err) {
       error.value = 'Gagal mengambil distribusi Green Book'
@@ -65,12 +69,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function fetchDaftarKegiatanDistribution() {
+  async function fetchDaftarKegiatanDistribution(periodIds?: string[]) {
     loadingDaftarKegiatanDistribution.value = true
     error.value = null
 
     try {
-      daftarKegiatanDistribution.value = await DashboardService.getDaftarKegiatanDistribution()
+      daftarKegiatanDistribution.value = await DashboardService.getDaftarKegiatanDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
       return daftarKegiatanDistribution.value
     } catch (err) {
       error.value = 'Gagal mengambil distribusi Daftar Kegiatan'
@@ -80,12 +86,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function fetchLoanAgreementDistribution() {
+  async function fetchLoanAgreementDistribution(periodIds?: string[]) {
     loadingLoanAgreementDistribution.value = true
     error.value = null
 
     try {
-      loanAgreementDistribution.value = await DashboardService.getLoanAgreementDistribution()
+      loanAgreementDistribution.value = await DashboardService.getLoanAgreementDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
       return loanAgreementDistribution.value
     } catch (err) {
       error.value = 'Gagal mengambil distribusi Loan Agreement'
