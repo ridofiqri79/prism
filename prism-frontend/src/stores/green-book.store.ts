@@ -154,6 +154,15 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     }
   }
 
+  async function downloadMultiImportTemplate(): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await GreenBookService.downloadMultiImportTemplate()
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
   async function previewProjectImport(
     greenBookId: string,
     file: File,
@@ -166,10 +175,31 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     }
   }
 
+  async function previewMultiImport(file: File): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await GreenBookService.previewMultiImport(file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
   async function importProjects(greenBookId: string, file: File): Promise<MasterImportSummary> {
     importExecuting.value = true
     try {
       const result = await GreenBookService.executeImportProjects(greenBookId, file)
+      projectOptions.value = []
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
+  async function executeMultiImport(file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await GreenBookService.executeMultiImport(file)
+      greenBooks.value = []
       projectOptions.value = []
       return result
     } finally {
@@ -223,8 +253,11 @@ export const useGreenBookStore = defineStore('greenBook', () => {
     deleteProject,
     importProjectsFromGreenBook,
     downloadProjectImportTemplate,
+    downloadMultiImportTemplate,
     previewProjectImport,
+    previewMultiImport,
     importProjects,
+    executeMultiImport,
     $reset,
   }
 })

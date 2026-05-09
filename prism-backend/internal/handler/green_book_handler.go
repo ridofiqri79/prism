@@ -213,6 +213,24 @@ func (h *GreenBookHandler) PreviewImportGBProjects(c echo.Context) error {
 	return h.handleImportGBProjects(c, true)
 }
 
+func (h *GreenBookHandler) ImportMultiGreenBook(c echo.Context) error {
+	return h.handleMultiGreenBookImport(c, false)
+}
+
+func (h *GreenBookHandler) PreviewMultiGreenBookImport(c echo.Context) error {
+	return h.handleMultiGreenBookImport(c, true)
+}
+
+func (h *GreenBookHandler) DownloadMultiGreenBookImportTemplate(c echo.Context) error {
+	template, err := h.service.BuildMultiGreenBookImportTemplate(c.Request().Context())
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
 func (h *GreenBookHandler) DownloadGBProjectImportTemplate(c echo.Context) error {
 	gbID, err := parseIDParam(c, "gbId")
 	if err != nil {
@@ -250,6 +268,31 @@ func (h *GreenBookHandler) handleImportGBProjects(c echo.Context, preview bool) 
 		res, err = h.service.PreviewGreenBookProjects(c.Request().Context(), gbID, file.Filename, src, file.Size)
 	} else {
 		res, err = h.service.ImportGreenBookProjects(c.Request().Context(), gbID, file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
+}
+
+func (h *GreenBookHandler) handleMultiGreenBookImport(c echo.Context, preview bool) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewMultiGreenBookImport(c.Request().Context(), file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportMultiGreenBook(c.Request().Context(), file.Filename, src, file.Size)
 	}
 	if err != nil {
 		return err

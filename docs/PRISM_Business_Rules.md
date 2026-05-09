@@ -45,7 +45,7 @@
 - BB Project adalah snapshot di dalam satu Blue Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi harus dihubungkan dengan logical identity.
 - `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
-- Create Blue Book baru selalu kosong. Project dari Blue Book lain hanya boleh dibawa lewat aksi impor di detail Blue Book.
+- Create Blue Book baru lewat form selalu kosong kecuali dibuat melalui import workbook multi Blue Book. Project dari Blue Book lain hanya boleh dibawa lewat aksi impor di detail Blue Book.
 - Pada Blue Book detail untuk revisi, user dapat memakai tombol `Impor Proyek dari Blue Book Lain` untuk memilih Project Blue Book dari Blue Book sumber periode yang sama dan membawanya ke Blue Book tujuan.
 - Project Blue Book yang dibawa dari revisi sebelumnya di-clone sebagai snapshot baru dengan `project_identity_id` yang sama.
 - Mitra Kerja Bappenas bersifat opsional dan boleh lebih dari satu. Simpan Eselon II saja; Eselon I diturunkan dari `parent_id`.
@@ -62,7 +62,7 @@
 - GB Project adalah snapshot di dalam satu Green Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
-- Green Book baru selalu dimulai kosong. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
+- Green Book baru selalu dimulai kosong kecuali dibuat melalui import workbook multi Green Book. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
 - Pada Green Book detail, user dapat memakai tombol `Tambahkan Proyek dari Green Book Lain` untuk memilih Project Green Book dari Green Book sumber mana pun dan membawanya ke Green Book tujuan.
 - Saat user membuat GB Project baru dengan `gb_code` yang sama pada revisi Green Book berikutnya, backend menyambungkan snapshot tersebut ke logical identity sebelumnya.
 - Green Book boleh dihapus permanen hanya jika belum memiliki Project Green Book dan tidak menjadi sumber revisi Green Book lain.

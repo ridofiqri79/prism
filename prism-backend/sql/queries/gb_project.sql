@@ -88,6 +88,13 @@ SELECT
 FROM green_book gb
 WHERE gb.id = $1;
 
+-- name: GetGreenBookByPublishYearAndRevisionNumber :one
+SELECT *
+FROM green_book
+WHERE publish_year = sqlc.arg('publish_year')
+  AND revision_number = sqlc.arg('revision_number')
+LIMIT 1;
+
 -- name: CreateGreenBook :one
 INSERT INTO green_book (publish_year, replaces_green_book_id, revision_number, status)
 VALUES ($1, $2, $3, $4)

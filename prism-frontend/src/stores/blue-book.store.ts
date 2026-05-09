@@ -268,6 +268,15 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     }
   }
 
+  async function downloadMultiImportTemplate(): Promise<Blob> {
+    templateDownloading.value = true
+    try {
+      return await BlueBookService.downloadMultiImportTemplate()
+    } finally {
+      templateDownloading.value = false
+    }
+  }
+
   async function previewProjectImport(
     blueBookId: string,
     file: File,
@@ -280,10 +289,31 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     }
   }
 
+  async function previewMultiImport(file: File): Promise<MasterImportSummary> {
+    importPreviewing.value = true
+    try {
+      return await BlueBookService.previewMultiImport(file)
+    } finally {
+      importPreviewing.value = false
+    }
+  }
+
   async function importProjects(blueBookId: string, file: File): Promise<MasterImportSummary> {
     importExecuting.value = true
     try {
       const result = await BlueBookService.executeImportProjects(blueBookId, file)
+      projectOptions.value = []
+      return result
+    } finally {
+      importExecuting.value = false
+    }
+  }
+
+  async function executeMultiImport(file: File): Promise<MasterImportSummary> {
+    importExecuting.value = true
+    try {
+      const result = await BlueBookService.executeMultiImport(file)
+      blueBooks.value = []
       projectOptions.value = []
       return result
     } finally {
@@ -369,8 +399,11 @@ export const useBlueBookStore = defineStore('blueBook', () => {
     updateProject,
     deleteProject,
     downloadProjectImportTemplate,
+    downloadMultiImportTemplate,
     previewProjectImport,
+    previewMultiImport,
     importProjects,
+    executeMultiImport,
     importProjectsFromBlueBook,
     fetchLoI,
     createLoI,

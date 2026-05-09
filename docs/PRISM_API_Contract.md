@@ -668,6 +668,9 @@ Create Blue Book baru selalu dimulai kosong. Jika user ingin membawa Project Blu
 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
+| `GET` | `/blue-books/import/template` | ADMIN only |
+| `POST` | `/blue-books/import/preview` | ADMIN only |
+| `POST` | `/blue-books/import/execute` | ADMIN only |
 | `GET` | `/blue-books/:bb_id/import-projects/template` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/execute` | ADMIN only |
@@ -689,37 +692,44 @@ Endpoint `POST /blue-books/:bb_id/import-projects/from-blue-book` meng-clone Pro
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - National Priority`, `Relasi - Project Cost`, dan `Relasi - Lender Indication` |
+| `file` | Workbook `.xlsx` berisi sheet `Blue Book`, `Input Data`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - National Priority`, `Relasi - Project Cost`, dan `Relasi - Lender Indication` |
 
-Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Code (*)` sebagai kunci penghubung ke sheet `Input Data`.
+Endpoint collection-level `/blue-books/import/*` mengimpor beberapa header Blue Book dalam satu workbook. Sheet `Blue Book` menjadi daftar target dan memakai `Blue Book Key (*)` sebagai kunci kerja antar sheet. Key ini tidak disimpan di database. Sheet proyek dan relasi memakai kombinasi `Blue Book Key (*)` + `BB Code (*)` sebagai kunci penghubung.
+
+Endpoint legacy `/blue-books/:bb_id/import-projects/*` tetap tersedia untuk import proyek ke satu Blue Book target dari detail Blue Book. Format workbook legacy tidak memakai sheet `Blue Book` dan tidak membuat header Blue Book baru.
 
 **Template:**
-`GET /blue-books/:bb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, `Master Data`, `Input Data`, dan semua sheet relasi. Kolom relasi memiliki dropdown Excel dari master data dan BB Code pada sheet relasi memiliki dropdown dari `Input Data`. Sheet `Master Data` berisi snapshot master data saat template dibuat; national priority menampilkan seluruh master data dan tidak dibatasi period Blue Book target. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown.
+`GET /blue-books/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Blue Book`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data saat template dibuat; national priority menampilkan seluruh master data dan tidak dibatasi period Blue Book target.
+
+`GET /blue-books/:bb_id/import-projects/template` mengunduh template legacy untuk satu target Blue Book.
 
 **Kolom utama workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Input Data` | `Program Title (*)`, `Bappenas Partners`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
-| `Relasi - EA` | `BB Code (*)`, `Executing Agency Name (*)` |
-| `Relasi - IA` | `BB Code (*)`, `Implementing Agency Name (*)` |
-| `Relasi - Locations` | `BB Code (*)`, `Location Name (*)` |
-| `Relasi - National Priority` | `BB Code (*)`, `National Priority Name (*)` |
-| `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
-| `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
+| `Blue Book` | `Blue Book Key (*)`, `Period Name (*)`, `Publish Date (*)`, `Revision Number`, `Revision Year`, `Status (*)`, `Replaces Blue Book Ref` |
+| `Input Data` | `Blue Book Key (*)`, `Program Title (*)`, `Bappenas Partners`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
+| `Relasi - EA` | `Blue Book Key (*)`, `BB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `Blue Book Key (*)`, `BB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `Blue Book Key (*)`, `BB Code (*)`, `Location Name (*)` |
+| `Relasi - National Priority` | `Blue Book Key (*)`, `BB Code (*)`, `National Priority Name (*)` |
+| `Relasi - Project Cost` | `Blue Book Key (*)`, `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
+| `Relasi - Lender Indication` | `Blue Book Key (*)`, `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
+
+`Status` menerima `Berlaku` atau `Tidak Berlaku` dan disimpan sebagai `active` atau `superseded`. `Revision Number` kosong dianggap `0`. `Replaces Blue Book Ref` opsional dan dapat berisi `Blue Book Key` dari workbook yang sama atau UUID Blue Book existing; sumber revisi harus Period yang sama. Jika kombinasi `Period Name + Revision Number + Revision Year` sudah ada di database, baris header masuk `skip` hanya jika metadata workbook cocok dengan data existing; jika tidak cocok, baris `failed`.
 
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma. Kolom institution pada `Relasi - EA` dan `Relasi - IA` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Lender Indication.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
-`POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+`POST /blue-books/import/preview` dan `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
 
 **Execute:**
-`POST /blue-books/:bb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+`POST /blue-books/import/execute` dan `POST /blue-books/:bb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `project_identity_id` yang sama. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
+Baris dengan `BB Code` yang sudah ada dalam Blue Book target terkait akan di-skip. `BB Code` boleh sama pada `Blue Book Key` berbeda, tetapi tidak boleh duplikat dalam `Blue Book Key` yang sama. `BB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `project_identity_id` yang sama. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
 
 ---
 
@@ -947,6 +957,9 @@ Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Gre
 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
+| `GET` | `/green-books/import/template` | ADMIN only |
+| `POST` | `/green-books/import/preview` | ADMIN only |
+| `POST` | `/green-books/import/execute` | ADMIN only |
 | `GET` | `/green-books/:gb_id/import-projects/template` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/execute` | ADMIN only |
@@ -968,39 +981,46 @@ Endpoint `POST /green-books/:gb_id/import-projects/from-green-book` meng-clone P
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - BB Project`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - Activities`, `Relasi - Funding Source`, `Relasi - Disbursement Plan`, dan `Relasi - Funding Allocation` |
+| `file` | Workbook `.xlsx` berisi sheet `Green Book`, `Input Data`, `Relasi - BB Project`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - Activities`, `Relasi - Funding Source`, `Relasi - Disbursement Plan`, dan `Relasi - Funding Allocation` |
 
-Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB Code (*)` sebagai kunci penghubung ke sheet `Input Data`. Import ini tidak membuat header Green Book baru.
+Endpoint collection-level `/green-books/import/*` mengimpor beberapa header Green Book dalam satu workbook. Sheet `Green Book` menjadi daftar target dan memakai `Green Book Key (*)` sebagai kunci kerja antar sheet. Key ini tidak disimpan di database. Sheet proyek dan relasi memakai kombinasi `Green Book Key (*)` + `GB Code (*)` sebagai kunci penghubung.
+
+Endpoint legacy `/green-books/:gb_id/import-projects/*` tetap tersedia untuk import proyek ke satu Green Book target dari detail Green Book. Format workbook legacy tidak memakai sheet `Green Book` dan tidak membuat header Green Book baru.
 
 **Template:**
-`GET /green-books/:gb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data dan BB Project aktif saat template dibuat.
+`GET /green-books/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Green Book`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data dan BB Project aktif saat template dibuat.
+
+`GET /green-books/:gb_id/import-projects/template` mengunduh template legacy untuk satu target Green Book.
 
 **Kolom utama workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Input Data` | `Program Title (*)`, `GB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Project` |
-| `Relasi - BB Project` | `GB Code (*)`, `BB Code (*)` |
-| `Relasi - EA` | `GB Code (*)`, `Executing Agency Name (*)` |
-| `Relasi - IA` | `GB Code (*)`, `Implementing Agency Name (*)` |
-| `Relasi - Locations` | `GB Code (*)`, `Location Name (*)` |
-| `Relasi - Activities` | `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
-| `Relasi - Funding Source` | `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Currency`, `Loan Original`, `Grant Original`, `Local Original`, `Loan USD`, `Grant USD`, `Local USD` |
-| `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
-| `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+| `Green Book` | `Green Book Key (*)`, `Publish Year (*)`, `Revision Number`, `Status (*)`, `Replaces Green Book Ref` |
+| `Input Data` | `Green Book Key (*)`, `Program Title (*)`, `GB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Project` |
+| `Relasi - BB Project` | `Green Book Key (*)`, `GB Code (*)`, `BB Code (*)` |
+| `Relasi - EA` | `Green Book Key (*)`, `GB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `Green Book Key (*)`, `GB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `Green Book Key (*)`, `GB Code (*)`, `Location Name (*)` |
+| `Relasi - Activities` | `Green Book Key (*)`, `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
+| `Relasi - Funding Source` | `Green Book Key (*)`, `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Currency`, `Loan Original`, `Grant Original`, `Local Original`, `Loan USD`, `Grant USD`, `Local USD` |
+| `Relasi - Disbursement Plan` | `Green Book Key (*)`, `GB Code (*)`, `Year (*)`, `Amount USD` |
+| `Relasi - Funding Allocation` | `Green Book Key (*)`, `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+
+`Status` menerima `Berlaku` atau `Tidak Berlaku` dan disimpan sebagai `active` atau `superseded`. `Revision Number` kosong dianggap `0`. `Replaces Green Book Ref` opsional dan dapat berisi `Green Book Key` dari workbook yang sama atau UUID Green Book existing; sumber revisi harus `Publish Year` yang sama. Jika kombinasi `Publish Year + Revision Number` sudah ada di database, baris header masuk `skip` hanya jika metadata workbook cocok dengan data existing; jika tidak cocok, baris `failed`.
 
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom institution pada `Relasi - EA`, `Relasi - IA`, dan `Relasi - Funding Source` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Funding Source.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
-`POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+`POST /green-books/import/preview` dan `POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
 
 **Execute:**
-`POST /green-books/:gb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+`POST /green-books/import/execute` dan `POST /green-books/:gb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Currency` kosong dianggap `USD`; jika `USD`, nilai USD disamakan dengan nilai original sehingga user tidak perlu mengisi dua kali. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
+Baris dengan `GB Code` yang sudah ada dalam Green Book target terkait akan di-skip. `GB Code` boleh sama pada `Green Book Key` berbeda, tetapi tidak boleh duplikat dalam `Green Book Key` yang sama. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Currency` kosong dianggap `USD`; jika `USD`, nilai USD disamakan dengan nilai original sehingga user tidak perlu mengisi dua kali. `Year` pada Disbursement Plan harus unik per kombinasi `Green Book Key + GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
 
 ---
 

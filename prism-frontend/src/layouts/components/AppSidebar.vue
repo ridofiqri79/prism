@@ -47,6 +47,7 @@ const searchQuery = ref('')
 const isCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
 )
+const isDesktopViewport = ref(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
 const expandedGroups = ref<Record<string, boolean>>({
   'Dokumen Perencanaan': true,
   Referensi: true,
@@ -56,11 +57,17 @@ const expandedGroups = ref<Record<string, boolean>>({
 const accountLabel = computed(() => auth.user?.email || auth.user?.username || 'PRISM')
 const accountMeta = computed(() => (auth.user ? `Akun ${auth.user.role}` : 'Belum ada sesi aktif'))
 const hasSearch = computed(() => searchQuery.value.trim().length > 0)
+const isSidebarCollapsed = computed(() => isDesktopViewport.value && isCollapsed.value)
 
 watch(isCollapsed, (value) => {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(value))
 })
+
+function syncViewportMode() {
+  if (typeof window === 'undefined') return
+  isDesktopViewport.value = window.innerWidth >= 1024
+}
 
 // Close drawer on Escape key
 function handleKeydown(event: KeyboardEvent) {
@@ -70,15 +77,20 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
   event.preventDefault()
-  isCollapsed.value = false
+  if (isDesktopViewport.value) {
+    isCollapsed.value = false
+  }
   window.setTimeout(() => searchInput.value?.focus(), 0)
 }
 
 onMounted(() => {
+  syncViewportMode()
+  window.addEventListener('resize', syncViewportMode, { passive: true })
   window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewportMode)
   window.removeEventListener('keydown', handleKeydown)
 })
 
@@ -211,6 +223,7 @@ function isActive(path: string) {
 }
 
 function toggleSidebar() {
+  if (!isDesktopViewport.value) return
   isCollapsed.value = !isCollapsed.value
 }
 
@@ -233,6 +246,15 @@ function isGroupExpanded(group: NavigationGroup) {
 }
 
 function toggleGroup(group: NavigationGroup) {
+  if (isSidebarCollapsed.value) {
+    isCollapsed.value = false
+    expandedGroups.value = {
+      ...expandedGroups.value,
+      [group.label]: true,
+    }
+    return
+  }
+
   expandedGroups.value = {
     ...expandedGroups.value,
     [group.label]: !isGroupExpanded(group),
@@ -250,29 +272,29 @@ function toggleGroup(group: NavigationGroup) {
     :class="[
       // Desktop layout — always visible, no transform
       'lg:relative lg:flex lg:translate-x-0 lg:flex-col',
-      isCollapsed ? 'lg:w-[68px]' : 'lg:w-[288px]',
+      isSidebarCollapsed ? 'lg:w-[68px]' : 'lg:w-[288px]',
       // Mobile layout — overlay drawer
       'fixed inset-y-0 left-0 z-50 flex w-[288px] flex-col',
       isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
     ]"
-    :aria-hidden="!isMobileOpen ? 'true' : undefined"
+    :aria-hidden="isDesktopViewport ? undefined : (!isMobileOpen ? 'true' : undefined)"
   >
     <div
       class="prism-sidebar-header flex items-center border-b"
-      :class="isCollapsed ? 'px-2' : 'px-4'"
+      :class="isSidebarCollapsed ? 'px-2' : 'px-4'"
     >
       <div
         class="flex w-full"
-        :class="isCollapsed ? 'justify-center' : 'items-center gap-3'"
+        :class="isSidebarCollapsed ? 'justify-center' : 'items-center gap-3'"
       >
-        <div class="flex min-w-0 items-center gap-3" :class="isCollapsed ? 'justify-center' : ''">
+        <div class="flex min-w-0 items-center gap-3" :class="isSidebarCollapsed ? 'justify-center' : ''">
           <img
             src="/prism-logo.png"
             alt=""
             class="prism-sidebar-logo shrink-0 rounded-md object-contain p-0.5"
-            :class="isCollapsed ? 'h-5 w-5' : 'h-7 w-7'"
+            :class="isSidebarCollapsed ? 'h-5 w-5' : 'h-7 w-7'"
           />
-          <div v-if="!isCollapsed" class="min-w-0">
+          <div v-if="!isSidebarCollapsed" class="min-w-0">
             <p class="prism-sidebar-title truncate text-sm font-medium">{{ accountLabel }}</p>
             <p class="prism-sidebar-muted truncate text-xs">{{ accountMeta }}</p>
           </div>
@@ -291,7 +313,7 @@ function toggleGroup(group: NavigationGroup) {
       </div>
     </div>
 
-    <div v-if="!isCollapsed" class="px-4 py-3">
+    <div v-if="!isSidebarCollapsed" class="px-4 py-3">
       <label class="sr-only" for="sidebar-search">Cari menu</label>
       <div class="relative">
         <IconField iconPosition="left">
@@ -314,7 +336,7 @@ function toggleGroup(group: NavigationGroup) {
 
     <nav
       class="prism-sidebar-nav flex-1 overflow-y-auto pb-4"
-      :class="isCollapsed ? 'px-2 py-3' : 'px-3'"
+      :class="isSidebarCollapsed ? 'px-2 py-3' : 'px-3'"
     >
       <div class="space-y-1">
         <RouterLink
@@ -324,13 +346,13 @@ function toggleGroup(group: NavigationGroup) {
           class="prism-sidebar-item flex min-h-8 items-center rounded-lg text-sm transition-colors"
           :class="[
             isActive(item.to) ? 'is-active' : 'font-medium',
-            isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5',
+            isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5',
           ]"
           :aria-label="item.label"
-          :title="isCollapsed ? item.label : undefined"
+          :title="isSidebarCollapsed ? item.label : undefined"
         >
           <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-          <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+          <span v-if="!isSidebarCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
             {{ item.label }}
           </span>
         </RouterLink>
@@ -339,9 +361,9 @@ function toggleGroup(group: NavigationGroup) {
       <section
         v-for="group in visibleNavigationGroups"
         :key="group.label"
-        :class="[isCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
+        :class="[isSidebarCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
       >
-        <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
+        <p v-if="!isSidebarCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
           {{ group.section }}
         </p>
 
@@ -349,18 +371,18 @@ function toggleGroup(group: NavigationGroup) {
           <button
             type="button"
             class="prism-sidebar-item flex min-h-8 w-full items-center rounded-lg text-sm font-medium transition-colors"
-            :class="[isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5 text-left']"
+            :class="[isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5 text-left']"
             :aria-expanded="isGroupExpanded(group)"
             :aria-label="group.label"
-            :title="isCollapsed ? group.label : undefined"
+            :title="isSidebarCollapsed ? group.label : undefined"
             @click="toggleGroup(group)"
           >
             <i :class="[group.icon, 'shrink-0 text-[13px]']" />
-            <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+            <span v-if="!isSidebarCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
               {{ group.label }}
             </span>
             <i
-              v-if="!isCollapsed"
+              v-if="!isSidebarCollapsed"
               :class="[
                 isGroupExpanded(group) ? 'pi pi-angle-down' : 'pi pi-angle-right',
                 'shrink-0 text-[11px]',
@@ -369,7 +391,7 @@ function toggleGroup(group: NavigationGroup) {
           </button>
 
           <div
-            v-if="!isCollapsed && isGroupExpanded(group)"
+            v-if="!isSidebarCollapsed && isGroupExpanded(group)"
             class="prism-sidebar-child-list ml-[18px] border-l py-1 pl-2"
           >
             <RouterLink
@@ -392,16 +414,50 @@ function toggleGroup(group: NavigationGroup) {
       </section>
     </nav>
 
-    <div class="prism-sidebar-footer border-t p-3" :class="isCollapsed ? 'flex justify-center' : ''">
+    <div class="prism-sidebar-footer border-t p-3" :class="isSidebarCollapsed ? 'flex justify-center' : ''">
       <button
+        v-if="isDesktopViewport"
         type="button"
-        class="prism-sidebar-icon-button hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors lg:flex"
-        :class="isCollapsed ? '' : 'ml-auto'"
-        :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        class="prism-sidebar-icon-button flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        :class="isSidebarCollapsed ? '' : 'ml-auto'"
+        :aria-label="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-pressed="isSidebarCollapsed"
+        :title="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="toggleSidebar"
       >
-        <i class="pi pi-bars text-sm" />
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 40 40"
+          fill="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <rect
+            x="3"
+            y="5"
+            width="34"
+            height="30"
+            rx="7"
+            stroke="currentColor"
+            stroke-width="2.2"
+          />
+          <path
+            v-if="isSidebarCollapsed"
+            d="M27 6.5V33.5M16 14.5L21.5 20L16 25.5"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            v-else
+            d="M13 6.5V33.5M24 14.5L18.5 20L24 25.5"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
       </button>
     </div>
   </aside>

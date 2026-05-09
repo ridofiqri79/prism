@@ -211,6 +211,24 @@ func (h *BlueBookHandler) PreviewImportBBProjects(c echo.Context) error {
 	return h.handleImportBBProjects(c, true)
 }
 
+func (h *BlueBookHandler) ImportMultiBlueBook(c echo.Context) error {
+	return h.handleMultiBlueBookImport(c, false)
+}
+
+func (h *BlueBookHandler) PreviewMultiBlueBookImport(c echo.Context) error {
+	return h.handleMultiBlueBookImport(c, true)
+}
+
+func (h *BlueBookHandler) DownloadMultiBlueBookImportTemplate(c echo.Context) error {
+	template, err := h.service.BuildMultiBlueBookImportTemplate(c.Request().Context())
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+template.FileName+`"`)
+	return c.Blob(http.StatusOK, template.ContentType, template.Data)
+}
+
 func (h *BlueBookHandler) DownloadBBProjectImportTemplate(c echo.Context) error {
 	bbID, err := parseIDParam(c, "bbId")
 	if err != nil {
@@ -248,6 +266,31 @@ func (h *BlueBookHandler) handleImportBBProjects(c echo.Context, preview bool) e
 		res, err = h.service.PreviewBlueBookProjects(c.Request().Context(), bbID, file.Filename, src, file.Size)
 	} else {
 		res, err = h.service.ImportBlueBookProjects(c.Request().Context(), bbID, file.Filename, src, file.Size)
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, model.DataResponse[*model.MasterImportResponse]{Data: res})
+}
+
+func (h *BlueBookHandler) handleMultiBlueBookImport(c echo.Context, preview bool) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file wajib diunggah"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return apperrors.Validation(apperrors.FieldError{Field: "file", Message: "file tidak dapat dibaca"})
+	}
+	defer src.Close()
+
+	var res *model.MasterImportResponse
+	if preview {
+		res, err = h.service.PreviewMultiBlueBookImport(c.Request().Context(), file.Filename, src, file.Size)
+	} else {
+		res, err = h.service.ImportMultiBlueBook(c.Request().Context(), file.Filename, src, file.Size)
 	}
 	if err != nil {
 		return err

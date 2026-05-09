@@ -107,6 +107,17 @@ INSERT INTO blue_book (period_id, replaces_blue_book_id, publish_date, revision_
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
+-- name: GetBlueBookByPeriodAndVersion :one
+SELECT *
+FROM blue_book
+WHERE period_id = sqlc.arg('period_id')
+  AND revision_number = sqlc.arg('revision_number')
+  AND (
+      (sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year = sqlc.arg('revision_year')::INT)
+      OR (NOT sqlc.arg('revision_year_valid')::BOOLEAN AND revision_year IS NULL)
+  )
+LIMIT 1;
+
 -- name: UpdateBlueBook :one
 UPDATE blue_book
 SET publish_date = $2,
