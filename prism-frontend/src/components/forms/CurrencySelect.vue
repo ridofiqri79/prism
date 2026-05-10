@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import Select from 'primevue/select'
 import { useMasterStore } from '@/stores/master.store'
 
 const props = withDefaults(
@@ -44,7 +44,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <SingleSelectDropdown
+  <Select
     v-model="selectedValue"
     :options="options"
     option-label="label"
@@ -55,7 +55,6 @@ onMounted(() => {
     filter
     :show-clear="false"
     append-to="body"
-    :overlay-style="{ minWidth: '100%' }"
     class="w-full"
   />
 </template>

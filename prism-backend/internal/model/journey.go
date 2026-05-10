@@ -51,11 +51,11 @@ type JourneyGBProject struct {
 }
 
 type JourneyDKProject struct {
-	ID             string                `json:"id"`
-	ProjectName    string                `json:"project_name"`
-	Objectives     *string               `json:"objectives,omitempty"`
-	DaftarKegiatan *JourneyDKHeader      `json:"daftar_kegiatan,omitempty"`
-	LoanAgreement  *JourneyLoanAgreement `json:"loan_agreement"`
+	ID             string                 `json:"id"`
+	ProjectName    string                 `json:"project_name"`
+	Objectives     *string                `json:"objectives,omitempty"`
+	DaftarKegiatan *JourneyDKHeader       `json:"daftar_kegiatan,omitempty"`
+	LoanAgreements []JourneyLoanAgreement `json:"loan_agreements"`
 }
 
 type JourneyDKHeader struct {
@@ -78,6 +78,8 @@ type JourneyLoanAgreement struct {
 	Currency            string                      `json:"currency"`
 	AmountOriginal      float64                     `json:"amount_original"`
 	AmountUSD           float64                     `json:"amount_usd"`
+	AllocationOriginal  float64                     `json:"allocation_original"`
+	AllocationUSD       float64                     `json:"allocation_usd"`
 	Monitoring          []JourneyMonitoringResponse `json:"monitoring"`
 }
 

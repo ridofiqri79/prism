@@ -55,34 +55,6 @@ INSERT INTO monitoring_komponen (
 -- name: DeleteKomponenByMonitoring :exec
 DELETE FROM monitoring_komponen WHERE monitoring_disbursement_id = $1;
 
--- Dashboard queries:
--- name: GetDashboardSummary :one
-SELECT
-    COUNT(DISTINCT bp.id) FILTER (WHERE bp.status = 'active') as total_bb_projects,
-    COUNT(DISTINCT gp.id) FILTER (WHERE gp.status = 'active') as total_gb_projects,
-    COUNT(DISTINCT la.id) as total_loan_agreements,
-    COALESCE(SUM(la.amount_usd), 0) as total_amount_usd,
-    COALESCE(SUM(md.realized_usd), 0) as total_realisasi_usd,
-    COUNT(DISTINCT md.id) as active_monitoring
-FROM bb_project bp
-FULL JOIN gb_project gp ON true
-FULL JOIN loan_agreement la ON true
-LEFT JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id;
-
--- name: GetMonitoringSummary :many
-SELECT
-    md.budget_year, md.quarter,
-    l.id as lender_id, l.name as lender_name,
-    SUM(md.planned_usd) as total_planned_usd,
-    SUM(md.realized_usd) as total_realized_usd
-FROM monitoring_disbursement md
-JOIN loan_agreement la ON la.id = md.loan_agreement_id
-JOIN lender l ON l.id = la.lender_id
-WHERE ($1::int IS NULL OR md.budget_year = $1)
-  AND ($2::varchar IS NULL OR md.quarter = $2)
-  AND ($3::uuid IS NULL OR l.id = $3)
-GROUP BY md.budget_year, md.quarter, l.id, l.name
-ORDER BY md.budget_year, md.quarter;
 ```
 
 Jalankan `make generate`.
@@ -145,29 +117,7 @@ func (s *MonitoringService) buildResponse(m *queries.MonitoringDisbursement, kom
 
 ---
 
-## Task 3 — Dashboard Service
-
-```go
-func (s *DashboardService) GetSummary(ctx context.Context) (*model.DashboardSummary, error) {
-    row, _ := s.queries.GetDashboardSummary(ctx)
-    totalAmount := row.TotalAmountUsd.InexactFloat64()
-    totalRealisasi := row.TotalRealisasiUsd.InexactFloat64()
-    absorptionPct := 0.0
-    if totalAmount > 0 {
-        absorptionPct = math.Round(totalRealisasi/totalAmount*1000) / 10
-    }
-    return &model.DashboardSummary{
-        TotalBBProjects: int(row.TotalBbProjects),
-        TotalGBProjects: int(row.TotalGbProjects),
-        // ...
-        OverallAbsorptionPct: absorptionPct,
-    }, nil
-}
-```
-
----
-
-## Task 4 — Journey Endpoint
+## Task 3 — Journey Endpoint
 
 ```sql
 -- sql/queries/journey.sql
@@ -180,7 +130,7 @@ Journey service: fetch BB project, lalu fetch semua GB terkait, lalu DK, lalu LA
 
 ---
 
-## Task 5 — Handler & Routes
+## Task 4 — Handler & Routes
 
 ```go
 // Monitoring
@@ -191,11 +141,6 @@ monGroup.GET("/:id", monHandler.Get, permission.Require("monitoring_disbursement
 monGroup.PUT("/:id", monHandler.Update, permission.Require("monitoring_disbursement", "update"))
 monGroup.DELETE("/:id", monHandler.Delete, permission.Require("monitoring_disbursement", "delete"))
 
-// Dashboard
-dash := api.Group("/dashboard")
-dash.GET("/summary", dashHandler.Summary)
-dash.GET("/monitoring-summary", dashHandler.MonitoringSummary)
-
 // Journey
 api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, permission.Require("bb_project", "read"))
 ```
@@ -204,15 +149,13 @@ api.GET("/projects/:bbProjectId/journey", journeyHandler.GetJourney, permission.
 
 ## Checklist
 
-- [x] `sql/queries/monitoring.sql` — monitoring + komponen + dashboard queries
+- [x] `sql/queries/monitoring.sql` — monitoring + komponen + journey queries
 - [x] `make generate`
-- [x] `internal/model/monitoring.go` + `internal/model/dashboard.go`
+- [x] `internal/model/monitoring.go` + `internal/model/journey.go`
 - [x] `internal/service/monitoring_service.go` — guard effective_date + absorption_pct computed
-- [x] `internal/service/dashboard_service.go`
 - [x] `internal/service/journey_service.go` — assemble multi-level response
-- [x] Handler monitoring, dashboard, journey
+- [x] Handler monitoring, journey
 - [x] Routes terdaftar
 - [x] `POST /monitoring` sebelum LA efektif → 422
 - [x] `POST /monitoring` duplikat quarter → 409
-- [x] `GET /dashboard/summary` → angka agregat benar
 - [x] `GET /projects/:id/journey` → full tree response

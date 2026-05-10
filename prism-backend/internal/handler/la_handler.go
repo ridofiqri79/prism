@@ -28,6 +28,7 @@ func (h *LAHandler) ListLA(c echo.Context) error {
 
 func loanAgreementListFilter(c echo.Context) model.LoanAgreementListFilter {
 	return model.LoanAgreementListFilter{
+		PeriodIDs:         queryValues(c, "period_ids", "period_ids[]", "period_id"),
 		LenderID:          queryStringPtr(c, "lender_id"),
 		IsExtended:        queryStringPtr(c, "is_extended"),
 		ClosingDateBefore: queryStringPtr(c, "closing_date_before"),

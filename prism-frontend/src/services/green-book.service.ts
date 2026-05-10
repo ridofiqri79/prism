@@ -96,6 +96,14 @@ export const GreenBookService = {
     return response.data
   },
 
+  async downloadMultiImportTemplate() {
+    const response = await http.get<Blob>('/green-books/import/template', {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
   async previewImportProjects(greenBookId: string, file: File) {
     const formData = new FormData()
     formData.append('file', file)
@@ -108,12 +116,36 @@ export const GreenBookService = {
     return response.data.data
   },
 
+  async previewMultiImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/green-books/import/preview',
+      formData,
+    )
+
+    return response.data.data
+  },
+
   async executeImportProjects(greenBookId: string, file: File) {
     const formData = new FormData()
     formData.append('file', file)
 
     const response = await http.post<ApiResponse<MasterImportSummary>>(
       `/green-books/${greenBookId}/import-projects/execute`,
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeMultiImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/green-books/import/execute',
       formData,
     )
 

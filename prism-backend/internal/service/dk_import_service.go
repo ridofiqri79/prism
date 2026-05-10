@@ -71,8 +71,6 @@ type dkImportRelationRow struct {
 	message    string
 }
 
-type dkAllowedLenderCache map[string]map[string]queries.ListAllowedLenderReferencesByGBProjectRow
-
 func (d *dkImportHeaderDraft) addError(message string) {
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -206,15 +204,9 @@ func (s *DKService) buildDaftarKegiatanImportPreview(ctx context.Context, qtx *q
 		dkImportSheetActivityDetail:  {Sheet: dkImportSheetActivityDetail},
 	}
 	relationRows := make([]dkImportRelationRow, 0)
-	allowedCache := dkAllowedLenderCache{}
-
 	relationRows = append(relationRows, s.parseDKGBProjectRelation(workbook, lookups, headersByKey, projectsByKey, relationResults)...)
 	relationRows = append(relationRows, s.parseDKLocationRelation(workbook, lookups, headersByKey, projectsByKey, relationResults)...)
-	financingRows, err := s.parseDKFinancingDetailRelation(ctx, qtx, workbook, lookups, headersByKey, projectsByKey, relationResults, allowedCache)
-	if err != nil {
-		return nil, nil, err
-	}
-	relationRows = append(relationRows, financingRows...)
+	relationRows = append(relationRows, s.parseDKFinancingDetailRelation(workbook, lookups, headersByKey, projectsByKey, relationResults)...)
 	relationRows = append(relationRows, s.parseDKLoanAllocationRelation(workbook, lookups, headersByKey, projectsByKey, relationResults)...)
 	relationRows = append(relationRows, s.parseDKActivityDetailRelation(workbook, headersByKey, projectsByKey, relationResults)...)
 
@@ -640,17 +632,17 @@ func (s *DKService) parseDKLocationRelation(workbook *xlsxWorkbook, lookups *mas
 	return relations
 }
 
-func (s *DKService) parseDKFinancingDetailRelation(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups, headersByKey map[string]*dkImportHeaderDraft, projectsByKey map[string]*dkImportProjectDraft, relationResults map[string]model.MasterImportSheetResult, allowedCache dkAllowedLenderCache) ([]dkImportRelationRow, error) {
+func (s *DKService) parseDKFinancingDetailRelation(workbook *xlsxWorkbook, lookups *masterImportLookups, headersByKey map[string]*dkImportHeaderDraft, projectsByKey map[string]*dkImportProjectDraft, relationResults map[string]model.MasterImportSheetResult) []dkImportRelationRow {
 	result := relationResults[dkImportSheetFinancingDetail]
 	rows, ok := workbook.importRows(dkImportSheetFinancingDetail, []string{"dk_key", "project_key", "lender_name"})
 	if !ok {
 		addImportError(&result, 0, "Sheet Relasi - Financing Detail tidak ditemukan")
 		relationResults[dkImportSheetFinancingDetail] = result
-		return nil, nil
+		return nil
 	}
 	if hasImportHeaderError(&result, rows) {
 		relationResults[dkImportSheetFinancingDetail] = result
-		return nil, nil
+		return nil
 	}
 
 	relations := make([]dkImportRelationRow, 0, len(rows))
@@ -691,17 +683,6 @@ func (s *DKService) parseDKFinancingDetailRelation(ctx context.Context, qtx *que
 			relations = append(relations, relation)
 			continue
 		}
-		allowed, err := s.allowedLendersForDKImportProject(ctx, qtx, draft, allowedCache)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := allowed[model.UUIDToString(lender.ID)]; !ok {
-			relation.status = masterImportStatusFailed
-			relation.message = fmt.Sprintf("Lender %q tidak berasal dari GB Project terkait", lenderName)
-			draft.addError(relation.message)
-			relations = append(relations, relation)
-			continue
-		}
 		currency, err := parseDKImportCurrency(row.value("currency"))
 		if err != nil {
 			relation.status = masterImportStatusFailed
@@ -732,7 +713,7 @@ func (s *DKService) parseDKFinancingDetailRelation(ctx context.Context, qtx *que
 	}
 
 	relationResults[dkImportSheetFinancingDetail] = result
-	return relations, nil
+	return relations
 }
 
 func (s *DKService) parseDKLoanAllocationRelation(workbook *xlsxWorkbook, lookups *masterImportLookups, headersByKey map[string]*dkImportHeaderDraft, projectsByKey map[string]*dkImportProjectDraft, relationResults map[string]model.MasterImportSheetResult) []dkImportRelationRow {
@@ -893,32 +874,6 @@ func (s *DKService) parseDKActivityDetailRelation(workbook *xlsxWorkbook, header
 
 	relationResults[dkImportSheetActivityDetail] = result
 	return relations
-}
-
-func (s *DKService) allowedLendersForDKImportProject(ctx context.Context, qtx *queries.Queries, draft *dkImportProjectDraft, cache dkAllowedLenderCache) (map[string]queries.ListAllowedLenderReferencesByGBProjectRow, error) {
-	allowed := map[string]queries.ListAllowedLenderReferencesByGBProjectRow{}
-	if draft == nil {
-		return allowed, nil
-	}
-	for _, gbProjectID := range draft.gbProjectUUIDs {
-		gbID := model.UUIDToString(gbProjectID)
-		items, exists := cache[gbID]
-		if !exists {
-			rows, err := qtx.ListAllowedLenderReferencesByGBProject(ctx, gbProjectID)
-			if err != nil {
-				return nil, apperrors.Internal("Gagal membaca allowed lender GB Project")
-			}
-			items = map[string]queries.ListAllowedLenderReferencesByGBProjectRow{}
-			for _, row := range rows {
-				items[model.UUIDToString(row.LenderID)] = row
-			}
-			cache[gbID] = items
-		}
-		for lenderID, row := range items {
-			allowed[lenderID] = row
-		}
-	}
-	return allowed, nil
 }
 
 func parseDKFinancingDetailItem(row importRow, lenderID pgtype.UUID, currency string) (model.DKFinancingDetailItem, error) {

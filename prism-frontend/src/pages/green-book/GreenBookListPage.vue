@@ -3,8 +3,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
@@ -64,9 +64,9 @@ const form = reactive<GreenBookPayload>({
 })
 const errors = ref<FormErrors<GreenBookField>>({})
 const columns: ColumnDef[] = [
-  { field: 'publish_year', header: 'Publish Year' },
-  { field: 'revision', header: 'Revision' },
-  { field: 'status', header: 'Status' },
+  { field: 'publish_year', header: 'Tahun Terbit', sortable: true, nowrap: true },
+  { field: 'revision', header: 'Revisi', sortable: true, nowrap: true },
+  { field: 'status', header: 'Status', sortable: true, nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
@@ -140,6 +140,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -176,7 +178,7 @@ onMounted(() => {
       @remove="listControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
           <MultiSelect
             v-model="listControls.draftFilters.publish_year"
@@ -187,7 +189,7 @@ onMounted(() => {
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Status</span>
           <MultiSelect
             v-model="listControls.draftFilters.status"
@@ -209,6 +211,9 @@ onMounted(() => {
       :columns="columns"
       :loading="greenBookStore.loading"
       :total="greenBookStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'revision'">
@@ -234,7 +239,6 @@ onMounted(() => {
             size="small"
             severity="danger"
             outlined
-            rounded
             aria-label="Hapus Green Book"
             @click="deleteGreenBook(row as GreenBook)"
           />
@@ -246,18 +250,18 @@ onMounted(() => {
     <Dialog v-model:visible="dialogVisible" modal header="Buat Green Book" class="w-[32rem] max-w-[95vw]">
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Publish Year</span>
+          <span class="text-sm font-medium text-surface-700">Tahun Terbit</span>
           <InputNumber v-model="form.publish_year" :use-grouping="false" class="w-full" />
           <small v-if="errors.publish_year" class="text-red-600">{{ errors.publish_year }}</small>
         </label>
         <label class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Revision Number</span>
+          <span class="text-sm font-medium text-surface-700">Nomor Revisi</span>
           <InputNumber v-model="form.revision_number" :min="0" class="w-full" />
           <small v-if="errors.revision_number" class="text-red-600">{{ errors.revision_number }}</small>
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Status</span>
-          <SingleSelectDropdown
+          <Select
             v-model="form.status"
             :options="statusOptions"
             option-label="label"

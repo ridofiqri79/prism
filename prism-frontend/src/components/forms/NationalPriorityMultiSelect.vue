@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import MultiSelectDropdown from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import { useMasterStore } from '@/stores/master.store'
 import type { NationalPriority } from '@/types/master.types'
 
@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <MultiSelectDropdown
+  <MultiSelect
     v-model="selectedValues"
     :options="options"
     option-label="display_label"
@@ -145,6 +145,7 @@ onBeforeUnmount(() => {
     filter-placeholder="Cari prioritas nasional"
     display="chip"
     scroll-height="18rem"
+    class="w-full"
     @show="loadOptions(undefined, true)"
     @filter="scheduleSearch($event.value)"
   >
@@ -156,5 +157,5 @@ onBeforeUnmount(() => {
         </span>
       </span>
     </template>
-  </MultiSelectDropdown>
+  </MultiSelect>
 </template>

@@ -104,6 +104,8 @@ type inlineStringXML struct {
 type masterImportLookups struct {
 	countriesByCode           map[string]queries.Country
 	countriesByName           map[string]queries.Country
+	currenciesByCode          map[string]queries.Currency
+	kursTengahKeys            map[string]struct{}
 	lendersByName             map[string]masterImportLenderRef
 	lendersByShortName        map[string]masterImportLenderRef
 	ambiguousLenderShortNames map[string]struct{}
@@ -180,6 +182,7 @@ func (s *MasterService) processMasterDataWorkbook(ctx context.Context, fileName 
 		s.importPeriods,
 		s.importNationalPriorities,
 		s.importLenders,
+		s.importKursTengah,
 	}
 
 	response := &model.MasterImportResponse{FileName: fileName, Sheets: make([]model.MasterImportSheetResult, 0, len(importers))}
@@ -212,6 +215,8 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	lookups := &masterImportLookups{
 		countriesByCode:           map[string]queries.Country{},
 		countriesByName:           map[string]queries.Country{},
+		currenciesByCode:          map[string]queries.Currency{},
+		kursTengahKeys:            map[string]struct{}{},
 		lendersByName:             map[string]masterImportLenderRef{},
 		lendersByShortName:        map[string]masterImportLenderRef{},
 		ambiguousLenderShortNames: map[string]struct{}{},
@@ -238,6 +243,31 @@ func (s *MasterService) loadMasterImportLookups(ctx context.Context, qtx *querie
 	}
 	for _, country := range countries {
 		lookups.addCountry(country)
+	}
+
+	currencies, err := qtx.ListCurrencies(ctx, queries.ListCurrenciesParams{Limit: masterImportListLimit, Offset: 0, ActiveFilter: pgtype.Bool{}, Search: pgtype.Text{}, SortField: "sort_order", SortOrder: "asc"})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca referensi currency")
+	}
+	for _, currency := range currencies {
+		lookups.addCurrency(currency)
+	}
+
+	kursTengahRows, err := qtx.ListKursTengah(ctx, queries.ListKursTengahParams{
+		Limit:             masterImportListLimit,
+		Offset:            0,
+		CurrencyIDFilters: nil,
+		CutOffDateFrom:    pgtype.Date{},
+		CutOffDateTo:      pgtype.Date{},
+		Search:            pgtype.Text{},
+		SortField:         "cut_off_date",
+		SortOrder:         "desc",
+	})
+	if err != nil {
+		return nil, apperrors.Internal("Gagal membaca referensi kurs tengah")
+	}
+	for _, item := range kursTengahRows {
+		lookups.addKursTengahKey(item.CurrencyID, item.CutOffDate)
 	}
 
 	lenders, err := qtx.ListLenders(ctx, queries.ListLendersParams{Limit: masterImportListLimit, Offset: 0, TypeFilters: nil, Search: pgtype.Text{}, SortField: "name", SortOrder: "asc"})
@@ -682,11 +712,13 @@ func (s *MasterService) importLenders(ctx context.Context, qtx *queries.Queries,
 
 		countryID := pgtype.UUID{}
 		countryName := row.value("country_name")
-		if lenderType != "Multilateral" {
+		if lenderType == "Bilateral" {
 			if countryName == "" {
-				addImportError(&result, row.number, "Country Name wajib diisi untuk Bilateral dan KSA")
+				addImportError(&result, row.number, "Country Name wajib diisi untuk Bilateral")
 				continue
 			}
+		}
+		if lenderType != "Multilateral" && countryName != "" {
 			country, exists := lookups.countryByNameOrCode(countryName)
 			if !exists {
 				addImportError(&result, row.number, fmt.Sprintf("Country Name %q belum ada di master country", countryName))
@@ -706,6 +738,73 @@ func (s *MasterService) importLenders(ctx context.Context, qtx *queries.Queries,
 		}
 		lookups.addLender(created.ID, created.Name, created.Type, created.ShortName)
 		addImportCreated(&result, row.number, fmt.Sprintf("%s (%s)", created.Name, created.Type))
+	}
+
+	return result, nil
+}
+
+func (s *MasterService) importKursTengah(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, lookups *masterImportLookups) (model.MasterImportSheetResult, error) {
+	result := model.MasterImportSheetResult{Sheet: "Kurs Tengah"}
+	rows, ok := workbook.importRows("Kurs Tengah", []string{"currency", "kurs", "kurs_tengah_bi", "cut_off_date"})
+	if !ok {
+		return result, nil
+	}
+	if hasImportHeaderError(&result, rows) {
+		return result, nil
+	}
+
+	seen := map[string]struct{}{}
+	for _, row := range rows {
+		currencyCode := strings.ToUpper(row.value("currency"))
+		if currencyCode == "" {
+			addImportError(&result, row.number, "Currency wajib diisi")
+			continue
+		}
+		currency, exists := lookups.currenciesByCode[currencyCode]
+		if !exists {
+			addImportError(&result, row.number, fmt.Sprintf("Currency %q belum ada di master currency", currencyCode))
+			continue
+		}
+
+		kurs, err := parseImportFloat(row.value("kurs"))
+		if err != nil || kurs <= 0 {
+			addImportError(&result, row.number, "Kurs wajib berupa angka lebih dari 0")
+			continue
+		}
+		kursTengahBI, err := parseImportFloat(row.value("kurs_tengah_bi"))
+		if err != nil || kursTengahBI <= 0 {
+			addImportError(&result, row.number, "Kurs Tengah BI wajib berupa angka lebih dari 0")
+			continue
+		}
+		cutOffDate, err := parseDKImportDate(row.value("cut_off_date"))
+		if err != nil {
+			addImportError(&result, row.number, "Cut Off Date harus tanggal valid")
+			continue
+		}
+
+		key := kursTengahUniqueKey(currency.ID, cutOffDate)
+		label := fmt.Sprintf("%s - %s", currency.Code, dateString(cutOffDate))
+		if _, exists := seen[key]; exists {
+			addImportError(&result, row.number, "Currency dan Cut Off Date duplikat dalam workbook")
+			continue
+		}
+		seen[key] = struct{}{}
+		if lookups.hasKursTengahKey(currency.ID, cutOffDate) {
+			addImportSkipped(&result, row.number, label)
+			continue
+		}
+
+		created, err := qtx.CreateKursTengah(ctx, queries.CreateKursTengahParams{
+			CurrencyID:   currency.ID,
+			Kurs:         numericFromFloat(kurs),
+			KursTengahBi: numericFromFloat(kursTengahBI),
+			CutOffDate:   cutOffDate,
+		})
+		if err != nil {
+			return result, fromPg(err)
+		}
+		lookups.addKursTengahKey(created.CurrencyID, created.CutOffDate)
+		addImportCreated(&result, row.number, label)
 	}
 
 	return result, nil
@@ -1174,6 +1273,19 @@ func nationalPriorityKey(periodID, title string) string {
 func (l *masterImportLookups) addCountry(country queries.Country) {
 	l.countriesByCode[strings.ToUpper(country.Code)] = country
 	l.countriesByName[normalizeLookupKey(country.Name)] = country
+}
+
+func (l *masterImportLookups) addCurrency(currency queries.Currency) {
+	l.currenciesByCode[strings.ToUpper(currency.Code)] = currency
+}
+
+func (l *masterImportLookups) addKursTengahKey(currencyID pgtype.UUID, cutOffDate pgtype.Date) {
+	l.kursTengahKeys[kursTengahUniqueKey(currencyID, cutOffDate)] = struct{}{}
+}
+
+func (l *masterImportLookups) hasKursTengahKey(currencyID pgtype.UUID, cutOffDate pgtype.Date) bool {
+	_, exists := l.kursTengahKeys[kursTengahUniqueKey(currencyID, cutOffDate)]
+	return exists
 }
 
 func (l *masterImportLookups) addInstitution(institution queries.Institution) {

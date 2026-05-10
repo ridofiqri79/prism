@@ -152,7 +152,7 @@ Response meta:
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, dan `Lenders` |
+| `file` | Workbook `.xlsx` berisi sheet `Program Titles`, `Bappenas Partners`, `Institutions`, `Regions`, `Periods`, `National Priorities`, `Lenders`, dan `Kurs Tengah` |
 
 **Template:**
 `GET /master/import-data/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, header sheet import, dropdown Excel untuk kolom yang punya pilihan master data, dan sheet `Master Data Snapshot` berisi data master yang ada di database saat template dibuat. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown. Response memakai `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dan `Content-Disposition: attachment`.
@@ -202,7 +202,7 @@ Response meta:
 }
 ```
 
-Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. `Parent Name` dapat diisi dengan nama jika unik, UUID institution, atau path `Nama Child; Nama Parent; Nama Root;`. Jika `Parent Name` hanya berisi nama polos dan mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Sheet `Panduan` pada template menjelaskan fallback referensi Institution: path dropdown sebagai prioritas utama, UUID dari sheet Master Data sebagai fallback paling spesifik, dan nama polos hanya jika unik. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
+Baris yang sudah ada akan di-skip. Untuk sheet `Institutions`, duplikat dicek sesuai scope: top-level berdasarkan nama, child berdasarkan kombinasi parent dan nama. `Parent Name` dapat diisi dengan nama jika unik, UUID institution, atau path `Nama Child; Nama Parent; Nama Root;`. Jika `Parent Name` hanya berisi nama polos dan mengarah ke lebih dari satu institution karena nama child duplikat lintas parent, baris dianggap `failed` agar import tidak memilih parent yang salah. Sheet `Kurs Tengah` memakai kolom `Currency`, `Kurs`, `Kurs Tengah BI`, dan `Cut Off Date`; kombinasi currency dan cut off date yang sudah ada akan di-skip. Sheet `Panduan` pada template menjelaskan fallback referensi Institution: path dropdown sebagai prioritas utama, UUID dari sheet Master Data sebagai fallback paling spesifik, dan nama polos hanya jika unik. Detail baris preview dikembalikan di `sheets[].rows` dengan `status`: `create`, `skip`, atau `failed`, sehingga frontend dapat memberi tab/filter sebelum eksekusi. Baris yang gagal validasi juga dikembalikan di `sheets[].errors`. Frontend wajib meminta preview terlebih dahulu sebelum user menekan eksekusi import.
 
 ### Country
 
@@ -290,6 +290,85 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 
 ---
 
+### Kurs Tengah BI
+
+Kurs Tengah BI memakai permission module `currency` karena merupakan turunan master mata uang. Operasi tulis hanya tersedia dalam bentuk bulk.
+
+| Method | Endpoint | Permission |
+|--------|----------|-----------|
+| `GET` | `/master/kurs-tengah` | read: `currency` |
+| `POST` | `/master/kurs-tengah/bulk` | create: `currency` |
+| `PUT` | `/master/kurs-tengah/bulk` | update: `currency` |
+| `DELETE` | `/master/kurs-tengah/bulk` | delete: `currency` |
+
+**`GET /master/kurs-tengah` Query Params tambahan:**
+
+| Param | Keterangan |
+|-------|-----------|
+| `currency_id` | Filter multi-value UUID Master Currency |
+| `cut_off_date_from` | Filter tanggal mulai, format `YYYY-MM-DD` |
+| `cut_off_date_to` | Filter tanggal akhir, format `YYYY-MM-DD` |
+| `search` | Cari berdasarkan kode atau nama currency |
+| `sort` | `currency`, `cut_off_date`, `kurs`, `kurs_tengah_bi` |
+
+**`GET /master/kurs-tengah` Response `200`:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "currency_id": "uuid-currency-jpy",
+      "currency": {
+        "id": "uuid-currency-jpy",
+        "code": "JPY",
+        "name": "Japanese Yen",
+        "symbol": "JPY",
+        "is_active": true
+      },
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 }
+}
+```
+
+**`POST /master/kurs-tengah/bulk` Request:**
+```json
+{
+  "items": [
+    {
+      "currency_id": "uuid-currency-jpy",
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ]
+}
+```
+
+**`PUT /master/kurs-tengah/bulk` Request:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid-kurs-tengah",
+      "currency_id": "uuid-currency-jpy",
+      "kurs": 105.25,
+      "kurs_tengah_bi": 105.18,
+      "cut_off_date": "2026-05-07"
+    }
+  ]
+}
+```
+
+Response bulk create/update membungkus array data yang tersimpan dalam `data`. `DELETE /master/kurs-tengah/bulk` menerima body `{"ids":["uuid-kurs-tengah"]}` dan mengembalikan `204`.
+
+Validasi: `currency_id` wajib merujuk Master Currency, `kurs` dan `kurs_tengah_bi` wajib lebih dari 0, `cut_off_date` wajib format `YYYY-MM-DD`, dan kombinasi `(currency_id, cut_off_date)` unik.
+
+---
+
 ### Lender
 
 | Method | Endpoint | Permission |
@@ -305,7 +384,7 @@ Currency pada Green Book, DK, dan LA harus memakai kode ISO 4217 yang terdaftar 
 {
   "name": "JICA",
   "type": "Bilateral",
-  "country_id": "uuid"        // wajib jika type Bilateral atau KSA
+  "country_id": "uuid"        // wajib jika type Bilateral; opsional untuk KSA; null/kosong untuk Multilateral
 }
 ```
 
@@ -545,6 +624,8 @@ Response `/master/bappenas-partners/lookup` adalah list flat untuk selector/drop
 | `search` | string | Cari berdasarkan nama periode, tanggal terbit, tahun revisi, atau status |
 | `period_id` | multi-value UUID | Filter periode Blue Book |
 | `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+| `sort` | enum | `period`, `publish_date`, `revision`, `status`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list Blue Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -587,6 +668,9 @@ Create Blue Book baru selalu dimulai kosong. Jika user ingin membawa Project Blu
 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
+| `GET` | `/blue-books/import/template` | ADMIN only |
+| `POST` | `/blue-books/import/preview` | ADMIN only |
+| `POST` | `/blue-books/import/execute` | ADMIN only |
 | `GET` | `/blue-books/:bb_id/import-projects/template` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/blue-books/:bb_id/import-projects/execute` | ADMIN only |
@@ -608,37 +692,44 @@ Endpoint `POST /blue-books/:bb_id/import-projects/from-blue-book` meng-clone Pro
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - National Priority`, `Relasi - Project Cost`, dan `Relasi - Lender Indication` |
+| `file` | Workbook `.xlsx` berisi sheet `Blue Book`, `Input Data`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - National Priority`, `Relasi - Project Cost`, dan `Relasi - Lender Indication` |
 
-Workbook diimport ke Blue Book target dari `:bb_id`. Sheet relasi memakai `BB Code (*)` sebagai kunci penghubung ke sheet `Input Data`.
+Endpoint collection-level `/blue-books/import/*` mengimpor beberapa header Blue Book dalam satu workbook. Sheet `Blue Book` menjadi daftar target dan memakai `Blue Book Key (*)` sebagai kunci kerja antar sheet. Key ini tidak disimpan di database. Sheet proyek dan relasi memakai kombinasi `Blue Book Key (*)` + `BB Code (*)` sebagai kunci penghubung.
+
+Endpoint legacy `/blue-books/:bb_id/import-projects/*` tetap tersedia untuk import proyek ke satu Blue Book target dari detail Blue Book. Format workbook legacy tidak memakai sheet `Blue Book` dan tidak membuat header Blue Book baru.
 
 **Template:**
-`GET /blue-books/:bb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan` yang deskriptif, `Master Data`, `Input Data`, dan semua sheet relasi. Kolom relasi memiliki dropdown Excel dari master data dan BB Code pada sheet relasi memiliki dropdown dari `Input Data`. Sheet `Master Data` berisi snapshot master data saat template dibuat; national priority menampilkan seluruh master data dan tidak dibatasi period Blue Book target. Workbook juga memiliki sheet `_Dropdowns` tersembunyi sebagai sumber pilihan dropdown.
+`GET /blue-books/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Blue Book`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data saat template dibuat; national priority menampilkan seluruh master data dan tidak dibatasi period Blue Book target.
+
+`GET /blue-books/:bb_id/import-projects/template` mengunduh template legacy untuk satu target Blue Book.
 
 **Kolom utama workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Input Data` | `Program Title (*)`, `Bappenas Partners`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
-| `Relasi - EA` | `BB Code (*)`, `Executing Agency Name (*)` |
-| `Relasi - IA` | `BB Code (*)`, `Implementing Agency Name (*)` |
-| `Relasi - Locations` | `BB Code (*)`, `Location Name (*)` |
-| `Relasi - National Priority` | `BB Code (*)`, `National Priority Name (*)` |
-| `Relasi - Project Cost` | `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
-| `Relasi - Lender Indication` | `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
+| `Blue Book` | `Blue Book Key (*)`, `Period Name (*)`, `Publish Date (*)`, `Revision Number`, `Revision Year`, `Status (*)`, `Replaces Blue Book Ref` |
+| `Input Data` | `Blue Book Key (*)`, `Program Title (*)`, `Bappenas Partners`, `BB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Work`, `Outputs`, `Outcomes` |
+| `Relasi - EA` | `Blue Book Key (*)`, `BB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `Blue Book Key (*)`, `BB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `Blue Book Key (*)`, `BB Code (*)`, `Location Name (*)` |
+| `Relasi - National Priority` | `Blue Book Key (*)`, `BB Code (*)`, `National Priority Name (*)` |
+| `Relasi - Project Cost` | `Blue Book Key (*)`, `BB Code (*)`, `Funding Type (*)`, `Funding Category (*)`, `Amount USD` |
+| `Relasi - Lender Indication` | `Blue Book Key (*)`, `BB Code (*)`, `Lender Name (*)`, `Keterangan` |
+
+`Status` menerima `Berlaku` atau `Tidak Berlaku` dan disimpan sebagai `active` atau `superseded`. `Revision Number` kosong dianggap `0`. `Replaces Blue Book Ref` opsional dan dapat berisi `Blue Book Key` dari workbook yang sama atau UUID Blue Book existing; sumber revisi harus Period yang sama. Jika kombinasi `Period Name + Revision Number + Revision Year` sudah ada di database, baris header masuk `skip` hanya jika metadata workbook cocok dengan data existing; jika tidak cocok, baris `failed`.
 
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom `Bappenas Partners` opsional; isi lebih dari satu mitra dengan pemisah koma atau titik koma. Kolom institution pada `Relasi - EA` dan `Relasi - IA` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Lender Indication.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
-`POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+`POST /blue-books/import/preview` dan `POST /blue-books/:bb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
 
 **Execute:**
-`POST /blue-books/:bb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+`POST /blue-books/import/execute` dan `POST /blue-books/:bb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `BB Code` yang sudah ada dalam Blue Book target akan di-skip. `BB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `project_identity_id` yang sama. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
+Baris dengan `BB Code` yang sudah ada dalam Blue Book target terkait akan di-skip. `BB Code` boleh sama pada `Blue Book Key` berbeda, tetapi tidak boleh duplikat dalam `Blue Book Key` yang sama. `BB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `project_identity_id` yang sama. Relasi valid akan dibuat bersama proyek baru; relasi untuk proyek yang di-skip ikut di-skip. National Priority divalidasi terhadap master data tanpa pembatasan period Blue Book target.
 
 ---
 
@@ -682,6 +773,8 @@ Contoh response ketika masih dipakai downstream:
 | `search` | string | Cari berdasarkan `project_name` atau nama/nama singkat Executing Agency |
 | `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
+| `sort` | enum | `bb_code`, `project_name`, `executing_agency`, `location`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /blue-books/:bb_id/projects` Request:**
 ```json
@@ -838,6 +931,8 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 | `search` | string | Cari berdasarkan tahun terbit, nomor revisi, status teknis, atau label status |
 | `publish_year` | multi-value number | Filter tahun terbit Green Book |
 | `status` | multi-value enum | `active` = Berlaku, `superseded` = Tidak Berlaku |
+| `sort` | enum | `publish_year`, `revision`, `status`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list dan detail Green Book menyertakan `project_count` pada tiap item untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -862,6 +957,9 @@ Status dikirim eksplisit saat create/update. Backend tidak otomatis mengubah Gre
 
 | Method | Endpoint | Permission |
 |--------|----------|-----------|
+| `GET` | `/green-books/import/template` | ADMIN only |
+| `POST` | `/green-books/import/preview` | ADMIN only |
+| `POST` | `/green-books/import/execute` | ADMIN only |
 | `GET` | `/green-books/:gb_id/import-projects/template` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/preview` | ADMIN only |
 | `POST` | `/green-books/:gb_id/import-projects/execute` | ADMIN only |
@@ -883,39 +981,46 @@ Endpoint `POST /green-books/:gb_id/import-projects/from-green-book` meng-clone P
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Input Data`, `Relasi - BB Project`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - Activities`, `Relasi - Funding Source`, `Relasi - Disbursement Plan`, dan `Relasi - Funding Allocation` |
+| `file` | Workbook `.xlsx` berisi sheet `Green Book`, `Input Data`, `Relasi - BB Project`, `Relasi - EA`, `Relasi - IA`, `Relasi - Locations`, `Relasi - Activities`, `Relasi - Funding Source`, `Relasi - Disbursement Plan`, dan `Relasi - Funding Allocation` |
 
-Workbook diimport ke Green Book target dari `:gb_id`. Sheet relasi memakai `GB Code (*)` sebagai kunci penghubung ke sheet `Input Data`. Import ini tidak membuat header Green Book baru.
+Endpoint collection-level `/green-books/import/*` mengimpor beberapa header Green Book dalam satu workbook. Sheet `Green Book` menjadi daftar target dan memakai `Green Book Key (*)` sebagai kunci kerja antar sheet. Key ini tidak disimpan di database. Sheet proyek dan relasi memakai kombinasi `Green Book Key (*)` + `GB Code (*)` sebagai kunci penghubung.
+
+Endpoint legacy `/green-books/:gb_id/import-projects/*` tetap tersedia untuk import proyek ke satu Green Book target dari detail Green Book. Format workbook legacy tidak memakai sheet `Green Book` dan tidak membuat header Green Book baru.
 
 **Template:**
-`GET /green-books/:gb_id/import-projects/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data dan BB Project aktif saat template dibuat.
+`GET /green-books/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Green Book`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data dan BB Project aktif saat template dibuat.
+
+`GET /green-books/:gb_id/import-projects/template` mengunduh template legacy untuk satu target Green Book.
 
 **Kolom utama workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Input Data` | `Program Title (*)`, `GB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Project` |
-| `Relasi - BB Project` | `GB Code (*)`, `BB Code (*)` |
-| `Relasi - EA` | `GB Code (*)`, `Executing Agency Name (*)` |
-| `Relasi - IA` | `GB Code (*)`, `Implementing Agency Name (*)` |
-| `Relasi - Locations` | `GB Code (*)`, `Location Name (*)` |
-| `Relasi - Activities` | `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
-| `Relasi - Funding Source` | `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Currency`, `Loan Original`, `Grant Original`, `Local Original`, `Loan USD`, `Grant USD`, `Local USD` |
-| `Relasi - Disbursement Plan` | `GB Code (*)`, `Year (*)`, `Amount USD` |
-| `Relasi - Funding Allocation` | `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+| `Green Book` | `Green Book Key (*)`, `Publish Year (*)`, `Revision Number`, `Status (*)`, `Replaces Green Book Ref` |
+| `Input Data` | `Green Book Key (*)`, `Program Title (*)`, `GB Code (*)`, `Project Name (*)`, `Duration`, `Objective`, `Scope of Project` |
+| `Relasi - BB Project` | `Green Book Key (*)`, `GB Code (*)`, `BB Code (*)` |
+| `Relasi - EA` | `Green Book Key (*)`, `GB Code (*)`, `Executing Agency Name (*)` |
+| `Relasi - IA` | `Green Book Key (*)`, `GB Code (*)`, `Implementing Agency Name (*)` |
+| `Relasi - Locations` | `Green Book Key (*)`, `GB Code (*)`, `Location Name (*)` |
+| `Relasi - Activities` | `Green Book Key (*)`, `GB Code (*)`, `Activity No (*)`, `Activity Name (*)`, `Implementation Location`, `PIU`, `Sort Order` |
+| `Relasi - Funding Source` | `Green Book Key (*)`, `GB Code (*)`, `Lender Name (*)`, `Institution Name`, `Currency`, `Loan Original`, `Grant Original`, `Local Original`, `Loan USD`, `Grant USD`, `Local USD` |
+| `Relasi - Disbursement Plan` | `Green Book Key (*)`, `GB Code (*)`, `Year (*)`, `Amount USD` |
+| `Relasi - Funding Allocation` | `Green Book Key (*)`, `GB Code (*)`, `Activity No (*)`, `Services`, `Constructions`, `Goods`, `Trainings`, `Other` |
+
+`Status` menerima `Berlaku` atau `Tidak Berlaku` dan disimpan sebagai `active` atau `superseded`. `Revision Number` kosong dianggap `0`. `Replaces Green Book Ref` opsional dan dapat berisi `Green Book Key` dari workbook yang sama atau UUID Green Book existing; sumber revisi harus `Publish Year` yang sama. Jika kombinasi `Publish Year + Revision Number` sudah ada di database, baris header masuk `skip` hanya jika metadata workbook cocok dengan data existing; jika tidak cocok, baris `failed`.
 
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan. Kolom institution pada `Relasi - EA`, `Relasi - IA`, dan `Relasi - Funding Source` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Template dropdown memakai path agar nama child yang sama di parent berbeda tetap bisa dipilih tanpa ambigu. Kolom `Relasi - Funding Source.Lender Name` di-resolve ke master Lender berdasarkan `name`; jika tidak cocok, import mencoba fallback ke `short_name` yang unik. Sheet `Panduan` menjelaskan fallback ini agar operator tidak perlu menebak ketika nama Institution sama atau workbook memakai singkatan lender seperti `ADB`, `IFAD`, `EIB`, atau `UKEF`.
 
 **Preview:**
-`POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
+`POST /green-books/import/preview` dan `POST /green-books/:gb_id/import-projects/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
 
 **Execute:**
-`POST /green-books/:gb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
+`POST /green-books/import/execute` dan `POST /green-books/:gb_id/import-projects/execute` menyimpan data jika hasil pemrosesan tidak memiliki baris gagal.
 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`. Frontend wajib menampilkan preview dan meminta konfirmasi user sebelum eksekusi.
 
-Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Currency` kosong dianggap `USD`; jika `USD`, nilai USD disamakan dengan nilai original sehingga user tidak perlu mengisi dua kali. `Year` pada Disbursement Plan harus unik per `GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
+Baris dengan `GB Code` yang sudah ada dalam Green Book target terkait akan di-skip. `GB Code` boleh sama pada `Green Book Key` berbeda, tetapi tidak boleh duplikat dalam `Green Book Key` yang sama. `GB Code` yang hanya ada pada revisi lama tidak di-skip; jika cocok dengan revisi sumber, snapshot baru memakai `gb_project_identity_id` yang sama. Relasi BB Project di-resolve ke latest BB Project snapshot saat import dieksekusi. Proyek baru wajib memiliki minimal satu BB Project, EA, IA, dan lokasi. `Currency` kosong dianggap `USD`; jika `USD`, nilai USD disamakan dengan nilai original sehingga user tidak perlu mengisi dua kali. `Year` pada Disbursement Plan harus unik per kombinasi `Green Book Key + GB Code`. Funding Allocation mengacu ke `Activity No`; activity tanpa Funding Allocation eksplisit tetap dibuat dengan allocation bernilai 0.
 
 ---
 
@@ -940,6 +1045,8 @@ Baris dengan `GB Code` yang sudah ada dalam Green Book target akan di-skip. `GB 
 | `executing_agency_ids` | multi-value UUID | Filter institution role `Executing Agency` |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
 | `status` | multi-value enum | `active` saja; Project Green Book yang dihapus tidak tersedia karena hard delete |
+| `sort` | enum | `gb_code`, `project_name`, `bb_projects`, `status`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /green-books/:gb_id/projects` Request:**
 ```json
@@ -1102,7 +1209,7 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh relasinya. Workbook mendukung multi header DK. `DK Key (*)` adalah kunci sementara workbook untuk header; `Project Key (*)` wajib unik per `DK Key` dan hanya dipakai untuk menghubungkan sheet relasi. `Letter Number (*)` wajib untuk import dan menjadi idempotency key.
 
 **Template:**
-`GET /daftar-kegiatan/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Daftar Kegiatan`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data, GB Project aktif, dan referensi allowed lender per GB Project saat template dibuat.
+`GET /daftar-kegiatan/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Daftar Kegiatan`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data, Master Lender, dan GB Project aktif saat template dibuat.
 
 **Kolom workbook:**
 
@@ -1125,7 +1232,7 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Project Name, Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Project Name` adalah nama snapshot di Daftar Kegiatan dan boleh berbeda dari nama Green Book. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Project Name, Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Project Name` adalah nama snapshot di Daftar Kegiatan dan boleh berbeda dari nama Green Book. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus ada di Master Lender dan boleh berbeda dari funding source Green Book terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
 
@@ -1153,6 +1260,8 @@ Jika currency hasil autofill adalah `USD`, field USD tidak perlu diisi terpisah 
 | `search` | string | Cari berdasarkan `subject`, `letter_number`, atau tanggal surat |
 | `date_from` | date `YYYY-MM-DD` | Batas awal tanggal surat |
 | `date_to` | date `YYYY-MM-DD` | Batas akhir tanggal surat |
+| `sort` | enum | `subject`, `date`, `letter_number`, `project_count`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menentukan apakah tombol hapus boleh ditampilkan.
 
@@ -1188,6 +1297,8 @@ Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menen
 | `executing_agency_ids` | multi-value UUID | Filter institution/executing agency DK Project |
 | `location_ids` | multi-value UUID | Filter region lokasi proyek |
 | `lender_ids` | multi-value UUID | Filter lender financing detail |
+| `sort` | enum | `project_name`, `executing_agency`, `duration`, `created_at` |
+| `order` | enum | `asc` atau `desc` |
 
 **`POST /daftar-kegiatan/:dk_id/projects` Request:**
 ```json
@@ -1236,20 +1347,26 @@ Response list dan detail Daftar Kegiatan menyertakan `project_count` untuk menen
 
 **`GET /daftar-kegiatan/:dk_id/projects/:id` Response `200`** menyertakan `bappenas_partners` sebagai array Mitra Kerja Bappenas Eselon II. Field ini boleh kosong.
 
-Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar-kegiatan/:dk_id/projects/:id` juga menyertakan `loan_agreement` jika proyek tersebut sudah memiliki Loan Agreement. Jika belum ada, field ini tidak dikirim.
+Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar-kegiatan/:dk_id/projects/:id` juga menyertakan `loan_agreements` sebagai array Loan Agreement yang sudah dibuat untuk proyek tersebut. Jika belum ada, array kosong dikirim.
 
 ```json
 {
   "id": "uuid-dk-project",
   "project_name": "Trans Sumatra Section 1 - DK",
-  "loan_agreement": {
-    "id": "uuid-loan-agreement",
-    "loan_code": "IP-603"
-  }
+  "loan_agreements": [
+    {
+      "id": "uuid-loan-agreement",
+      "loan_code": "IP-603"
+    },
+    {
+      "id": "uuid-loan-agreement-2",
+      "loan_code": "IP-604"
+    }
+  ]
 }
 ```
 
-Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect Proyek Daftar Kegiatan. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`; jika `loan_agreement` sudah ada, frontend menampilkan aksi `Buka Loan Agreement`.
+Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect satu Proyek Daftar Kegiatan awal, lalu user tetap dapat menambahkan project lain dan mengatur alokasi. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`. Loan Agreement yang sudah ada ditampilkan sebagai daftar aksi `Buka Loan Agreement` dengan nilai alokasi project terkait.
 
 ---
 
@@ -1274,18 +1391,19 @@ Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` |
+| `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` dan `Relasi - DK Project` |
 
-Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru untuk DK Project yang belum memiliki Loan Agreement. DK Project yang sudah memiliki Loan Agreement masuk status `skip`; Loan Code yang sudah dipakai oleh record lain masuk status `failed`.
+Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru. Satu `Loan Code` dapat memiliki beberapa baris relasi DK Project pada sheet `Relasi - DK Project`, termasuk relasi lintas header Daftar Kegiatan. `Loan Code` yang sudah dipakai oleh record lain masuk status `failed`.
 
 **Template:**
-`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, dan currency aktif saat template dibuat.
+`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, `Relasi - DK Project`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, currency aktif, dan Kurs Tengah BI saat template dibuat.
 
 **Kolom workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date (*)`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Amount USD` |
+| `Loan Agreement` | `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Cumulative Disbursement` |
+| `Relasi - DK Project` | `Loan Code (*)`, `DK Project Ref (*)`, `Allocation Original (*)` |
 
 **Preview:**
 `POST /loan-agreements/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -1296,12 +1414,16 @@ Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`; `Amount USD` wajib lebih dari `0` untuk non-USD. Jika `Currency` adalah `USD`, `Amount USD` boleh kosong dan backend menyimpan nilai USD sama dengan `Amount Original`.
+`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail semua DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`. Total `Allocation Original` pada sheet relasi untuk satu `Loan Code` wajib sama dengan `Amount Original`. Backend menghitung `amount_usd` dari Kurs Tengah BI terbaru untuk currency non-USD; jika Kurs Tengah BI untuk currency tersebut belum tersedia, preview/import berstatus `failed`. Jika `Currency` adalah `USD`, `amount_usd` disamakan dengan `Amount Original`. `allocation_usd` per project dihitung dari alokasi original dan disesuaikan rounding-nya agar total sama dengan `amount_usd`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih. Workbook lama yang masih mengirim `DK Project Ref` di sheet `Loan Agreement` tetap diterima sebagai fallback single-project.
 
 **`POST /loan-agreements` Request:**
+`original_closing_date` boleh dikosongkan/diomit untuk pinjaman yang belum diperpanjang. `is_extended=false` dan `extension_days=0` saat field ini kosong.
 ```json
 {
-  "dk_project_id": "uuid",
+  "dk_project_allocations": [
+    { "dk_project_id": "uuid-dk-project-1", "allocation_original": 30000000000 },
+    { "dk_project_id": "uuid-dk-project-2", "allocation_original": 15000000000 }
+  ],
   "lender_id": "uuid-jica",
   "loan_code": "IP-603",
   "agreement_date": "2025-03-15",
@@ -1310,9 +1432,11 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
   "closing_date": "2030-12-31",
   "currency": "JPY",
   "amount_original": 45000000000,
-  "amount_usd": 300000000
+  "cumulative_disbursement": 12500000000
 }
 ```
+
+`dk_project_allocations` wajib untuk kontrak baru. Field lama `dk_project_id` masih diterima sebagai fallback single-project dan backend mengisi alokasi sebesar `amount_original`. Backend menolak project kosong, project duplikat, project yang tidak ditemukan, lender yang tidak ada di Financing Detail salah satu project, dan total alokasi yang tidak sama dengan `amount_original`. `amount_usd` pada request diabaikan untuk perhitungan baru dan dipertahankan hanya untuk kompatibilitas client lama; backend selalu menghitung nilai USD dari `amount_original` dan Kurs Tengah BI terbaru.
 
 **`GET /loan-agreements/:id` Response `200`:**
 ```json
@@ -1320,7 +1444,38 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
   "data": {
     "id": "uuid",
     "loan_code": "IP-603",
-    "dk_project": { "id": "uuid", "objectives": "..." },
+    "dk_projects": [
+      {
+        "id": "uuid-dk-project-1",
+        "dk_id": "uuid-dk-header-1",
+        "project_name": "Trans Sumatra Section 1 - DK",
+        "objectives": "Meningkatkan konektivitas",
+        "gb_codes": "GB-2025-001",
+        "daftar_kegiatan": {
+          "id": "uuid-dk-header-1",
+          "subject": "DK TA 2025",
+          "date": "2025-02-01",
+          "letter_number": "B-001/2025"
+        },
+        "allocation_original": 30000000000,
+        "allocation_usd": 200000000
+      },
+      {
+        "id": "uuid-dk-project-2",
+        "dk_id": "uuid-dk-header-2",
+        "project_name": "Trans Sumatra Section 2 - DK",
+        "objectives": "Meningkatkan konektivitas",
+        "gb_codes": "GB-2025-002",
+        "daftar_kegiatan": {
+          "id": "uuid-dk-header-2",
+          "subject": "DK TA 2026",
+          "date": "2026-02-01",
+          "letter_number": "B-002/2026"
+        },
+        "allocation_original": 15000000000,
+        "allocation_usd": 100000000
+      }
+    ],
     "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" },
     "agreement_date": "2025-03-15",
     "effective_date": "2025-06-01",
@@ -1331,11 +1486,21 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
     "currency": "JPY",
     "amount_original": 45000000000,
     "amount_usd": 300000000,
+    "cumulative_disbursement": 12500000000,
+    "cumulative_disbursement_usd": 83333333.33,
+    "disbursement_ratio": 27.78,
+    "estimated_time_ratio": 41.67,
+    "performance_value": 0.67,
+    "performance_status": "Behind Schedule",
+    "kurs_tengah_bi": 150,
+    "kurs_cut_off_date": "2026-05-07",
     "created_at": "2025-03-15T08:00:00Z",
     "updated_at": "2025-03-15T08:00:00Z"
   }
 }
 ```
+
+`amount_usd` dan `cumulative_disbursement_usd` dihitung dari Kurs Tengah BI terbaru untuk currency non-USD. `amount_original`, `amount_usd`, `cumulative_disbursement`, dan metrik kinerja adalah nilai global Loan Agreement. `dk_projects[].allocation_original` dan `dk_projects[].allocation_usd` adalah nilai komitmen per DK Project. `cumulative_disbursement` tetap nilai input manual dalam `currency` Loan Agreement yang dipilih dan tidak dialokasikan per project. `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, dan `performance_status` adalah field tampilan dan tidak disimpan sebagai kolom DB.
 
 **`GET /loan-agreements` Query Params tambahan:**
 
@@ -1345,10 +1510,18 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 | `lender_id` | Filter by lender |
 | `is_extended` | Filter: `true` / `false` |
 | `closing_date_before` | Filter LA yang akan berakhir sebelum tanggal ini |
+| `sort` | `loan_code`, `lender`, `effective_date`, `closing_date`, `currency`, `amount_usd`, `cumulative_disbursement_usd`, `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, `performance_status`, `status`, `created_at` |
+| `order` | `asc` atau `desc` |
 
 ---
 
 ## Monitoring Disbursement
+
+> Status aktif: dinonaktifkan. Menu, route frontend, import flow, dan endpoint
+> CRUD Monitoring Disbursement (`/monitoring/*` dan
+> `/loan-agreements/:la_id/monitoring*`) tidak lagi diregistrasikan di aplikasi.
+> Bagian di bawah dipertahankan sebagai catatan kontrak historis sampai dokumen
+> baseline dipangkas menyeluruh.
 
 ### Monitoring Workspace & Import
 
@@ -1568,64 +1741,6 @@ data: {"id":"uuid","loan_agreement_id":"uuid","quarter":"TW2","updated_by":"staf
 
 ---
 
-## Dashboard & Aggregasi
-
-### `GET /dashboard/summary`
-
-**Permission:** Authenticated
-
-**Response `200`:**
-```json
-{
-  "data": {
-    "total_bb_projects": 120,
-    "total_gb_projects": 85,
-    "total_loan_agreements": 42,
-    "total_amount_usd": 15000000000,
-    "total_realized_usd": 8500000000,
-    "overall_absorption_pct": 56.7,
-    "active_monitoring": 38
-  }
-}
-```
-
----
-
-### `GET /dashboard/monitoring-summary`
-
-**Permission:** Authenticated
-
-**Query Params:**
-
-| Param | Keterangan |
-|-------|-----------|
-| `budget_year` | Filter tahun anggaran |
-| `quarter` | Filter: `TW1`, `TW2`, `TW3`, `TW4` |
-| `lender_id` | Filter by lender |
-
-**Response `200`:**
-```json
-{
-  "data": {
-    "budget_year": 2025,
-    "quarter": "TW1",
-    "total_planned_usd": 500000000,
-    "total_realized_usd": 380000000,
-    "absorption_pct": 76.0,
-    "by_lender": [
-      {
-        "lender": { "id": "uuid", "name": "JICA" },
-        "planned_usd": 300000000,
-        "realized_usd": 240000000,
-        "absorption_pct": 80.0
-      }
-    ]
-  }
-}
-```
-
----
-
 ## Spatial Distribution
 
 Endpoint ini dipakai menu frontend `/spatial-distribution` dengan label sidebar **Sebaran Wilayah**. Route frontend tetap berbahasa Inggris, sedangkan label UI/menu memakai Bahasa Indonesia.
@@ -1649,6 +1764,10 @@ Mengembalikan data peta choropleth provinsi atau kabupaten/kota. Cakupan lokasi 
 | `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
 | `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
 | `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `reached_stages` | Multi value tahap yang sudah dicapai. `GB` mencakup project dengan status `GB`, `DK`, `LA`, atau `Monitoring`; `DK` mencakup `DK`, `LA`, atau `Monitoring`; `LA` mencakup `LA` atau `Monitoring`; `Monitoring` hanya `Monitoring`; `BB` mencakup seluruh project aktif |
+| `missing_stages` | Multi value tahap yang belum dicapai untuk analisa bottleneck. Contoh: `missing_stages=GB` hanya project yang masih di `BB`; `missing_stages=LA` mencakup project `BB`, `GB`, atau `DK` |
+| `has_loi` | Boolean `true`/`false`; filter keberadaan LoI pada BB Project |
+| `has_lender_indication` | Boolean `true`/`false`; filter keberadaan indikasi lender pada BB Project |
 | `search` | Cari berdasarkan kode atau nama proyek |
 | `include_history` | `true` untuk menghitung snapshot historis, default latest snapshot saja |
 
@@ -1697,7 +1816,7 @@ Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi 
 | `region_code` | Kode nasional (`ID`), provinsi, atau kabupaten/kota yang dipilih |
 | `province_code` | Konteks parent saat `level=city` |
 | `page`, `limit`, `sort`, `order` | Pagination dan sorting standar project master |
-| `loan_types`, `project_statuses`, `pipeline_statuses`, `search`, `include_history` | Sama dengan choropleth |
+| `loan_types`, `project_statuses`, `pipeline_statuses`, `reached_stages`, `missing_stages`, `has_loi`, `has_lender_indication`, `search`, `include_history` | Sama dengan choropleth |
 
 **Response `200`:**
 ```json
@@ -1727,6 +1846,181 @@ Untuk `level=city`, daftar proyek mengikuti angka peta dan hanya memakai lokasi 
 
 ---
 
+### `GET /dashboard/stage-overview`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan ringkasan tahap untuk funnel dashboard. Hitungan memakai entitas pada tahap masing-masing: Project Blue Book terbaru per `project_identity_id`, Project Green Book, Project Daftar Kegiatan, dan Loan Agreement. Sebaran `regions[]` memakai `region.region_group`: lokasi `CITY` dinaikkan ke provinsi induknya lalu dihitung satu kali per proyek per grup, lokasi `PROVINCE` masuk ke `region_group`, dan lokasi nasional tampil sebagai `Indonesia`.
+
+**Query Params:**
+
+| Param | Keterangan |
+|-------|------------|
+| `period_ids` | Multi-value UUID periode Blue Book untuk membatasi seluruh tahap berdasarkan relasi BB |
+| `region_ids` | Multi-value UUID wilayah/lokasi untuk membatasi ringkasan tahap pada wilayah terpilih |
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "stages": [
+      {
+        "stage": "GB",
+        "project_count": 36,
+        "total_loan_usd": 1970815490,
+        "regions": [
+          {
+            "label": "Jawa",
+            "level": "Region Group",
+            "project_count": 18,
+            "foreign_loan_usd": 900000000
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### `GET /dashboard/blue-book-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Blue Book untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` agar revisi lama tidak double-count. Relasi K/L dihitung dari role `Executing Agency`, lalu setiap institution dinaikkan ke ancestor level tertinggi (`parent_id IS NULL`). Distribusi Program memakai `program_title_id` exact pada Project Blue Book agar item dashboard dapat deep-link ke Project Master dengan `program_title_ids`.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "agency_groups": [
+      {
+        "label": "Kementerian/Lembaga",
+        "level": "Kementerian/Lembaga",
+        "project_count": 85,
+        "foreign_loan_usd": 25550770000
+      }
+    ],
+    "top_agencies": [
+      {
+        "id": "uuid-root-institution",
+        "label": "Kemen PU",
+        "level": "Kementerian/Badan/Lembaga",
+        "project_count": 27,
+        "foreign_loan_usd": 12055300000
+      }
+    ],
+    "programs": [
+      {
+        "id": "uuid-program-title",
+        "label": "Konektivitas & Transportasi",
+        "level": "Program Title",
+        "project_count": 38,
+        "foreign_loan_usd": 12100000000
+      }
+    ]
+  }
+}
+```
+
+Catatan: satu proyek dapat memiliki lebih dari satu Executing Agency pada root berbeda. Karena itu total `project_count` pada distribusi K/L dapat lebih besar dari total proyek Blue Book.
+
+---
+
+### `GET /dashboard/green-book-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Green Book untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah memiliki relasi Green Book. Tipe lender dan top lender dihitung dari `gb_funding_source`; top K/L dihitung dari role `Executing Agency` pada Project Blue Book lalu dinaikkan ke institution level tertinggi agar deep link memakai `executing_agency_ids` exact.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "lender_types": [
+      {
+        "label": "Bilateral",
+        "level": "Lender Type",
+        "project_count": 16,
+        "foreign_loan_usd": 8700000000
+      }
+    ],
+    "top_lenders": [
+      {
+        "id": "uuid-lender",
+        "label": "JICA",
+        "level": "Bilateral",
+        "project_count": 10,
+        "foreign_loan_usd": 4100000000
+      }
+    ],
+    "top_agencies": [
+      {
+        "id": "uuid-root-institution",
+        "label": "Kemen PU",
+        "level": "Kementerian/Badan/Lembaga",
+        "project_count": 11,
+        "foreign_loan_usd": 5100000000
+      }
+    ]
+  }
+}
+```
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=GB&loan_types=Bilateral`
+- `/projects?reached_stages=GB&fixed_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=GB&executing_agency_ids=<uuid-root-institution>`
+
+Catatan: satu proyek Green Book dapat memiliki lebih dari satu lender atau Executing Agency root. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Green Book.
+
+---
+
+### `GET /dashboard/daftar-kegiatan-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Daftar Kegiatan untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah mencapai Daftar Kegiatan. Tipe lender dan top lender dihitung dari `dk_financing_detail`; top K/L dihitung dari `dk_project.institution_id` lalu dinaikkan ke institution level tertinggi agar deep link memakai `dk_executing_agency_ids` exact.
+
+Response shape sama dengan `GET /dashboard/green-book-distribution`:
+- `lender_types[]`
+- `top_lenders[]`
+- `top_agencies[]`
+- `programs[]`
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=DK&loan_types=Bilateral`
+- `/projects?reached_stages=DK&dk_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=DK&dk_executing_agency_ids=<uuid-root-institution>`
+- `/projects?reached_stages=DK&program_title_ids=<uuid-program-title>`
+
+Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu lender. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Daftar Kegiatan.
+
+---
+
+### `GET /dashboard/loan-agreement-distribution`
+
+**Permission:** read: `bb_project`
+
+Mengembalikan agregasi distribusi Loan Agreement untuk panel dashboard. Endpoint hanya memakai snapshot Blue Book terbaru per `project_identity_id` yang sudah memiliki Loan Agreement. Tipe lender dan top lender dihitung dari `loan_agreement.lender_id`; top K/L tetap mengikuti Executing Agency pada `dk_project.institution_id` lalu dinaikkan ke institution level tertinggi agar deep link memakai `dk_executing_agency_ids` exact.
+
+Response shape sama dengan `GET /dashboard/green-book-distribution`:
+- `lender_types[]`
+- `top_lenders[]`
+- `top_agencies[]`
+- `programs[]`
+
+Contoh deep link dari item endpoint ini:
+- `/projects?reached_stages=LA&loan_types=Bilateral`
+- `/projects?reached_stages=LA&loan_agreement_lender_ids=<uuid-lender>`
+- `/projects?reached_stages=LA&dk_executing_agency_ids=<uuid-root-institution>`
+- `/projects?reached_stages=LA&program_title_ids=<uuid-program-title>`
+
+Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu Loan Agreement, dan satu Loan Agreement dapat dialokasikan ke beberapa proyek Daftar Kegiatan. Agregasi nilai per project memakai `loan_agreement_dk_project.allocation_usd`; agregasi nilai global LA memakai `COUNT(DISTINCT loan_agreement.id)` atau nilai LA distinct agar tidak double count.
+
+---
+
 ### `GET /projects`
 
 **Permission:** read: `bb_project`
@@ -1743,10 +2037,17 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `sort`, `order` | Sorting standar. `sort`: `project_name`, `bb_code`, `loan_types`, `indication_lenders`, `executing_agencies`, `fixed_lenders`, `project_status`, `pipeline_status`, `program_title`, `locations`, `foreign_loan_usd`, `dk_dates`. `order`: `asc` atau `desc` |
 | `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
 | `indication_lender_ids` | Multi value UUID lender dari `lender_indication` BB |
-| `executing_agency_ids` | Multi value UUID institution role `Executing Agency` |
+| `executing_agency_ids` | Multi value UUID institution role `Executing Agency`. Jika UUID adalah institution level tertinggi, filter juga mencakup EA turunan di bawah root tersebut |
 | `fixed_lender_ids` | Multi value UUID lender dari `gb_funding_source` Green Book |
+| `dk_lender_ids` | Multi value UUID lender dari `dk_financing_detail` Daftar Kegiatan |
+| `loan_agreement_lender_ids` | Multi value UUID lender dari `loan_agreement.lender_id` |
+| `dk_executing_agency_ids` | Multi value UUID institution dari `dk_project.institution_id`. Jika UUID adalah institution level tertinggi, filter juga mencakup EA DK turunan di bawah root tersebut |
 | `project_statuses` | Multi value: `Pipeline`, `Ongoing` |
 | `pipeline_statuses` | Multi value: `BB`, `GB`, `DK`, `LA`, `Monitoring` |
+| `reached_stages` | Multi value tahap yang sudah dicapai. `GB` mencakup project dengan status `GB`, `DK`, `LA`, atau `Monitoring`; `DK` mencakup `DK`, `LA`, atau `Monitoring`; `LA` mencakup `LA` atau `Monitoring`; `Monitoring` hanya `Monitoring`; `BB` mencakup seluruh project aktif |
+| `missing_stages` | Multi value tahap yang belum dicapai untuk analisa bottleneck. Contoh: `missing_stages=GB` hanya project yang masih di `BB`; `missing_stages=LA` mencakup project `BB`, `GB`, atau `DK` |
+| `has_loi` | Boolean `true`/`false`; filter keberadaan LoI pada BB Project |
+| `has_lender_indication` | Boolean `true`/`false`; filter keberadaan indikasi lender pada BB Project |
 | `program_title_ids` | Multi value UUID program title |
 | `region_ids` | Multi value UUID region/location |
 | `foreign_loan_min`, `foreign_loan_max` | Range nilai pinjaman foreign loan dalam USD |
@@ -1755,6 +2056,19 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 | `include_history` | `true` untuk menampilkan semua snapshot, default `false` |
 
 Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&loan_types=KSA`), comma-separated value, atau format array query string (`loan_types[]=Bilateral`).
+
+Contoh deep link dari dashboard:
+- `/projects?reached_stages=GB`
+- `/projects?reached_stages=GB&fixed_lender_ids=<uuid>`
+- `/projects?reached_stages=GB&executing_agency_ids=<uuid>`
+- `/projects?reached_stages=DK&dk_lender_ids=<uuid>`
+- `/projects?reached_stages=DK&dk_executing_agency_ids=<uuid>`
+- `/projects?reached_stages=LA&loan_agreement_lender_ids=<uuid>`
+- `/projects?reached_stages=LA&dk_executing_agency_ids=<uuid>`
+- `/projects?reached_stages=BB&missing_stages=GB&has_loi=true`
+- `/projects?reached_stages=BB&missing_stages=GB&has_lender_indication=false`
+- `/projects?reached_stages=BB&program_title_ids=<uuid>`
+- `/spatial-distribution?level=province&region_code=ID&reached_stages=BB&metric=count`
 
 **Response `200`:**
 ```json
@@ -1794,7 +2108,7 @@ Multi value dapat dikirim sebagai repeated query param (`loan_types=Bilateral&lo
 
 **Permission:** read: `bb_project`
 
-Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filter aktif. Endpoint memakai query param yang sama dengan `GET /projects`; `page` dan `limit` diabaikan karena export selalu mengambil semua hasil filter. Sorting tetap mengikuti `sort` dan `order`. Sheet `Ringkasan` berisi total pendanaan serta daftar filter aktif yang dipakai saat export.
+Mengunduh workbook Excel (`.xlsx`) berisi seluruh project yang cocok dengan filter aktif. Endpoint memakai query param yang sama dengan `GET /projects`, termasuk `reached_stages`, `missing_stages`, `has_loi`, `has_lender_indication`, `dk_lender_ids`, `loan_agreement_lender_ids`, dan `dk_executing_agency_ids`; `page` dan `limit` diabaikan karena export selalu mengambil semua hasil filter. Sorting tetap mengikuti `sort` dan `order`. Sheet `Ringkasan` berisi total pendanaan serta daftar filter aktif yang dipakai saat export.
 
 **Response `200`:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dengan `Content-Disposition: attachment`.
 
@@ -1876,30 +2190,35 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
               "date": "2025-02-01",
               "letter_number": "B-001/2025"
             },
-            "loan_agreement": {
-              "id": "uuid",
-              "loan_code": "IP-603",
-              "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
-              "agreement_date": "2025-05-01",
-              "effective_date": "2025-06-01",
-              "original_closing_date": "2030-12-31",
-              "closing_date": "2030-12-31",
-              "is_extended": false,
-              "extension_days": 0,
-              "currency": "USD",
-              "amount_original": 300000000,
-              "amount_usd": 300000000,
-              "monitoring": [
-                {
-                  "id": "uuid",
-                  "budget_year": 2025,
-                  "quarter": "TW1",
-                  "planned_usd": 3333333,
-                  "realized_usd": 2800000,
-                  "absorption_pct": 84.0
-                }
-              ]
-            }
+            "loan_agreements": [
+              {
+                "id": "uuid",
+                "loan_code": "IP-603",
+                "lender": { "id": "uuid", "name": "JICA", "short_name": "JICA", "type": "Bilateral" },
+                "agreement_date": "2025-05-01",
+                "effective_date": "2025-06-01",
+                "original_closing_date": "2030-12-31",
+                "closing_date": "2030-12-31",
+                "is_extended": false,
+                "extension_days": 0,
+                "currency": "USD",
+                "amount_original": 300000000,
+                "amount_usd": 300000000,
+                "allocation_original": 300000000,
+                "allocation_usd": 300000000,
+                "cumulative_disbursement": 125000000,
+                "monitoring": [
+                  {
+                    "id": "uuid",
+                    "budget_year": 2025,
+                    "quarter": "TW1",
+                    "planned_usd": 3333333,
+                    "realized_usd": 2800000,
+                    "absorption_pct": 84.0
+                  }
+                ]
+              }
+            ]
           }
         ]
       }

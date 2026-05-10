@@ -40,7 +40,7 @@ Gunakan plan di folder `plans/` berikut untuk implementasi step by step:
 | 2 | `plans/PLAN_BE_08_Blue_Book_Revision_Versioning.md` | Blue Book logical identity, duplicate per dokumen, clone revisi, BB history endpoint, import BB |
 | 3 | `plans/PLAN_BE_09_Green_Book_Revision_Versioning.md` | Green Book logical identity, latest BB resolver, clone revisi, GB history endpoint |
 | 4 | `plans/PLAN_BE_10_DK_LA_Frozen_Snapshot.md` | DK latest GB resolver, downstream frozen snapshot, lender validation berdasarkan concrete version |
-| 5 | `plans/PLAN_BE_11_Journey_Import_Project_List_Versioning.md` | Project list latest default, journey concrete path, dashboard count safety, import final, smoke backend |
+| 5 | `plans/PLAN_BE_11_Journey_Import_Project_List_Versioning.md` | Project list latest default, journey concrete path, aggregate safety, import final, smoke backend |
 | 6 | `plans/PLAN_10_BB_GB_Revision_UI.md` | Frontend history UI, latest pickers, DK/Journey concrete snapshot display |
 
 Setiap file plan memiliki checklist per step. Kerjakan berurutan; jangan lompat ke fase frontend sebelum backend contract dan smoke BE-11 selesai.
@@ -230,7 +230,7 @@ Tasks:
 3. LA tetap mengikuti DK Project yang sudah tersimpan.
 4. Lender validation DK/LA harus memakai concrete version yang tersimpan, bukan latest version saat request LA/monitoring dibuat.
 
-### Phase BE-5: Journey, Dashboard, dan Import
+### Phase BE-5: Journey, Aggregate Safety, dan Import
 
 Files:
 
@@ -316,7 +316,7 @@ Affected plans:
 - `plans/PLAN_04_Blue_Book.md`
 - `plans/PLAN_05_Green_Book.md`
 - `plans/PLAN_06_Daftar_Kegiatan.md`
-- `plans/PLAN_09_Dashboard_Journey.md`
+- `plans/PLAN_09_Project_Journey.md`
 
 Tasks:
 

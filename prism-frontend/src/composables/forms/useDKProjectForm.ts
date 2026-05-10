@@ -1,7 +1,6 @@
-import { computed, reactive, ref, watch } from 'vue'
-import type { ZodError } from 'zod'
+import { computed, reactive, ref } from 'vue'
+import { assignFormErrors } from '@/utils/form-errors'
 import { dkProjectSchema } from '@/schemas/daftar-kegiatan.schema'
-import type { BBProject } from '@/types/blue-book.types'
 import type {
   DKActivityDetailPayload,
   DKFinancingDetailPayload,
@@ -85,19 +84,6 @@ function fromProject(project?: DKProject | null): Partial<DKProjectFormValues> {
   }
 }
 
-function assignErrors(target: DKProjectFormErrors, error: ZodError) {
-  Object.keys(target).forEach((key) => {
-    delete target[key as keyof DKProjectFormErrors]
-  })
-
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as keyof DKProjectFormErrors
-    if (!target[field]) {
-      target[field] = issue.message
-    }
-  }
-}
-
 function normalizeActivities(rows: DKActivityDetailPayload[]) {
   rows.forEach((row, index) => {
     row.activity_number = index + 1
@@ -121,7 +107,6 @@ export function useDKProjectForm(
   initialData?: Partial<DKProjectFormValues> | DKProject | null,
   options?: {
     gbProjects?: () => GBProjectOption[]
-    bbProjects?: () => BBProject[]
   },
 ) {
   const initialValues: Partial<DKProjectFormValues> =
@@ -177,35 +162,6 @@ export function useDKProjectForm(
     const selected = new Set(values.gb_project_ids)
     return gbProjects.filter((project) => selected.has(project.id))
   })
-
-  const allowedLenderIds = computed(() => {
-    const allowed = new Set<string>()
-    const bbProjects = options?.bbProjects?.() ?? []
-
-    selectedGBProjects.value.forEach((project) => {
-      project.funding_sources.forEach((source) => allowed.add(source.lender.id))
-
-      project.bb_projects.forEach((summary) => {
-        const bbProject = bbProjects.find((item) => item.id === summary.id)
-        bbProject?.lender_indications.forEach((indication) => allowed.add(indication.lender.id))
-      })
-    })
-
-    return [...allowed]
-  })
-
-  watch(
-    allowedLenderIds,
-    (ids) => {
-      const allowed = new Set(ids)
-      financingDetails.value.forEach((row) => {
-        if (row.lender_id && !allowed.has(row.lender_id)) {
-          row.lender_id = ''
-        }
-      })
-    },
-    { deep: true },
-  )
 
   function addFinancing() {
     financingDetails.value.push(emptyFinancing())
@@ -369,7 +325,7 @@ export function useDKProjectForm(
       normalizeActivities(activityDetails.value)
       const parsed = dkProjectSchema.safeParse(toPayload())
       if (!parsed.success) {
-        assignErrors(errors, parsed.error)
+        assignFormErrors(errors, parsed.error)
         return
       }
 
@@ -423,7 +379,6 @@ export function useDKProjectForm(
     activityDetails,
     addActivity,
     removeActivity,
-    allowedLenderIds,
     selectedGBProjects,
     applySelectedGBProjects,
     submit,

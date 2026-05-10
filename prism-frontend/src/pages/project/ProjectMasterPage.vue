@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import Skeleton from 'primevue/skeleton'
+import MultiSelect from 'primevue/multiselect'
+import Popover from 'primevue/popover'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import { useRoute } from 'vue-router'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import SummaryCard from '@/components/common/SummaryCard.vue'
-import TableReloadShell from '@/components/common/TableReloadShell.vue'
 import { useListControls } from '@/composables/useListControls'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -31,11 +35,23 @@ import type {
   ProjectPipelineStatus,
   ProjectStatus,
 } from '@/types/project.types'
+import {
+  queryBoolean,
+  queryEnum,
+  queryEnumArray,
+  queryNumber,
+  queryString,
+  queryStringValues,
+} from '@/utils/route-query'
+import { getPipelineStatusLabel } from '@/utils/status-labels'
+import { primeTablePt } from '@/utils/table-styles'
 
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
+const route = useRoute()
 const { can } = usePermission()
 const toast = useToast()
+let routeHydrating = false
 
 const listControls = useListControls<ProjectMasterFilterState>({
   initialFilters: createDefaultFilters(),
@@ -47,8 +63,15 @@ const listControls = useListControls<ProjectMasterFilterState>({
     indication_lender_ids: 'Indikasi Lender',
     executing_agency_ids: 'Executing Agency',
     fixed_lender_ids: 'Fixed Lender',
+    dk_lender_ids: 'Lender Daftar Kegiatan',
+    loan_agreement_lender_ids: 'Lender Loan Agreement',
+    dk_executing_agency_ids: 'EA Daftar Kegiatan',
     project_statuses: 'Status Project',
     pipeline_statuses: 'Status Pipeline',
+    reached_stages: 'Sudah mencapai tahap',
+    missing_stages: 'Belum mencapai tahap',
+    has_loi: 'LoI',
+    has_lender_indication: 'Indikasi Lender',
     program_title_ids: 'Program Title',
     region_ids: 'Region/Location',
     foreign_loan_min: 'Foreign Loan Min',
@@ -66,27 +89,29 @@ const sortOrder = listControls.order as Ref<ProjectMasterSortOrder>
 const filters = listControls.draftFilters
 const appliedFilters = listControls.appliedFilters
 const columnConfigs: ProjectMasterColumnConfig[] = [
-  { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: true },
+  { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: false },
   { key: 'indication_lenders', label: 'Indikasi Lender', sortField: 'indication_lenders', defaultVisible: false },
   { key: 'executing_agencies', label: 'Executing Agency', sortField: 'executing_agencies', defaultVisible: true },
-  { key: 'fixed_lenders', label: 'Fixed Lender', sortField: 'fixed_lenders', defaultVisible: true },
+  { key: 'fixed_lenders', label: 'Fixed Lender', sortField: 'fixed_lenders', defaultVisible: false },
   { key: 'status', label: 'Status', sortField: 'project_status', defaultVisible: true },
   { key: 'program_title', label: 'Program Title', sortField: 'program_title', defaultVisible: false },
   { key: 'locations', label: 'Region/Location', sortField: 'locations', defaultVisible: false },
   { key: 'foreign_loan_usd', label: 'Nilai Pinjaman', sortField: 'foreign_loan_usd', defaultVisible: true },
   { key: 'dk_dates', label: 'Tanggal Daftar Kegiatan', sortField: 'dk_dates', defaultVisible: false },
+  { key: 'bb_book_ref', label: 'Kode Blue Book', sortField: 'bb_code', defaultVisible: false },
+  { key: 'gb_book_ref', label: 'Kode Green Book', sortField: 'gb_codes', defaultVisible: false },
 ]
 const visibleColumnKeys = ref<ProjectMasterColumnKey[]>(
   columnConfigs.filter((column) => column.defaultVisible).map((column) => column.key),
 )
 
-const skeletonRows = computed(() => Array.from({ length: Math.min(limit.value, 10) }, (_, index) => index))
 const visibleColumns = computed(() =>
   columnConfigs.filter((column) => visibleColumnKeys.value.includes(column.key)),
 )
-const initialTableLoading = computed(() => projectStore.loading && projectStore.projects.length === 0)
-const refreshingExistingRows = computed(() => projectStore.loading && projectStore.projects.length > 0)
-const columnSelectionLabel = computed(() => `${visibleColumns.value.length + 2} kolom tampil`)
+const columnVisibleCount = computed(() => visibleColumns.value.length + 1) // +1 for fixed name col
+const columnPopover = ref()
+const tableSortOrder = computed(() => (sortOrder.value === 'asc' ? 1 : -1))
+const tablePt = primeTablePt
 const programTitleOptions = computed(() =>
   masterStore.programTitles.map((programTitle) => ({
     label: formatProgramTitle(programTitle),
@@ -126,11 +151,30 @@ const regionOptions = computed(() =>
   })),
 )
 
-const loanTypeOptions: Array<{ label: string; value: LenderType }> = [
-  { label: 'Bilateral', value: 'Bilateral' },
-  { label: 'Multilateral', value: 'Multilateral' },
-  { label: 'KSA', value: 'KSA' },
+const loanTypeValues: LenderType[] = ['Bilateral', 'Multilateral', 'KSA']
+const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
+const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
+const projectSortFieldValues: ProjectMasterSortField[] = [
+  'bb_code',
+  'project_name',
+  'loan_types',
+  'indication_lenders',
+  'executing_agencies',
+  'fixed_lenders',
+  'project_status',
+  'pipeline_status',
+  'program_title',
+  'locations',
+  'foreign_loan_usd',
+  'dk_dates',
+  'gb_codes',
 ]
+const sortOrderValues: ProjectMasterSortOrder[] = ['asc', 'desc']
+
+const loanTypeOptions: Array<{ label: string; value: LenderType }> = loanTypeValues.map((value) => ({
+  label: value,
+  value,
+}))
 const projectStatusOptions: Array<{ label: string; value: ProjectStatus }> = [
   { label: 'Pipeline (Blue Book-Daftar Kegiatan)', value: 'Pipeline' },
   { label: 'Ongoing (Loan Agreement-Monitoring)', value: 'Ongoing' },
@@ -142,14 +186,12 @@ const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus
   { label: 'Loan Agreement', value: 'LA' },
   { label: 'Monitoring', value: 'Monitoring' },
 ]
+const presenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua', value: null },
+  { label: 'Ada', value: true },
+  { label: 'Tidak ada', value: false },
+]
 
-const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
-  BB: 'Blue Book',
-  GB: 'Green Book',
-  DK: 'Daftar Kegiatan',
-  LA: 'Loan Agreement',
-  Monitoring: 'Monitoring',
-}
 const fundingSummaryCards = computed(() => [
   {
     label: 'Total Pinjaman',
@@ -171,8 +213,15 @@ function createDefaultFilters(): ProjectMasterFilterState {
     indication_lender_ids: [],
     executing_agency_ids: [],
     fixed_lender_ids: [],
+    dk_lender_ids: [],
+    loan_agreement_lender_ids: [],
+    dk_executing_agency_ids: [],
     project_statuses: [],
     pipeline_statuses: [],
+    reached_stages: [],
+    missing_stages: [],
+    has_loi: null,
+    has_lender_indication: null,
     program_title_ids: [],
     region_ids: [],
     foreign_loan_min: null,
@@ -207,11 +256,30 @@ function buildParams(): ProjectMasterListParams {
   if (appliedFilters.fixed_lender_ids.length > 0) {
     params.fixed_lender_ids = [...appliedFilters.fixed_lender_ids]
   }
+  if (appliedFilters.dk_lender_ids.length > 0) {
+    params.dk_lender_ids = [...appliedFilters.dk_lender_ids]
+  }
+  if (appliedFilters.loan_agreement_lender_ids.length > 0) {
+    params.loan_agreement_lender_ids = [...appliedFilters.loan_agreement_lender_ids]
+  }
+  if (appliedFilters.dk_executing_agency_ids.length > 0) {
+    params.dk_executing_agency_ids = [...appliedFilters.dk_executing_agency_ids]
+  }
   if (appliedFilters.project_statuses.length > 0) {
     params.project_statuses = [...appliedFilters.project_statuses]
   }
   if (appliedFilters.pipeline_statuses.length > 0) {
     params.pipeline_statuses = [...appliedFilters.pipeline_statuses]
+  }
+  if (appliedFilters.reached_stages.length > 0) {
+    params.reached_stages = [...appliedFilters.reached_stages]
+  }
+  if (appliedFilters.missing_stages.length > 0) {
+    params.missing_stages = [...appliedFilters.missing_stages]
+  }
+  if (appliedFilters.has_loi !== null) params.has_loi = appliedFilters.has_loi
+  if (appliedFilters.has_lender_indication !== null) {
+    params.has_lender_indication = appliedFilters.has_lender_indication
   }
   if (appliedFilters.program_title_ids.length > 0) {
     params.program_title_ids = [...appliedFilters.program_title_ids]
@@ -231,6 +299,85 @@ function buildParams(): ProjectMasterListParams {
   params.search = textParam(listControls.debouncedSearch.value)
 
   return params
+}
+
+function positiveInteger(value: number | undefined) {
+  if (value === undefined || value < 1) return undefined
+  return Math.floor(value)
+}
+
+function hydrateProjectMasterRouteQuery() {
+  routeHydrating = true
+
+  try {
+    const query = route.query
+    const nextFilters = createDefaultFilters()
+    const queryPage = positiveInteger(queryNumber(query, 'page'))
+    const queryLimit = positiveInteger(queryNumber(query, 'limit'))
+    const minLoan = queryNumber(query, 'foreign_loan_min')
+    const maxLoan = queryNumber(query, 'foreign_loan_max')
+    const searchValue = queryString(query, 'search') ?? ''
+
+    page.value = queryPage ?? 1
+    limit.value = queryLimit ?? 20
+    sortField.value = queryEnum(query, projectSortFieldValues, 'sort') ?? 'project_name'
+    sortOrder.value = queryEnum(query, sortOrderValues, 'order') ?? 'asc'
+
+    nextFilters.loan_types = queryEnumArray(query, loanTypeValues, 'loan_types', 'loan_types[]')
+    nextFilters.indication_lender_ids = queryStringValues(
+      query,
+      'indication_lender_ids',
+      'indication_lender_ids[]',
+    )
+    nextFilters.executing_agency_ids = queryStringValues(
+      query,
+      'executing_agency_ids',
+      'executing_agency_ids[]',
+    )
+    nextFilters.fixed_lender_ids = queryStringValues(query, 'fixed_lender_ids', 'fixed_lender_ids[]')
+    nextFilters.dk_lender_ids = queryStringValues(query, 'dk_lender_ids', 'dk_lender_ids[]')
+    nextFilters.loan_agreement_lender_ids = queryStringValues(
+      query,
+      'loan_agreement_lender_ids',
+      'loan_agreement_lender_ids[]',
+    )
+    nextFilters.dk_executing_agency_ids = queryStringValues(
+      query,
+      'dk_executing_agency_ids',
+      'dk_executing_agency_ids[]',
+    )
+    nextFilters.project_statuses = queryEnumArray(
+      query,
+      projectStatusValues,
+      'project_statuses',
+      'project_statuses[]',
+    )
+    nextFilters.pipeline_statuses = queryEnumArray(
+      query,
+      pipelineStatusValues,
+      'pipeline_statuses',
+      'pipeline_statuses[]',
+    )
+    nextFilters.reached_stages = queryEnumArray(query, pipelineStatusValues, 'reached_stages', 'reached_stages[]')
+    nextFilters.missing_stages = queryEnumArray(query, pipelineStatusValues, 'missing_stages', 'missing_stages[]')
+    nextFilters.has_loi = queryBoolean(query, 'has_loi')
+    nextFilters.has_lender_indication = queryBoolean(query, 'has_lender_indication')
+    nextFilters.program_title_ids = queryStringValues(query, 'program_title_ids', 'program_title_ids[]')
+    nextFilters.region_ids = queryStringValues(query, 'region_ids', 'region_ids[]')
+    nextFilters.foreign_loan_min = minLoan ?? null
+    nextFilters.foreign_loan_max = maxLoan ?? null
+    nextFilters.dk_date_from = queryString(query, 'dk_date_from') ?? ''
+    nextFilters.dk_date_to = queryString(query, 'dk_date_to') ?? ''
+    nextFilters.include_history = queryBoolean(query, 'include_history') === true
+
+    Object.assign(filters, nextFilters)
+    Object.assign(appliedFilters, nextFilters)
+    listControls.setSearchSilently(searchValue)
+  } finally {
+    window.setTimeout(() => {
+      routeHydrating = false
+    }, 0)
+  }
 }
 
 async function loadProjectMaster() {
@@ -264,14 +411,10 @@ async function refreshFromFirstPage() {
   await loadProjectMaster()
 }
 
-function sortBy(field: ProjectMasterSortField) {
-  if (sortField.value === field) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortOrder.value = 'asc'
-  }
-
+function handleSort(event: { sortField?: unknown; sortOrder?: unknown }) {
+  if (typeof event.sortField !== 'string' || event.sortOrder === 0) return
+  sortField.value = event.sortField as ProjectMasterSortField
+  sortOrder.value = event.sortOrder === 1 ? 'asc' : 'desc'
   page.value = 1
 }
 
@@ -280,15 +423,7 @@ function listLabel(values: string[]) {
 }
 
 function statusLabel(project: ProjectMasterRow) {
-  return `${project.project_status} - ${pipelineStatusLabels[project.pipeline_status]}`
-}
-
-function sortIcon(field: ProjectMasterSortField) {
-  if (sortField.value !== field) {
-    return 'pi pi-sort-alt text-surface-400'
-  }
-
-  return sortOrder.value === 'asc' ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
+  return `${project.project_status} - ${getPipelineStatusLabel(project.pipeline_status)}`
 }
 
 function saveBlob(blob: Blob, fileName: string) {
@@ -304,18 +439,6 @@ function saveBlob(blob: Blob, fileName: string) {
 
 function projectExportFileName() {
   return `projects_filtered_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
-}
-
-function headerAlignClass(column?: ProjectMasterColumnConfig) {
-  return column?.key === 'foreign_loan_usd' ? 'justify-end text-right' : 'justify-start text-left'
-}
-
-function bodyCellClass(column: ProjectMasterColumnConfig) {
-  if (column.key === 'foreign_loan_usd') {
-    return 'px-4 py-3 text-right font-medium text-surface-900'
-  }
-
-  return 'px-4 py-3 text-surface-700'
 }
 
 function formatProgramTitle(programTitle: ProgramTitle) {
@@ -384,7 +507,12 @@ function selectedLabelSummary(labels: string[]) {
 
 function formatProjectFilterValue(key: string, value: unknown) {
   if (Array.isArray(value)) {
-    if (key === 'indication_lender_ids' || key === 'fixed_lender_ids') {
+    if (
+      key === 'indication_lender_ids' ||
+      key === 'fixed_lender_ids' ||
+      key === 'dk_lender_ids' ||
+      key === 'loan_agreement_lender_ids'
+    ) {
       const selected = new Set(value)
       return selectedLabelSummary(
         masterStore.lenders
@@ -393,7 +521,7 @@ function formatProjectFilterValue(key: string, value: unknown) {
       )
     }
 
-    if (key === 'executing_agency_ids') {
+    if (key === 'executing_agency_ids' || key === 'dk_executing_agency_ids') {
       const selected = new Set(value)
       return selectedLabelSummary(
         masterStore.institutions
@@ -418,14 +546,16 @@ function formatProjectFilterValue(key: string, value: unknown) {
       )
     }
 
-    if (key === 'pipeline_statuses') {
-      return selectedLabelSummary(value.map((item) => pipelineStatusLabels[item as ProjectPipelineStatus] ?? item))
+    if (key === 'pipeline_statuses' || key === 'reached_stages' || key === 'missing_stages') {
+      return selectedLabelSummary(value.map((item) => getPipelineStatusLabel(item as ProjectPipelineStatus)))
     }
 
     return selectedLabelSummary(value.map(String))
   }
 
   if (typeof value === 'boolean') {
+    if (key === 'has_loi') return value ? 'Ada' : 'Tidak ada'
+    if (key === 'has_lender_indication') return value ? 'Ada' : 'Tidak ada'
     return value ? 'Ditampilkan' : 'Tidak'
   }
 
@@ -464,17 +594,29 @@ function expandRegionFilterIds(regionIds: string[]) {
 }
 
 watch([page, limit], () => {
+  if (routeHydrating) return
   void loadProjectMaster()
 })
 
 watch(
   [listControls.debouncedSearch, () => JSON.stringify(appliedFilters), sortField, sortOrder],
   () => {
+    if (routeHydrating) return
     void refreshFromFirstPage()
   },
 )
 
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateProjectMasterRouteQuery()
+    void loadProjectMaster()
+  },
+)
+
 onMounted(() => {
+  hydrateProjectMasterRouteQuery()
+
   void Promise.all([
     masterStore.fetchLenders(true, { limit: 1000, sort: 'name', order: 'asc' }),
     masterStore.fetchInstitutions(true, { limit: 1000, sort: 'name', order: 'asc' }),
@@ -494,195 +636,393 @@ onUnmounted(() => {
     <PageHeader
       title="Project"
       subtitle="Master table seluruh Proyek Blue Book beserta status pipeline, lender, instansi, lokasi, dan nilai pinjaman"
-    />
+    >
+      <template #actions>
+        <Button
+          v-tooltip.top="'Export semua project sesuai filter aktif'"
+          label="Export Excel"
+          icon="pi pi-download"
+          severity="secondary"
+          outlined
+          :loading="projectStore.exporting"
+          :disabled="projectStore.total === 0 || projectStore.exporting"
+          @click="exportFilteredProjects"
+        />
+      </template>
+    </PageHeader>
 
     <SearchFilterBar
       v-model:search="listControls.search.value"
-      search-placeholder="Cari nama proyek, indikasi lender, fixed lender, atau executing agency"
+      search-placeholder="Cari nama proyek, lender, executing agency, atau program"
       :active-filters="listControls.activeFilterPills.value"
       :filter-count="listControls.activeFilterCount.value"
       @apply="listControls.applyFilters"
       @reset="listControls.resetFilters"
       @remove="listControls.removeFilter"
     >
+      <template #actions>
+        <Button
+          v-tooltip.bottom="'Atur kolom yang ditampilkan'"
+          type="button"
+          icon="pi pi-table"
+          severity="secondary"
+          outlined
+          class="h-11 shrink-0 gap-2"
+          :badge="String(columnVisibleCount)"
+          badge-severity="secondary"
+          @click="(e) => columnPopover.toggle(e)"
+        />
+        <Popover ref="columnPopover">
+          <div class="w-52">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-400">Kolom Tampil</p>
+            <div class="space-y-0.5">
+              <label
+                v-for="column in columnConfigs"
+                :key="column.key"
+                class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-50"
+              >
+                <Checkbox v-model="visibleColumnKeys" :value="column.key" />
+                <span class="text-sm text-surface-700">{{ column.label }}</span>
+              </label>
+            </div>
+          </div>
+        </Popover>
+      </template>
       <template #filters>
-        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
-          <ToggleSwitch v-model="filters.include_history" />
-          <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
-        </label>
-
-        <div class="contents">
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
-            <MultiSelect
-              v-model="filters.loan_types"
-              :options="loanTypeOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua jenis"
-              filter
-              filter-placeholder="Cari jenis pinjaman"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Indikasi Lender</span>
-            <MultiSelect
-              v-model="filters.indication_lender_ids"
-              :options="lenderOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua indikasi lender"
-              filter
-              filter-placeholder="Cari indikasi lender"
-              display="chip"
-              class="w-full"
+        <div class="xl:col-span-6 space-y-5">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">
+                Mode data
+              </p>
+              <p class="mt-0.5 text-sm font-medium text-surface-800">Snapshot historis</p>
+            </div>
+            <label
+              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 sm:self-center"
             >
-              <template #option="{ option }">
-                <div class="flex w-full items-center justify-between gap-3">
-                  <span>{{ option.label }}</span>
-                  <Tag :value="option.type" severity="info" rounded />
-                </div>
-              </template>
-            </MultiSelect>
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Executing Agency</span>
-            <MultiSelect
-              v-model="filters.executing_agency_ids"
-              :options="institutionOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua executing agency"
-              filter
-              filter-placeholder="Cari executing agency"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Fixed Lender (Green Book)</span>
-            <MultiSelect
-              v-model="filters.fixed_lender_ids"
-              :options="lenderOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua fixed lender"
-              filter
-              filter-placeholder="Cari fixed lender"
-              display="chip"
-              class="w-full"
-            >
-              <template #option="{ option }">
-                <div class="flex w-full items-center justify-between gap-3">
-                  <span>{{ option.label }}</span>
-                  <Tag :value="option.type" severity="info" rounded />
-                </div>
-              </template>
-            </MultiSelect>
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Status Project</span>
-            <MultiSelect
-              v-model="filters.project_statuses"
-              :options="projectStatusOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua status"
-              filter
-              filter-placeholder="Cari status project"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Status Pipeline</span>
-            <MultiSelect
-              v-model="filters.pipeline_statuses"
-              :options="pipelineStatusOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua step"
-              filter
-              filter-placeholder="Cari status pipeline"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Program Title</span>
-            <MultiSelect
-              v-model="filters.program_title_ids"
-              :options="programTitleOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Semua program title"
-              filter
-              filter-placeholder="Cari program title"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <label class="block space-y-2 xl:col-span-2">
-            <span class="text-sm font-medium text-surface-700">Region/Location</span>
-            <MultiSelect
-              v-model="filters.region_ids"
-              :options="regionOptions"
-              option-label="label"
-              option-value="value"
-              option-disabled="disabled"
-              placeholder="Semua lokasi"
-              filter
-              filter-placeholder="Cari lokasi"
-              display="chip"
-              class="w-full"
-            />
-          </label>
-
-          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Foreign Loan Min</span>
-              <InputNumber
-                v-model="filters.foreign_loan_min"
-                mode="decimal"
-                :min="0"
-                :min-fraction-digits="0"
-                :max-fraction-digits="2"
-                placeholder="USD minimum"
-                class="w-full"
-              />
-            </label>
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Foreign Loan Max</span>
-              <InputNumber
-                v-model="filters.foreign_loan_max"
-                mode="decimal"
-                :min="0"
-                :min-fraction-digits="0"
-                :max-fraction-digits="2"
-                placeholder="USD maksimum"
-                class="w-full"
-              />
+              <span class="text-sm font-semibold text-surface-700">
+                {{ filters.include_history ? 'Aktif' : 'Nonaktif' }}
+              </span>
+              <ToggleSwitch v-model="filters.include_history" />
             </label>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2 xl:col-span-2">
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Dari</span>
-              <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
-            </label>
-            <label class="block space-y-2">
-              <span class="text-sm font-medium text-surface-700">Tanggal Daftar Kegiatan Sampai</span>
-              <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
-            </label>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Klasifikasi pipeline
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Jenis Pinjaman</span>
+                <MultiSelect
+                  v-model="filters.loan_types"
+                  :options="loanTypeOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua jenis"
+                  filter
+                  filter-placeholder="Cari jenis pinjaman"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Project</span>
+                <MultiSelect
+                  v-model="filters.project_statuses"
+                  :options="projectStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua status"
+                  filter
+                  filter-placeholder="Cari status project"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Pipeline</span>
+                <MultiSelect
+                  v-model="filters.pipeline_statuses"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua step"
+                  filter
+                  filter-placeholder="Cari status pipeline"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.reached_stages"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua tahap"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Belum Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.missing_stages"
+                  :options="pipelineStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Tidak ada bottleneck"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">LoI</span>
+                <Select
+                  v-model="filters.has_loi"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">Indikasi</span>
+                <Select
+                  v-model="filters.has_lender_indication"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Lender, instansi, program
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Indikasi Lender</span>
+                <MultiSelect
+                  v-model="filters.indication_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua indikasi lender"
+                  filter
+                  filter-placeholder="Cari indikasi lender"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Fixed Lender (Green Book)</span>
+                <MultiSelect
+                  v-model="filters.fixed_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua fixed lender"
+                  filter
+                  filter-placeholder="Cari fixed lender"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Lender Daftar Kegiatan</span>
+                <MultiSelect
+                  v-model="filters.dk_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua lender DK"
+                  filter
+                  filter-placeholder="Cari lender DK"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Lender Loan Agreement</span>
+                <MultiSelect
+                  v-model="filters.loan_agreement_lender_ids"
+                  :options="lenderOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua lender LA"
+                  filter
+                  filter-placeholder="Cari lender LA"
+                  display="chip"
+                  class="w-full"
+                >
+                  <template #option="{ option }">
+                    <div class="flex w-full items-center justify-between gap-3">
+                      <span>{{ option.label }}</span>
+                      <Tag :value="option.type" severity="info" rounded />
+                    </div>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Executing Agency</span>
+                <MultiSelect
+                  v-model="filters.executing_agency_ids"
+                  :options="institutionOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua executing agency"
+                  filter
+                  filter-placeholder="Cari executing agency"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">EA Daftar Kegiatan</span>
+                <MultiSelect
+                  v-model="filters.dk_executing_agency_ids"
+                  :options="institutionOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua EA DK"
+                  filter
+                  filter-placeholder="Cari EA DK"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
+                <span class="text-sm font-medium text-surface-700">Program Title</span>
+                <MultiSelect
+                  v-model="filters.program_title_ids"
+                  :options="programTitleOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua program title"
+                  filter
+                  filter-placeholder="Cari program title"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Lokasi, nilai, tanggal
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Region/Location</span>
+                <MultiSelect
+                  v-model="filters.region_ids"
+                  :options="regionOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-disabled="disabled"
+                  placeholder="Semua lokasi"
+                  filter
+                  filter-placeholder="Cari lokasi"
+                  display="chip"
+                  class="w-full"
+                />
+              </label>
+
+              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">Loan Min</span>
+                  <InputNumber
+                    v-model="filters.foreign_loan_min"
+                    mode="decimal"
+                    prefix="USD "
+                    :min="0"
+                    :min-fraction-digits="0"
+                    :max-fraction-digits="2"
+                    placeholder="Minimum"
+                    class="w-full"
+                  />
+                </label>
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">Loan Max</span>
+                  <InputNumber
+                    v-model="filters.foreign_loan_max"
+                    mode="decimal"
+                    prefix="USD "
+                    :min="0"
+                    :min-fraction-digits="0"
+                    :max-fraction-digits="2"
+                    placeholder="Maksimum"
+                    class="w-full"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">DK Dari</span>
+                  <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
+                </label>
+                <label class="block min-w-0 space-y-2">
+                  <span class="text-sm font-medium text-surface-700">DK Sampai</span>
+                  <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -700,220 +1040,131 @@ onUnmounted(() => {
       />
     </section>
 
-    <section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200 p-4">
-        <div>
-          <h2 class="text-lg font-semibold text-surface-950">Master Table Project</h2>
-          <p class="text-sm text-surface-500">{{ projectStore.total }} project ditemukan.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button
-            v-tooltip.top="'Export semua project sesuai filter aktif'"
-            label="Export Excel"
-            icon="pi pi-download"
-            severity="secondary"
-            outlined
-            :loading="projectStore.exporting"
-            :disabled="projectStore.total === 0 || projectStore.exporting"
-            @click="exportFilteredProjects"
-          />
-          <Tag :value="columnSelectionLabel" severity="secondary" rounded />
-          <MultiSelect
-            v-model="visibleColumnKeys"
-            :options="columnConfigs"
-            option-label="label"
-            option-value="key"
-            placeholder="Kolom tampil"
-            filter
-            filter-placeholder="Cari kolom"
-            class="w-64 max-w-full"
-          />
-        </div>
-      </div>
+    <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+      <div class="overflow-x-auto">
+        <DataTable
+          :value="projectStore.projects"
+          :loading="projectStore.loading"
+          lazy
+          striped-rows
+          removable-sort
+          data-key="id"
+          :sort-field="sortField"
+          :sort-order="tableSortOrder"
+          :table-style="{ minWidth: '68rem', width: '100%', tableLayout: 'auto' }"
+          :pt="tablePt"
+          class="prism-data-table w-full"
+          @sort="handleSort"
+        >
+          <template #empty>
+            <EmptyState title="Tidak ada project" description="Ubah filter atau kata kunci pencarian." />
+          </template>
 
-      <div v-if="initialTableLoading" class="overflow-x-auto">
-        <table class="w-full min-w-[72rem] table-fixed text-left text-sm">
-          <tbody class="divide-y divide-surface-100">
-            <tr v-for="row in skeletonRows" :key="row">
-              <td class="w-[28rem] px-4 py-3">
-                <Skeleton height="2rem" />
-              </td>
-              <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3">
-                <Skeleton height="1.5rem" />
-              </td>
-              <td class="w-40 px-4 py-3">
-                <Skeleton height="1.5rem" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-else-if="projectStore.projects.length === 0" class="p-8">
-        <EmptyState title="Tidak ada project" description="Ubah filter atau kata kunci pencarian." />
-      </div>
-
-      <TableReloadShell v-else :refreshing="refreshingExistingRows" content-class="overflow-x-auto">
-        <table class="w-full min-w-[72rem] table-fixed text-left text-sm">
-          <thead class="bg-surface-50 text-xs uppercase text-surface-500">
-            <tr>
-              <th class="w-[28rem] px-4 py-3">
-                <button
-                  type="button"
-                  class="inline-flex w-full items-center gap-2 text-left font-semibold"
-                  @click="sortBy('project_name')"
-                >
-                  <span>Nama Proyek</span>
-                  <i :class="sortIcon('project_name')" aria-hidden="true" />
-                </button>
-              </th>
-              <th
-                v-for="column in visibleColumns"
-                :key="column.key"
-                class="px-4 py-3"
-                :class="column.key === 'foreign_loan_usd' ? 'w-48 text-right' : 'w-60'"
+          <!-- Kolom Nama Proyek (fixed) -->
+          <Column field="project_name" header="Nama Proyek" sortable :style="{ minWidth: '18rem', width: '18rem' }">
+            <template #body="{ data: project }">
+              <RouterLink
+                :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
+                class="block whitespace-normal font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
               >
-                <button
-                  type="button"
-                  class="inline-flex w-full items-center gap-2 font-semibold"
-                  :class="headerAlignClass(column)"
-                  @click="sortBy(column.sortField)"
-                >
-                  <span>{{ column.label }}</span>
-                  <i :class="sortIcon(column.sortField)" aria-hidden="true" />
-                </button>
-              </th>
-              <th class="w-40 px-4 py-3 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <TransitionGroup tag="tbody" name="prism-table-row-fade" class="divide-y divide-surface-100">
-            <tr v-for="project in projectStore.projects" :key="project.id" class="align-top hover:bg-surface-50/70">
-              <td class="w-[28rem] px-4 py-3">
-                <RouterLink
-                  :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
-                  class="block whitespace-normal text-sm font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
-                >
-                  {{ project.project_name }}
-                </RouterLink>
-                <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <span class="text-xs font-medium text-surface-500">{{ project.bb_code }}</span>
+                {{ project.project_name }}
+              </RouterLink>
+              <p v-if="project.program_title" class="mt-0.5 whitespace-normal text-xs leading-relaxed text-surface-500">
+                {{ project.program_title }}
+              </p>
+            </template>
+          </Column>
+
+          <!-- Kolom dinamis -->
+          <Column
+            v-for="column in visibleColumns"
+            :key="column.key"
+            :field="column.sortField"
+            :header="column.label"
+            sortable
+            :style="column.key === 'foreign_loan_usd'
+              ? { minWidth: '11rem', width: '11rem', textAlign: 'right' }
+              : { minWidth: '8rem', width: '8rem' }"
+            :header-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
+            :body-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
+            :header-style="column.key === 'foreign_loan_usd' ? { textAlign: 'right' } : {}"
+            :body-style="column.key === 'foreign_loan_usd'
+              ? { textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }
+              : {}"
+          >
+            <template #body="{ data: project }">
+              <div v-if="column.key === 'loan_types'">
+                <div v-if="project.loan_types.length > 0" class="flex flex-wrap gap-1.5">
                   <Tag
-                    :value="project.blue_book_revision_label"
-                    :severity="project.is_latest ? 'success' : 'secondary'"
-                    rounded
-                  />
-                  <Tag
-                    v-if="project.has_newer_revision"
-                    value="Ada revisi lebih baru"
-                    severity="warn"
+                    v-for="type in project.loan_types"
+                    :key="type"
+                    :value="type"
+                    :severity="loanTypeSeverity(type)"
                     rounded
                   />
                 </div>
-              </td>
-              <td v-for="column in visibleColumns" :key="column.key" :class="bodyCellClass(column)">
-                <div v-if="column.key === 'loan_types'">
-                  <div v-if="project.loan_types.length > 0" class="flex flex-wrap gap-1.5">
-                    <Tag
-                      v-for="type in project.loan_types"
-                      :key="type"
-                      :value="type"
-                      :severity="loanTypeSeverity(type)"
-                      rounded
-                    />
+                <span v-else class="text-surface-400">-</span>
+              </div>
+              <span
+                v-else-if="column.key === 'indication_lenders'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.indication_lenders)"
+              >{{ listLabel(project.indication_lenders) }}</span>
+              <span
+                v-else-if="column.key === 'executing_agencies'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.executing_agencies)"
+              >{{ listLabel(project.executing_agencies) }}</span>
+              <span
+                v-else-if="column.key === 'fixed_lenders'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.fixed_lenders)"
+              >{{ listLabel(project.fixed_lenders) }}</span>
+              <Tag
+                v-else-if="column.key === 'status'"
+                :value="statusLabel(project)"
+                :severity="projectStatusSeverity(project.project_status)"
+                rounded
+              />
+              <span v-else-if="column.key === 'program_title'" class="block whitespace-normal leading-relaxed">
+                {{ project.program_title || '-' }}
+              </span>
+              <span
+                v-else-if="column.key === 'locations'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.locations)"
+              >{{ listLabel(project.locations) }}</span>
+              <CurrencyDisplay
+                v-else-if="column.key === 'foreign_loan_usd'"
+                :amount="project.foreign_loan_usd"
+                currency="USD"
+              />
+              <span
+                v-else-if="column.key === 'dk_dates'"
+                class="block whitespace-normal leading-relaxed"
+                :title="listLabel(project.dk_dates)"
+              >{{ listLabel(project.dk_dates) }}</span>
+              <div v-else-if="column.key === 'bb_book_ref'">
+                <div class="font-semibold">{{ project.bb_code }}</div>
+                <div class="mt-0.5 text-xs text-surface-500">{{ project.blue_book_revision_label }}</div>
+              </div>
+              <div v-else-if="column.key === 'gb_book_ref'">
+                <template v-if="project.gb_codes.length > 0">
+                  <div
+                    v-for="(gbCode, i) in project.gb_codes"
+                    :key="gbCode"
+                    :class="Number(i) > 0 ? 'mt-1.5 border-t border-surface-100 pt-1.5' : ''"
+                  >
+                    <div class="font-semibold">{{ gbCode }}</div>
+                    <div class="mt-0.5 text-xs text-surface-500">{{ project.green_book_revision_labels[i] ?? '-' }}</div>
                   </div>
-                  <span v-else class="text-surface-400">-</span>
-                </div>
-                <span
-                  v-else-if="column.key === 'indication_lenders'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.indication_lenders)"
-                >
-                  {{ listLabel(project.indication_lenders) }}
-                </span>
-                <span
-                  v-else-if="column.key === 'executing_agencies'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.executing_agencies)"
-                >
-                  {{ listLabel(project.executing_agencies) }}
-                </span>
-                <span
-                  v-else-if="column.key === 'fixed_lenders'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.fixed_lenders)"
-                >
-                  {{ listLabel(project.fixed_lenders) }}
-                </span>
-                <Tag
-                  v-else-if="column.key === 'status'"
-                  :value="statusLabel(project)"
-                  :severity="projectStatusSeverity(project.project_status)"
-                  rounded
-                />
-                <span v-else-if="column.key === 'program_title'" class="block whitespace-normal leading-relaxed">
-                  {{ project.program_title || '-' }}
-                </span>
-                <span
-                  v-else-if="column.key === 'locations'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.locations)"
-                >
-                  {{ listLabel(project.locations) }}
-                </span>
-                <CurrencyDisplay
-                  v-else-if="column.key === 'foreign_loan_usd'"
-                  :amount="project.foreign_loan_usd"
-                  currency="USD"
-                />
-                <span
-                  v-else-if="column.key === 'dk_dates'"
-                  class="block whitespace-normal leading-relaxed"
-                  :title="listLabel(project.dk_dates)"
-                >
-                  {{ listLabel(project.dk_dates) }}
-                </span>
-              </td>
-              <td class="w-40 px-4 py-3">
-                <div class="flex justify-end gap-1.5">
-                  <Button
-                    v-tooltip.top="'Detail proyek'"
-                    as="router-link"
-                    :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
-                    icon="pi pi-eye"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Detail proyek"
-                  />
-                  <Button
-                    v-tooltip.top="'Lihat perjalanan proyek'"
-                    as="router-link"
-                    :to="{ name: 'project-journey', params: { bbProjectId: project.id } }"
-                    icon="pi pi-sitemap"
-                    severity="secondary"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Lihat perjalanan proyek"
-                  />
-                  <Button
-                    v-if="can('bb_project', 'update')"
-                    v-tooltip.top="'Edit proyek'"
-                    as="router-link"
-                    :to="{ name: 'bb-project-edit', params: { bbId: project.blue_book_id, id: project.id } }"
-                    icon="pi pi-pencil"
-                    size="small"
-                    outlined
-                    rounded
-                    aria-label="Edit proyek"
-                  />
-                </div>
-              </td>
-            </tr>
-          </TransitionGroup>
-        </table>
-      </TableReloadShell>
+                </template>
+                <span v-else class="text-surface-400">-</span>
+              </div>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
 
       <div class="border-t border-surface-200 p-3">
         <ListPaginationFooter
@@ -922,6 +1173,6 @@ onUnmounted(() => {
           :total="projectStore.total"
         />
       </div>
-    </section>
+    </div>
   </section>
 </template>

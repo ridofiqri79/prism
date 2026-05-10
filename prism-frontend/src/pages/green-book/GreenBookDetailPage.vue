@@ -6,8 +6,8 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
-import SingleSelectDropdown from '@/components/common/SingleSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
@@ -94,11 +94,11 @@ const importForm = reactive<ImportGBProjectsFromGreenBookPayload>({
   project_ids: [],
 })
 const columns: ColumnDef[] = [
-  { field: 'gb_code', header: 'Kode Green Book' },
-  { field: 'project_name', header: 'Nama Proyek' },
-  { field: 'bb_projects', header: 'Proyek Blue Book' },
-  { field: 'status', header: 'Status' },
-  { field: 'actions', header: 'Aksi' },
+  { field: 'gb_code', header: 'Kode Green Book', sortable: true },
+  { field: 'project_name', header: 'Nama Proyek', sortable: true },
+  { field: 'bb_projects', header: 'Proyek Blue Book', sortable: true },
+  { field: 'status', header: 'Status', sortable: true },
+  { field: 'actions', header: 'Aksi', align: 'right' },
 ]
 const statusOptions: Array<{ label: string; value: GreenBookStatus }> = [
   { label: 'Berlaku', value: 'active' },
@@ -579,6 +579,8 @@ watch(
   [
     projectControls.page,
     projectControls.limit,
+    projectControls.sort,
+    projectControls.order,
     projectControls.debouncedSearch,
     () => JSON.stringify(projectControls.appliedFilters),
   ],
@@ -624,15 +626,15 @@ watch(
 
     <div v-if="greenBookStore.currentGreenBook" class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-3">
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Tahun Terbit</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tahun Terbit</p>
         <p class="font-semibold text-surface-950">{{ greenBookStore.currentGreenBook.publish_year }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Revisi</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Revisi</p>
         <p class="font-semibold text-surface-950">{{ formatGBRevision(greenBookStore.currentGreenBook.revision_number) }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Status</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</p>
         <StatusBadge
           :status="greenBookStore.currentGreenBook.status"
           :label="formatGreenBookStatus(greenBookStore.currentGreenBook.status)"
@@ -650,7 +652,7 @@ watch(
       @remove="projectControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Proyek Blue Book</span>
           <MultiSelect
             v-model="projectControls.draftFilters.bb_project_ids"
@@ -663,7 +665,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Executing Agency</span>
           <MultiSelect
             v-model="projectControls.draftFilters.executing_agency_ids"
@@ -676,8 +678,8 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-1">
-          <span class="text-sm font-medium text-surface-700">Location</span>
+        <label class="block min-w-0 space-y-2 xl:col-span-1">
+          <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectControls.draftFilters.location_ids"
             :options="locationFilterOptions"
@@ -700,6 +702,9 @@ watch(
       :columns="columns"
       :loading="greenBookStore.loading"
       :total="greenBookStore.projectTotal"
+      :sort-field="projectControls.sort.value"
+      :sort-order="projectControls.order.value"
+      @sort="projectControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'bb_projects'">{{ joinNames((row as GBProject).bb_projects) }}</span>
@@ -708,31 +713,37 @@ watch(
           :status="String(row.status)"
           :label="formatGreenBookStatus(String(row.status))"
         />
-        <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
+        <div v-else-if="column.field === 'actions'" class="flex flex-wrap justify-end gap-1.5">
           <Button
+            v-tooltip.top="'Lihat proyek'"
             as="router-link"
             :to="{ name: 'gb-project-detail', params: { gbId: greenBookId, id: row.id } }"
             icon="pi pi-eye"
-            label="Lihat"
             size="small"
             outlined
+            rounded
+            aria-label="Lihat proyek"
           />
           <Button
             v-if="can('gb_project', 'update')"
+            v-tooltip.top="'Edit proyek'"
             as="router-link"
             :to="{ name: 'gb-project-edit', params: { gbId: greenBookId, id: row.id } }"
             icon="pi pi-pencil"
-            label="Edit"
             size="small"
             outlined
+            rounded
+            aria-label="Edit proyek"
           />
           <Button
             v-if="can('gb_project', 'delete')"
+            v-tooltip.top="'Hapus proyek'"
             icon="pi pi-trash"
-            label="Hapus"
             size="small"
             severity="danger"
             outlined
+            rounded
+            aria-label="Hapus proyek"
             @click="deleteProject(row as GBProject)"
           />
         </div>
@@ -749,7 +760,7 @@ watch(
       <form class="flex flex-col gap-5" @submit.prevent="saveImportFromGreenBook">
         <label class="grid gap-2">
           <span class="text-sm font-medium text-surface-700">Green Book Sumber</span>
-          <SingleSelectDropdown
+          <Select
             v-model="importForm.source_green_book_id"
             :options="importSourceGreenBookSelectOptions"
             option-label="label"
@@ -795,8 +806,8 @@ watch(
 
           <div class="overflow-hidden rounded-lg border border-surface-200 bg-surface-0">
             <div class="max-h-[22rem] overflow-auto">
-              <table class="min-w-full table-fixed text-sm">
-                <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold text-surface-600">
+              <table class="prism-table min-w-full table-fixed">
+                <thead class="sticky top-0 z-10 bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
                   <tr class="border-b border-surface-200">
                     <th class="w-12 px-4 py-3">
                       <Checkbox
@@ -812,22 +823,22 @@ watch(
                 </thead>
                 <tbody>
                   <tr v-if="importProjectLoading">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                    <td colspan="3" class="prism-table-empty px-4 py-8">
                       Memuat Project Green Book...
                     </td>
                   </tr>
                   <tr v-else-if="!importForm.source_green_book_id">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                    <td colspan="3" class="prism-table-empty px-4 py-8">
                       Pilih Green Book sumber untuk melihat Project Green Book.
                     </td>
                   </tr>
                   <tr v-else-if="importProjectOptions.length === 0">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                    <td colspan="3" class="prism-table-empty px-4 py-8">
                       Green Book sumber ini belum memiliki Project Green Book.
                     </td>
                   </tr>
                   <tr v-else-if="filteredImportProjectOptions.length === 0">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-surface-500">
+                    <td colspan="3" class="prism-table-empty px-4 py-8">
                       Tidak ada Project Green Book yang cocok dengan pencarian.
                     </td>
                   </tr>
@@ -955,7 +966,7 @@ watch(
         </label>
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Status</span>
-          <SingleSelectDropdown
+          <Select
             v-model="form.status"
             :options="statusOptions"
             option-label="label"

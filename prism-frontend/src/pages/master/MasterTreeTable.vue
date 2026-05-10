@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import TreeTable from 'primevue/treetable'
 import type { TreeNode } from 'primevue/treenode'
 import EmptyState from '@/components/common/EmptyState.vue'
+import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import TableReloadShell from '@/components/common/TableReloadShell.vue'
-
-interface PageEvent {
-  page: number
-  rows: number
-}
+import { primeTablePt } from '@/utils/table-styles'
 
 interface SortEvent {
   sortField?: unknown
@@ -44,7 +40,6 @@ const emit = defineEmits<{
   sort: [value: { sort: string; order: SortOrder }]
 }>()
 
-const first = computed(() => (props.page - 1) * props.limit)
 const tableSortOrder = computed(() => {
   if (!props.sortOrder) return undefined
   return props.sortOrder === 'asc' ? 1 : -1
@@ -52,15 +47,7 @@ const tableSortOrder = computed(() => {
 const skeletonRows = computed(() => Array.from({ length: props.limit }, (_, index) => index))
 const initialLoading = computed(() => props.loading && props.value.length === 0)
 const refreshingRows = computed(() => props.loading && props.value.length > 0)
-
-function handlePage(event: PageEvent) {
-  if (event.rows !== props.limit) {
-    emit('update:limit', event.rows)
-    return
-  }
-
-  emit('update:page', event.page + 1)
-}
+const tablePt = primeTablePt
 
 function handleSort(event: SortEvent) {
   if (typeof event.sortField !== 'string' || event.sortOrder === 0) {
@@ -96,31 +83,34 @@ function handleExpandedKeys(value: ExpandedKeys) {
     <EmptyState v-else-if="value.length === 0" />
 
     <TableReloadShell v-else :refreshing="refreshingRows">
-      <TreeTable
-        :value="value"
-        lazy
-        :expanded-keys="expandedKeys"
-        sort-mode="single"
-        removable-sort
-        resizable-columns
-        column-resize-mode="fit"
-        :sort-field="sortField"
-        :sort-order="tableSortOrder"
-        class="overflow-hidden rounded-lg border border-surface-200"
-        @update:expandedKeys="handleExpandedKeys"
-        @node-expand="(node) => emit('node-expand', node)"
-        @sort="handleSort"
-      >
-        <slot />
-      </TreeTable>
+      <div class="overflow-x-auto">
+        <TreeTable
+          :value="value"
+          lazy
+          :expanded-keys="expandedKeys"
+          sort-mode="single"
+          removable-sort
+          resizable-columns
+          column-resize-mode="fit"
+          :sort-field="sortField"
+          :sort-order="tableSortOrder"
+          :pt="tablePt"
+          class="prism-data-table min-w-[48rem] rounded-lg border border-surface-200"
+          @update:expandedKeys="handleExpandedKeys"
+          @node-expand="(node) => emit('node-expand', node)"
+          @sort="handleSort"
+        >
+          <slot />
+        </TreeTable>
+      </div>
     </TableReloadShell>
 
-    <Paginator
-      :first="first"
-      :rows="limit"
-      :total-records="total"
-      :rows-per-page-options="[10, 20, 50, 100]"
-      @page="handlePage"
+    <ListPaginationFooter
+      :page="page"
+      :limit="limit"
+      :total="total"
+      @update:page="(value) => emit('update:page', value)"
+      @update:limit="(value) => { emit('update:limit', value); emit('update:page', 1) }"
     />
   </div>
 </template>

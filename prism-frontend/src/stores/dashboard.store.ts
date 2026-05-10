@@ -1,307 +1,134 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { DashboardService } from '@/services/dashboard.service'
-import type { PaginationMeta } from '@/types/api.types'
 import type {
-  DashboardFilterOptions,
-  DashboardFilterParams,
-  DashboardSummary,
-  DataQualityGovernanceDashboard,
-  DataQualityGovernanceParams,
-  ExecutivePortfolioDashboard,
-  GreenBookReadinessDashboard,
-  GreenBookReadinessParams,
-  KLPortfolioPerformanceDashboard,
-  KLPortfolioPerformanceParams,
-  LADisbursementDashboard,
-  LADisbursementParams,
-  LenderFinancingMixDashboard,
-  LenderFinancingMixParams,
-  PipelineBottleneckParams,
-  PipelineBottleneckResponse,
-  StageMetric,
-  TimeSeriesPoint,
+  DashboardBlueBookDistribution,
+  DashboardDaftarKegiatanDistribution,
+  DashboardGreenBookDistribution,
+  DashboardLoanAgreementDistribution,
 } from '@/types/dashboard.types'
 
+function emptyBlueBookDistribution(): DashboardBlueBookDistribution {
+  return {
+    agency_groups: [],
+    top_agencies: [],
+    programs: [],
+  }
+}
+
+function emptyGreenBookDistribution(): DashboardGreenBookDistribution {
+  return {
+    lender_types: [],
+    top_lenders: [],
+    top_agencies: [],
+  }
+}
+
 export const useDashboardStore = defineStore('dashboard', () => {
-  const summary = ref<DashboardSummary | null>(null)
-  const stageFunnel = ref<StageMetric[]>([])
-  const monitoringRollup = ref<TimeSeriesPoint[]>([])
-  const executivePortfolio = ref<ExecutivePortfolioDashboard | null>(null)
-  const pipelineBottleneck = ref<PipelineBottleneckResponse | null>(null)
-  const pipelineBottleneckMeta = ref<PaginationMeta | null>(null)
-  const greenBookReadiness = ref<GreenBookReadinessDashboard | null>(null)
-  const lenderFinancingMix = ref<LenderFinancingMixDashboard | null>(null)
-  const klPortfolioPerformance = ref<KLPortfolioPerformanceDashboard | null>(null)
-  const laDisbursement = ref<LADisbursementDashboard | null>(null)
-  const dataQualityGovernance = ref<DataQualityGovernanceDashboard | null>(null)
-  const filterOptions = ref<DashboardFilterOptions>({})
-  const loading = ref(false)
-  const summaryLoading = ref(false)
-  const stageFunnelLoading = ref(false)
-  const monitoringRollupLoading = ref(false)
-  const pipelineLoading = ref(false)
-  const greenBookReadinessLoading = ref(false)
-  const lenderFinancingMixLoading = ref(false)
-  const klPortfolioPerformanceLoading = ref(false)
-  const laDisbursementLoading = ref(false)
-  const dataQualityGovernanceLoading = ref(false)
-  const filterOptionsLoading = ref(false)
+  const blueBookDistribution = ref<DashboardBlueBookDistribution>(emptyBlueBookDistribution())
+  const greenBookDistribution = ref<DashboardGreenBookDistribution>(emptyGreenBookDistribution())
+  const daftarKegiatanDistribution = ref<DashboardDaftarKegiatanDistribution>(emptyGreenBookDistribution())
+  const loanAgreementDistribution = ref<DashboardLoanAgreementDistribution>(emptyGreenBookDistribution())
+  const loadingBlueBookDistribution = ref(false)
+  const loadingGreenBookDistribution = ref(false)
+  const loadingDaftarKegiatanDistribution = ref(false)
+  const loadingLoanAgreementDistribution = ref(false)
   const error = ref<string | null>(null)
-  const summaryError = ref<string | null>(null)
-  const stageFunnelError = ref<string | null>(null)
-  const monitoringRollupError = ref<string | null>(null)
-  const pipelineError = ref<string | null>(null)
-  const greenBookReadinessError = ref<string | null>(null)
-  const lenderFinancingMixError = ref<string | null>(null)
-  const klPortfolioPerformanceError = ref<string | null>(null)
-  const laDisbursementError = ref<string | null>(null)
-  const dataQualityGovernanceError = ref<string | null>(null)
 
-  async function fetchSummary(params?: DashboardFilterParams) {
-    summaryLoading.value = true
-    summaryError.value = null
-    try {
-      summary.value = await DashboardService.getSummary(params)
-      return summary.value
-    } catch {
-      summaryError.value = 'Gagal memuat dashboard summary'
-      summary.value = null
-      return null
-    } finally {
-      summaryLoading.value = false
-    }
-  }
-
-  async function fetchStageFunnel(params?: DashboardFilterParams) {
-    stageFunnelLoading.value = true
-    stageFunnelError.value = null
-    try {
-      stageFunnel.value = await DashboardService.getStageFunnel(params)
-      return stageFunnel.value
-    } catch {
-      stageFunnelError.value = 'Gagal memuat stage funnel'
-      stageFunnel.value = []
-      return []
-    } finally {
-      stageFunnelLoading.value = false
-    }
-  }
-
-  async function fetchMonitoringRollup(params?: DashboardFilterParams) {
-    monitoringRollupLoading.value = true
-    monitoringRollupError.value = null
-    try {
-      monitoringRollup.value = await DashboardService.getMonitoringRollup(params)
-      return monitoringRollup.value
-    } catch {
-      monitoringRollupError.value = 'Gagal memuat monitoring rollup'
-      monitoringRollup.value = []
-      return []
-    } finally {
-      monitoringRollupLoading.value = false
-    }
-  }
-
-  async function fetchExecutivePortfolio(params?: DashboardFilterParams) {
-    loading.value = true
+  async function fetchBlueBookDistribution(periodIds?: string[]) {
+    loadingBlueBookDistribution.value = true
     error.value = null
+
     try {
-      executivePortfolio.value = await DashboardService.getExecutivePortfolio(params)
-      return executivePortfolio.value
-    } catch {
-      error.value = 'Gagal memuat Executive Portfolio'
-      executivePortfolio.value = null
-      return null
+      blueBookDistribution.value = await DashboardService.getBlueBookDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
+      return blueBookDistribution.value
+    } catch (err) {
+      error.value = 'Gagal mengambil distribusi Blue Book'
+      throw err
     } finally {
-      loading.value = false
+      loadingBlueBookDistribution.value = false
     }
   }
 
-  async function fetchFilterOptions() {
-    filterOptionsLoading.value = true
+  async function fetchGreenBookDistribution(periodIds?: string[]) {
+    loadingGreenBookDistribution.value = true
+    error.value = null
+
     try {
-      filterOptions.value = await DashboardService.getFilterOptions()
-      return filterOptions.value
+      greenBookDistribution.value = await DashboardService.getGreenBookDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
+      return greenBookDistribution.value
+    } catch (err) {
+      error.value = 'Gagal mengambil distribusi Green Book'
+      throw err
     } finally {
-      filterOptionsLoading.value = false
+      loadingGreenBookDistribution.value = false
     }
   }
 
-  async function fetchPipelineBottleneck(params?: PipelineBottleneckParams) {
-    pipelineLoading.value = true
-    pipelineError.value = null
+  async function fetchDaftarKegiatanDistribution(periodIds?: string[]) {
+    loadingDaftarKegiatanDistribution.value = true
+    error.value = null
+
     try {
-      const response = await DashboardService.getPipelineBottleneck(params)
-      pipelineBottleneck.value = response.data
-      pipelineBottleneckMeta.value = response.meta
-      return response.data
-    } catch {
-      pipelineError.value = 'Gagal memuat Pipeline & Bottleneck'
-      pipelineBottleneck.value = null
-      pipelineBottleneckMeta.value = null
-      return null
+      daftarKegiatanDistribution.value = await DashboardService.getDaftarKegiatanDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
+      return daftarKegiatanDistribution.value
+    } catch (err) {
+      error.value = 'Gagal mengambil distribusi Daftar Kegiatan'
+      throw err
     } finally {
-      pipelineLoading.value = false
+      loadingDaftarKegiatanDistribution.value = false
     }
   }
 
-  async function fetchGreenBookReadiness(params?: GreenBookReadinessParams) {
-    greenBookReadinessLoading.value = true
-    greenBookReadinessError.value = null
-    try {
-      greenBookReadiness.value = await DashboardService.getGreenBookReadiness(params)
-      return greenBookReadiness.value
-    } catch {
-      greenBookReadinessError.value = 'Gagal memuat Green Book Readiness'
-      greenBookReadiness.value = null
-      return null
-    } finally {
-      greenBookReadinessLoading.value = false
-    }
-  }
+  async function fetchLoanAgreementDistribution(periodIds?: string[]) {
+    loadingLoanAgreementDistribution.value = true
+    error.value = null
 
-  async function fetchLenderFinancingMix(params?: LenderFinancingMixParams) {
-    lenderFinancingMixLoading.value = true
-    lenderFinancingMixError.value = null
     try {
-      lenderFinancingMix.value = await DashboardService.getLenderFinancingMix(params)
-      return lenderFinancingMix.value
-    } catch {
-      lenderFinancingMixError.value = 'Gagal memuat Lender & Financing Mix'
-      lenderFinancingMix.value = null
-      return null
+      loanAgreementDistribution.value = await DashboardService.getLoanAgreementDistribution(
+        periodIds?.length ? { period_ids: periodIds } : undefined,
+      )
+      return loanAgreementDistribution.value
+    } catch (err) {
+      error.value = 'Gagal mengambil distribusi Loan Agreement'
+      throw err
     } finally {
-      lenderFinancingMixLoading.value = false
-    }
-  }
-
-  async function fetchKLPortfolioPerformance(params?: KLPortfolioPerformanceParams) {
-    klPortfolioPerformanceLoading.value = true
-    klPortfolioPerformanceError.value = null
-    try {
-      klPortfolioPerformance.value = await DashboardService.getKLPortfolioPerformance(params)
-      return klPortfolioPerformance.value
-    } catch {
-      klPortfolioPerformanceError.value = 'Gagal memuat K/L Portfolio Performance'
-      klPortfolioPerformance.value = null
-      return null
-    } finally {
-      klPortfolioPerformanceLoading.value = false
-    }
-  }
-
-  async function fetchLADisbursement(params?: LADisbursementParams) {
-    laDisbursementLoading.value = true
-    laDisbursementError.value = null
-    try {
-      laDisbursement.value = await DashboardService.getLADisbursement(params)
-      return laDisbursement.value
-    } catch {
-      laDisbursementError.value = 'Gagal memuat Loan Agreement & Disbursement'
-      laDisbursement.value = null
-      return null
-    } finally {
-      laDisbursementLoading.value = false
-    }
-  }
-
-  async function fetchDataQualityGovernance(params?: DataQualityGovernanceParams) {
-    dataQualityGovernanceLoading.value = true
-    dataQualityGovernanceError.value = null
-    try {
-      dataQualityGovernance.value = await DashboardService.getDataQualityGovernance(params)
-      return dataQualityGovernance.value
-    } catch {
-      dataQualityGovernanceError.value = 'Gagal memuat Data Quality & Governance'
-      dataQualityGovernance.value = null
-      return null
-    } finally {
-      dataQualityGovernanceLoading.value = false
+      loadingLoanAgreementDistribution.value = false
     }
   }
 
   function $reset() {
-    summary.value = null
-    stageFunnel.value = []
-    monitoringRollup.value = []
-    executivePortfolio.value = null
-    pipelineBottleneck.value = null
-    pipelineBottleneckMeta.value = null
-    greenBookReadiness.value = null
-    lenderFinancingMix.value = null
-    klPortfolioPerformance.value = null
-    laDisbursement.value = null
-    dataQualityGovernance.value = null
-    filterOptions.value = {}
-    loading.value = false
-    summaryLoading.value = false
-    stageFunnelLoading.value = false
-    monitoringRollupLoading.value = false
-    pipelineLoading.value = false
-    greenBookReadinessLoading.value = false
-    lenderFinancingMixLoading.value = false
-    klPortfolioPerformanceLoading.value = false
-    laDisbursementLoading.value = false
-    dataQualityGovernanceLoading.value = false
-    filterOptionsLoading.value = false
+    blueBookDistribution.value = emptyBlueBookDistribution()
+    greenBookDistribution.value = emptyGreenBookDistribution()
+    daftarKegiatanDistribution.value = emptyGreenBookDistribution()
+    loanAgreementDistribution.value = emptyGreenBookDistribution()
+    loadingBlueBookDistribution.value = false
+    loadingGreenBookDistribution.value = false
+    loadingDaftarKegiatanDistribution.value = false
+    loadingLoanAgreementDistribution.value = false
     error.value = null
-    summaryError.value = null
-    stageFunnelError.value = null
-    monitoringRollupError.value = null
-    pipelineError.value = null
-    greenBookReadinessError.value = null
-    lenderFinancingMixError.value = null
-    klPortfolioPerformanceError.value = null
-    laDisbursementError.value = null
-    dataQualityGovernanceError.value = null
   }
 
   return {
-    summary,
-    stageFunnel,
-    monitoringRollup,
-    executivePortfolio,
-    pipelineBottleneck,
-    pipelineBottleneckMeta,
-    greenBookReadiness,
-    lenderFinancingMix,
-    klPortfolioPerformance,
-    laDisbursement,
-    dataQualityGovernance,
-    filterOptions,
-    loading,
-    summaryLoading,
-    stageFunnelLoading,
-    monitoringRollupLoading,
-    pipelineLoading,
-    greenBookReadinessLoading,
-    lenderFinancingMixLoading,
-    klPortfolioPerformanceLoading,
-    laDisbursementLoading,
-    dataQualityGovernanceLoading,
-    filterOptionsLoading,
+    blueBookDistribution,
+    greenBookDistribution,
+    daftarKegiatanDistribution,
+    loanAgreementDistribution,
+    loadingBlueBookDistribution,
+    loadingGreenBookDistribution,
+    loadingDaftarKegiatanDistribution,
+    loadingLoanAgreementDistribution,
     error,
-    summaryError,
-    stageFunnelError,
-    monitoringRollupError,
-    pipelineError,
-    greenBookReadinessError,
-    lenderFinancingMixError,
-    klPortfolioPerformanceError,
-    laDisbursementError,
-    dataQualityGovernanceError,
-    fetchSummary,
-    fetchStageFunnel,
-    fetchMonitoringRollup,
-    fetchExecutivePortfolio,
-    fetchPipelineBottleneck,
-    fetchGreenBookReadiness,
-    fetchLenderFinancingMix,
-    fetchKLPortfolioPerformance,
-    fetchLADisbursement,
-    fetchDataQualityGovernance,
-    fetchFilterOptions,
+    fetchBlueBookDistribution,
+    fetchGreenBookDistribution,
+    fetchDaftarKegiatanDistribution,
+    fetchLoanAgreementDistribution,
     $reset,
   }
 })

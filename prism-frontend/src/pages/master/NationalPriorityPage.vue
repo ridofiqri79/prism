@@ -3,10 +3,11 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -119,30 +120,30 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Prioritas Nasional</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama prioritas" />
-        </span>
-      </label>
-
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Periode</span>
-        <MultiSelect
-          v-model="selectedPeriodIds"
-          :options="masterStore.periods"
-          option-label="name"
-          option-value="id"
-          placeholder="Semua period"
-          display="chip"
-          :max-selected-labels="2"
-          filter
-          class="w-full"
-        />
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Cari judul prioritas nasional"
+      :filter-count="selectedPeriodIds.length"
+      @reset="selectedPeriodIds = []; controls.resetAndLoad(loadData)"
+      @apply="controls.resetAndLoad(loadData)"
+    >
+      <template #filters>
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
+          <span class="text-sm font-medium text-surface-700">Periode</span>
+          <MultiSelect
+            v-model="selectedPeriodIds"
+            :options="masterStore.periods"
+            option-label="name"
+            option-value="id"
+            placeholder="Semua period"
+            display="chip"
+            :max-selected-labels="2"
+            filter
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <DataTable
       :data="masterStore.nationalPriorities"
@@ -169,18 +170,18 @@ onMounted(() => {
           <Button
             v-if="can('national_priority', 'update')"
             icon="pi pi-pencil"
-            label="Edit"
-            size="small"
+            rounded
             outlined
+            aria-label="Edit"
             @click="openEdit(row as NationalPriority)"
           />
           <Button
             v-if="can('national_priority', 'delete')"
             icon="pi pi-trash"
-            label="Hapus"
-            size="small"
-            severity="danger"
+            rounded
             outlined
+            severity="danger"
+            aria-label="Hapus"
             @click="deleteItem(row as NationalPriority)"
           />
         </div>

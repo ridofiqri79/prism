@@ -17,6 +17,7 @@ export type ProjectMasterSortField =
   | 'locations'
   | 'foreign_loan_usd'
   | 'dk_dates'
+  | 'gb_codes'
 export type ProjectMasterColumnKey =
   | 'loan_types'
   | 'indication_lenders'
@@ -27,6 +28,8 @@ export type ProjectMasterColumnKey =
   | 'locations'
   | 'foreign_loan_usd'
   | 'dk_dates'
+  | 'bb_book_ref'
+  | 'gb_book_ref'
 
 export interface ProjectMasterColumnConfig {
   key: ProjectMasterColumnKey
@@ -51,9 +54,13 @@ export interface ProjectMasterRow {
   locations: string[]
   foreign_loan_usd: number
   dk_dates: string[]
+  has_loi: boolean
+  has_lender_indication: boolean
   is_latest: boolean
   has_newer_revision: boolean
   blue_book_revision_label: string
+  gb_codes: string[]
+  green_book_revision_labels: string[]
 }
 
 export interface ProjectMasterFundingSummary {
@@ -71,12 +78,20 @@ export interface ProjectMasterListParams {
   limit?: number
   sort?: ProjectMasterSortField
   order?: ProjectMasterSortOrder
+  period_ids?: string[]
   loan_types?: LenderType[]
   indication_lender_ids?: string[]
   executing_agency_ids?: string[]
   fixed_lender_ids?: string[]
+  dk_lender_ids?: string[]
+  loan_agreement_lender_ids?: string[]
+  dk_executing_agency_ids?: string[]
   project_statuses?: ProjectStatus[]
   pipeline_statuses?: ProjectPipelineStatus[]
+  reached_stages?: ProjectPipelineStatus[]
+  missing_stages?: ProjectPipelineStatus[]
+  has_loi?: boolean
+  has_lender_indication?: boolean
   program_title_ids?: string[]
   region_ids?: string[]
   foreign_loan_min?: number
@@ -92,8 +107,15 @@ export interface ProjectMasterFilterState {
   indication_lender_ids: string[]
   executing_agency_ids: string[]
   fixed_lender_ids: string[]
+  dk_lender_ids: string[]
+  loan_agreement_lender_ids: string[]
+  dk_executing_agency_ids: string[]
   project_statuses: ProjectStatus[]
   pipeline_statuses: ProjectPipelineStatus[]
+  reached_stages: ProjectPipelineStatus[]
+  missing_stages: ProjectPipelineStatus[]
+  has_loi: boolean | null
+  has_lender_indication: boolean | null
   program_title_ids: string[]
   region_ids: string[]
   foreign_loan_min: number | null

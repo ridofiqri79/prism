@@ -381,7 +381,7 @@ func monitoringLoanAgreementResponse(row queries.ListMonitoringLoanAgreementRefe
 		Currency:           row.Currency,
 		AmountUSD:          floatFromNumeric(row.AmountUsd),
 		Lender:             model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
-		DKLetterNumber:     stringPtrFromText(row.DkLetterNumber),
+		DKLetterNumber:     stringPtrFromValue(row.DkLetterNumber),
 		DKProjectName:      row.DkProjectName,
 		MonitoringCount:    row.MonitoringCount,
 		LatestMonitoringAt: formatMasterTime(row.LatestMonitoringAt),

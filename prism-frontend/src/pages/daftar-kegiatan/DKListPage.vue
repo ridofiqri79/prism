@@ -49,10 +49,10 @@ const form = reactive<DaftarKegiatanPayload>({
 })
 const errors = ref<FormErrors<DKField>>({})
 const columns: ColumnDef[] = [
-  { field: 'subject', header: 'Perihal' },
-  { field: 'date', header: 'Tanggal' },
-  { field: 'letter_number', header: 'Nomor Surat' },
-  { field: 'project_count', header: 'Jumlah Proyek' },
+  { field: 'subject', header: 'Perihal Surat', sortable: true },
+  { field: 'date', header: 'Tanggal', sortable: true, nowrap: true },
+  { field: 'letter_number', header: 'Nomor Surat', sortable: true, nowrap: true },
+  { field: 'project_count', header: 'Jumlah Proyek', sortable: true, align: 'right', nowrap: true },
   { field: 'actions', header: 'Aksi' },
 ]
 
@@ -119,6 +119,8 @@ watch(
   [
     listControls.page,
     listControls.limit,
+    listControls.sort,
+    listControls.order,
     listControls.debouncedSearch,
     () => JSON.stringify(listControls.appliedFilters),
   ],
@@ -155,11 +157,11 @@ onMounted(() => {
       @remove="listControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tanggal dari</span>
           <InputText v-model="listControls.draftFilters.date_from" type="date" class="w-full" />
         </label>
-        <label class="block space-y-2 xl:col-span-3">
+        <label class="block min-w-0 space-y-2 xl:col-span-3">
           <span class="text-sm font-medium text-surface-700">Tanggal sampai</span>
           <InputText v-model="listControls.draftFilters.date_to" type="date" class="w-full" />
         </label>
@@ -173,6 +175,9 @@ onMounted(() => {
       :columns="columns"
       :loading="dkStore.loading"
       :total="dkStore.total"
+      :sort-field="listControls.sort.value"
+      :sort-order="listControls.order.value"
+      @sort="listControls.setSort"
     >
       <template #body-row="{ row, column }">
         <span v-if="column.field === 'date'">{{ formatDate(String(row.date ?? '')) }}</span>

@@ -35,19 +35,29 @@ func (s *SpatialDistributionService) Choropleth(ctx context.Context, filter mode
 		return nil, err
 	}
 
-	loanTypes, projectStatuses, pipelineStatuses, err := normalizeSpatialProjectFilters(filter)
+	periodIDs, err := parseUUIDList(filter.PeriodIDs, "period_ids")
+	if err != nil {
+		return nil, err
+	}
+
+	loanTypes, projectStatuses, pipelineStatuses, reachedStages, missingStages, hasLoI, hasLenderIndication, err := normalizeSpatialProjectFilters(filter)
 	if err != nil {
 		return nil, err
 	}
 
 	params := queries.ListSpatialRegionMetricsParams{
-		Level:            level,
-		ProvinceCode:     provinceCode,
-		IncludeHistory:   filter.IncludeHistory,
-		LoanTypes:        loanTypes,
-		ProjectStatuses:  projectStatuses,
-		PipelineStatuses: pipelineStatuses,
-		Search:           optionalText(filter.Search),
+		Level:               level,
+		ProvinceCode:        provinceCode,
+		PeriodIds:           periodIDs,
+		IncludeHistory:      filter.IncludeHistory,
+		LoanTypes:           loanTypes,
+		ProjectStatuses:     projectStatuses,
+		PipelineStatuses:    pipelineStatuses,
+		ReachedStages:       reachedStages,
+		MissingStages:       missingStages,
+		HasLoi:              hasLoI,
+		HasLenderIndication: hasLenderIndication,
+		Search:              optionalText(filter.Search),
 	}
 
 	rows, err := s.queries.ListSpatialRegionMetrics(ctx, params)
@@ -128,18 +138,23 @@ func (s *SpatialDistributionService) RegionProjects(ctx context.Context, filter 
 		regionIDFilters = append(regionIDFilters, model.UUIDToString(id))
 	}
 
-	loanTypes, projectStatuses, pipelineStatuses, err := normalizeSpatialProjectFilters(filter.SpatialDistributionFilter)
+	loanTypes, projectStatuses, pipelineStatuses, reachedStages, missingStages, _, _, err := normalizeSpatialProjectFilters(filter.SpatialDistributionFilter)
 	if err != nil {
 		return nil, err
 	}
 
 	projectList, err := s.projectService.ListProjectMaster(ctx, model.ProjectMasterFilter{
-		LoanTypes:        loanTypes,
-		ProjectStatuses:  projectStatuses,
-		PipelineStatuses: pipelineStatuses,
-		RegionIDs:        regionIDFilters,
-		Search:           filter.Search,
-		IncludeHistory:   filter.IncludeHistory,
+		PeriodIDs:           filter.PeriodIDs,
+		LoanTypes:           loanTypes,
+		ProjectStatuses:     projectStatuses,
+		PipelineStatuses:    pipelineStatuses,
+		ReachedStages:       reachedStages,
+		MissingStages:       missingStages,
+		HasLoI:              filter.HasLoI,
+		HasLenderIndication: filter.HasLenderIndication,
+		RegionIDs:           regionIDFilters,
+		Search:              filter.Search,
+		IncludeHistory:      filter.IncludeHistory,
 	}, params)
 	if err != nil {
 		return nil, err
@@ -190,21 +205,37 @@ func (s *SpatialDistributionService) normalizeLevel(ctx context.Context, rawLeve
 	return level, pgtype.Text{String: region.Code, Valid: true}, nil
 }
 
-func normalizeSpatialProjectFilters(filter model.SpatialDistributionFilter) ([]string, []string, []string, error) {
+func normalizeSpatialProjectFilters(filter model.SpatialDistributionFilter) ([]string, []string, []string, []string, []string, pgtype.Bool, pgtype.Bool, error) {
 	loanTypes, err := allowedValues(filter.LoanTypes, map[string]struct{}{"Bilateral": {}, "Multilateral": {}, "KSA": {}}, "loan_types")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
 	}
 	projectStatuses, err := allowedValues(filter.ProjectStatuses, map[string]struct{}{"Pipeline": {}, "Ongoing": {}}, "project_statuses")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
 	}
 	pipelineStatuses, err := allowedValues(filter.PipelineStatuses, map[string]struct{}{"BB": {}, "GB": {}, "DK": {}, "LA": {}, "Monitoring": {}}, "pipeline_statuses")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
+	}
+	reachedStages, err := allowedValues(filter.ReachedStages, map[string]struct{}{"BB": {}, "GB": {}, "DK": {}, "LA": {}, "Monitoring": {}}, "reached_stages")
+	if err != nil {
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
+	}
+	missingStages, err := allowedValues(filter.MissingStages, map[string]struct{}{"BB": {}, "GB": {}, "DK": {}, "LA": {}, "Monitoring": {}}, "missing_stages")
+	if err != nil {
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
+	}
+	hasLoI, err := optionalBool(filter.HasLoI, "has_loi")
+	if err != nil {
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
+	}
+	hasLenderIndication, err := optionalBool(filter.HasLenderIndication, "has_lender_indication")
+	if err != nil {
+		return nil, nil, nil, nil, nil, pgtype.Bool{}, pgtype.Bool{}, err
 	}
 
-	return loanTypes, projectStatuses, pipelineStatuses, nil
+	return loanTypes, projectStatuses, pipelineStatuses, reachedStages, missingStages, hasLoI, hasLenderIndication, nil
 }
 
 func spatialRegionMetric(row queries.ListSpatialRegionMetricsRow) model.SpatialDistributionRegionMetric {

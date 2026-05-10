@@ -12,22 +12,38 @@ SELECT
     l.name AS lender_name,
     l.type AS lender_type,
     l.short_name AS lender_short_name,
-    dk.letter_number AS dk_letter_number,
-    dp.project_name AS dk_project_name,
+    rel.dk_letter_number,
+    rel.dk_project_name,
     COUNT(md.id)::bigint AS monitoring_count,
     MAX(md.updated_at)::timestamptz AS latest_monitoring_at
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
-JOIN dk_project dp ON dp.id = la.dk_project_id
-JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN LATERAL (
+    SELECT
+        COALESCE(string_agg(DISTINCT dk.letter_number, ', ' ORDER BY dk.letter_number), '')::text AS dk_letter_number,
+        COALESCE(string_agg(DISTINCT dp.project_name, ', ' ORDER BY dp.project_name), '')::text AS dk_project_name
+    FROM loan_agreement_dk_project ladp
+    JOIN dk_project dp ON dp.id = ladp.dk_project_id
+    JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+    WHERE ladp.loan_agreement_id = la.id
+) rel ON TRUE
 LEFT JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
 WHERE (
     sqlc.narg('search')::text IS NULL
     OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
     OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
     OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM loan_agreement_dk_project ladp
+        JOIN dk_project dp ON dp.id = ladp.dk_project_id
+        JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+        WHERE ladp.loan_agreement_id = la.id
+          AND (
+              COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
 )
 AND (
     sqlc.narg('is_effective')::boolean IS NULL
@@ -43,8 +59,8 @@ GROUP BY
     l.name,
     l.type,
     l.short_name,
-    dk.letter_number,
-    dp.project_name
+    rel.dk_letter_number,
+    rel.dk_project_name
 ORDER BY la.effective_date DESC, la.loan_code ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -52,15 +68,22 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT COUNT(*)
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
-JOIN dk_project dp ON dp.id = la.dk_project_id
-JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
 WHERE (
     sqlc.narg('search')::text IS NULL
     OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
     OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
     OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-    OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM loan_agreement_dk_project ladp
+        JOIN dk_project dp ON dp.id = ladp.dk_project_id
+        JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+        WHERE ladp.loan_agreement_id = la.id
+          AND (
+              COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
 )
 AND (
     sqlc.narg('is_effective')::boolean IS NULL
@@ -78,8 +101,8 @@ SELECT
     l.name AS lender_name,
     l.type AS lender_type,
     l.short_name AS lender_short_name,
-    dk.letter_number AS dk_letter_number,
-    dp.project_name AS dk_project_name,
+    rel.dk_letter_number,
+    rel.dk_project_name,
     COALESCE(
         string_agg(md.budget_year::text || ' ' || md.quarter, ', ' ORDER BY md.budget_year, md.quarter)
             FILTER (WHERE md.id IS NOT NULL),
@@ -87,8 +110,15 @@ SELECT
     )::text AS monitoring_periods
 FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id
-JOIN dk_project dp ON dp.id = la.dk_project_id
-JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN LATERAL (
+    SELECT
+        COALESCE(string_agg(DISTINCT dk.letter_number, ', ' ORDER BY dk.letter_number), '')::text AS dk_letter_number,
+        COALESCE(string_agg(DISTINCT dp.project_name, ', ' ORDER BY dp.project_name), '')::text AS dk_project_name
+    FROM loan_agreement_dk_project ladp
+    JOIN dk_project dp ON dp.id = ladp.dk_project_id
+    JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+    WHERE ladp.loan_agreement_id = la.id
+) rel ON TRUE
 LEFT JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
 GROUP BY
     la.id,
@@ -99,8 +129,8 @@ GROUP BY
     l.name,
     l.type,
     l.short_name,
-    dk.letter_number,
-    dp.project_name
+    rel.dk_letter_number,
+    rel.dk_project_name
 ORDER BY la.effective_date DESC, la.loan_code ASC;
 
 -- name: ListMonitoringByLA :many
@@ -370,7 +400,7 @@ ORDER BY dpg.gb_project_id ASC, dk.date ASC, dp.project_name ASC, dp.id ASC;
 -- name: ListJourneyLoanAgreementsByDKProjects :many
 SELECT
     la.id,
-    la.dk_project_id,
+    ladp.dk_project_id,
     la.lender_id,
     la.loan_code,
     la.effective_date,
@@ -380,13 +410,16 @@ SELECT
     la.currency,
     la.amount_original,
     la.amount_usd,
+    ladp.allocation_original,
+    ladp.allocation_usd,
     l.name AS lender_name,
     l.type AS lender_type,
     l.short_name AS lender_short_name
-FROM loan_agreement la
+FROM loan_agreement_dk_project ladp
+JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
 JOIN lender l ON l.id = la.lender_id
-WHERE la.dk_project_id = ANY(sqlc.arg('dk_project_ids')::uuid[])
-ORDER BY la.dk_project_id ASC;
+WHERE ladp.dk_project_id = ANY(sqlc.arg('dk_project_ids')::uuid[])
+ORDER BY ladp.dk_project_id ASC, la.loan_code ASC;
 
 -- name: ListJourneyMonitoringByLAs :many
 SELECT

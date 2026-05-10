@@ -98,6 +98,14 @@ export const BlueBookService = {
     return response.data
   },
 
+  async downloadMultiImportTemplate() {
+    const response = await http.get<Blob>('/blue-books/import/template', {
+      responseType: 'blob',
+    })
+
+    return response.data
+  },
+
   async previewImportProjects(blueBookId: string, file: File) {
     const formData = new FormData()
     formData.append('file', file)
@@ -110,12 +118,36 @@ export const BlueBookService = {
     return response.data.data
   },
 
+  async previewMultiImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/blue-books/import/preview',
+      formData,
+    )
+
+    return response.data.data
+  },
+
   async executeImportProjects(blueBookId: string, file: File) {
     const formData = new FormData()
     formData.append('file', file)
 
     const response = await http.post<ApiResponse<MasterImportSummary>>(
       `/blue-books/${blueBookId}/import-projects/execute`,
+      formData,
+    )
+
+    return response.data.data
+  },
+
+  async executeMultiImport(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await http.post<ApiResponse<MasterImportSummary>>(
+      '/blue-books/import/execute',
       formData,
     )
 

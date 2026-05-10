@@ -4,9 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import LenderIndicationTable from '@/components/blue-book/LenderIndicationTable.vue'
 import ProjectCostTable from '@/components/blue-book/ProjectCostTable.vue'
+import FormActionBar from '@/components/common/FormActionBar.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
 import LocationMultiSelect from '@/components/forms/LocationMultiSelect.vue'
@@ -277,7 +278,7 @@ onMounted(() => {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Kode Blue Book</span>
-            <InputText v-model="form.values.bb_code" class="w-full" :disabled="isEditMode" />
+            <InputText v-model="form.values.bb_code" class="w-full" :class="isEditMode ? 'bg-surface-50 opacity-100' : ''" :disabled="isEditMode" />
             <small v-if="form.errors.bb_code" class="text-red-600">{{ form.errors.bb_code }}</small>
           </label>
           <label class="block space-y-2">
@@ -300,7 +301,7 @@ onMounted(() => {
             }}</small>
           </label>
         </div>
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-6">
           <div class="block space-y-2">
             <span class="text-sm font-medium text-surface-700">Tujuan</span>
             <RichTextEditor v-model="form.values.objective" placeholder="Tulis tujuan proyek" />
@@ -398,17 +399,10 @@ onMounted(() => {
         />
       </section>
 
-      <div
-        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
-      >
-        <Button
-          label="Batal"
-          severity="secondary"
-          outlined
-          @click="router.push({ name: 'blue-book-detail', params: { id: blueBookId } })"
-        />
-        <Button type="submit" label="Simpan" icon="pi pi-save" :loading="blueBookStore.loading" />
-      </div>
+      <FormActionBar
+        :loading="blueBookStore.loading"
+        @cancel="router.push({ name: 'blue-book-detail', params: { id: blueBookId } })"
+      />
     </form>
   </section>
 </template>

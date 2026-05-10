@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -14,6 +14,7 @@ import ActivitiesTable from '@/components/green-book/ActivitiesTable.vue'
 import DisbursementPlanTable from '@/components/green-book/DisbursementPlanTable.vue'
 import FundingAllocationTable from '@/components/green-book/FundingAllocationTable.vue'
 import FundingSourceTable from '@/components/green-book/FundingSourceTable.vue'
+import FormActionBar from '@/components/common/FormActionBar.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import CurrencySelect from '@/components/forms/CurrencySelect.vue'
 import InstitutionSelect from '@/components/forms/InstitutionSelect.vue'
@@ -205,7 +206,7 @@ onMounted(() => {
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Kode Green Book</span>
-                  <InputText v-model="form.values.gb_code" class="w-full" :disabled="isEditMode" />
+                  <InputText v-model="form.values.gb_code" class="w-full" :class="isEditMode ? 'bg-surface-50 opacity-100' : ''" :disabled="isEditMode" />
                   <small v-if="form.errors.gb_code" class="text-red-600">{{
                     form.errors.gb_code
                   }}</small>
@@ -241,7 +242,7 @@ onMounted(() => {
                 </label>
               </div>
 
-              <div class="grid gap-4 md:grid-cols-2">
+              <div class="grid gap-6">
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Tujuan</span>
                   <RichTextEditor
@@ -351,17 +352,10 @@ onMounted(() => {
         </TabPanels>
       </Tabs>
 
-      <div
-        class="sticky bottom-0 flex justify-end gap-2 border-t border-surface-200 bg-surface-50/95 py-4 backdrop-blur"
-      >
-        <Button
-          label="Batal"
-          severity="secondary"
-          outlined
-          @click="router.push({ name: 'green-book-detail', params: { id: greenBookId } })"
-        />
-        <Button type="submit" label="Simpan" icon="pi pi-save" :loading="greenBookStore.loading" />
-      </div>
+      <FormActionBar
+        :loading="greenBookStore.loading"
+        @cancel="router.push({ name: 'green-book-detail', params: { id: greenBookId } })"
+      />
     </form>
   </section>
 </template>

@@ -62,12 +62,20 @@ func buildDaftarKegiatanListParams(filter model.DaftarKegiatanListFilter, params
 	if dateFrom.Valid && dateTo.Valid && dateFrom.Time.After(dateTo.Time) {
 		return queries.ListDaftarKegiatanParams{}, validation("date_to", "harus setelah tanggal mulai")
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "date", "desc", map[string]struct{}{
+		"subject": {}, "date": {}, "letter_number": {}, "project_count": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListDaftarKegiatanParams{}, err
+	}
 	return queries.ListDaftarKegiatanParams{
-		Search:   nullableText(params.Search),
-		DateFrom: dateFrom,
-		DateTo:   dateTo,
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+		Search:    nullableText(params.Search),
+		DateFrom:  dateFrom,
+		DateTo:    dateTo,
+		SortField: sortField,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
 	}, nil
 }
 
@@ -221,6 +229,12 @@ func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter
 	if err != nil {
 		return queries.ListDKProjectsByDKParams{}, err
 	}
+	sortField, sortOrder, err := normalizeListSort(params.Sort, params.Order, "created_at", "desc", map[string]struct{}{
+		"project_name": {}, "executing_agency": {}, "duration": {}, "created_at": {},
+	})
+	if err != nil {
+		return queries.ListDKProjectsByDKParams{}, err
+	}
 	return queries.ListDKProjectsByDKParams{
 		DkID:               dkID,
 		Search:             nullableText(params.Search),
@@ -228,6 +242,8 @@ func buildDKProjectListParams(dkID pgtype.UUID, filter model.DKProjectListFilter
 		ExecutingAgencyIds: executingAgencyIDs,
 		LocationIds:        locationIDs,
 		LenderIds:          lenderIDs,
+		SortField:          sortField,
+		SortOrder:          sortOrder,
 		Limit:              int32(limit),
 		Offset:             int32(offset),
 	}, nil
@@ -358,20 +374,10 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 			return err
 		}
 	}
-	allowed, err := qtx.GetAllowedLenderIDsForDK(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	allowedSet := uuidSet(allowed)
 	for _, item := range req.FinancingDetails {
 		lenderID, err := parseOptionalUUID(item.LenderID, "financing_details.lender_id")
 		if err != nil {
 			return err
-		}
-		if lenderID.Valid {
-			if _, ok := allowedSet[model.UUIDToString(lenderID)]; !ok {
-				return apperrors.BusinessRule("Lender tidak terdaftar di GB atau BB terkait")
-			}
 		}
 		currency := normalizeCurrency(item.Currency)
 		if err := validateActiveCurrency(ctx, qtx, "financing_details.currency", currency); err != nil {
@@ -459,8 +465,8 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil activity detail")
 	}
-	loanAgreement, err := s.queries.GetLoanAgreementByDKProject(ctx, row.ID)
-	if err != nil && err != pgx.ErrNoRows {
+	loanAgreements, err := s.queries.ListLoanAgreementsByDKProject(ctx, row.ID)
+	if err != nil {
 		return nil, apperrors.Internal("Gagal mengambil Loan Agreement DK Project")
 	}
 	res := model.DKProjectResponse{
@@ -477,14 +483,21 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 		FinancingDetails: make([]model.DKFinancingDetailResponse, 0, len(financingDetails)),
 		LoanAllocations:  make([]model.DKLoanAllocationResponse, 0, len(loanAllocations)),
 		ActivityDetails:  make([]model.DKActivityDetailResponse, 0, len(activityDetails)),
+		LoanAgreements:   make([]model.LoanAgreementSummary, 0, len(loanAgreements)),
 		CreatedAt:        formatMasterTime(row.CreatedAt),
 		UpdatedAt:        formatMasterTime(row.UpdatedAt),
 	}
-	if err == nil {
-		res.LoanAgreement = &model.LoanAgreementSummary{
-			ID:       model.UUIDToString(loanAgreement.ID),
-			LoanCode: loanAgreement.LoanCode,
-		}
+	for _, loanAgreement := range loanAgreements {
+		res.LoanAgreements = append(res.LoanAgreements, model.LoanAgreementSummary{
+			ID:                     model.UUIDToString(loanAgreement.ID),
+			LoanCode:               loanAgreement.LoanCode,
+			Currency:               loanAgreement.Currency,
+			AmountOriginal:         floatFromNumeric(loanAgreement.AmountOriginal),
+			AmountUSD:              floatFromNumeric(loanAgreement.AmountUsd),
+			AllocationOriginal:     floatFromNumeric(loanAgreement.AllocationOriginal),
+			AllocationUSD:          floatFromNumeric(loanAgreement.AllocationUsd),
+			CumulativeDisbursement: floatFromNumeric(loanAgreement.CumulativeDisbursement),
+		})
 	}
 	for _, item := range gbProjects {
 		summary := model.GBProjectSummary{

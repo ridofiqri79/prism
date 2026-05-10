@@ -3,11 +3,12 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import DataTable, { type ColumnDef } from '@/components/common/DataTable.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
@@ -114,6 +115,11 @@ function deleteItem(lender: Lender) {
   })
 }
 
+function resetFilters() {
+  selectedTypes.value = []
+  controls.resetAndLoad(loadData)
+}
+
 onMounted(() => {
   void loadData()
 })
@@ -129,33 +135,41 @@ watch(selectedTypes, () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Lender" subtitle="Master lender dengan aturan country untuk Bilateral dan KSA">
+    <PageHeader
+      title="Lender"
+      subtitle="Master lender dengan negara wajib untuk Bilateral dan opsional untuk KSA"
+    >
       <template #actions>
-        <Button v-if="can('lender', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
+        <Button
+          v-if="can('lender', 'create')"
+          label="Tambah"
+          icon="pi pi-plus"
+          @click="openCreate"
+        />
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 rounded-lg border border-surface-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Cari Lender</span>
-        <span class="relative block">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-          <InputText v-model="controls.search.value" class="w-full pl-10" placeholder="Nama atau nama singkat" />
-        </span>
-      </label>
-
-      <label class="block space-y-2">
-        <span class="text-sm font-medium text-surface-700">Filter Tipe</span>
-        <MultiSelect
-          v-model="selectedTypes"
-          :options="typeOptions"
-          placeholder="Semua tipe"
-          display="chip"
-          :max-selected-labels="2"
-          class="w-full"
-        />
-      </label>
-    </div>
+    <SearchFilterBar
+      v-model:search="controls.search.value"
+      search-placeholder="Cari nama atau nama singkat lender"
+      :filter-count="selectedTypes.length"
+      @reset="resetFilters"
+      @apply="controls.resetAndLoad(loadData)"
+    >
+      <template #filters>
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
+          <span class="text-sm font-medium text-surface-700">Tipe</span>
+          <MultiSelect
+            v-model="selectedTypes"
+            :options="typeOptions"
+            placeholder="Semua tipe"
+            display="chip"
+            :max-selected-labels="2"
+            class="w-full"
+          />
+        </label>
+      </template>
+    </SearchFilterBar>
 
     <DataTable
       :data="masterStore.lenders"
@@ -172,23 +186,25 @@ watch(selectedTypes, () => {
     >
       <template #body-row="{ row, column }">
         <Tag v-if="column.field === 'type'" :value="row.type" severity="info" rounded />
-        <span v-else-if="column.field === 'country'">{{ (row as Lender).country?.name ?? '-' }}</span>
+        <span v-else-if="column.field === 'country'">{{
+          (row as Lender).country?.name ?? '-'
+        }}</span>
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             v-if="can('lender', 'update')"
             icon="pi pi-pencil"
-            label="Edit"
-            size="small"
+            rounded
             outlined
+            aria-label="Edit"
             @click="openEdit(row as Lender)"
           />
           <Button
             v-if="can('lender', 'delete')"
             icon="pi pi-trash"
-            label="Hapus"
-            size="small"
-            severity="danger"
+            rounded
             outlined
+            severity="danger"
+            aria-label="Hapus"
             @click="deleteItem(row as Lender)"
           />
         </div>
@@ -196,7 +212,12 @@ watch(selectedTypes, () => {
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Lender' : 'Tambah Lender'" class="w-[36rem] max-w-[95vw]">
+    <Dialog
+      v-model:visible="dialogVisible"
+      modal
+      :header="editing ? 'Edit Lender' : 'Tambah Lender'"
+      class="w-[36rem] max-w-[95vw]"
+    >
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama</span>
@@ -206,7 +227,11 @@ watch(selectedTypes, () => {
 
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama Singkat</span>
-          <InputText v-model="form.short_name" class="w-full" :invalid="Boolean(errors.short_name)" />
+          <InputText
+            v-model="form.short_name"
+            class="w-full"
+            :invalid="Boolean(errors.short_name)"
+          />
           <small v-if="errors.short_name" class="text-red-600">{{ errors.short_name }}</small>
         </label>
 

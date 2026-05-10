@@ -6,7 +6,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionPanel from 'primevue/accordionpanel'
 import Button from 'primevue/button'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import MultiSelect from 'primevue/multiselect'
 import Tag from 'primevue/tag'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -22,7 +22,11 @@ import { useToast } from '@/composables/useToast'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
-import type { DKProject, DKProjectListParams, GBProjectSummary } from '@/types/daftar-kegiatan.types'
+import type {
+  DKProject,
+  DKProjectListParams,
+  GBProjectSummary,
+} from '@/types/daftar-kegiatan.types'
 import type { Institution, Region } from '@/types/master.types'
 import { formatApiError } from '@/utils/api-error'
 import { formatDate } from './daftar-kegiatan-page-utils'
@@ -58,7 +62,8 @@ const projectControls = useListControls<DKProjectFilterState>({
   },
   formatFilterValue: (key, value) => {
     if (key === 'gb_project_ids' && Array.isArray(value)) return selectedGBProjectSummary(value)
-    if (key === 'executing_agency_ids' && Array.isArray(value)) return selectedInstitutionSummary(value)
+    if (key === 'executing_agency_ids' && Array.isArray(value))
+      return selectedInstitutionSummary(value)
     if (key === 'location_ids' && Array.isArray(value)) return selectedRegionSummary(value)
     if (key === 'lender_ids' && Array.isArray(value)) return selectedLenderSummary(value)
     return Array.isArray(value) ? selectedLabelSummary(value) : String(value)
@@ -140,7 +145,10 @@ function gbProjectRoute(project: GBProjectSummary) {
 }
 
 function toNameList(items?: { name?: string; title?: string }[]) {
-  return items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ?? []
+  return (
+    items?.map((item) => item.name ?? item.title).filter((item): item is string => Boolean(item)) ??
+    []
+  )
 }
 
 function executingAgencyNames(project: DKProject) {
@@ -149,11 +157,7 @@ function executingAgencyNames(project: DKProject) {
   return []
 }
 
-function loanAgreementRoute(project: DKProject) {
-  if (project.loan_agreement) {
-    return { name: 'loan-agreement-detail', params: { id: project.loan_agreement.id } }
-  }
-
+function loanAgreementCreateRoute(project: DKProject) {
   return {
     name: 'loan-agreement-create',
     query: {
@@ -163,10 +167,16 @@ function loanAgreementRoute(project: DKProject) {
   }
 }
 
-function canUseLoanAgreementAction(project: DKProject) {
-  return project.loan_agreement
-    ? can('loan_agreement', 'read')
-    : can('loan_agreement', 'create')
+function loanAgreementDetailRoute(loanAgreement: { id: string }) {
+  return { name: 'loan-agreement-detail', params: { id: loanAgreement.id } }
+}
+
+function canUseLoanAgreementAction() {
+  return can('loan_agreement', 'create')
+}
+
+function canViewLoanAgreementAction() {
+  return can('loan_agreement', 'read')
 }
 
 function hasFinancingLender(project: DKProject) {
@@ -174,22 +184,22 @@ function hasFinancingLender(project: DKProject) {
 }
 
 function isLoanAgreementActionDisabled(project: DKProject) {
-  return !project.loan_agreement && !hasFinancingLender(project)
+  return !hasFinancingLender(project)
 }
 
-function loanAgreementActionLabel(project: DKProject) {
-  return project.loan_agreement ? 'Buka Loan Agreement' : 'Buat Loan Agreement'
+function loanAgreements(project: DKProject) {
+  return project.loan_agreements ?? []
 }
 
-function loanAgreementActionIcon(project: DKProject) {
-  return project.loan_agreement ? 'pi pi-external-link' : 'pi pi-file-plus'
+function loanAgreementActionLabel() {
+  return 'Buat Loan Agreement'
+}
+
+function loanAgreementActionIcon() {
+  return 'pi pi-file-plus'
 }
 
 function loanAgreementActionTitle(project: DKProject) {
-  if (project.loan_agreement) {
-    return `Loan Agreement ${project.loan_agreement.loan_code}`
-  }
-
   if (!hasFinancingLender(project)) {
     return 'Tambahkan lender pada rincian pembiayaan sebelum membuat Loan Agreement'
   }
@@ -197,9 +207,14 @@ function loanAgreementActionTitle(project: DKProject) {
   return 'Buat Loan Agreement dari proyek ini'
 }
 
-function goToLoanAgreement(project: DKProject) {
+function goToLoanAgreementCreate(project: DKProject) {
   if (isLoanAgreementActionDisabled(project)) return
-  void router.push(loanAgreementRoute(project))
+  void router.push(loanAgreementCreateRoute(project))
+}
+
+function goToLoanAgreementDetail(loanAgreement: { id: string }) {
+  if (!canViewLoanAgreementAction()) return
+  void router.push(loanAgreementDetailRoute(loanAgreement))
 }
 
 function deleteDaftarKegiatan() {
@@ -225,7 +240,9 @@ function deleteDaftarKegiatan() {
 }
 
 function formatInstitution(institution: Institution) {
-  return institution.short_name ? `${institution.name} (${institution.short_name})` : institution.name
+  return institution.short_name
+    ? `${institution.name} (${institution.short_name})`
+    : institution.name
 }
 
 function formatRegion(region: Region) {
@@ -254,7 +271,10 @@ function expandLocationFilterIds(locationIDs: string[]) {
           ? masterStore.regions.find((item) => item.code === region.parent_code)
           : undefined
 
-        if (region.parent_code === selectedRegion.code || parent?.parent_code === selectedRegion.code) {
+        if (
+          region.parent_code === selectedRegion.code ||
+          parent?.parent_code === selectedRegion.code
+        ) {
           expanded.add(region.id)
         }
       })
@@ -362,19 +382,19 @@ watch(
       class="grid gap-4 rounded-lg border border-surface-200 bg-white p-5 md:grid-cols-4"
     >
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Perihal</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Perihal</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.subject }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Tanggal</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tanggal</p>
         <p class="font-semibold text-surface-950">{{ formatDate(dkStore.currentDK.date) }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Nomor Surat</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nomor Surat</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.letter_number || '-' }}</p>
       </div>
       <div>
-        <p class="text-xs uppercase tracking-wide text-surface-500">Jumlah Proyek</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Jumlah Proyek</p>
         <p class="font-semibold text-surface-950">{{ dkStore.currentDK.project_count ?? 0 }}</p>
       </div>
     </div>
@@ -389,7 +409,7 @@ watch(
       @remove="projectControls.removeFilter"
     >
       <template #filters>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Proyek Green Book</span>
           <MultiSelect
             v-model="projectControls.draftFilters.gb_project_ids"
@@ -402,7 +422,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-2">
+        <label class="block min-w-0 space-y-2 xl:col-span-2">
           <span class="text-sm font-medium text-surface-700">Executing Agency</span>
           <MultiSelect
             v-model="projectControls.draftFilters.executing_agency_ids"
@@ -415,8 +435,8 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-1">
-          <span class="text-sm font-medium text-surface-700">Location</span>
+        <label class="block min-w-0 space-y-2 xl:col-span-1">
+          <span class="text-sm font-medium text-surface-700">Lokasi</span>
           <MultiSelect
             v-model="projectControls.draftFilters.location_ids"
             :options="locationFilterOptions"
@@ -429,7 +449,7 @@ watch(
             class="w-full"
           />
         </label>
-        <label class="block space-y-2 xl:col-span-1">
+        <label class="block min-w-0 space-y-2 xl:col-span-1">
           <span class="text-sm font-medium text-surface-700">Lender</span>
           <MultiSelect
             v-model="projectControls.draftFilters.lender_ids"
@@ -457,151 +477,223 @@ watch(
           :value="String(index)"
           class="overflow-hidden rounded-lg border border-surface-200 bg-white"
         >
-        <AccordionHeader>
-          <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
-            <span class="min-w-0 flex-1">{{ project.project_name }}</span>
-            <div class="flex flex-wrap items-center justify-end gap-3">
-              <Button
-                v-if="canUseLoanAgreementAction(project)"
-                :label="loanAgreementActionLabel(project)"
-                :icon="loanAgreementActionIcon(project)"
-                :disabled="isLoanAgreementActionDisabled(project)"
-                :title="loanAgreementActionTitle(project)"
-                size="small"
-                outlined
-                @click.stop="goToLoanAgreement(project)"
-              />
-              <span class="text-sm font-normal text-surface-500">{{
-                project.duration ? `${project.duration} bulan` : '-'
-              }}</span>
-            </div>
-          </div>
-        </AccordionHeader>
-        <AccordionContent>
-          <div class="space-y-5 p-2">
-            <div class="grid gap-4 md:grid-cols-2">
-              <div class="md:col-span-2">
-                <p class="text-xs uppercase tracking-wide text-surface-500">
-                  Nama Proyek Daftar Kegiatan
-                </p>
-                <p class="font-medium text-surface-900">{{ project.project_name }}</p>
-              </div>
-              <div class="min-w-0 space-y-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-                  Executing Agency
-                </p>
-                <ValueChipList :items="executingAgencyNames(project)" />
-              </div>
-              <div class="min-w-0 space-y-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">Lokasi</p>
-                <ValueChipList :items="toNameList(project.locations)" />
-              </div>
-              <div class="min-w-0 space-y-2 md:col-span-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-                  Mitra Kerja Bappenas
-                </p>
-                <ValueChipList :items="toNameList(project.bappenas_partners)" />
-              </div>
-              <div class="md:col-span-2">
-                <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>
-                <p class="text-surface-800">{{ project.objectives || '-' }}</p>
+          <AccordionHeader>
+            <div class="flex w-full flex-wrap items-center justify-between gap-3 pr-4">
+              <span class="min-w-0 flex-1">{{ project.project_name }}</span>
+              <div class="flex flex-wrap items-center justify-end gap-3">
+                <Button
+                  v-if="canUseLoanAgreementAction()"
+                  :label="loanAgreementActionLabel()"
+                  :icon="loanAgreementActionIcon()"
+                  :disabled="isLoanAgreementActionDisabled(project)"
+                  :title="loanAgreementActionTitle(project)"
+                  size="small"
+                  outlined
+                  @click.stop="goToLoanAgreementCreate(project)"
+                />
+                <Tag
+                  v-if="loanAgreements(project).length > 0"
+                  :value="`${loanAgreements(project).length} Loan Agreement`"
+                  severity="info"
+                  rounded
+                />
+                <span class="text-sm font-normal text-surface-500">{{
+                  project.duration ? `${project.duration} bulan` : '-'
+                }}</span>
               </div>
             </div>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="space-y-5 p-2">
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="md:col-span-2">
+                  <p class="text-xs uppercase tracking-wide text-surface-500">
+                    Nama Proyek Daftar Kegiatan
+                  </p>
+                  <p class="font-medium text-surface-900">{{ project.project_name }}</p>
+                </div>
+                <div class="min-w-0 space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Executing Agency
+                  </p>
+                  <ValueChipList :items="executingAgencyNames(project)" />
+                </div>
+                <div class="min-w-0 space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Lokasi
+                  </p>
+                  <ValueChipList :items="toNameList(project.locations)" />
+                </div>
+                <div class="min-w-0 space-y-2 md:col-span-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Mitra Kerja Bappenas
+                  </p>
+                  <ValueChipList :items="toNameList(project.bappenas_partners)" />
+                </div>
+                <div class="md:col-span-2">
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Objectives</p>
+                  <p class="text-surface-800">{{ project.objectives || '-' }}</p>
+                </div>
+              </div>
 
-            <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">
-                Snapshot Proyek Green Book yang Dipakai
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <RouterLink
-                  v-for="gbProject in project.gb_projects"
-                  :key="gbProject.id"
-                  :to="gbProjectRoute(gbProject)"
-                  class="inline-flex items-center gap-2 rounded-full border border-surface-200 px-3 py-1.5 text-sm font-medium text-primary"
+              <div class="space-y-2">
+                <h3 class="font-semibold text-surface-950">Loan Agreement</h3>
+                <div
+                  v-if="loanAgreements(project).length === 0"
+                  class="rounded-lg border border-dashed border-surface-200 p-3 text-sm text-surface-500"
                 >
-                  <span>{{ gbProject.gb_code }} - {{ gbProject.project_name }}</span>
-                  <Tag
-                    v-if="gbProject.has_newer_revision"
-                    value="Ada revisi lebih baru"
-                    severity="warn"
-                    rounded
-                  />
-                  <Tag v-else-if="gbProject.is_latest" value="Terbaru" severity="success" rounded />
-                </RouterLink>
+                  Belum ada Loan Agreement untuk proyek ini.
+                </div>
+                <div v-else class="grid gap-2 md:grid-cols-2">
+                  <div
+                    v-for="loanAgreement in loanAgreements(project)"
+                    :key="loanAgreement.id"
+                    class="space-y-2 rounded-md border border-surface-200 p-3"
+                  >
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p class="font-medium text-surface-900">{{ loanAgreement.loan_code }}</p>
+                        <p class="text-xs text-surface-500">Alokasi project</p>
+                      </div>
+                      <Button
+                        icon="pi pi-external-link"
+                        size="small"
+                        text
+                        rounded
+                        :disabled="!canViewLoanAgreementAction()"
+                        @click="goToLoanAgreementDetail(loanAgreement)"
+                      />
+                    </div>
+                    <div class="grid gap-2 text-sm">
+                      <p class="font-medium text-surface-800">
+                        <CurrencyDisplay
+                          :amount="loanAgreement.allocation_original"
+                          :currency="loanAgreement.currency"
+                        />
+                      </p>
+                      <p class="text-surface-600">
+                        <CurrencyDisplay :amount="loanAgreement.allocation_usd" currency="USD" />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h3 class="font-semibold text-surface-950">
+                  Snapshot Proyek Green Book yang Dipakai
+                </h3>
+                <div class="flex flex-wrap gap-2">
+                  <RouterLink
+                    v-for="gbProject in project.gb_projects"
+                    :key="gbProject.id"
+                    :to="gbProjectRoute(gbProject)"
+                    class="inline-flex items-center gap-2 rounded-full border border-surface-200 px-3 py-1.5 text-sm font-medium text-primary"
+                  >
+                    <span>{{ gbProject.gb_code }} - {{ gbProject.project_name }}</span>
+                    <Tag
+                      v-if="gbProject.has_newer_revision"
+                      value="Ada revisi lebih baru"
+                      severity="warn"
+                      rounded
+                    />
+                    <Tag
+                      v-else-if="gbProject.is_latest"
+                      value="Terbaru"
+                      severity="success"
+                      rounded
+                    />
+                  </RouterLink>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h3 class="font-semibold text-surface-950">Rincian Pembiayaan</h3>
+                <div class="overflow-auto rounded-lg border border-surface-200">
+                  <table class="prism-table min-w-[56rem]">
+                    <thead
+                      class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500"
+                    >
+                      <tr>
+                        <th class="px-4 py-3 text-left">Lender</th>
+                        <th class="px-4 py-3 text-left">Mata Uang</th>
+                        <th class="prism-table-currency px-4 py-3">Nilai Asli</th>
+                        <th class="prism-table-currency px-4 py-3">USD</th>
+                        <th class="px-4 py-3 text-left">Catatan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in project.financing_details" :key="row.id">
+                        <td class="px-4 py-2.5 text-sm text-surface-800">
+                          {{ row.lender?.name ?? '-' }}
+                        </td>
+                        <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.currency }}</td>
+                        <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
+                          <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
+                        </td>
+                        <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
+                          <CurrencyDisplay :amount="row.amount_usd" />
+                        </td>
+                        <td class="px-4 py-2.5 text-sm text-surface-800">
+                          {{ row.remarks || '-' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h3 class="font-semibold text-surface-950">Alokasi Pinjaman</h3>
+                <div class="overflow-auto rounded-lg border border-surface-200">
+                  <table class="prism-table min-w-[56rem]">
+                    <thead
+                      class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500"
+                    >
+                      <tr>
+                        <th class="px-4 py-3 text-left">Instansi</th>
+                        <th class="px-4 py-3 text-left">Mata Uang</th>
+                        <th class="prism-table-currency px-4 py-3">Nilai Asli</th>
+                        <th class="prism-table-currency px-4 py-3">USD</th>
+                        <th class="px-4 py-3 text-left">Catatan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in project.loan_allocations" :key="row.id">
+                        <td class="px-4 py-2.5 text-sm text-surface-800">
+                          {{ row.institution?.name ?? '-' }}
+                        </td>
+                        <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.currency }}</td>
+                        <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
+                          <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
+                        </td>
+                        <td class="prism-table-currency px-4 py-2.5 text-sm text-surface-800">
+                          <CurrencyDisplay :amount="row.amount_usd" />
+                        </td>
+                        <td class="px-4 py-2.5 text-sm text-surface-800">
+                          {{ row.remarks || '-' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h3 class="font-semibold text-surface-950">Rincian Kegiatan</h3>
+                <ol class="space-y-2">
+                  <li
+                    v-for="activity in project.activity_details"
+                    :key="activity.id"
+                    class="rounded-lg border border-surface-200 p-3 text-sm"
+                  >
+                    <span class="font-semibold">{{ activity.activity_number }}.</span>
+                    {{ activity.activity_name }}
+                  </li>
+                </ol>
               </div>
             </div>
-
-            <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Rincian Pembiayaan</h3>
-              <div class="overflow-auto rounded-lg border border-surface-200">
-                <table class="w-full min-w-[56rem] text-left text-sm">
-                  <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-                    <tr>
-                      <th class="px-4 py-3">Lender</th>
-                      <th class="px-4 py-3">Mata Uang</th>
-                      <th class="px-4 py-3">Nilai Asli</th>
-                      <th class="px-4 py-3">USD</th>
-                      <th class="px-4 py-3">Catatan</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-surface-100">
-                    <tr v-for="row in project.financing_details" :key="row.id">
-                      <td class="px-4 py-3">{{ row.lender?.name ?? '-' }}</td>
-                      <td class="px-4 py-3">{{ row.currency }}</td>
-                      <td class="px-4 py-3">
-                        <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
-                      </td>
-                      <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_usd" /></td>
-                      <td class="px-4 py-3">{{ row.remarks || '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Alokasi Pinjaman</h3>
-              <div class="overflow-auto rounded-lg border border-surface-200">
-                <table class="w-full min-w-[56rem] text-left text-sm">
-                  <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-                    <tr>
-                      <th class="px-4 py-3">Instansi</th>
-                      <th class="px-4 py-3">Mata Uang</th>
-                      <th class="px-4 py-3">Nilai Asli</th>
-                      <th class="px-4 py-3">USD</th>
-                      <th class="px-4 py-3">Catatan</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-surface-100">
-                    <tr v-for="row in project.loan_allocations" :key="row.id">
-                      <td class="px-4 py-3">{{ row.institution?.name ?? '-' }}</td>
-                      <td class="px-4 py-3">{{ row.currency }}</td>
-                      <td class="px-4 py-3">
-                        <CurrencyDisplay :amount="row.amount_original" :currency="row.currency" />
-                      </td>
-                      <td class="px-4 py-3"><CurrencyDisplay :amount="row.amount_usd" /></td>
-                      <td class="px-4 py-3">{{ row.remarks || '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <h3 class="font-semibold text-surface-950">Rincian Kegiatan</h3>
-              <ol class="space-y-2">
-                <li
-                  v-for="activity in project.activity_details"
-                  :key="activity.id"
-                  class="rounded-lg border border-surface-200 p-3 text-sm"
-                >
-                  <span class="font-semibold">{{ activity.activity_number }}.</span>
-                  {{ activity.activity_name }}
-                </li>
-              </ol>
-            </div>
-          </div>
-        </AccordionContent>
+          </AccordionContent>
         </AccordionPanel>
       </Accordion>
     </TableReloadShell>

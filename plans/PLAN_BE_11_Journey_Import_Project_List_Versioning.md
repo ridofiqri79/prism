@@ -1,6 +1,6 @@
 # PLAN BE-11 - Journey, Import, Project List & Versioning Smoke
 
-> Scope: integrasi akhir backend untuk project list, journey, import, dashboard counts, dan smoke test end-to-end.
+> Scope: integrasi akhir backend untuk project list, journey, import, aggregate safety, dan smoke test end-to-end.
 > Deliverable: list default tidak menduplikasi snapshot lama, journey menampilkan concrete path + newer indicator, import mendukung code reuse lintas revisi, dan smoke flow BB->GB->DK->LA stabil.
 > Referensi: `plans/PLAN_BE_08_Blue_Book_Revision_Versioning.md`, `plans/PLAN_BE_09_Green_Book_Revision_Versioning.md`, `plans/PLAN_BE_10_DK_LA_Frozen_Snapshot.md`, `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`, `docs/PRISM_API_Contract.md`.
 
@@ -34,7 +34,7 @@ Checklist:
   - [x] `has_newer_revision`.
   - [x] `blue_book_revision_label`.
 - [x] Sorting/filter existing tetap bekerja.
-- [x] Dashboard/list count tidak double count snapshot lama kecuali historical mode aktif.
+- [x] Project list count tidak double count snapshot lama kecuali historical mode aktif.
 
 Acceptance:
 
@@ -96,24 +96,22 @@ Acceptance:
 
 ---
 
-## Step 4 - Dashboard dan Aggregate Safety
+## Step 4 - Aggregate Safety
 
 Files:
 
-- `prism-backend/sql/queries/monitoring.sql`
-- `prism-backend/internal/service/dashboard_service.go`
+- `prism-backend/sql/queries/project.sql`
 
 Checklist:
 
-- [x] `total_bb_projects` menghitung latest logical BB Project, bukan semua snapshot, kecuali contract meminta historical count.
-- [x] `total_gb_projects` menghitung latest logical GB Project.
-- [x] Monitoring/LA aggregates tetap berdasarkan concrete downstream records.
+- [x] Aggregate project list menghitung latest logical BB Project, bukan semua snapshot, kecuali historical mode aktif.
+- [x] Monitoring/LA aggregates tetap berdasarkan concrete downstream records jika dipakai modul lain.
 - [x] Tidak ada double count karena snapshot revisi lama.
-- [x] Contract dashboard diperbarui jika ada field baru untuk historical counts.
+- [x] Contract project list diperbarui jika ada field baru untuk historical counts.
 
 Acceptance:
 
-- [x] Dashboard summary tidak naik palsu hanya karena revisi dokumen.
+- [x] Aggregate tidak naik palsu hanya karena revisi dokumen.
 
 ---
 
@@ -141,5 +139,5 @@ Checklist:
 Done Criteria:
 
 - [x] Backend versioning flow lulus dari schema sampai journey.
-- [x] Tidak ada double count pada project list/dashboard default.
+- [x] Tidak ada double count pada project list default.
 - [x] Import dan smoke flow selaras dengan business rules baru.

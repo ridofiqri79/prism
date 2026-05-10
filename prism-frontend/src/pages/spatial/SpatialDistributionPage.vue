@@ -2,12 +2,15 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
-import MultiSelect from '@/components/common/MultiSelectDropdown.vue'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import CurrencyDisplay from '@/components/common/CurrencyDisplay.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar, { type ActiveFilterPill } from '@/components/common/SearchFilterBar.vue'
@@ -26,6 +29,17 @@ import type {
   SpatialDistributionParams,
   SpatialDistributionRegionMetric,
 } from '@/types/spatial-distribution.types'
+import {
+  hasQueryParam,
+  queryBoolean,
+  queryEnum,
+  queryEnumArray,
+  queryNumber,
+  queryString,
+  queryStringValues,
+} from '@/utils/route-query'
+import { getPipelineStatusLabel, getPipelineStatusSeverity } from '@/utils/status-labels'
+import { primeTablePt } from '@/utils/table-styles'
 
 type FilterOption<T extends string> = {
   label: string
@@ -34,12 +48,17 @@ type FilterOption<T extends string> = {
 
 interface SpatialFilterState {
   pipelineStatuses: ProjectPipelineStatus[]
+  reachedStages: ProjectPipelineStatus[]
+  missingStages: ProjectPipelineStatus[]
   projectStatuses: ProjectStatus[]
   loanTypes: LenderType[]
+  hasLoI: boolean | null
+  hasLenderIndication: boolean | null
   includeHistory: boolean
 }
 
 const store = useSpatialDistributionStore()
+const route = useRoute()
 const router = useRouter()
 const { choropleth, error, loadingMap, loadingProjects, projectError, projectList } = storeToRefs(store)
 
@@ -47,7 +66,9 @@ const level = ref<SpatialDistributionLevel>('province')
 const provinceCode = ref<string | undefined>()
 const provinceName = ref<string | undefined>()
 const selectedRegion = ref<SpatialDistributionRegionMetric | null>(null)
+const pendingRegionCode = ref<string | null>(null)
 const metric = ref<SpatialDistributionMetric>('count')
+const periodIds = ref<string[]>([])
 const projectPage = ref(1)
 const projectLimit = ref(10)
 const projectSortField = ref<ProjectMasterSortField>('project_name')
@@ -56,25 +77,41 @@ let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 let projectPaginationTimer: ReturnType<typeof window.setTimeout> | undefined
 let searchWatcherPaused = false
 
+const tablePt = primeTablePt
+
+const tableSortOrder = computed(() => (projectSortOrder.value === 'asc' ? 1 : -1))
+
 const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
 const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
 const loanTypeValues: LenderType[] = ['Bilateral', 'Multilateral', 'KSA']
+const spatialLevelValues: SpatialDistributionLevel[] = ['province', 'city']
+const metricValues: SpatialDistributionMetric[] = ['count', 'value']
+const projectSortFieldValues: ProjectMasterSortField[] = ['project_name', 'foreign_loan_usd']
+const projectSortOrderValues: ProjectMasterSortOrder[] = ['asc', 'desc']
 const indonesiaRegionCode = 'ID'
 
 const filters = reactive<SpatialFilterState & {
   search: string
 }>({
   pipelineStatuses: [...pipelineStatusValues],
+  reachedStages: [],
+  missingStages: [],
   projectStatuses: [...projectStatusValues],
   loanTypes: [...loanTypeValues],
+  hasLoI: null,
+  hasLenderIndication: null,
   search: '',
   includeHistory: false,
 })
 
 const appliedFilters = reactive<SpatialFilterState>({
   pipelineStatuses: [...pipelineStatusValues],
+  reachedStages: [],
+  missingStages: [],
   projectStatuses: [...projectStatusValues],
   loanTypes: [...loanTypeValues],
+  hasLoI: null,
+  hasLenderIndication: null,
   includeHistory: false,
 })
 
@@ -102,13 +139,11 @@ const loanTypeOptions: Array<FilterOption<LenderType>> = [
   { label: 'KSA', value: 'KSA' },
 ]
 
-const pipelineStatusLabels: Record<ProjectPipelineStatus, string> = {
-  BB: 'Blue Book',
-  GB: 'Green Book',
-  DK: 'Daftar Kegiatan',
-  LA: 'Loan Agreement',
-  Monitoring: 'Monitoring Disbursement',
-}
+const presenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua', value: null },
+  { label: 'Ada', value: true },
+  { label: 'Tidak ada', value: false },
+]
 
 const numberFormatter = new Intl.NumberFormat('id-ID')
 const compactUsdFormatter = new Intl.NumberFormat('en-US', {
@@ -193,6 +228,14 @@ const pipelineSelectionLabel = computed(() =>
   selectionControlLabel(filters.pipelineStatuses, pipelineOptions, 'Semua Tahap', 'tahap'),
 )
 
+const reachedStageSelectionLabel = computed(() =>
+  selectionControlLabel(filters.reachedStages, pipelineOptions, 'Semua tahap', 'tahap'),
+)
+
+const missingStageSelectionLabel = computed(() =>
+  selectionControlLabel(filters.missingStages, pipelineOptions, 'Tidak ada bottleneck', 'tahap'),
+)
+
 const projectStatusSelectionLabel = computed(() =>
   selectionControlLabel(filters.projectStatuses, projectStatusOptions, 'Semua Status', 'status'),
 )
@@ -213,6 +256,20 @@ const activeFilterPills = computed<ActiveFilterPill[]>(() => {
       value: selectionPillValue(appliedFilters.pipelineStatuses, pipelineOptions),
     })
   }
+  if (appliedFilters.reachedStages.length > 0) {
+    pills.push({
+      key: 'reachedStages',
+      label: 'Sudah mencapai',
+      value: selectionPillValue(appliedFilters.reachedStages, pipelineOptions),
+    })
+  }
+  if (appliedFilters.missingStages.length > 0) {
+    pills.push({
+      key: 'missingStages',
+      label: 'Belum mencapai',
+      value: selectionPillValue(appliedFilters.missingStages, pipelineOptions),
+    })
+  }
   if (isFilteredSelection(appliedFilters.projectStatuses, projectStatusValues)) {
     pills.push({
       key: 'projectStatuses',
@@ -230,6 +287,16 @@ const activeFilterPills = computed<ActiveFilterPill[]>(() => {
   if (appliedFilters.includeHistory) {
     pills.push({ key: 'includeHistory', label: 'Riwayat revisi', value: 'Ditampilkan' })
   }
+  if (appliedFilters.hasLoI !== null) {
+    pills.push({ key: 'hasLoI', label: 'LoI', value: presencePillValue(appliedFilters.hasLoI) })
+  }
+  if (appliedFilters.hasLenderIndication !== null) {
+    pills.push({
+      key: 'hasLenderIndication',
+      label: 'Indikasi lender',
+      value: presencePillValue(appliedFilters.hasLenderIndication),
+    })
+  }
   return pills
 })
 
@@ -239,9 +306,14 @@ function buildParams(): SpatialDistributionParams {
   return {
     level: level.value,
     province_code: level.value === 'city' ? provinceCode.value : undefined,
+    period_ids: periodIds.value.length ? [...periodIds.value] : undefined,
     pipeline_statuses: selectedFilterValues(appliedFilters.pipelineStatuses, pipelineStatusValues),
+    reached_stages: selectedExactFilterValues(appliedFilters.reachedStages),
+    missing_stages: selectedExactFilterValues(appliedFilters.missingStages),
     project_statuses: selectedFilterValues(appliedFilters.projectStatuses, projectStatusValues),
     loan_types: selectedFilterValues(appliedFilters.loanTypes, loanTypeValues),
+    has_loi: appliedFilters.hasLoI ?? undefined,
+    has_lender_indication: appliedFilters.hasLenderIndication ?? undefined,
     search: filters.search.trim() || undefined,
     include_history: appliedFilters.includeHistory || undefined,
   }
@@ -249,6 +321,27 @@ function buildParams(): SpatialDistributionParams {
 
 async function loadMap() {
   await store.fetchChoropleth(buildParams())
+
+  const pendingCode = pendingRegionCode.value
+  if (pendingCode) {
+    pendingRegionCode.value = null
+
+    const pendingRegion = choropleth.value.regions.find(
+      (region) => region.region_code === pendingCode,
+    )
+
+    if (pendingRegion) {
+      selectedRegion.value = pendingRegion
+      await loadProjects()
+      return
+    }
+
+    if (level.value === 'province' && pendingCode === indonesiaRegionCode) {
+      selectedRegion.value = null
+      await loadProjects()
+      return
+    }
+  }
 
   if (!selectedRegion.value) {
     if (level.value === 'province') {
@@ -317,8 +410,12 @@ async function resetFilters() {
 
   try {
     filters.pipelineStatuses = [...pipelineStatusValues]
+    filters.reachedStages = []
+    filters.missingStages = []
     filters.projectStatuses = [...projectStatusValues]
     filters.loanTypes = [...loanTypeValues]
+    filters.hasLoI = null
+    filters.hasLenderIndication = null
     filters.search = ''
     filters.includeHistory = false
     syncAppliedFiltersFromDraft()
@@ -385,14 +482,9 @@ async function setProjectSort(field: ProjectMasterSortField) {
   await loadProjects()
 }
 
-function sortIcon(field: ProjectMasterSortField) {
-  if (projectSortField.value !== field) return 'pi pi-sort-alt'
-  return projectSortOrder.value === 'asc' ? 'pi pi-sort-up' : 'pi pi-sort-down'
-}
-
-function sortAriaLabel(field: ProjectMasterSortField, label: string) {
-  if (projectSortField.value !== field) return `Urutkan ${label}`
-  return `Urutkan ${label} ${projectSortOrder.value === 'asc' ? 'menurun' : 'menaik'}`
+function handleSort(event: { sortField?: unknown; sortOrder?: unknown }) {
+  if (typeof event.sortField !== 'string' || event.sortOrder === 0) return
+  setProjectSort(event.sortField as ProjectMasterSortField)
 }
 
 function selectedFilterValues<T extends string>(selected: T[], allValues: T[]) {
@@ -400,8 +492,85 @@ function selectedFilterValues<T extends string>(selected: T[], allValues: T[]) {
   return [...selected]
 }
 
+function selectedExactFilterValues<T extends string>(selected: T[]) {
+  return selected.length > 0 ? [...selected] : undefined
+}
+
 function isFilteredSelection<T extends string>(selected: T[], allValues: T[]) {
   return selected.length > 0 && selected.length < allValues.length
+}
+
+function routeSelectionOrDefault<T extends string>(
+  key: string,
+  allowedValues: T[],
+  defaultValues: T[],
+) {
+  if (!hasQueryParam(route.query, key, `${key}[]`)) return [...defaultValues]
+
+  const values = queryEnumArray(route.query, allowedValues, key, `${key}[]`)
+  return values.length > 0 ? values : [...defaultValues]
+}
+
+function positiveInteger(value: number | undefined) {
+  if (value === undefined || value < 1) return undefined
+  return Math.floor(value)
+}
+
+function hydrateSpatialRouteQuery() {
+  searchWatcherPaused = true
+  clearSearchTimer()
+
+  try {
+    const routeLevel = queryEnum(route.query, spatialLevelValues, 'level') ?? 'province'
+    const routeProvinceCode = queryString(route.query, 'province_code')
+    const routePage = positiveInteger(queryNumber(route.query, 'page'))
+    const routeLimit = positiveInteger(queryNumber(route.query, 'limit'))
+
+    level.value = routeLevel === 'city' && routeProvinceCode ? 'city' : 'province'
+    provinceCode.value = level.value === 'city' ? routeProvinceCode : undefined
+    provinceName.value = undefined
+    selectedRegion.value = null
+    pendingRegionCode.value = queryString(route.query, 'region_code') ?? null
+    metric.value = queryEnum(route.query, metricValues, 'metric') ?? 'count'
+    periodIds.value = queryStringValues(route.query, 'period_ids', 'period_ids[]', 'period_id')
+    projectPage.value = routePage ?? 1
+    projectLimit.value = routeLimit ?? 10
+    projectSortField.value = queryEnum(route.query, projectSortFieldValues, 'sort') ?? 'project_name'
+    projectSortOrder.value = queryEnum(route.query, projectSortOrderValues, 'order') ?? 'asc'
+
+    filters.pipelineStatuses = routeSelectionOrDefault(
+      'pipeline_statuses',
+      pipelineStatusValues,
+      pipelineStatusValues,
+    )
+    filters.projectStatuses = routeSelectionOrDefault(
+      'project_statuses',
+      projectStatusValues,
+      projectStatusValues,
+    )
+    filters.loanTypes = routeSelectionOrDefault('loan_types', loanTypeValues, loanTypeValues)
+    filters.reachedStages = queryEnumArray(
+      route.query,
+      pipelineStatusValues,
+      'reached_stages',
+      'reached_stages[]',
+    )
+    filters.missingStages = queryEnumArray(
+      route.query,
+      pipelineStatusValues,
+      'missing_stages',
+      'missing_stages[]',
+    )
+    filters.hasLoI = queryBoolean(route.query, 'has_loi')
+    filters.hasLenderIndication = queryBoolean(route.query, 'has_lender_indication')
+    filters.search = queryString(route.query, 'search') ?? ''
+    filters.includeHistory = queryBoolean(route.query, 'include_history') === true
+    syncAppliedFiltersFromDraft()
+  } finally {
+    window.setTimeout(() => {
+      searchWatcherPaused = false
+    }, 0)
+  }
 }
 
 function selectionControlLabel<T extends string>(
@@ -428,6 +597,10 @@ function selectionPillValue<T extends string>(
 
   if (labels.length <= 2) return labels.join(', ')
   return `${labels.length} dipilih`
+}
+
+function presencePillValue(value: boolean) {
+  return value ? 'Ada' : 'Tidak ada'
 }
 
 function averagePerRegion(total: number) {
@@ -497,8 +670,12 @@ function clearProjectPaginationTimer() {
 
 function syncAppliedFiltersFromDraft() {
   appliedFilters.pipelineStatuses = [...filters.pipelineStatuses]
+  appliedFilters.reachedStages = [...filters.reachedStages]
+  appliedFilters.missingStages = [...filters.missingStages]
   appliedFilters.projectStatuses = [...filters.projectStatuses]
   appliedFilters.loanTypes = [...filters.loanTypes]
+  appliedFilters.hasLoI = filters.hasLoI
+  appliedFilters.hasLenderIndication = filters.hasLenderIndication
   appliedFilters.includeHistory = filters.includeHistory
 }
 
@@ -515,17 +692,15 @@ function ensureLoanTypeSelection() {
 }
 
 function pipelineStatusLabel(status: ProjectPipelineStatus) {
-  return pipelineStatusLabels[status]
+  return getPipelineStatusLabel(status)
 }
 
 function statusSeverity(status: ProjectPipelineStatus) {
-  if (status === 'Monitoring') return 'success'
-  if (status === 'LA' || status === 'DK') return 'info'
-  return 'warning'
+  return getPipelineStatusSeverity(status)
 }
 
-function goToProjectDetail(projectID: string) {
-  void router.push(`/projects/${projectID}`)
+function goToProjectDetail(project: { id: string; blue_book_id: string }) {
+  void router.push({ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } })
 }
 
 async function focusIndonesia() {
@@ -540,6 +715,14 @@ async function removeFilter(key: string) {
     filters.pipelineStatuses = [...pipelineStatusValues]
     appliedFilters.pipelineStatuses = [...pipelineStatusValues]
   }
+  if (key === 'reachedStages') {
+    filters.reachedStages = []
+    appliedFilters.reachedStages = []
+  }
+  if (key === 'missingStages') {
+    filters.missingStages = []
+    appliedFilters.missingStages = []
+  }
   if (key === 'projectStatuses') {
     filters.projectStatuses = [...projectStatusValues]
     appliedFilters.projectStatuses = [...projectStatusValues]
@@ -551,6 +734,14 @@ async function removeFilter(key: string) {
   if (key === 'includeHistory') {
     filters.includeHistory = false
     appliedFilters.includeHistory = false
+  }
+  if (key === 'hasLoI') {
+    filters.hasLoI = null
+    appliedFilters.hasLoI = null
+  }
+  if (key === 'hasLenderIndication') {
+    filters.hasLenderIndication = null
+    appliedFilters.hasLenderIndication = null
   }
 
   projectPage.value = 1
@@ -570,7 +761,16 @@ watch(
   },
 )
 
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateSpatialRouteQuery()
+    void loadMap()
+  },
+)
+
 onMounted(() => {
+  hydrateSpatialRouteQuery()
   void loadMap()
 })
 
@@ -625,78 +825,169 @@ onUnmounted(() => {
       @remove="removeFilter"
     >
       <template #filters>
-        <label class="flex items-center gap-3 rounded-lg border border-surface-200 px-3 py-2 xl:col-span-6">
-          <ToggleSwitch v-model="filters.includeHistory" />
-          <span class="text-sm font-medium text-surface-700">Tampilkan snapshot historis</span>
-        </label>
-
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Metrik</span>
-          <Select
-            v-model="metric"
-            :options="metricOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-          />
-        </label>
-
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Tahap</span>
-          <MultiSelect
-            v-model="filters.pipelineStatuses"
-            :options="pipelineOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari tahap"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensurePipelineSelection"
+        <div class="space-y-5 xl:col-span-6">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
-            <template #value>
-              <span class="block truncate">{{ pipelineSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">
+                Mode data
+              </p>
+              <p class="mt-0.5 text-sm font-medium text-surface-800">Snapshot historis</p>
+            </div>
+            <label
+              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 sm:self-center"
+            >
+              <span class="text-sm font-semibold text-surface-700">
+                {{ filters.includeHistory ? 'Aktif' : 'Nonaktif' }}
+              </span>
+              <ToggleSwitch v-model="filters.includeHistory" />
+            </label>
+          </div>
 
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Status Proyek</span>
-          <MultiSelect
-            v-model="filters.projectStatuses"
-            :options="projectStatusOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari status"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensureProjectStatusSelection"
-          >
-            <template #value>
-              <span class="block truncate">{{ projectStatusSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                Tampilan peta
+              </span>
+              <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Metrik</span>
+                <Select
+                  v-model="metric"
+                  :options="metricOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </label>
 
-        <label class="block min-w-0 space-y-2 xl:col-span-2">
-          <span class="text-sm font-medium text-surface-700">Tipe Pinjaman</span>
-          <MultiSelect
-            v-model="filters.loanTypes"
-            :options="loanTypeOptions"
-            option-label="label"
-            option-value="value"
-            filter
-            filter-placeholder="Cari tipe pinjaman"
-            :show-toggle-all="false"
-            class="w-full"
-            @change="ensureLoanTypeSelection"
-          >
-            <template #value>
-              <span class="block truncate">{{ loanTypeSelectionLabel }}</span>
-            </template>
-          </MultiSelect>
-        </label>
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Tahap</span>
+                <MultiSelect
+                  v-model="filters.pipelineStatuses"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua Tahap"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensurePipelineSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ pipelineSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.reachedStages"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua tahap"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ reachedStageSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Belum Mencapai Tahap</span>
+                <MultiSelect
+                  v-model="filters.missingStages"
+                  :options="pipelineOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Tidak ada bottleneck"
+                  filter
+                  filter-placeholder="Cari tahap"
+                  :show-toggle-all="false"
+                  class="w-full"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ missingStageSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Status Proyek</span>
+                <MultiSelect
+                  v-model="filters.projectStatuses"
+                  :options="projectStatusOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua Status"
+                  filter
+                  filter-placeholder="Cari status"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensureProjectStatusSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ projectStatusSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">LoI</span>
+                <Select
+                  v-model="filters.hasLoI"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua LoI"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-1">
+                <span class="text-sm font-medium text-surface-700">Indikasi</span>
+                <Select
+                  v-model="filters.hasLenderIndication"
+                  :options="presenceOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua indikasi"
+                  class="w-full"
+                />
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Tipe Pinjaman</span>
+                <MultiSelect
+                  v-model="filters.loanTypes"
+                  :options="loanTypeOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Semua Tipe Pinjaman"
+                  filter
+                  filter-placeholder="Cari tipe pinjaman"
+                  :show-toggle-all="false"
+                  class="w-full"
+                  @change="ensureLoanTypeSelection"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ loanTypeSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+            </div>
+          </div>
+        </div>
       </template>
     </SearchFilterBar>
 
@@ -862,94 +1153,124 @@ onUnmounted(() => {
       </p>
 
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[62rem] text-left text-sm">
-          <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
-            <tr>
-              <th class="px-4 py-3">Kode</th>
-              <th class="px-4 py-3">
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-2 rounded-md text-left font-semibold text-surface-500 transition hover:text-prism-teal-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-prism-gold"
-                  :aria-label="sortAriaLabel('project_name', 'nama proyek')"
-                  @click="setProjectSort('project_name')"
-                >
-                  <span>Nama Proyek</span>
-                  <i :class="[sortIcon('project_name'), 'text-[11px]']" />
-                </button>
-              </th>
-              <th class="px-4 py-3">
-                <span class="inline-flex items-center gap-1.5">
-                  <span>Tahap</span>
-                  <i
-                    v-tooltip.top="'BB: Blue Book, GB: Green Book, DK: Daftar Kegiatan, LA: Loan Agreement'"
-                    class="pi pi-info-circle text-[11px] text-surface-400"
-                  />
-                </span>
-              </th>
-              <th class="px-4 py-3">Executing Agency</th>
-              <th class="px-4 py-3">Lender</th>
-              <th class="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  class="ml-auto inline-flex items-center gap-2 rounded-md font-semibold text-surface-500 transition hover:text-prism-teal-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-prism-gold"
-                  :aria-label="sortAriaLabel('foreign_loan_usd', 'pinjaman USD')"
-                  @click="setProjectSort('foreign_loan_usd')"
-                >
-                  <span>Pinjaman USD</span>
-                  <i :class="[sortIcon('foreign_loan_usd'), 'text-[11px]']" />
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-100">
-            <tr v-if="!activeFocusRegion">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">
-                Pilih provinsi atau kabupaten/kota pada peta untuk melihat proyek.
-              </td>
-            </tr>
-            <tr v-else-if="loadingProjects">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">Memuat proyek...</td>
-            </tr>
-            <tr v-else-if="(projectList?.data.length ?? 0) === 0">
-              <td colspan="6" class="px-4 py-8 text-center text-surface-500">Tidak ada proyek untuk wilayah dan filter ini.</td>
-            </tr>
-            <tr
-              v-for="project in projectList?.data ?? []"
-              :key="project.id"
-              class="group cursor-pointer transition-colors hover:bg-teal-50/45 focus-visible:bg-teal-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-prism-gold"
-              role="link"
-              tabindex="0"
-              @click="goToProjectDetail(project.id)"
-              @keydown.enter.prevent="goToProjectDetail(project.id)"
-              @keydown.space.prevent="goToProjectDetail(project.id)"
-            >
-              <td class="px-4 py-3 font-medium text-surface-700">{{ project.bb_code }}</td>
-              <td class="px-4 py-3">
-                <span class="font-semibold text-prism-teal-dark group-hover:underline">
-                  {{ project.project_name }}
-                </span>
-                <p class="mt-1 text-xs text-surface-500">{{ project.program_title || 'Tanpa judul program' }}</p>
-              </td>
-              <td class="px-4 py-3">
-                <Tag
-                  v-tooltip.top="pipelineStatusLabel(project.pipeline_status)"
-                  :value="project.pipeline_status"
-                  :severity="statusSeverity(project.pipeline_status)"
-                  rounded
+        <DataTable
+          :value="activeFocusRegion ? (projectList?.data ?? []) : []"
+          :loading="loadingProjects"
+          lazy
+          striped-rows
+          removable-sort
+          data-key="id"
+          :sort-field="projectSortField"
+          :sort-order="tableSortOrder"
+          :table-style="{ minWidth: '62rem', width: '100%', tableLayout: 'auto' }"
+          :pt="tablePt"
+          class="prism-data-table w-full"
+          @sort="handleSort"
+          @row-click="(e) => goToProjectDetail(e.data)"
+        >
+          <template #empty>
+            <EmptyState
+              :title="activeFocusRegion ? 'Tidak ada proyek' : 'Pilih wilayah'"
+              :description="activeFocusRegion
+                ? 'Tidak ada proyek untuk wilayah dan filter ini.'
+                : 'Pilih provinsi atau kabupaten/kota pada peta untuk melihat proyek.'"
+            />
+          </template>
+
+          <Column
+            field="bb_code"
+            header="Kode BB"
+            :style="{ minWidth: '8rem', width: '8rem', whiteSpace: 'nowrap' }"
+          >
+            <template #body="{ data: project }">
+            <span class="font-medium text-surface-700">{{ project.bb_code }}</span>
+            </template>
+          </Column>
+
+          <Column
+            field="project_name"
+            header="Nama Proyek"
+            sortable
+            :style="{ minWidth: '16rem', width: '16rem' }"
+          >
+            <template #body="{ data: project }">
+              <RouterLink
+                :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
+                class="block font-semibold text-surface-950 hover:text-primary-600"
+                @click.stop
+              >
+                {{ project.project_name }}
+              </RouterLink>
+              <p v-if="project.program_title" class="mt-0.5 text-xs text-surface-500">
+                {{ project.program_title }}
+              </p>
+            </template>
+          </Column>
+
+          <Column :style="{ minWidth: '5rem', width: '5rem' }">
+            <template #header>
+              <span class="inline-flex items-center gap-1.5">
+                <span>Tahap</span>
+                <i
+                  v-tooltip.top="'BB: Blue Book, GB: Green Book, DK: Daftar Kegiatan, LA: Loan Agreement'"
+                  class="pi pi-info-circle text-[11px] text-surface-400"
                 />
-              </td>
-              <td class="px-4 py-3 text-surface-600">
+              </span>
+            </template>
+            <template #body="{ data: project }">
+              <Tag
+                v-tooltip.top="pipelineStatusLabel(project.pipeline_status)"
+                :value="project.pipeline_status"
+                :severity="statusSeverity(project.pipeline_status)"
+                rounded
+              />
+            </template>
+          </Column>
+
+          <Column
+            field="executing_agencies"
+            header="Executing Agency"
+            :style="{ minWidth: '8rem', width: '8rem' }"
+          >
+            <template #body="{ data: project }">
+              <span
+                class="block max-w-[8rem] truncate text-surface-600"
+                :title="project.executing_agencies.join(', ') || '-'"
+              >
                 {{ project.executing_agencies.join(', ') || '-' }}
-              </td>
-              <td class="px-4 py-3 text-surface-600">
+              </span>
+            </template>
+          </Column>
+
+          <Column
+            header="Lender"
+            :style="{ minWidth: '7rem', width: '7rem' }"
+          >
+            <template #body="{ data: project }">
+              <span
+                class="block max-w-[7rem] truncate text-surface-600"
+                :title="[...project.fixed_lenders, ...project.indication_lenders].filter(Boolean).join(', ') || '-'"
+              >
                 {{ [...project.fixed_lenders, ...project.indication_lenders].filter(Boolean).join(', ') || '-' }}
-              </td>
-              <td class="px-4 py-3 text-right font-medium text-surface-900">
-                <CurrencyDisplay :amount="project.foreign_loan_usd" currency="USD" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+            </template>
+          </Column>
+
+          <Column
+            field="foreign_loan_usd"
+            header="Pinjaman USD"
+            sortable
+            :style="{ minWidth: '14rem', width: '14rem' }"
+            header-class="prism-table-currency"
+            body-class="prism-table-currency"
+            :header-style="{ textAlign: 'right', justifyContent: 'flex-end' }"
+            :body-style="{ textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }"
+          >
+            <template #body="{ data: project }">
+              <CurrencyDisplay :amount="project.foreign_loan_usd" currency="USD" />
+            </template>
+          </Column>
+        </DataTable>
       </div>
 
       <div v-if="activeFocusRegion" class="border-t border-surface-200 p-3">

@@ -9,27 +9,60 @@ export interface DKProjectSummary {
   project_name?: string
 }
 
+export interface LoanAgreementDKHeader {
+  id: string
+  subject: string
+  date: string
+  letter_number?: string | null
+}
+
+export interface LoanAgreementDKProject {
+  id: string
+  dk_id: string
+  project_name: string
+  objectives?: string | null
+  gb_codes: string
+  daftar_kegiatan: LoanAgreementDKHeader
+  allocation_original: number
+  allocation_usd: number
+}
+
 export interface LoanAgreement {
   id: string
   dk_project?: DKProjectSummary | null
   dk_project_id?: string
+  dk_projects: LoanAgreementDKProject[]
   lender: Lender
   loan_code: string
   agreement_date: string
   effective_date: string
-  original_closing_date: string
+  original_closing_date: string | null
   closing_date: string
   is_extended: boolean
   extension_days: number
   currency: string
   amount_original: number
   amount_usd: number
+  cumulative_disbursement: number
+  cumulative_disbursement_usd: number | null
+  disbursement_ratio: number | null
+  estimated_time_ratio: number | null
+  performance_value: number | null
+  performance_status: string | null
+  kurs_tengah_bi: number | null
+  kurs_cut_off_date: string | null
   created_at?: string
   updated_at?: string
 }
 
-export interface LoanAgreementPayload {
+export interface LoanAgreementDKProjectAllocationPayload {
   dk_project_id: string
+  allocation_original: number
+}
+
+export interface LoanAgreementPayload {
+  dk_project_id?: string
+  dk_project_allocations: LoanAgreementDKProjectAllocationPayload[]
   lender_id: string
   loan_code: string
   agreement_date: string
@@ -39,9 +72,11 @@ export interface LoanAgreementPayload {
   currency: string
   amount_original: number
   amount_usd: number
+  cumulative_disbursement: number
 }
 
 export interface LoanAgreementListParams extends ListParams {
+  period_ids?: string[]
   search?: string
   lender_id?: string
   is_extended?: boolean

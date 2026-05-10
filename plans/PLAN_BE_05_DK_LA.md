@@ -1,7 +1,7 @@
 # PLAN BE-05 — Daftar Kegiatan & Loan Agreement
 
-> **Scope:** CRUD DK (header + project + sub-tabel multi-currency) dan LA (One-to-One dengan DK).
-> **Deliverable:** DK tersimpan dengan validasi lender. LA tersimpan dengan deteksi perpanjangan.
+> **Scope:** CRUD DK (header + project + sub-tabel multi-currency) dan LA multi DK Project dengan alokasi per project.
+> **Deliverable:** DK tersimpan dengan lender dari Master Lender. LA tersimpan dengan validasi lender dari Financing Detail semua DK Project terkait, alokasi komitmen per project, dan deteksi perpanjangan.
 > **Referensi:** docs/PRISM_API_Contract.md (DK & LA), docs/PRISM_Business_Rules.md (bagian 5 & 6)
 > **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. DK baru harus resolve pilihan GB Project ke versi latest, tetapi setelah DK/LA dibuat relasi downstream tetap frozen pada concrete snapshot yang tersimpan.
 
@@ -92,21 +92,8 @@ VALUES ($1, $2, $3) RETURNING *;
 -- name: DeleteDKActivityDetails :exec
 DELETE FROM dk_activity_detail WHERE dk_project_id = $1;
 
--- Ambil lender ID yang diperbolehkan untuk DK project tertentu:
--- (dari lender_indication BB terkait + gb_funding_source GB terkait)
--- name: GetAllowedLenderIDsForDK :many
-SELECT DISTINCT lender_id FROM (
-    SELECT li.lender_id
-    FROM dk_project_gb_project dkgb
-    JOIN gb_project_bb_project gbbb ON gbbb.gb_project_id = dkgb.gb_project_id
-    JOIN lender_indication li ON li.bb_project_id = gbbb.bb_project_id
-    WHERE dkgb.dk_project_id = $1
-    UNION
-    SELECT gfs.lender_id
-    FROM dk_project_gb_project dkgb
-    JOIN gb_funding_source gfs ON gfs.gb_project_id = dkgb.gb_project_id
-    WHERE dkgb.dk_project_id = $1
-) allowed_lenders;
+-- DK Financing Detail tidak membutuhkan query allowed lender dari GB/BB.
+-- Validitas lender dijaga oleh foreign key ke Master Lender.
 ```
 
 ---
@@ -123,10 +110,22 @@ ORDER BY la.created_at DESC LIMIT $1 OFFSET $2;
 SELECT la.*, l.name as lender_name FROM loan_agreement la
 JOIN lender l ON l.id = la.lender_id WHERE la.id = $1;
 
--- name: GetLoanAgreementByDKProject :one
-SELECT * FROM loan_agreement WHERE dk_project_id = $1;
+-- name: ListLoanAgreementsByDKProject :many
+SELECT la.*, ladp.allocation_original, ladp.allocation_usd
+FROM loan_agreement_dk_project ladp
+JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
+WHERE ladp.dk_project_id = $1
+ORDER BY la.created_at DESC, la.loan_code ASC;
+
+-- name: ListLoanAgreementDKProjectsByLoanAgreements :many
+SELECT ladp.*, dp.dk_id, dp.project_name, dk.subject, dk.date, dk.letter_number
+FROM loan_agreement_dk_project ladp
+JOIN dk_project dp ON dp.id = ladp.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+WHERE ladp.loan_agreement_id = ANY($1::uuid[]);
 
 -- name: CreateLoanAgreement :one
+-- dk_project_id dipertahankan sebagai legacy primary reference; relasi resmi ada di loan_agreement_dk_project.
 INSERT INTO loan_agreement (dk_project_id, lender_id, loan_code, agreement_date, effective_date, original_closing_date, closing_date, currency, amount_original, amount_usd)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
@@ -137,33 +136,43 @@ WHERE id=$1 RETURNING *;
 -- name: DeleteLoanAgreement :exec
 DELETE FROM loan_agreement WHERE id=$1;
 
--- name: GetAllowedLenderIDsForLA :many
--- Ambil lender dari dk_financing_detail untuk DK Project tertentu
-SELECT DISTINCT lender_id FROM dk_financing_detail WHERE dk_project_id = $1 AND lender_id IS NOT NULL;
+-- name: AddLoanAgreementDKProject :exec
+INSERT INTO loan_agreement_dk_project (loan_agreement_id, dk_project_id, allocation_original, allocation_usd)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (loan_agreement_id, dk_project_id) DO UPDATE
+SET allocation_original = EXCLUDED.allocation_original,
+    allocation_usd = EXCLUDED.allocation_usd,
+    updated_at = NOW();
+
+-- name: DeleteLoanAgreementDKProjects :exec
+DELETE FROM loan_agreement_dk_project WHERE loan_agreement_id = $1;
+
+-- name: GetAllowedLenderIDsForLAProjects :many
+-- Ambil lender yang muncul pada financing detail semua DK Project terkait.
+SELECT dfd.lender_id
+FROM dk_financing_detail dfd
+WHERE dfd.dk_project_id = ANY($1::uuid[]) AND dfd.lender_id IS NOT NULL
+GROUP BY dfd.lender_id
+HAVING COUNT(DISTINCT dfd.dk_project_id) = cardinality($1::uuid[]);
 ```
 
 Jalankan `make generate`.
 
 ---
 
-## Task 3 — Service: Validasi Lender DK
+## Task 3 — Service: Simpan Financing Detail DK
 
 ```go
 func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req model.CreateDKProjectRequest) (*model.DKProjectResponse, error) {
     // ... insert DK project, relasi GB, dan Mitra Kerja Bappenas dulu ...
     // Mitra Kerja Bappenas opsional, multi-value, dan hanya boleh Eselon II.
 
-    // Setelah GB relations tersimpan, fetch allowed lender IDs
-    allowedLenders, _ := qtx.GetAllowedLenderIDsForDK(ctx, dkProject.ID)
-    allowedSet := toUUIDSet(allowedLenders)
-
-    // Validasi setiap financing detail
+    // Insert financing details. Lender boleh dari Master Lender mana pun.
+    // Foreign key memastikan lender_id yang dikirim valid.
     for _, fd := range req.FinancingDetails {
-        if fd.LenderID != nil && !allowedSet[*fd.LenderID] {
-            return nil, errors.BusinessRule("Lender tidak terdaftar di GB atau BB terkait")
-        }
+        // insert financing detail, currency aktif, amount non-negatif
     }
-    // Insert financing details, loan allocations, activity details
+    // Insert loan allocations, activity details
 }
 ```
 
@@ -173,18 +182,16 @@ func (s *DKService) CreateDKProject(ctx context.Context, dkID pgtype.UUID, req m
 
 ```go
 func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.CreateLoanAgreementRequest) (*model.LAResponse, error) {
-    // Cek DK sudah punya LA
-    existing, _ := s.queries.GetLoanAgreementByDKProject(ctx, req.DKProjectID)
-    if existing != nil {
-        return nil, errors.Conflict("DK Project sudah memiliki Loan Agreement")
-    }
-
-    // Validasi lender dari DK financing detail
-    allowedLenders, _ := s.queries.GetAllowedLenderIDsForLA(ctx, req.DKProjectID)
+    // Validasi minimal satu DK Project, tidak duplikat, dan total allocation_original = amount_original.
+    // Field dk_project_id lama hanya fallback single-project.
+    // Validasi lender dari irisan DK financing detail semua project.
+    allowedLenders, _ := s.queries.GetAllowedLenderIDsForLAProjects(ctx, dkProjectIDs)
     if !inSet(req.LenderID, allowedLenders) {
-        return nil, errors.BusinessRule("Lender harus berasal dari Financing Detail DK Project terkait")
+        return nil, errors.BusinessRule("Lender harus berasal dari Financing Detail semua DK Project terkait")
     }
 
+    // Hitung allocation_usd per project dengan rounding adjustment agar total sama dengan amount_usd.
+    // Create LA dan replace junction rows dilakukan dalam satu transaksi.
     la, err := s.queries.CreateLoanAgreement(ctx, ...)
 
     // Trigger SSE
@@ -196,8 +203,8 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.CreateLoa
 func (s *LAService) buildResponse(la *queries.LoanAgreement) *model.LAResponse {
     return &model.LAResponse{
         // ...
-        IsExtended:    la.ClosingDate != la.OriginalClosingDate,
-        ExtensionDays: int(la.ClosingDate.Time.Sub(la.OriginalClosingDate.Time).Hours() / 24),
+        IsExtended:    la.OriginalClosingDate.Valid && la.ClosingDate != la.OriginalClosingDate,
+        ExtensionDays: func() int { if !la.OriginalClosingDate.Valid { return 0 }; return int(la.ClosingDate.Time.Sub(la.OriginalClosingDate.Time).Hours() / 24) }(),
     }
 }
 ```
@@ -234,14 +241,14 @@ la.DELETE("/:id", laHandler.DeleteLA, permission.Require("loan_agreement", "dele
 
 ## Checklist
 
-- [x] `sql/queries/dk_project.sql` — termasuk `GetAllowedLenderIDsForDK`
-- [x] `sql/queries/loan_agreement.sql` — termasuk `GetAllowedLenderIDsForLA`
+- [x] `sql/queries/dk_project.sql` — DK financing detail memakai FK lender, bukan allowed set GB/BB
+- [x] `sql/queries/loan_agreement.sql` — termasuk junction `loan_agreement_dk_project`, `GetAllowedLenderIDsForLAProjects`, dan `ListLoanAgreementsByDKProject`
 - [x] `make generate`
 - [x] `internal/model/daftar_kegiatan.go` + `internal/model/loan_agreement.go`
-- [x] `internal/service/dk_service.go` — validasi lender dari allowed set
-- [x] `internal/service/la_service.go` — cek duplicate + validasi lender + computed is_extended
+- [x] `internal/service/dk_service.go` — simpan lender DK dari Master Lender
+- [x] `internal/service/la_service.go` — validasi lender semua project + alokasi + loan_code unik + computed is_extended
 - [x] Handler DK dan LA
 - [x] Routes terdaftar
-- [x] `POST /dk-projects` dengan lender tidak dari GB/BB → 422
-- [x] `POST /loan-agreements` untuk DK yang sudah punya LA → 409
-- [x] `is_extended = true` saat `closing_date != original_closing_date`
+- [x] `POST /dk-projects` dengan lender valid dari Master Lender meski tidak dari GB/BB → 201
+- [x] `POST /loan-agreements` mendukung satu atau banyak DK Project, termasuk lintas header DK, dengan total alokasi sama dengan `amount_original`
+- [x] `is_extended = true` saat `original_closing_date` diisi dan `closing_date != original_closing_date`

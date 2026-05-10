@@ -187,10 +187,10 @@ Buat types untuk semua entitas master.
 Implementasi validasi bisnis di `internal/service/master_service.go`:
 
 ```go
-// Lender: country_id wajib untuk Bilateral dan KSA
+// Lender: country_id wajib untuk Bilateral, opsional untuk KSA
 func (s *MasterService) CreateLender(ctx context.Context, req model.CreateLenderRequest) (*model.LenderResponse, error) {
-    if req.Type != "Multilateral" && req.CountryID == nil {
-        return nil, errors.Validation(errors.FieldError{Field: "country_id", Message: "Wajib diisi untuk Bilateral dan KSA"})
+    if req.Type == "Bilateral" && req.CountryID == nil {
+        return nil, errors.Validation(errors.FieldError{Field: "country_id", Message: "Wajib diisi untuk Bilateral"})
     }
     if req.Type == "Multilateral" && req.CountryID != nil {
         return nil, errors.Validation(errors.FieldError{Field: "country_id", Message: "Harus kosong untuk Multilateral"})

@@ -14,9 +14,9 @@
 
 ## 2. Aturan Lender
 
-- `Bilateral` dan `KSA` → `country_id` wajib. `Multilateral` → `country_id` NULL.
-- Funding Source di DK hanya boleh dipilih dari lender yang ada di `lender_indication` BB terkait ATAU `gb_funding_source` GB terkait.
-- `lender_id` di LA harus berasal dari `dk_financing_detail` DK Project yang direferensikan.
+- `Bilateral` → `country_id` wajib. `KSA` → `country_id` opsional. `Multilateral` → `country_id` NULL.
+- Financing Detail di DK dipilih dari Master Lender dan boleh memakai lender lain yang tidak ada di `lender_indication` BB atau `gb_funding_source` GB terkait.
+- `lender_id` di LA harus berasal dari `dk_financing_detail` semua DK Project yang direferensikan.
 - Alur kepastian: Lender Indication (belum pasti) → LoI → Funding Source GB (pasti) → DK → LA (legal binding).
 
 ---
@@ -28,7 +28,9 @@
 - Pencatatan currency dimulai dari Green Book Funding Source. DK melakukan autofill currency dan nilai original/USD dari Funding Source GB, lalu tetap dapat diedit sebelum disimpan.
 - Jika currency adalah `USD`, user tidak perlu mengisi nilai USD terpisah. Backend menyimpan nilai USD sama dengan nilai original.
 - Seed awal Master Currency berisi mata uang negara donor/lender dan mata uang yang lazim dipakai lembaga multilateral. `XDR` disediakan nonaktif sebagai referensi Special Drawing Rights.
-- Konversi ke USD dan IDR tetap manual oleh Staff. Sistem tidak melakukan konversi otomatis.
+- Master Kurs Tengah BI disimpan per currency dan `cut_off_date`; kombinasi currency dan cut off date harus unik.
+- CRUD Kurs Tengah BI dilakukan bulk agar operator dapat mengisi banyak tanggal/currency dalam satu transaksi.
+- Konversi ke USD dan IDR tetap manual oleh Staff, kecuali perhitungan tampilan Loan Agreement yang memakai Kurs Tengah BI terbaru untuk menghitung nilai USD, Disbursement Ratio, Estimated Time Ratio, PV (DR/ETR), dan status kinerja.
 
 ---
 
@@ -43,7 +45,7 @@
 - BB Project adalah snapshot di dalam satu Blue Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi harus dihubungkan dengan logical identity.
 - `bb_code` unik hanya dalam Blue Book yang sama. Kode yang sama boleh muncul kembali pada revisi Blue Book lain untuk logical project yang sama.
-- Create Blue Book baru selalu kosong. Project dari Blue Book lain hanya boleh dibawa lewat aksi impor di detail Blue Book.
+- Create Blue Book baru lewat form selalu kosong kecuali dibuat melalui import workbook multi Blue Book. Project dari Blue Book lain hanya boleh dibawa lewat aksi impor di detail Blue Book.
 - Pada Blue Book detail untuk revisi, user dapat memakai tombol `Impor Proyek dari Blue Book Lain` untuk memilih Project Blue Book dari Blue Book sumber periode yang sama dan membawanya ke Blue Book tujuan.
 - Project Blue Book yang dibawa dari revisi sebelumnya di-clone sebagai snapshot baru dengan `project_identity_id` yang sama.
 - Mitra Kerja Bappenas bersifat opsional dan boleh lebih dari satu. Simpan Eselon II saja; Eselon I diturunkan dari `parent_id`.
@@ -60,7 +62,7 @@
 - GB Project adalah snapshot di dalam satu Green Book/revisi, bukan identitas logical tunggal.
 - Project yang sama lintas revisi Green Book harus dihubungkan dengan logical identity.
 - `gb_code` unik hanya dalam Green Book yang sama. Kode yang sama boleh muncul kembali pada revisi Green Book lain untuk logical GB Project yang sama.
-- Green Book baru selalu dimulai kosong. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
+- Green Book baru selalu dimulai kosong kecuali dibuat melalui import workbook multi Green Book. Project Green Book dari dokumen/revisi lain hanya masuk jika user membuatnya manual atau menjalankan import.
 - Pada Green Book detail, user dapat memakai tombol `Tambahkan Proyek dari Green Book Lain` untuk memilih Project Green Book dari Green Book sumber mana pun dan membawanya ke Green Book tujuan.
 - Saat user membuat GB Project baru dengan `gb_code` yang sama pada revisi Green Book berikutnya, backend menyambungkan snapshot tersebut ke logical identity sebelumnya.
 - Green Book boleh dihapus permanen hanya jika belum memiliki Project Green Book dan tidak menjadi sumber revisi Green Book lain.
@@ -89,11 +91,23 @@
 
 ## 6. Aturan Loan Agreement
 
-- One-to-One dengan DK Project — tidak boleh ada LA kedua untuk DK yang sama.
-- `closing_date >= original_closing_date` (enforced di DDL).
+- Satu Loan Agreement dapat mencakup satu atau lebih DK Project. DK Project yang dipilih boleh berasal dari header Daftar Kegiatan berbeda; header hanya konteks yang diturunkan dari project.
+- Relasi LA ke DK Project disimpan di tabel `loan_agreement_dk_project` pada level project, bukan sebagai relasi langsung ke header DK.
+- Satu DK Project tetap boleh memiliki lebih dari satu Loan Agreement selama `loan_code` unik.
+- `loan_code` tetap unik secara global.
+- Request baru memakai `dk_project_allocations[]` minimal satu baris, setiap `dk_project_id` unik, dan total `allocation_original` harus sama dengan `amount_original` LA. Field lama `dk_project_id` hanya fallback single-project untuk kompatibilitas.
+- `allocation_usd` per project dihitung dengan aturan Kurs Tengah BI yang sama seperti `amount_usd`, dengan penyesuaian rounding agar total alokasi USD sama dengan `amount_usd` LA.
+- `original_closing_date` opsional; jika diisi, `closing_date >= original_closing_date` (enforced di DDL).
 - `is_extended` dan `extension_days` adalah computed, tidak disimpan di DB.
 - Saat `closing_date` diupdate → kirim SSE `loan_agreement.extended`.
-- `currency`: kode ISO 4217. Konversi ke USD dilakukan manual oleh Staff — sistem tidak konversi otomatis.
+- `currency`: kode ISO 4217. `amount_usd` dihitung dari `amount_original / kurs_tengah_bi` terbaru untuk currency non-USD; currency `USD` memakai `amount_original` apa adanya.
+- `amount_original`, `amount_usd`, `cumulative_disbursement`, dan seluruh metrik kinerja tetap bernilai global pada level Loan Agreement; hanya nilai komitmen yang dialokasikan per DK Project.
+- `cumulative_disbursement` diinput manual mengikuti `currency` Loan Agreement yang dipilih. Tampilan `cumulative_disbursement_usd` dihitung dari `cumulative_disbursement / kurs_tengah_bi` terbaru untuk currency non-USD.
+- Tampilan kinerja Loan Agreement dihitung sebagai:
+  - `disbursement_ratio = MAX(0, MIN(100, cumulative_disbursement_usd / amount_usd * 100))`; jika `amount_usd = 0`, hasil kosong.
+  - `estimated_time_ratio = (cut_off_date_kurs - effective_date) / (closing_date - effective_date) * 100`.
+  - `performance_value = disbursement_ratio / estimated_time_ratio`.
+  - `performance_status`: jika `disbursement_ratio != 0`, maka `performance_value <= 0.3` = `At-Risk`, `< 1` = `Behind Schedule`, selain itu `On Schedule`; jika `disbursement_ratio = 0`, maka `estimated_time_ratio > 71` = `At-Risk`, selain itu `Behind Schedule`.
 
 ---
 

@@ -1,28 +1,25 @@
-import type { ZodError } from 'zod'
+import { toFormErrors } from '@/utils/form-errors'
+import { formatBookStatus, formatRevision as _formatRevision } from '@/utils/formatters'
 
-export type FormErrors<T extends string> = Partial<Record<T, string>>
+export type { FormErrors } from '@/utils/form-errors'
 
-export function toFormErrors<T extends string>(error: ZodError, fields: readonly T[]) {
-  const formErrors: FormErrors<T> = {}
+// Re-export shared utilities for backward compatibility
+export { toFormErrors }
 
-  for (const issue of error.issues) {
-    const field = String(issue.path[0] ?? '') as T
-    if (fields.includes(field) && !formErrors[field]) {
-      formErrors[field] = issue.message
-    }
-  }
-
-  return formErrors
-}
-
+/**
+ * @deprecated Gunakan `formatRevision` dari `@/utils/formatters`.
+ * Tetap di-export untuk backward compatibility.
+ */
 export function formatGBRevision(revisionNumber: number) {
-  return revisionNumber === 0 ? 'Original' : `Revisi ke-${revisionNumber}`
+  return _formatRevision(revisionNumber)
 }
 
+/**
+ * @deprecated Gunakan `formatBookStatus` dari `@/utils/formatters`.
+ * Tetap di-export untuk backward compatibility.
+ */
 export function formatGreenBookStatus(status: string) {
-  if (status === 'active') return 'Berlaku'
-  if (status === 'superseded') return 'Tidak Berlaku'
-  return status
+  return formatBookStatus(status)
 }
 
 export function joinNames(items: { name?: string; project_name?: string; bb_code?: string }[]) {

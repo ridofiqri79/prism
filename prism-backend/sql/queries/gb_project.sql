@@ -29,7 +29,28 @@ AND (
     COALESCE(cardinality(sqlc.arg('statuses')::text[]), 0) = 0
     OR gb.status = ANY(sqlc.arg('statuses')::text[])
 )
-ORDER BY gb.publish_year DESC, gb.revision_number DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'publish_year' AND sqlc.arg('sort_order')::text = 'asc' THEN gb.publish_year END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'publish_year' AND sqlc.arg('sort_order')::text = 'desc' THEN gb.publish_year END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'revision' AND sqlc.arg('sort_order')::text = 'asc' THEN gb.revision_number END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'revision' AND sqlc.arg('sort_order')::text = 'desc' THEN gb.revision_number END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'asc' THEN gb.status END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'desc' THEN gb.status END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT COUNT(*)
+        FROM gb_project gp
+        WHERE gp.green_book_id = gb.id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT COUNT(*)
+        FROM gb_project gp
+        WHERE gp.green_book_id = gb.id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN gb.created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN gb.created_at END DESC,
+    gb.publish_year DESC,
+    gb.revision_number DESC,
+    gb.id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountGreenBooks :one
@@ -66,6 +87,13 @@ SELECT
     )::BIGINT AS project_count
 FROM green_book gb
 WHERE gb.id = $1;
+
+-- name: GetGreenBookByPublishYearAndRevisionNumber :one
+SELECT *
+FROM green_book
+WHERE publish_year = sqlc.arg('publish_year')
+  AND revision_number = sqlc.arg('revision_number')
+LIMIT 1;
 
 -- name: CreateGreenBook :one
 INSERT INTO green_book (publish_year, replaces_green_book_id, revision_number, status)
@@ -213,7 +241,29 @@ WHERE green_book_id = sqlc.arg('green_book_id')
             AND gpl.region_id = ANY(sqlc.arg('location_ids')::uuid[])
       )
   )
-ORDER BY gb_code ASC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'gb_code' AND sqlc.arg('sort_order')::text = 'asc' THEN gb_code END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'gb_code' AND sqlc.arg('sort_order')::text = 'desc' THEN gb_code END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'asc' THEN project_name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'desc' THEN project_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'bb_projects' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT string_agg(bp.bb_code, ', ' ORDER BY bp.bb_code)
+        FROM gb_project_bb_project gbp
+        JOIN bb_project bp ON bp.id = gbp.bb_project_id
+        WHERE gbp.gb_project_id = gb_project.id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'bb_projects' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT string_agg(bp.bb_code, ', ' ORDER BY bp.bb_code)
+        FROM gb_project_bb_project gbp
+        JOIN bb_project bp ON bp.id = gbp.bb_project_id
+        WHERE gbp.gb_project_id = gb_project.id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'asc' THEN status END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'status' AND sqlc.arg('sort_order')::text = 'desc' THEN status END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN created_at END DESC,
+    gb_code ASC,
+    id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountGBProjectsByGreenBook :one
@@ -506,7 +556,8 @@ related_la AS (
         rd.subject,
         rd.letter_number
     FROM related_dk rd
-    JOIN loan_agreement la ON la.dk_project_id = rd.id
+    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = rd.id
+    JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
 ),
 related_monitoring AS (
     SELECT DISTINCT
@@ -689,6 +740,7 @@ SELECT
     r.name,
     r.type,
     r.parent_code,
+    r.region_group,
     r.created_at,
     r.updated_at
 FROM gb_project_location gpl

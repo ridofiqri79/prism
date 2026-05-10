@@ -26,5 +26,5 @@ const formattedAmount = computed(() => {
 </script>
 
 <template>
-  <span class="tabular-nums">{{ formattedAmount }}</span>
+  <span class="prism-currency-display">{{ formattedAmount }}</span>
 </template>

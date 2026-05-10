@@ -27,6 +27,24 @@ export const currencySchema = z.object({
   sort_order: z.number().int().min(0, 'Urutan tidak boleh negatif'),
 })
 
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Tanggal harus format YYYY-MM-DD')
+
+export const kursTengahSchema = z.object({
+  id: z.string().uuid().optional(),
+  currency_id: z.string().uuid('Currency wajib dipilih'),
+  kurs: z.number().positive('Kurs harus lebih dari 0'),
+  kurs_tengah_bi: z.number().positive('Kurs Tengah BI harus lebih dari 0'),
+  cut_off_date: isoDateSchema,
+})
+
+export const kursTengahCreateSchema = kursTengahSchema.omit({ id: true })
+export const kursTengahUpdateSchema = kursTengahSchema.extend({
+  id: z.string().uuid('ID kurs tengah tidak valid'),
+})
+
 export const lenderSchema = z
   .object({
     name: z.string().min(1, 'Nama wajib diisi'),
@@ -36,7 +54,7 @@ export const lenderSchema = z
   })
   .refine(
     (data) => {
-      if (data.type !== 'Multilateral') return Boolean(data.country_id)
+      if (data.type === 'Bilateral') return Boolean(data.country_id)
       return true
     },
     { message: 'Negara wajib diisi', path: ['country_id'] },
@@ -107,16 +125,10 @@ export const masterImportFileSchema = z.object({
     .refine((file) => file.size <= 20 * 1024 * 1024, 'Ukuran file maksimal 20 MB'),
 })
 
-export const blueBookImportFileSchema = masterImportFileSchema.extend({
-  blue_book_id: z.string().uuid('Blue Book wajib dipilih'),
-})
+export const blueBookImportFileSchema = masterImportFileSchema
 
-export const greenBookImportFileSchema = masterImportFileSchema.extend({
-  green_book_id: z.string().uuid('Green Book wajib dipilih'),
-})
+export const greenBookImportFileSchema = masterImportFileSchema
 
 export const daftarKegiatanImportFileSchema = masterImportFileSchema
 
 export const loanAgreementImportFileSchema = masterImportFileSchema
-
-export const monitoringImportFileSchema = masterImportFileSchema

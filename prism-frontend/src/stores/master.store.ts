@@ -10,6 +10,11 @@ import type {
   CurrencyPayload,
   Institution,
   InstitutionPayload,
+  KursTengah,
+  KursTengahBulkDeletePayload,
+  KursTengahBulkPayload,
+  KursTengahPayload,
+  KursTengahUpdatePayload,
   Lender,
   LenderPayload,
   ListParams,
@@ -28,6 +33,7 @@ import type {
 type MasterKey =
   | 'countries'
   | 'currencies'
+  | 'kursTengah'
   | 'lenders'
   | 'institutions'
   | 'regions'
@@ -39,6 +45,7 @@ type MasterKey =
 export const useMasterStore = defineStore('master', () => {
   const countries = ref<Country[]>([])
   const currencies = ref<Currency[]>([])
+  const kursTengah = ref<KursTengah[]>([])
   const lenders = ref<Lender[]>([])
   const institutions = ref<Institution[]>([])
   const regions = ref<Region[]>([])
@@ -64,6 +71,14 @@ export const useMasterStore = defineStore('master', () => {
     const response = await MasterService.getCurrencies(params)
     currencies.value = response.data
     loaded.value.currencies = true
+    return response
+  }
+
+  async function fetchKursTengah(force = false, params?: ListParams) {
+    if (loaded.value.kursTengah && !force) return
+    const response = await MasterService.getKursTengah(params)
+    kursTengah.value = response.data
+    loaded.value.kursTengah = true
     return response
   }
 
@@ -164,6 +179,7 @@ export const useMasterStore = defineStore('master', () => {
     const keys: MasterKey[] = [
       'countries',
       'currencies',
+      'kursTengah',
       'lenders',
       'institutions',
       'regions',
@@ -239,6 +255,26 @@ export const useMasterStore = defineStore('master', () => {
   async function deleteCurrency(id: string) {
     await MasterService.deleteCurrency(id)
     invalidate('currencies')
+  }
+
+  async function createKursTengahBulk(items: KursTengahPayload[]) {
+    const payload: KursTengahBulkPayload<KursTengahPayload> = { items }
+    const result = await MasterService.createKursTengahBulk(payload)
+    invalidate('kursTengah')
+    return result
+  }
+
+  async function updateKursTengahBulk(items: KursTengahUpdatePayload[]) {
+    const payload: KursTengahBulkPayload<KursTengahUpdatePayload> = { items }
+    const result = await MasterService.updateKursTengahBulk(payload)
+    invalidate('kursTengah')
+    return result
+  }
+
+  async function deleteKursTengahBulk(ids: string[]) {
+    const payload: KursTengahBulkDeletePayload = { ids }
+    await MasterService.deleteKursTengahBulk(payload)
+    invalidate('kursTengah')
   }
 
   async function createLender(data: LenderPayload) {
@@ -363,6 +399,7 @@ export const useMasterStore = defineStore('master', () => {
   function $reset() {
     countries.value = []
     currencies.value = []
+    kursTengah.value = []
     lenders.value = []
     institutions.value = []
     regions.value = []
@@ -379,6 +416,7 @@ export const useMasterStore = defineStore('master', () => {
   return {
     countries,
     currencies,
+    kursTengah,
     lenders,
     institutions,
     regions,
@@ -392,6 +430,7 @@ export const useMasterStore = defineStore('master', () => {
     importing,
     fetchCountries,
     fetchCurrencies,
+    fetchKursTengah,
     fetchLenders,
     fetchInstitutions,
     fetchInstitutionTree,
@@ -413,6 +452,9 @@ export const useMasterStore = defineStore('master', () => {
     createCurrency,
     updateCurrency,
     deleteCurrency,
+    createKursTengahBulk,
+    updateKursTengahBulk,
+    deleteKursTengahBulk,
     createLender,
     updateLender,
     deleteLender,

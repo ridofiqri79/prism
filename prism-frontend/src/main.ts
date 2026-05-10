@@ -9,6 +9,7 @@ import { prismPreset } from '@/assets/styles/theme'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth.store'
 import { LOGIN_REDIRECT_EVENT_NAME, UNAUTHORIZED_EVENT_NAME } from '@/utils/app-events'
+import '@fontsource-variable/inter/index.css'
 import 'primeicons/primeicons.css'
 import '@/assets/styles/main.css'
 

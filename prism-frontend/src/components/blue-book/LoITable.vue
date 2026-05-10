@@ -13,7 +13,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+  <div class="overflow-x-auto rounded-lg border border-surface-200 bg-white">
     <div class="flex items-center justify-between border-b border-surface-200 px-4 py-3">
       <h2 class="font-semibold text-surface-950">Letter of Intent</h2>
       <Button
@@ -25,24 +25,24 @@ const emit = defineEmits<{
       />
     </div>
 
-    <table class="w-full min-w-[44rem] text-left text-sm">
-      <thead class="bg-surface-50 text-xs uppercase tracking-wide text-surface-500">
+    <table class="prism-table min-w-[44rem]">
+      <thead class="bg-surface-50 text-xs font-semibold uppercase tracking-wide text-surface-500">
         <tr>
-          <th class="px-4 py-3">Lender</th>
-          <th class="px-4 py-3">Subject</th>
-          <th class="px-4 py-3">Date</th>
-          <th class="px-4 py-3">Letter Number</th>
+          <th class="px-4 py-3 text-left">Lender</th>
+          <th class="px-4 py-3 text-left">Subject</th>
+          <th class="px-4 py-3 text-left">Date</th>
+          <th class="px-4 py-3 text-left">Letter Number</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-100">
+      <tbody>
         <tr v-for="row in rows" :key="row.id">
-          <td class="px-4 py-3">{{ row.lender.name }}</td>
-          <td class="px-4 py-3">{{ row.subject }}</td>
-          <td class="px-4 py-3">{{ row.date }}</td>
-          <td class="px-4 py-3">{{ row.letter_number || '-' }}</td>
+          <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.lender.name }}</td>
+          <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.subject }}</td>
+          <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.date }}</td>
+          <td class="px-4 py-2.5 text-sm text-surface-800">{{ row.letter_number || '-' }}</td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="4" class="px-4 py-6 text-center text-surface-500">
+          <td colspan="4" class="prism-table-empty px-4 py-6">
             Belum ada LoI.
           </td>
         </tr>
@@ -50,4 +50,3 @@ const emit = defineEmits<{
     </table>
   </div>
 </template>
-

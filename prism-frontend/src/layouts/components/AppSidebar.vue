@@ -3,6 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePermission } from '@/composables/usePermission'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 
 interface NavigationItem {
   label: string
@@ -21,6 +24,20 @@ interface NavigationGroup {
 
 const SIDEBAR_COLLAPSED_KEY = 'prism-sidebar-collapsed'
 
+const props = withDefaults(
+  defineProps<{
+    /** Controls the mobile drawer open state (managed by AppLayout) */
+    isMobileOpen?: boolean
+  }>(),
+  {
+    isMobileOpen: false,
+  },
+)
+
+const emit = defineEmits<{
+  close: []
+}>()
+
 const route = useRoute()
 const auth = useAuthStore()
 const { can } = usePermission()
@@ -30,8 +47,8 @@ const searchQuery = ref('')
 const isCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
 )
+const isDesktopViewport = ref(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
 const expandedGroups = ref<Record<string, boolean>>({
-  Dashboard: true,
   'Dokumen Perencanaan': true,
   Referensi: true,
   'Akses Admin': true,
@@ -40,18 +57,41 @@ const expandedGroups = ref<Record<string, boolean>>({
 const accountLabel = computed(() => auth.user?.email || auth.user?.username || 'PRISM')
 const accountMeta = computed(() => (auth.user ? `Akun ${auth.user.role}` : 'Belum ada sesi aktif'))
 const hasSearch = computed(() => searchQuery.value.trim().length > 0)
+const isSidebarCollapsed = computed(() => isDesktopViewport.value && isCollapsed.value)
 
 watch(isCollapsed, (value) => {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(value))
 })
 
+function syncViewportMode() {
+  if (typeof window === 'undefined') return
+  isDesktopViewport.value = window.innerWidth >= 1024
+}
+
+// Close drawer on Escape key
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && props.isMobileOpen) {
+    emit('close')
+    return
+  }
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
+  event.preventDefault()
+  if (isDesktopViewport.value) {
+    isCollapsed.value = false
+  }
+  window.setTimeout(() => searchInput.value?.focus(), 0)
+}
+
 onMounted(() => {
-  window.addEventListener('keydown', handleSearchShortcut)
+  syncViewportMode()
+  window.addEventListener('resize', syncViewportMode, { passive: true })
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleSearchShortcut)
+  window.removeEventListener('resize', syncViewportMode)
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 function canAccessItem(item: NavigationItem) {
@@ -66,22 +106,10 @@ function filterNavigation(items: NavigationItem[]) {
 
 const primaryItems = computed<NavigationItem[]>(() =>
   filterNavigation([
-    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
+    { label: 'Dashboard', to: '/dashboard', icon: 'pi pi-chart-line', module: 'bb_project' },
     { label: 'Proyek', to: '/projects', icon: 'pi pi-table', module: 'bb_project' },
     { label: 'Perjalanan Proyek', to: '/journey', icon: 'pi pi-sitemap', module: 'bb_project' },
-  ]),
-)
-
-const dashboardItems = computed<NavigationItem[]>(() =>
-  filterNavigation([
-    { label: 'Beranda Dashboard', to: '/dashboard', icon: 'pi pi-chart-bar' },
-    { label: 'Executive Portfolio', to: '/dashboard/executive-portfolio', icon: 'pi pi-briefcase' },
-    { label: 'Pipeline & Bottleneck', to: '/dashboard/pipeline-bottleneck', icon: 'pi pi-sort-amount-down' },
-    { label: 'Green Book Readiness', to: '/dashboard/green-book-readiness', icon: 'pi pi-check-square' },
-    { label: 'Lender & Financing Mix', to: '/dashboard/lender-financing-mix', icon: 'pi pi-building-columns' },
-    { label: 'K/L Portfolio Performance', to: '/dashboard/kl-portfolio-performance', icon: 'pi pi-sitemap' },
-    { label: 'Loan Agreement & Disbursement', to: '/dashboard/la-disbursement', icon: 'pi pi-chart-line' },
-    { label: 'Data Quality & Governance', to: '/dashboard/data-quality-governance', icon: 'pi pi-shield' },
+    { label: 'Sebaran Wilayah', to: '/spatial-distribution', icon: 'pi pi-map', module: 'bb_project' },
   ]),
 )
 
@@ -101,12 +129,6 @@ const planningDocumentItems = computed<NavigationItem[]>(() =>
       icon: 'pi pi-file-edit',
       module: 'loan_agreement',
     },
-    {
-      label: 'Monitoring Disbursement',
-      to: '/monitoring',
-      icon: 'pi pi-chart-line',
-      module: 'monitoring_disbursement',
-    },
   ]),
 )
 
@@ -120,6 +142,12 @@ const referenceItems = computed<NavigationItem[]>(() =>
       module: 'lender',
     },
     { label: 'Mata Uang', to: '/master/currencies', icon: 'pi pi-dollar', module: 'currency' },
+    {
+      label: 'Kurs Tengah BI',
+      to: '/master/kurs-tengah',
+      icon: 'pi pi-chart-line',
+      module: 'currency',
+    },
     { label: 'Instansi', to: '/master/institutions', icon: 'pi pi-sitemap', module: 'institution' },
     { label: 'Wilayah', to: '/master/regions', icon: 'pi pi-map', module: 'region' },
     {
@@ -159,12 +187,6 @@ const adminAccessItems = computed<NavigationItem[]>(() =>
 const navigationGroups = computed<NavigationGroup[]>(() =>
   [
     {
-      section: 'Utama',
-      label: 'Dashboard',
-      icon: 'pi pi-chart-bar',
-      items: dashboardItems.value,
-    },
-    {
       section: 'Perencanaan',
       label: 'Dokumen Perencanaan',
       icon: 'pi pi-compass',
@@ -197,11 +219,11 @@ const visibleNavigationGroups = computed<NavigationGroup[]>(() => {
 })
 
 function isActive(path: string) {
-  if (path === '/dashboard') return route.path === path
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 
 function toggleSidebar() {
+  if (!isDesktopViewport.value) return
   isCollapsed.value = !isCollapsed.value
 }
 
@@ -224,63 +246,86 @@ function isGroupExpanded(group: NavigationGroup) {
 }
 
 function toggleGroup(group: NavigationGroup) {
+  if (isSidebarCollapsed.value) {
+    isCollapsed.value = false
+    expandedGroups.value = {
+      ...expandedGroups.value,
+      [group.label]: true,
+    }
+    return
+  }
+
   expandedGroups.value = {
     ...expandedGroups.value,
     [group.label]: !isGroupExpanded(group),
   }
 }
-
-function handleSearchShortcut(event: KeyboardEvent) {
-  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
-
-  event.preventDefault()
-  isCollapsed.value = false
-  window.setTimeout(() => searchInput.value?.focus(), 0)
-}
 </script>
 
 <template>
+  <!--
+    Desktop (lg+): static sidebar with collapse/expand toggle — unchanged from before.
+    Mobile/tablet (< lg): fixed overlay drawer controlled by isMobileOpen prop from AppLayout.
+  -->
   <aside
-    class="prism-sidebar hidden shrink-0 border-r transition-[width] duration-200 lg:flex lg:flex-col"
-    :class="isCollapsed ? 'w-[68px]' : 'w-[288px]'"
+    class="prism-sidebar shrink-0 border-r transition-[width,transform] duration-200"
+    :class="[
+      // Desktop layout — always visible, no transform
+      'lg:relative lg:flex lg:translate-x-0 lg:flex-col',
+      isSidebarCollapsed ? 'lg:w-[68px]' : 'lg:w-[288px]',
+      // Mobile layout — overlay drawer
+      'fixed inset-y-0 left-0 z-50 flex w-[288px] flex-col',
+      isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+    ]"
+    :aria-hidden="isDesktopViewport ? undefined : (!isMobileOpen ? 'true' : undefined)"
   >
     <div
       class="prism-sidebar-header flex items-center border-b"
-      :class="isCollapsed ? 'px-2' : 'px-4'"
+      :class="isSidebarCollapsed ? 'px-2' : 'px-4'"
     >
       <div
         class="flex w-full"
-        :class="isCollapsed ? 'justify-center' : 'items-center gap-3'"
+        :class="isSidebarCollapsed ? 'justify-center' : 'items-center gap-3'"
       >
-        <div class="flex min-w-0 items-center gap-3" :class="isCollapsed ? 'justify-center' : ''">
+        <div class="flex min-w-0 items-center gap-3" :class="isSidebarCollapsed ? 'justify-center' : ''">
           <img
             src="/prism-logo.png"
             alt=""
             class="prism-sidebar-logo shrink-0 rounded-md object-contain p-0.5"
-            :class="isCollapsed ? 'h-5 w-5' : 'h-7 w-7'"
+            :class="isSidebarCollapsed ? 'h-5 w-5' : 'h-7 w-7'"
           />
-          <div v-if="!isCollapsed" class="min-w-0">
+          <div v-if="!isSidebarCollapsed" class="min-w-0">
             <p class="prism-sidebar-title truncate text-sm font-medium">{{ accountLabel }}</p>
             <p class="prism-sidebar-muted truncate text-xs">{{ accountMeta }}</p>
           </div>
         </div>
+
+        <!-- Close button visible only in mobile drawer mode -->
+        <button
+          v-if="isMobileOpen"
+          type="button"
+          class="prism-sidebar-icon-button ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors lg:hidden"
+          aria-label="Tutup navigasi"
+          @click="emit('close')"
+        >
+          <i class="pi pi-times text-sm" />
+        </button>
       </div>
     </div>
 
-    <div v-if="!isCollapsed" class="px-4 py-3">
+    <div v-if="!isSidebarCollapsed" class="px-4 py-3">
       <label class="sr-only" for="sidebar-search">Cari menu</label>
       <div class="relative">
-        <i
-          class="prism-sidebar-search-icon pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs"
-        />
-        <input
-          id="sidebar-search"
-          ref="searchInput"
-          v-model="searchQuery"
-          type="search"
-          class="prism-sidebar-search-input h-9 w-full rounded-lg border px-9 pr-16 text-sm outline-none transition"
-          placeholder="Cari menu..."
-        />
+        <IconField iconPosition="left">
+          <InputIcon class="pi pi-search text-xs" />
+          <InputText
+            id="sidebar-search"
+            ref="searchInput"
+            v-model="searchQuery"
+            placeholder="Cari menu..."
+            class="h-9 w-full pr-16 text-sm"
+          />
+        </IconField>
         <span
           class="prism-sidebar-kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]"
         >
@@ -291,7 +336,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
 
     <nav
       class="prism-sidebar-nav flex-1 overflow-y-auto pb-4"
-      :class="isCollapsed ? 'px-2 py-3' : 'px-3'"
+      :class="isSidebarCollapsed ? 'px-2 py-3' : 'px-3'"
     >
       <div class="space-y-1">
         <RouterLink
@@ -301,13 +346,13 @@ function handleSearchShortcut(event: KeyboardEvent) {
           class="prism-sidebar-item flex min-h-8 items-center rounded-lg text-sm transition-colors"
           :class="[
             isActive(item.to) ? 'is-active' : 'font-medium',
-            isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5',
+            isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5',
           ]"
           :aria-label="item.label"
-          :title="isCollapsed ? item.label : undefined"
+          :title="isSidebarCollapsed ? item.label : undefined"
         >
           <i :class="[item.icon, 'shrink-0 text-[13px]']" />
-          <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+          <span v-if="!isSidebarCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
             {{ item.label }}
           </span>
         </RouterLink>
@@ -316,9 +361,9 @@ function handleSearchShortcut(event: KeyboardEvent) {
       <section
         v-for="group in visibleNavigationGroups"
         :key="group.label"
-        :class="[isCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
+        :class="[isSidebarCollapsed ? 'mt-3' : 'mt-5', 'prism-sidebar-group']"
       >
-        <p v-if="!isCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
+        <p v-if="!isSidebarCollapsed" class="prism-sidebar-section mb-2 px-3 text-xs font-medium">
           {{ group.section }}
         </p>
 
@@ -326,18 +371,18 @@ function handleSearchShortcut(event: KeyboardEvent) {
           <button
             type="button"
             class="prism-sidebar-item flex min-h-8 w-full items-center rounded-lg text-sm font-medium transition-colors"
-            :class="[isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5 text-left']"
+            :class="[isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-1.5 text-left']"
             :aria-expanded="isGroupExpanded(group)"
             :aria-label="group.label"
-            :title="isCollapsed ? group.label : undefined"
+            :title="isSidebarCollapsed ? group.label : undefined"
             @click="toggleGroup(group)"
           >
             <i :class="[group.icon, 'shrink-0 text-[13px]']" />
-            <span v-if="!isCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
+            <span v-if="!isSidebarCollapsed" class="min-w-0 flex-1 whitespace-normal break-words leading-5">
               {{ group.label }}
             </span>
             <i
-              v-if="!isCollapsed"
+              v-if="!isSidebarCollapsed"
               :class="[
                 isGroupExpanded(group) ? 'pi pi-angle-down' : 'pi pi-angle-right',
                 'shrink-0 text-[11px]',
@@ -346,7 +391,7 @@ function handleSearchShortcut(event: KeyboardEvent) {
           </button>
 
           <div
-            v-if="!isCollapsed && isGroupExpanded(group)"
+            v-if="!isSidebarCollapsed && isGroupExpanded(group)"
             class="prism-sidebar-child-list ml-[18px] border-l py-1 pl-2"
           >
             <RouterLink
@@ -369,16 +414,50 @@ function handleSearchShortcut(event: KeyboardEvent) {
       </section>
     </nav>
 
-    <div class="prism-sidebar-footer border-t p-3" :class="isCollapsed ? 'flex justify-center' : ''">
+    <div class="prism-sidebar-footer border-t p-3" :class="isSidebarCollapsed ? 'flex justify-center' : ''">
       <button
+        v-if="isDesktopViewport"
         type="button"
-        class="prism-sidebar-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
-        :class="isCollapsed ? '' : 'ml-auto'"
-        :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        class="prism-sidebar-icon-button flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        :class="isSidebarCollapsed ? '' : 'ml-auto'"
+        :aria-label="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-pressed="isSidebarCollapsed"
+        :title="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="toggleSidebar"
       >
-        <i class="pi pi-bars text-sm" />
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 40 40"
+          fill="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <rect
+            x="3"
+            y="5"
+            width="34"
+            height="30"
+            rx="7"
+            stroke="currentColor"
+            stroke-width="2.2"
+          />
+          <path
+            v-if="isSidebarCollapsed"
+            d="M27 6.5V33.5M16 14.5L21.5 20L16 25.5"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            v-else
+            d="M13 6.5V33.5M24 14.5L18.5 20L24 25.5"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
       </button>
     </div>
   </aside>

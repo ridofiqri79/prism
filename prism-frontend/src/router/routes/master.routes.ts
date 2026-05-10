@@ -32,6 +32,16 @@ export const masterRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: 'master/kurs-tengah',
+    name: 'master-kurs-tengah',
+    component: () => import('@/pages/master/KursTengahPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Master Kurs Tengah BI',
+      permission: { module: 'currency', action: 'read' },
+    },
+  },
+  {
     path: 'master/institutions',
     name: 'master-institutions',
     component: () => import('@/pages/master/InstitutionPage.vue'),

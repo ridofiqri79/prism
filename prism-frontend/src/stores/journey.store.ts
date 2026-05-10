@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { DashboardService } from '@/services/dashboard.service'
+import { JourneyService } from '@/services/journey.service'
 import { ProjectService } from '@/services/project.service'
-import type { JourneyResponse } from '@/types/dashboard.types'
+import type { JourneyResponse } from '@/types/journey.types'
 import type { ProjectMasterRow } from '@/types/project.types'
 
 export const useJourneyStore = defineStore('journey', () => {
@@ -24,7 +24,7 @@ export const useJourneyStore = defineStore('journey', () => {
     error.value = null
     journey.value = null
     try {
-      journey.value = await DashboardService.getJourney(normalized)
+      journey.value = await JourneyService.getJourney(normalized)
       return journey.value
     } catch {
       journey.value = null

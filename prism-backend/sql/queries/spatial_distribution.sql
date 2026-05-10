@@ -4,9 +4,41 @@
 WITH project_rows AS (
     SELECT
         bp.id,
+        bb.period_id,
         bp.bb_code,
         bp.project_name,
         CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(la_alloc.allocation_usd)
+                FROM (
+                    SELECT DISTINCT ladp.loan_agreement_id, ladp.dk_project_id, ladp.allocation_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) la_alloc
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(dk_financing.amount_usd)
+                FROM (
+                    SELECT DISTINCT dfd.id, dfd.amount_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) dk_financing
+            ), 0)
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
@@ -30,7 +62,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Monitoring'
@@ -38,7 +71,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'LA'
             WHEN EXISTS (
@@ -59,7 +93,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Ongoing'
             ELSE 'Pipeline'
@@ -81,7 +116,8 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
             ) loan_types
@@ -89,6 +125,7 @@ WITH project_rows AS (
             ORDER BY type_label
         )::text[] AS loan_types
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -105,10 +142,42 @@ WITH project_rows AS (
 ),
 filtered_projects AS (
     SELECT *
-    FROM project_rows
-    WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+    FROM project_rows pr
+    WHERE (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('reached_stages')::text[]), 0) = 0
+          OR 'BB' = ANY(sqlc.arg('reached_stages')::text[])
+          OR ('GB' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('GB', 'DK', 'LA', 'Monitoring'))
+          OR ('DK' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('DK', 'LA', 'Monitoring'))
+          OR ('LA' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('LA', 'Monitoring'))
+          OR ('Monitoring' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status = 'Monitoring')
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('missing_stages')::text[]), 0) = 0
+          OR ('GB' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status = 'BB')
+          OR ('DK' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB'))
+          OR ('LA' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK'))
+          OR ('Monitoring' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK', 'LA'))
+      )
+      AND (
+          sqlc.narg('has_loi')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM loi loi_filter
+              WHERE loi_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_loi')::boolean
+      )
+      AND (
+          sqlc.narg('has_lender_indication')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM lender_indication li_filter
+              WHERE li_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_lender_indication')::boolean
+      )
       AND (
           sqlc.narg('search')::text IS NULL
           OR LOWER(project_name) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'
@@ -172,9 +241,41 @@ ORDER BY dr.name ASC;
 WITH project_rows AS (
     SELECT
         bp.id,
+        bb.period_id,
         bp.bb_code,
         bp.project_name,
         CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(la_alloc.allocation_usd)
+                FROM (
+                    SELECT DISTINCT ladp.loan_agreement_id, ladp.dk_project_id, ladp.allocation_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) la_alloc
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(dk_financing.amount_usd)
+                FROM (
+                    SELECT DISTINCT dfd.id, dfd.amount_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) dk_financing
+            ), 0)
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
@@ -198,7 +299,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Monitoring'
@@ -206,7 +308,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'LA'
             WHEN EXISTS (
@@ -227,7 +330,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Ongoing'
             ELSE 'Pipeline'
@@ -249,7 +353,8 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
             ) loan_types
@@ -257,6 +362,7 @@ WITH project_rows AS (
             ORDER BY type_label
         )::text[] AS loan_types
     FROM bb_project bp
+    JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (
           sqlc.arg('include_history')::boolean
@@ -273,10 +379,42 @@ WITH project_rows AS (
 ),
 filtered_projects AS (
     SELECT *
-    FROM project_rows
-    WHERE (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
+    FROM project_rows pr
+    WHERE (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (COALESCE(cardinality(sqlc.arg('loan_types')::text[]), 0) = 0 OR loan_types && sqlc.arg('loan_types')::text[])
       AND (COALESCE(cardinality(sqlc.arg('project_statuses')::text[]), 0) = 0 OR project_status = ANY(sqlc.arg('project_statuses')::text[]))
       AND (COALESCE(cardinality(sqlc.arg('pipeline_statuses')::text[]), 0) = 0 OR pipeline_status = ANY(sqlc.arg('pipeline_statuses')::text[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('reached_stages')::text[]), 0) = 0
+          OR 'BB' = ANY(sqlc.arg('reached_stages')::text[])
+          OR ('GB' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('GB', 'DK', 'LA', 'Monitoring'))
+          OR ('DK' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('DK', 'LA', 'Monitoring'))
+          OR ('LA' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status IN ('LA', 'Monitoring'))
+          OR ('Monitoring' = ANY(sqlc.arg('reached_stages')::text[]) AND pipeline_status = 'Monitoring')
+      )
+      AND (
+          COALESCE(cardinality(sqlc.arg('missing_stages')::text[]), 0) = 0
+          OR ('GB' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status = 'BB')
+          OR ('DK' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB'))
+          OR ('LA' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK'))
+          OR ('Monitoring' = ANY(sqlc.arg('missing_stages')::text[]) AND pipeline_status IN ('BB', 'GB', 'DK', 'LA'))
+      )
+      AND (
+          sqlc.narg('has_loi')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM loi loi_filter
+              WHERE loi_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_loi')::boolean
+      )
+      AND (
+          sqlc.narg('has_lender_indication')::boolean IS NULL
+          OR EXISTS (
+              SELECT 1
+              FROM lender_indication li_filter
+              WHERE li_filter.bb_project_id = pr.id
+          ) = sqlc.narg('has_lender_indication')::boolean
+      )
       AND (
           sqlc.narg('search')::text IS NULL
           OR LOWER(project_name) LIKE '%' || LOWER(sqlc.narg('search')::text) || '%'

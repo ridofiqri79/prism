@@ -1,5 +1,5 @@
 import { reactive, ref } from 'vue'
-import type { ZodError } from 'zod'
+import { assignFormErrors } from '@/utils/form-errors'
 import { bbProjectSchema } from '@/schemas/blue-book.schema'
 import type {
   BBProject,
@@ -81,18 +81,7 @@ function fromProject(project?: BBProject | null): Partial<BBProjectFormValues> {
   }
 }
 
-function assignErrors(target: BBProjectFormErrors, error: ZodError) {
-  Object.keys(target).forEach((key) => {
-    delete target[key as keyof BBProjectFormValues]
-  })
 
-  for (const issue of error.issues) {
-    const field = String(issue.path[0]) as keyof BBProjectFormValues
-    if (!target[field]) {
-      target[field] = issue.message
-    }
-  }
-}
 
 function richTextPayload(value: string) {
   const sanitized = sanitizeRichText(value)
@@ -162,7 +151,7 @@ export function useBBProjectForm(initialData?: Partial<BBProjectFormValues> | BB
     return async () => {
       const parsed = bbProjectSchema.safeParse(values)
       if (!parsed.success) {
-        assignErrors(errors, parsed.error)
+        assignFormErrors(errors, parsed.error)
         return
       }
 

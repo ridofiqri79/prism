@@ -57,6 +57,7 @@ export function useListControls<TFilters extends object>(
   const draftFilters = reactive(cloneFilters(initialFilters)) as TFilters
   const appliedFilters = reactive(cloneFilters(initialFilters)) as TFilters
   let searchTimer: ReturnType<typeof window.setTimeout> | undefined
+  let suppressNextSearchWatch = false
 
   const activeFilterPills = computed<ActiveFilterPill[]>(() =>
     Object.entries(appliedFilters)
@@ -100,6 +101,19 @@ export function useListControls<TFilters extends object>(
     resetPage()
   }
 
+  function setSearchSilently(value: string) {
+    if (searchTimer) {
+      window.clearTimeout(searchTimer)
+      searchTimer = undefined
+    }
+
+    if (search.value !== value) {
+      suppressNextSearchWatch = true
+      search.value = value
+    }
+    debouncedSearch.value = value.trim()
+  }
+
   function removeFilter(key: string) {
     const emptyFilters = cloneFilters(initialFilters) as Record<string, unknown>
     const emptyValue = emptyFilters[key]
@@ -130,6 +144,11 @@ export function useListControls<TFilters extends object>(
   }
 
   watch(search, (value) => {
+    if (suppressNextSearchWatch) {
+      suppressNextSearchWatch = false
+      return
+    }
+
     if (searchTimer) {
       window.clearTimeout(searchTimer)
     }
@@ -165,6 +184,7 @@ export function useListControls<TFilters extends object>(
     setSort,
     applyFilters,
     resetFilters,
+    setSearchSilently,
     removeFilter,
     buildParams,
     dispose,

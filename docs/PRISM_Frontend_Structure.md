@@ -16,7 +16,7 @@
 | HTTP Client | `axios` | Interceptor untuk JWT inject & token refresh |
 | Form Validation | `VeeValidate` + `Zod` | Schema-based, sinergi dengan API contract |
 | Table Kompleks | `TanStack Table v8` | Untuk tabel dengan nested editing (Funding Source, Activities) |
-| Charts | `vue-echarts` + `echarts` | Terbaik untuk dashboard monitoring disbursement |
+| Charts | `vue-echarts` + `echarts` | Dipakai untuk visualisasi data seperti alur journey berbasis sankey |
 | SSE Client | Native `EventSource` | Built-in browser, tidak butuh library tambahan |
 | Date | `date-fns` | Ringan, tree-shakeable |
 | CSS | `Tailwind CSS v4` | Utility-first via Vite plugin — tidak perlu PostCSS |
@@ -51,7 +51,7 @@ prism-frontend/
 │   │       ├── daftar-kegiatan.routes.ts
 │   │       ├── loan-agreement.routes.ts
 │   │       ├── monitoring.routes.ts
-│   │       ├── dashboard.routes.ts
+│   │       ├── home.routes.ts
 │   │       ├── project.routes.ts
 │   │       ├── journey.routes.ts
 │   │       └── user.routes.ts
@@ -76,7 +76,7 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.service.ts
 │   │   ├── loan-agreement.service.ts
 │   │   ├── monitoring.service.ts
-│   │   ├── dashboard.service.ts
+│   │   ├── journey.service.ts
 │   │   ├── project.service.ts
 │   │   ├── master.service.ts
 │   │   └── user.service.ts
@@ -105,7 +105,7 @@ prism-frontend/
 │   │   ├── daftar-kegiatan.types.ts
 │   │   ├── loan-agreement.types.ts
 │   │   ├── monitoring.types.ts
-│   │   ├── dashboard.types.ts           # Dashboard + Perjalanan Proyek response types
+│   │   ├── journey.types.ts             # Response types untuk perjalanan proyek
 │   │   ├── project.types.ts             # Project master list/search types
 │   │   ├── user.types.ts
 │   │   └── master.types.ts              # Country, Currency, Lender, Institution, Region, dll
@@ -129,9 +129,6 @@ prism-frontend/
 │   ├── pages/                         # Halaman — satu folder per modul
 │   │   ├── auth/
 │   │   │   └── LoginPage.vue
-│   │   │
-│   │   ├── dashboard/
-│   │   │   └── DashboardPage.vue
 │   │   │
 │   │   ├── blue-book/
 │   │   │   ├── BlueBookListPage.vue
@@ -313,6 +310,56 @@ Component re-render via reactivity
 
 ---
 
+## Panduan Typography dan Header Tabel
+
+PRISM memakai `Inter Variable` sebagai font utama. Font harus di-load dari package `@fontsource-variable/inter` di `src/main.ts`, lalu token keluarga font didefinisikan di `src/assets/styles/main.css`:
+
+```typescript
+import '@fontsource-variable/inter/index.css'
+```
+
+```css
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui;
+}
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-surface-900;
+    font-family: var(--font-sans);
+  }
+}
+```
+
+Skala ukuran font standar:
+
+| Elemen | Class |
+|--------|-------|
+| Page title | `text-2xl font-semibold` |
+| Section title | `text-lg font-semibold` |
+| Compact panel title | `text-base font-semibold` |
+| Body, form label, table body | `text-sm` |
+| Helper text, metadata, table header | `text-xs` |
+| Metric utama | `text-2xl font-semibold` |
+
+Hindari arbitrary font size seperti `text-[11px]` atau `text-[0.65rem]` untuk teks biasa. Nilai arbitrary hanya boleh dipakai untuk icon alignment, keyboard hint, atau brand lockup yang memang membutuhkan ukuran optik khusus.
+
+Header tabel utama wajib memakai pola berikut:
+
+```html
+<thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
+```
+
+Header cell tabel standar:
+
+```html
+<th class="px-4 py-3">
+```
+
+Tabel compact boleh memakai `px-3 py-2`, tetapi tetap wajib mempertahankan `text-xs font-semibold uppercase tracking-wide text-surface-500`. Untuk PrimeVue `DataTable` dan `TreeTable`, styling header dilakukan lewat Pass-Through API di wrapper reusable, bukan override CSS global.
+
+---
+
 ## Setup Tailwind v4 — `vite.config.ts`
 
 Tailwind v4 menggunakan **Vite plugin**, bukan PostCSS. Hapus `postcss.config.ts` jika ada.
@@ -395,6 +442,7 @@ import Tooltip from 'primevue/tooltip'
 import { prismPreset } from '@/assets/styles/theme'
 import router from './router'
 
+import '@fontsource-variable/inter/index.css' // ← Font utama PRISM
 import '@/assets/styles/main.css'  // ← Import CSS sebelum mount
 import App from './App.vue'
 

@@ -1,26 +1,11 @@
 import { onBeforeUnmount, ref } from 'vue'
-import type { ZodError } from 'zod'
 import type { TreeNode } from 'primevue/treenode'
 import { usePagination, type SortOrder } from '@/composables/usePagination'
 import type { PaginationMeta } from '@/types/api.types'
 import type { ListParams } from '@/types/master.types'
 
-export type FormErrors<T extends string> = Partial<Record<T, string>>
-
-export function toFormErrors<T extends string>(error: ZodError, fields: readonly T[]) {
-  const allowedFields = new Set<string>(fields)
-  const errors: FormErrors<T> = {}
-
-  for (const issue of error.issues) {
-    const field = String(issue.path[0] ?? '')
-
-    if (allowedFields.has(field) && !errors[field as T]) {
-      errors[field as T] = issue.message
-    }
-  }
-
-  return errors
-}
+// Re-exported from shared utils for backward compatibility
+export { toFormErrors, type FormErrors } from '@/utils/form-errors'
 
 export interface HierarchyItem {
   id: string

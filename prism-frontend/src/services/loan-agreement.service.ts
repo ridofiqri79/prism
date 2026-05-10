@@ -27,6 +27,7 @@ function toDKProjectLoanOption(dk: DaftarKegiatan, project: DKProject): DKProjec
     financing_details: project.financing_details ?? [],
     loan_allocations: project.loan_allocations ?? [],
     activity_details: project.activity_details ?? [],
+    loan_agreements: project.loan_agreements ?? [],
     label: labelParts.join(' - ') || dk.subject,
   }
 }
@@ -111,7 +112,7 @@ export const LoanAgreementService = {
         .join(' ')
         .toLowerCase()
         .includes(keyword),
-      )
+    )
   },
 
   async getDKProjectOption(dkId: string, projectId: string) {
@@ -132,5 +133,20 @@ export const LoanAgreementService = {
           .filter((id): id is string => Boolean(id)),
       ),
     ]
+  },
+
+  getAllowedLenderIdsForProjects(projects: DKProject[]) {
+    if (projects.length === 0) return []
+    const lenderSets = projects.map(
+      (project) =>
+        new Set(
+          project.financing_details
+            .map((detail) => detail.lender?.id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+    )
+    const [firstSet] = lenderSets
+    if (!firstSet) return []
+    return [...firstSet].filter((id) => lenderSets.every((set) => set.has(id)))
   },
 }

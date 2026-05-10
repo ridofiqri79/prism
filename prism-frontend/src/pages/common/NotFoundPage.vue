@@ -2,7 +2,11 @@
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 
+import { useAuthStore } from '@/stores/auth.store'
+import { resolveDefaultAuthenticatedRoute } from '@/utils/default-route'
+
 const router = useRouter()
+const auth = useAuthStore()
 </script>
 
 <template>
@@ -12,9 +16,9 @@ const router = useRouter()
       <h1 class="mt-6 text-3xl font-semibold text-surface-950">404 - Halaman tidak ditemukan</h1>
       <Button
         class="mt-6"
-        label="Kembali ke Dashboard"
+        label="Kembali ke Halaman Utama"
         icon="pi pi-arrow-left"
-        @click="router.push({ name: 'dashboard' })"
+        @click="router.push(resolveDefaultAuthenticatedRoute({ user: auth.user, permissions: auth.permissions }))"
       />
     </section>
   </div>

@@ -445,6 +445,235 @@ func TestGreenBookImportRejectsDuplicateGBCodeInWorkbook(t *testing.T) {
 	}
 }
 
+func TestMultiGreenBookImportCreatesMultipleHeadersAndAllowsSameGBCode(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-MULTI-001", "Multi Source")
+
+	workbook := buildMultiGreenBookImportWorkbook(t, multiGreenBookWorkbookRows{
+		Headers: [][]string{
+			{"GB-2026", "2026", "0", "Berlaku", ""},
+			{"GB-2027", "2027", "0", "Berlaku", ""},
+		},
+		Inputs: [][]string{
+			{"GB-2026", env.programTitle.Title, "GB-SAME-001", "Same Code 2026"},
+			{"GB-2027", env.programTitle.Title, "GB-SAME-001", "Same Code 2027"},
+		},
+		BBProjects: [][]string{
+			{"GB-2026", "GB-SAME-001", bbProject.BBCode},
+			{"GB-2027", "GB-SAME-001", bbProject.BBCode},
+		},
+		ExecutingAgencies: [][]string{
+			{"GB-2026", "GB-SAME-001", env.ea.Name},
+			{"GB-2027", "GB-SAME-001", env.ea.Name},
+		},
+		ImplementingAgencies: [][]string{
+			{"GB-2026", "GB-SAME-001", env.ia.Name},
+			{"GB-2027", "GB-SAME-001", env.ia.Name},
+		},
+		Locations: [][]string{
+			{"GB-2026", "GB-SAME-001", env.region.Name},
+			{"GB-2027", "GB-SAME-001", env.region.Name},
+		},
+	})
+
+	res, err := gbService.ImportMultiGreenBook(env.ctx, "green-book-multi.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("ImportMultiGreenBook() error = %v", err)
+	}
+	if res.TotalFailed != 0 {
+		t.Fatalf("TotalFailed = %d, response = %+v", res.TotalFailed, res)
+	}
+	headerSheet := findImportSheet(t, res, greenBookImportSheetHeader)
+	if headerSheet.Inserted != 2 {
+		t.Fatalf("header inserted = %d, want 2: %+v", headerSheet.Inserted, headerSheet)
+	}
+
+	gb2026, err := env.queries.GetGreenBookByPublishYearAndRevisionNumber(env.ctx, queries.GetGreenBookByPublishYearAndRevisionNumberParams{PublishYear: 2026, RevisionNumber: 0})
+	if err != nil {
+		t.Fatalf("GetGreenBookByPublishYearAndRevisionNumber(2026) error = %v", err)
+	}
+	gb2027, err := env.queries.GetGreenBookByPublishYearAndRevisionNumber(env.ctx, queries.GetGreenBookByPublishYearAndRevisionNumberParams{PublishYear: 2027, RevisionNumber: 0})
+	if err != nil {
+		t.Fatalf("GetGreenBookByPublishYearAndRevisionNumber(2027) error = %v", err)
+	}
+	if _, err := env.queries.GetGBProjectByGreenBookAndCode(env.ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: gb2026.ID, Lower: "GB-SAME-001"}); err != nil {
+		t.Fatalf("GetGBProjectByGreenBookAndCode(2026) error = %v", err)
+	}
+	if _, err := env.queries.GetGBProjectByGreenBookAndCode(env.ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: gb2027.ID, Lower: "GB-SAME-001"}); err != nil {
+		t.Fatalf("GetGBProjectByGreenBookAndCode(2027) error = %v", err)
+	}
+}
+
+func TestMultiGreenBookImportRejectsDuplicateCodeWithinKeyAndUnknownRelationKey(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-MULTI-002", "Multi Source")
+
+	workbook := buildMultiGreenBookImportWorkbook(t, multiGreenBookWorkbookRows{
+		Headers: [][]string{{"GB-2026", "2026", "0", "Berlaku", ""}},
+		Inputs: [][]string{
+			{"GB-2026", env.programTitle.Title, "GB-DUP", "Duplicate A"},
+			{"GB-2026", env.programTitle.Title, "GB-DUP", "Duplicate B"},
+		},
+		BBProjects: [][]string{
+			{"UNKNOWN", "GB-DUP", bbProject.BBCode},
+		},
+		ExecutingAgencies:    [][]string{{"GB-2026", "GB-DUP", env.ea.Name}},
+		ImplementingAgencies: [][]string{{"GB-2026", "GB-DUP", env.ia.Name}},
+		Locations:            [][]string{{"GB-2026", "GB-DUP", env.region.Name}},
+	})
+
+	res, err := gbService.PreviewMultiGreenBookImport(env.ctx, "green-book-multi.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("PreviewMultiGreenBookImport() error = %v", err)
+	}
+	inputSheet := findImportSheet(t, res, greenBookImportSheetInput)
+	if inputSheet.Failed == 0 || !importSheetHasMessage(inputSheet, "GB Code duplikat di workbook untuk Green Book Key yang sama") {
+		t.Fatalf("input sheet did not report duplicate code: %+v", inputSheet)
+	}
+	bbSheet := findImportSheet(t, res, greenBookImportSheetBBProject)
+	if bbSheet.Failed == 0 || !importSheetHasMessage(bbSheet, "Green Book Key") {
+		t.Fatalf("BB relation sheet did not report unknown Green Book Key: %+v", bbSheet)
+	}
+}
+
+func TestMultiGreenBookImportSkipsExistingHeaderAndRejectsMetadataConflict(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	blueBook := env.createBlueBook(t, 0, nil)
+	bbProject := env.createBBProject(t, blueBook.ID, "BB-MULTI-003", "Multi Source")
+	existingGreenBook := env.createGreenBook(t, gbService, 0, nil)
+	_ = env.createGBProject(t, gbService, existingGreenBook.ID, bbProject.ID, "GB-EXISTING", "Existing Project")
+
+	workbook := buildMultiGreenBookImportWorkbook(t, multiGreenBookWorkbookRows{
+		Headers:              [][]string{{"GB-2026", "2026", "0", "Berlaku", ""}},
+		Inputs:               [][]string{{"GB-2026", env.programTitle.Title, "GB-EXISTING", "Existing Project"}},
+		BBProjects:           [][]string{{"GB-2026", "GB-EXISTING", bbProject.BBCode}},
+		ExecutingAgencies:    [][]string{{"GB-2026", "GB-EXISTING", env.ea.Name}},
+		ImplementingAgencies: [][]string{{"GB-2026", "GB-EXISTING", env.ia.Name}},
+		Locations:            [][]string{{"GB-2026", "GB-EXISTING", env.region.Name}},
+	})
+
+	res, err := gbService.PreviewMultiGreenBookImport(env.ctx, "green-book-multi.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("PreviewMultiGreenBookImport(existing) error = %v", err)
+	}
+	headerSheet := findImportSheet(t, res, greenBookImportSheetHeader)
+	if headerSheet.Skipped != 1 {
+		t.Fatalf("header skipped = %d, want 1: %+v", headerSheet.Skipped, headerSheet)
+	}
+	inputSheet := findImportSheet(t, res, greenBookImportSheetInput)
+	if inputSheet.Skipped != 1 {
+		t.Fatalf("input skipped = %d, want 1: %+v", inputSheet.Skipped, inputSheet)
+	}
+
+	conflictWorkbook := buildMultiGreenBookImportWorkbook(t, multiGreenBookWorkbookRows{
+		Headers: [][]string{{"GB-2026", "2026", "0", "Tidak Berlaku", ""}},
+	})
+	conflictRes, err := gbService.PreviewMultiGreenBookImport(env.ctx, "green-book-multi.xlsx", bytes.NewReader(conflictWorkbook), int64(len(conflictWorkbook)))
+	if err != nil {
+		t.Fatalf("PreviewMultiGreenBookImport(conflict) error = %v", err)
+	}
+	conflictHeaderSheet := findImportSheet(t, conflictRes, greenBookImportSheetHeader)
+	if conflictHeaderSheet.Failed == 0 || !importSheetHasMessage(conflictHeaderSheet, "Status Green Book existing tidak sama") {
+		t.Fatalf("header sheet did not report metadata conflict: %+v", conflictHeaderSheet)
+	}
+}
+
+func TestMultiGreenBookImportReusesRevisionIdentityAndLatestBB(t *testing.T) {
+	env := setupBlueBookVersioningTest(t)
+	gbService := NewGreenBookService(env.pool, env.queries, nil)
+	_, oldBBProject, latestBBProject := env.createBBRevisionPair(t)
+	sourceGreenBook := env.createGreenBook(t, gbService, 0, nil)
+	sourceGBProject := env.createGBProject(t, gbService, sourceGreenBook.ID, oldBBProject.ID, "GB-REV-001", "Revision Source")
+
+	workbook := buildMultiGreenBookImportWorkbook(t, multiGreenBookWorkbookRows{
+		Headers:              [][]string{{"GB-REV-1", "2026", "1", "Berlaku", sourceGreenBook.ID}},
+		Inputs:               [][]string{{"GB-REV-1", env.programTitle.Title, "GB-REV-001", "Revision Target"}},
+		BBProjects:           [][]string{{"GB-REV-1", "GB-REV-001", oldBBProject.BBCode}},
+		ExecutingAgencies:    [][]string{{"GB-REV-1", "GB-REV-001", env.ea.Name}},
+		ImplementingAgencies: [][]string{{"GB-REV-1", "GB-REV-001", env.ia.Name}},
+		Locations:            [][]string{{"GB-REV-1", "GB-REV-001", env.region.Name}},
+	})
+
+	res, err := gbService.ImportMultiGreenBook(env.ctx, "green-book-multi.xlsx", bytes.NewReader(workbook), int64(len(workbook)))
+	if err != nil {
+		t.Fatalf("ImportMultiGreenBook(revision) error = %v", err)
+	}
+	if res.TotalFailed != 0 {
+		t.Fatalf("TotalFailed = %d, response = %+v", res.TotalFailed, res)
+	}
+	targetGreenBook, err := env.queries.GetGreenBookByPublishYearAndRevisionNumber(env.ctx, queries.GetGreenBookByPublishYearAndRevisionNumberParams{PublishYear: 2026, RevisionNumber: 1})
+	if err != nil {
+		t.Fatalf("GetGreenBookByPublishYearAndRevisionNumber(revision) error = %v", err)
+	}
+	imported, err := env.queries.GetGBProjectByGreenBookAndCode(env.ctx, queries.GetGBProjectByGreenBookAndCodeParams{GreenBookID: targetGreenBook.ID, Lower: "GB-REV-001"})
+	if err != nil {
+		t.Fatalf("GetGBProjectByGreenBookAndCode(revision) error = %v", err)
+	}
+	if model.UUIDToString(imported.GbProjectIdentityID) != sourceGBProject.GBProjectIdentityID {
+		t.Fatalf("imported identity = %s, want %s", model.UUIDToString(imported.GbProjectIdentityID), sourceGBProject.GBProjectIdentityID)
+	}
+	detail, err := gbService.GetGBProject(env.ctx, targetGreenBook.ID, imported.ID)
+	if err != nil {
+		t.Fatalf("GetGBProject(imported revision) error = %v", err)
+	}
+	if len(detail.BBProjects) != 1 || detail.BBProjects[0].ID != latestBBProject.ID {
+		t.Fatalf("imported BB relation = %+v, want latest BB %s", detail.BBProjects, latestBBProject.ID)
+	}
+}
+
+type multiGreenBookWorkbookRows struct {
+	Headers              [][]string
+	Inputs               [][]string
+	BBProjects           [][]string
+	ExecutingAgencies    [][]string
+	ImplementingAgencies [][]string
+	Locations            [][]string
+	Activities           [][]string
+	FundingSources       [][]string
+	DisbursementPlans    [][]string
+	FundingAllocations   [][]string
+}
+
+func buildMultiGreenBookImportWorkbook(t *testing.T, rows multiGreenBookWorkbookRows) []byte {
+	t.Helper()
+	workbook := simpleXLSXWorkbook{Sheets: []simpleXLSXSheet{
+		importSheetFromRows(greenBookImportSheetHeader, []string{"Green Book Key (*)", "Publish Year (*)", "Revision Number", "Status (*)", "Replaces Green Book Ref"}, rows.Headers),
+		importSheetFromRows(greenBookImportSheetInput, []string{"Green Book Key (*)", "Program Title (*)", "GB Code (*)", "Project Name (*)", "Duration", "Objective", "Scope of Project"}, rows.Inputs),
+		importSheetFromRows(greenBookImportSheetBBProject, []string{"Green Book Key (*)", "GB Code (*)", "BB Code (*)"}, rows.BBProjects),
+		importSheetFromRows(greenBookImportSheetEA, []string{"Green Book Key (*)", "GB Code (*)", "Executing Agency Name (*)"}, rows.ExecutingAgencies),
+		importSheetFromRows(greenBookImportSheetIA, []string{"Green Book Key (*)", "GB Code (*)", "Implementing Agency Name (*)"}, rows.ImplementingAgencies),
+		importSheetFromRows(greenBookImportSheetLocations, []string{"Green Book Key (*)", "GB Code (*)", "Location Name (*)"}, rows.Locations),
+		importSheetFromRows(greenBookImportSheetActivities, []string{"Green Book Key (*)", "GB Code (*)", "Activity No (*)", "Activity Name (*)", "Implementation Location", "PIU", "Sort Order"}, rows.Activities),
+		importSheetFromRows(greenBookImportSheetFundingSource, []string{"Green Book Key (*)", "GB Code (*)", "Lender Name (*)", "Institution Name", "Currency", "Loan Original", "Grant Original", "Local Original", "Loan USD", "Grant USD", "Local USD"}, rows.FundingSources),
+		importSheetFromRows(greenBookImportSheetDisbursementPlan, []string{"Green Book Key (*)", "GB Code (*)", "Year (*)", "Amount USD"}, rows.DisbursementPlans),
+		importSheetFromRows(greenBookImportSheetFundingAllocation, []string{"Green Book Key (*)", "GB Code (*)", "Activity No (*)", "Services", "Constructions", "Goods", "Trainings", "Other"}, rows.FundingAllocations),
+	}}
+	data, err := buildSimpleXLSX(workbook)
+	if err != nil {
+		t.Fatalf("buildSimpleXLSX() error = %v", err)
+	}
+	return data
+}
+
+func importSheetFromRows(name string, headers []string, dataRows [][]string) simpleXLSXSheet {
+	sheetRows := make([][]simpleXLSXCell, 0, len(dataRows)+1)
+	sheetRows = append(sheetRows, headerRow(headers...))
+	for _, dataRow := range dataRows {
+		sheetRows = append(sheetRows, textRow(dataRow...))
+	}
+	return simpleXLSXSheet{
+		Name:          name,
+		Rows:          sheetRows,
+		Columns:       repeatedColumns(len(headers), 24),
+		ShowGridLines: false,
+	}
+}
+
 func (env *blueBookVersioningTestEnv) createBBRevisionPair(t *testing.T) (*model.BlueBookResponse, *model.BBProjectResponse, *model.BBProjectResponse) {
 	t.Helper()
 	original := env.createBlueBook(t, 0, nil)

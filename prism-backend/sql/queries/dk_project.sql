@@ -22,7 +22,28 @@ WHERE (
 )
 AND (sqlc.narg('date_from')::date IS NULL OR dk.date >= sqlc.narg('date_from')::date)
 AND (sqlc.narg('date_to')::date IS NULL OR dk.date <= sqlc.narg('date_to')::date)
-ORDER BY dk.date DESC, dk.created_at DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'subject' AND sqlc.arg('sort_order')::text = 'asc' THEN dk.subject END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'subject' AND sqlc.arg('sort_order')::text = 'desc' THEN dk.subject END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'date' AND sqlc.arg('sort_order')::text = 'asc' THEN dk.date END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'date' AND sqlc.arg('sort_order')::text = 'desc' THEN dk.date END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'letter_number' AND sqlc.arg('sort_order')::text = 'asc' THEN dk.letter_number END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'letter_number' AND sqlc.arg('sort_order')::text = 'desc' THEN dk.letter_number END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT COUNT(*)
+        FROM dk_project dkp
+        WHERE dkp.dk_id = dk.id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_count' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT COUNT(*)
+        FROM dk_project dkp
+        WHERE dkp.dk_id = dk.id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN dk.created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN dk.created_at END DESC,
+    dk.date DESC,
+    dk.created_at DESC,
+    dk.id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountDaftarKegiatan :one
@@ -149,7 +170,25 @@ AND (
           AND dfd.lender_id = ANY(sqlc.arg('lender_ids')::uuid[])
     )
 )
-ORDER BY created_at DESC
+ORDER BY
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'asc' THEN project_name END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'project_name' AND sqlc.arg('sort_order')::text = 'desc' THEN project_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'executing_agency' AND sqlc.arg('sort_order')::text = 'asc' THEN (
+        SELECT COALESCE(i.short_name, i.name)
+        FROM institution i
+        WHERE i.id = dk_project.institution_id
+    ) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'executing_agency' AND sqlc.arg('sort_order')::text = 'desc' THEN (
+        SELECT COALESCE(i.short_name, i.name)
+        FROM institution i
+        WHERE i.id = dk_project.institution_id
+    ) END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'duration' AND sqlc.arg('sort_order')::text = 'asc' THEN duration END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'duration' AND sqlc.arg('sort_order')::text = 'desc' THEN duration END DESC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN created_at END ASC,
+    CASE WHEN sqlc.arg('sort_field')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN created_at END DESC,
+    created_at DESC,
+    id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountDKProjectsByDK :one
@@ -343,6 +382,7 @@ SELECT
     r.name,
     r.type,
     r.parent_code,
+    r.region_group,
     r.created_at,
     r.updated_at
 FROM dk_project_location dkpl
@@ -465,40 +505,3 @@ RETURNING *;
 -- name: DeleteDKActivityDetails :exec
 DELETE FROM dk_activity_detail
 WHERE dk_project_id = $1;
-
--- name: GetAllowedLenderIDsForDK :many
-SELECT DISTINCT lender_id
-FROM (
-    SELECT li.lender_id
-    FROM dk_project_gb_project dkgb
-    JOIN gb_project_bb_project gbbb ON gbbb.gb_project_id = dkgb.gb_project_id
-    JOIN lender_indication li ON li.bb_project_id = gbbb.bb_project_id
-    WHERE dkgb.dk_project_id = $1
-    UNION
-    SELECT gfs.lender_id
-    FROM dk_project_gb_project dkgb
-    JOIN gb_funding_source gfs ON gfs.gb_project_id = dkgb.gb_project_id
-    WHERE dkgb.dk_project_id = $1
-) allowed_lenders
-WHERE lender_id IS NOT NULL;
-
--- name: ListAllowedLenderReferencesByGBProject :many
-SELECT DISTINCT
-    allowed_lenders.gb_project_id,
-    allowed_lenders.lender_id,
-    l.name AS lender_name,
-    l.short_name AS lender_short_name,
-    l.type AS lender_type
-FROM (
-    SELECT gfs.gb_project_id, gfs.lender_id
-    FROM gb_funding_source gfs
-    WHERE gfs.gb_project_id = $1
-    UNION
-    SELECT gbp.gb_project_id, li.lender_id
-    FROM gb_project_bb_project gbp
-    JOIN lender_indication li ON li.bb_project_id = gbp.bb_project_id
-    WHERE gbp.gb_project_id = $1
-) allowed_lenders
-JOIN lender l ON l.id = allowed_lenders.lender_id
-WHERE allowed_lenders.lender_id IS NOT NULL
-ORDER BY l.name ASC;

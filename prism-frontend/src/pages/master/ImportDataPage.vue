@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
-import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useToast } from '@/composables/useToast'
@@ -14,17 +13,13 @@ import {
   greenBookImportFileSchema,
   loanAgreementImportFileSchema,
   masterImportFileSchema,
-  monitoringImportFileSchema,
 } from '@/schemas/master.schema'
 import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
 import { useMasterStore } from '@/stores/master.store'
-import { useMonitoringStore } from '@/stores/monitoring.store'
 import type { ApiErrorResponse } from '@/types/api.types'
-import type { BlueBook } from '@/types/blue-book.types'
-import type { GreenBook } from '@/types/green-book.types'
 import type {
   MasterImportRowResult,
   MasterImportRowStatus,
@@ -39,9 +34,8 @@ type ImportKind =
   | 'green_book'
   | 'daftar_kegiatan'
   | 'loan_agreement'
-  | 'monitoring'
 type ImportRowDisplay = MasterImportRowResult & { sheet: string }
-type ParsedImportInput = { file: File; blueBookId?: string; greenBookId?: string }
+type ParsedImportInput = { file: File }
 type ImportKindOption = { value: ImportKind; label: string; description: string }
 
 interface ImportPageEvent {
@@ -54,13 +48,10 @@ const blueBookStore = useBlueBookStore()
 const greenBookStore = useGreenBookStore()
 const daftarKegiatanStore = useDaftarKegiatanStore()
 const loanAgreementStore = useLoanAgreementStore()
-const monitoringStore = useMonitoringStore()
 const toast = useToast()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const activeImportKind = ref<ImportKind>('master')
-const selectedBlueBookId = ref<string | null>(null)
-const selectedGreenBookId = ref<string | null>(null)
 const selectedFile = ref<File | null>(null)
 const summary = ref<MasterImportSummary | null>(null)
 const executed = ref(false)
@@ -74,12 +65,13 @@ const importKindOptions: ImportKindOption[] = [
   {
     value: 'master',
     label: 'Master Data',
-    description: 'Program title, instansi, wilayah, periode, prioritas, lender',
+    description: 'Program title, instansi, wilayah, periode, prioritas, lender, dan kurs tengah',
   },
   {
     value: 'blue_book',
     label: 'Blue Book',
-    description: 'Proyek Blue Book beserta Executing Agency, Implementing Agency, lokasi, biaya, dan indikasi lender',
+    description:
+      'Beberapa Blue Book beserta proyek, Executing Agency, Implementing Agency, lokasi, biaya, dan indikasi lender',
   },
   {
     value: 'green_book',
@@ -96,11 +88,6 @@ const importKindOptions: ImportKindOption[] = [
     label: 'Loan Agreement',
     description: 'Create-only Loan Agreement dari Proyek Daftar Kegiatan yang eligible',
   },
-  {
-    value: 'monitoring',
-    label: 'Monitoring Disbursement',
-    description: 'Create-only monitoring triwulan beserta breakdown komponen opsional',
-  },
 ]
 
 const masterWorkbookSheets = [
@@ -111,9 +98,11 @@ const masterWorkbookSheets = [
   'Periods',
   'National Priorities',
   'Lenders',
+  'Kurs Tengah',
 ]
 
 const blueBookWorkbookSheets = [
+  'Blue Book',
   'Input Data',
   'Relasi - EA',
   'Relasi - IA',
@@ -124,6 +113,7 @@ const blueBookWorkbookSheets = [
 ]
 
 const greenBookWorkbookSheets = [
+  'Green Book',
   'Input Data',
   'Relasi - BB Project',
   'Relasi - EA',
@@ -147,8 +137,6 @@ const daftarKegiatanWorkbookSheets = [
 
 const loanAgreementWorkbookSheets = ['Loan Agreement']
 
-const monitoringWorkbookSheets = ['Monitoring Disbursement', 'Relasi - Komponen']
-
 const sheetDisplayLabels: Record<string, string> = {
   'Relasi - BB Project': 'Relasi - Proyek Blue Book',
   'Relasi - GB Project': 'Relasi - Proyek Green Book',
@@ -159,24 +147,9 @@ const workbookSheets = computed(() => {
   if (activeImportKind.value === 'blue_book') return blueBookWorkbookSheets
   if (activeImportKind.value === 'green_book') return greenBookWorkbookSheets
   if (activeImportKind.value === 'loan_agreement') return loanAgreementWorkbookSheets
-  if (activeImportKind.value === 'monitoring') return monitoringWorkbookSheets
 
   return daftarKegiatanWorkbookSheets
 })
-
-const blueBookOptions = computed(() =>
-  blueBookStore.blueBooks.map((blueBook) => ({
-    id: blueBook.id,
-    label: blueBookOptionLabel(blueBook),
-  })),
-)
-
-const greenBookOptions = computed(() =>
-  greenBookStore.greenBooks.map((greenBook) => ({
-    id: greenBook.id,
-    label: greenBookOptionLabel(greenBook),
-  })),
-)
 
 const selectedImportKind = computed<ImportKindOption>(
   () =>
@@ -193,8 +166,6 @@ const importBusy = computed(() =>
         ? greenBookStore.importPreviewing || greenBookStore.importExecuting
         : activeImportKind.value === 'loan_agreement'
           ? loanAgreementStore.importPreviewing || loanAgreementStore.importExecuting
-          : activeImportKind.value === 'monitoring'
-            ? monitoringStore.importPreviewing || monitoringStore.importExecuting
           : daftarKegiatanStore.importPreviewing || daftarKegiatanStore.importExecuting,
 )
 
@@ -207,8 +178,6 @@ const previewLoading = computed(() =>
         ? greenBookStore.importPreviewing
         : activeImportKind.value === 'loan_agreement'
           ? loanAgreementStore.importPreviewing
-          : activeImportKind.value === 'monitoring'
-            ? monitoringStore.importPreviewing
           : daftarKegiatanStore.importPreviewing,
 )
 
@@ -221,8 +190,6 @@ const executeLoading = computed(() =>
         ? greenBookStore.importExecuting
         : activeImportKind.value === 'loan_agreement'
           ? loanAgreementStore.importExecuting
-          : activeImportKind.value === 'monitoring'
-            ? monitoringStore.importExecuting
           : daftarKegiatanStore.importExecuting,
 )
 
@@ -235,15 +202,7 @@ const templateLoading = computed(() =>
         ? greenBookStore.templateDownloading
         : activeImportKind.value === 'loan_agreement'
           ? loanAgreementStore.templateDownloading
-          : activeImportKind.value === 'monitoring'
-            ? monitoringStore.templateDownloading
           : daftarKegiatanStore.templateDownloading,
-)
-
-const targetMissing = computed(
-  () =>
-    (activeImportKind.value === 'blue_book' && !selectedBlueBookId.value) ||
-    (activeImportKind.value === 'green_book' && !selectedGreenBookId.value),
 )
 
 const selectedFileMeta = computed(() => {
@@ -314,25 +273,6 @@ watch(activeImportKind, () => {
   clearFile()
 })
 
-watch(selectedBlueBookId, () => {
-  if (activeImportKind.value === 'blue_book') {
-    clearPreviewResult()
-  }
-})
-
-watch(selectedGreenBookId, () => {
-  if (activeImportKind.value === 'green_book') {
-    clearPreviewResult()
-  }
-})
-
-onMounted(() => {
-  void Promise.all([
-    blueBookStore.fetchBlueBooks({ limit: 1000 }),
-    greenBookStore.fetchGreenBooks({ limit: 1000 }),
-  ])
-})
-
 function openFilePicker() {
   fileInput.value?.click()
 }
@@ -382,13 +322,11 @@ async function previewFile() {
     if (activeImportKind.value === 'master') {
       summary.value = await masterStore.previewMasterData(input.file)
     } else if (activeImportKind.value === 'blue_book') {
-      summary.value = await blueBookStore.previewProjectImport(input.blueBookId ?? '', input.file)
+      summary.value = await blueBookStore.previewMultiImport(input.file)
     } else if (activeImportKind.value === 'green_book') {
-      summary.value = await greenBookStore.previewProjectImport(input.greenBookId ?? '', input.file)
+      summary.value = await greenBookStore.previewMultiImport(input.file)
     } else if (activeImportKind.value === 'loan_agreement') {
       summary.value = await loanAgreementStore.previewImport(input.file)
-    } else if (activeImportKind.value === 'monitoring') {
-      summary.value = await monitoringStore.previewImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.previewImport(input.file)
     }
@@ -418,13 +356,11 @@ async function executeFile() {
     if (activeImportKind.value === 'master') {
       summary.value = await masterStore.importMasterData(input.file)
     } else if (activeImportKind.value === 'blue_book') {
-      summary.value = await blueBookStore.importProjects(input.blueBookId ?? '', input.file)
+      summary.value = await blueBookStore.executeMultiImport(input.file)
     } else if (activeImportKind.value === 'green_book') {
-      summary.value = await greenBookStore.importProjects(input.greenBookId ?? '', input.file)
+      summary.value = await greenBookStore.executeMultiImport(input.file)
     } else if (activeImportKind.value === 'loan_agreement') {
       summary.value = await loanAgreementStore.executeImport(input.file)
-    } else if (activeImportKind.value === 'monitoring') {
-      summary.value = await monitoringStore.executeImport(input.file)
     } else {
       summary.value = await daftarKegiatanStore.executeImport(input.file)
     }
@@ -448,24 +384,14 @@ async function downloadTemplate() {
     }
 
     if (activeImportKind.value === 'blue_book') {
-      if (!selectedBlueBookId.value) {
-        errorMessage.value = 'Pilih target Blue Book sebelum download template'
-        return
-      }
-
-      const blob = await blueBookStore.downloadProjectImportTemplate(selectedBlueBookId.value)
+      const blob = await blueBookStore.downloadMultiImportTemplate()
       saveBlob(blob, 'blue_book_import_template.xlsx')
       toast.success('Template diunduh', 'Template Blue Book sudah dibuat dari snapshot master data')
       return
     }
 
     if (activeImportKind.value === 'green_book') {
-      if (!selectedGreenBookId.value) {
-        errorMessage.value = 'Pilih target Green Book sebelum download template'
-        return
-      }
-
-      const blob = await greenBookStore.downloadProjectImportTemplate(selectedGreenBookId.value)
+      const blob = await greenBookStore.downloadMultiImportTemplate()
       saveBlob(blob, 'green_book_import_template.xlsx')
       toast.success('Template diunduh', 'Template Green Book sudah dibuat dari snapshot master data')
       return
@@ -475,16 +401,6 @@ async function downloadTemplate() {
       const laBlob = await loanAgreementStore.downloadImportTemplate()
       saveBlob(laBlob, 'loan_agreement_import_template.xlsx')
       toast.success('Template diunduh', 'Template Loan Agreement sudah dibuat dari snapshot master data')
-      return
-    }
-
-    if (activeImportKind.value === 'monitoring') {
-      const monitoringBlob = await monitoringStore.downloadImportTemplate()
-      saveBlob(monitoringBlob, 'monitoring_disbursement_import_template.xlsx')
-      toast.success(
-        'Template diunduh',
-        'Template Monitoring Disbursement sudah dibuat dari snapshot master data',
-      )
       return
     }
 
@@ -508,33 +424,7 @@ function getImportInput(): ParsedImportInput | null {
   }
 
   if (activeImportKind.value === 'blue_book') {
-    const parsed = blueBookImportFileSchema.safeParse({
-      file: selectedFile.value,
-      blue_book_id: selectedBlueBookId.value ?? '',
-    })
-    if (!parsed.success) {
-      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
-      return null
-    }
-
-    return { file: parsed.data.file, blueBookId: parsed.data.blue_book_id }
-  }
-
-  if (activeImportKind.value === 'green_book') {
-    const parsed = greenBookImportFileSchema.safeParse({
-      file: selectedFile.value,
-      green_book_id: selectedGreenBookId.value ?? '',
-    })
-    if (!parsed.success) {
-      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
-      return null
-    }
-
-    return { file: parsed.data.file, greenBookId: parsed.data.green_book_id }
-  }
-
-  if (activeImportKind.value === 'loan_agreement') {
-    const parsed = loanAgreementImportFileSchema.safeParse({ file: selectedFile.value })
+    const parsed = blueBookImportFileSchema.safeParse({ file: selectedFile.value })
     if (!parsed.success) {
       errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
       return null
@@ -543,8 +433,18 @@ function getImportInput(): ParsedImportInput | null {
     return { file: parsed.data.file }
   }
 
-  if (activeImportKind.value === 'monitoring') {
-    const parsed = monitoringImportFileSchema.safeParse({ file: selectedFile.value })
+  if (activeImportKind.value === 'green_book') {
+    const parsed = greenBookImportFileSchema.safeParse({ file: selectedFile.value })
+    if (!parsed.success) {
+      errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
+      return null
+    }
+
+    return { file: parsed.data.file }
+  }
+
+  if (activeImportKind.value === 'loan_agreement') {
+    const parsed = loanAgreementImportFileSchema.safeParse({ file: selectedFile.value })
     if (!parsed.success) {
       errorMessage.value = parsed.error.issues[0]?.message ?? 'File tidak valid'
       return null
@@ -635,21 +535,6 @@ function sheetLabel(sheet: string) {
   return sheetDisplayLabels[sheet] ?? sheet
 }
 
-function blueBookOptionLabel(blueBook: BlueBook) {
-  const revision =
-    blueBook.revision_number > 0
-      ? `Revisi ${blueBook.revision_number}${blueBook.revision_year ? `/${blueBook.revision_year}` : ''}`
-      : 'Awal'
-
-  return `${blueBook.period.name} - ${revision} - ${blueBook.publish_date}`
-}
-
-function greenBookOptionLabel(greenBook: GreenBook) {
-  const revision = greenBook.revision_number > 0 ? `Revisi ${greenBook.revision_number}` : 'Awal'
-
-  return `Green Book ${greenBook.publish_year} - ${revision}`
-}
-
 function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -693,32 +578,6 @@ function filterButtonClass(active: boolean) {
           </button>
         </div>
 
-        <label v-if="activeImportKind === 'blue_book'" class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Target Blue Book</span>
-          <Select
-            v-model="selectedBlueBookId"
-            :options="blueBookOptions"
-            option-label="label"
-            option-value="id"
-            placeholder="Pilih Blue Book"
-            class="w-full"
-            :loading="blueBookStore.loading"
-          />
-        </label>
-
-        <label v-if="activeImportKind === 'green_book'" class="block space-y-2">
-          <span class="text-sm font-medium text-surface-700">Target Green Book</span>
-          <Select
-            v-model="selectedGreenBookId"
-            :options="greenBookOptions"
-            option-label="label"
-            option-value="id"
-            placeholder="Pilih Green Book"
-            class="w-full"
-            :loading="greenBookStore.loading"
-          />
-        </label>
-
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
             <p class="text-sm font-semibold text-surface-900">
@@ -741,11 +600,7 @@ function filterButtonClass(active: boolean) {
               label="Template"
               icon="pi pi-download"
               outlined
-              :disabled="
-                importBusy ||
-                templateLoading ||
-                targetMissing
-              "
+              :disabled="importBusy || templateLoading"
               :loading="templateLoading"
               @click="downloadTemplate"
             />
@@ -753,11 +608,7 @@ function filterButtonClass(active: boolean) {
             <Button
               label="Preview"
               icon="pi pi-eye"
-              :disabled="
-                !selectedFile ||
-                importBusy ||
-                targetMissing
-              "
+              :disabled="!selectedFile || importBusy"
               :loading="previewLoading"
               outlined
               @click="previewFile"
@@ -770,8 +621,7 @@ function filterButtonClass(active: boolean) {
                 !summary ||
                 summary.total_failed > 0 ||
                 executed ||
-                importBusy ||
-                targetMissing
+                importBusy
               "
               :loading="executeLoading"
               @click="executeFile"
@@ -834,17 +684,17 @@ function filterButtonClass(active: boolean) {
       </div>
 
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-surface-200 text-sm">
-          <thead class="bg-surface-50 text-left text-xs uppercase text-surface-500">
+        <table class="prism-table min-w-full">
+          <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
             <tr>
               <th class="px-3 py-2 font-semibold">Sheet</th>
               <th class="px-3 py-2 font-semibold">Status</th>
-              <th class="px-3 py-2 font-semibold">Ditambah</th>
-              <th class="px-3 py-2 font-semibold">Skip</th>
-              <th class="px-3 py-2 font-semibold">Gagal</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Ditambah</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Skip</th>
+              <th class="prism-table-align-right px-3 py-2 font-semibold">Gagal</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-surface-100">
+          <tbody>
             <tr v-for="sheet in summary.sheets" :key="sheet.sheet">
               <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(sheet.sheet) }}</td>
               <td class="px-3 py-2">
@@ -854,9 +704,9 @@ function filterButtonClass(active: boolean) {
                   rounded
                 />
               </td>
-              <td class="px-3 py-2">{{ sheet.inserted }}</td>
-              <td class="px-3 py-2">{{ sheet.skipped }}</td>
-              <td class="px-3 py-2">{{ sheet.failed }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.inserted }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.skipped }}</td>
+              <td class="prism-table-align-right px-3 py-2">{{ sheet.failed }}</td>
             </tr>
           </tbody>
         </table>
@@ -901,23 +751,23 @@ function filterButtonClass(active: boolean) {
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-surface-200">
-          <table class="min-w-full divide-y divide-surface-200 text-sm">
-            <thead class="bg-surface-50 text-left text-xs uppercase text-surface-500">
+          <table class="prism-table min-w-full">
+            <thead class="bg-surface-50 text-left text-xs font-semibold uppercase tracking-wide text-surface-500">
               <tr>
                 <th class="px-3 py-2 font-semibold">Sheet</th>
-                <th class="px-3 py-2 font-semibold">Baris</th>
+                <th class="prism-table-align-right px-3 py-2 font-semibold">Baris</th>
                 <th class="px-3 py-2 font-semibold">Status</th>
                 <th class="px-3 py-2 font-semibold">Data</th>
                 <th class="px-3 py-2 font-semibold">Keterangan</th>
               </tr>
             </thead>
-            <tbody v-if="filteredImportRows.length" class="divide-y divide-surface-100">
+            <tbody v-if="filteredImportRows.length">
               <tr
                 v-for="row in paginatedImportRows"
                 :key="`${row.sheet}-${row.row}-${row.status}-${row.label}`"
               >
                 <td class="px-3 py-2 font-medium text-surface-900">{{ sheetLabel(row.sheet) }}</td>
-                <td class="px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
+                <td class="prism-table-align-right px-3 py-2 text-surface-600">{{ rowNumberLabel(row.row) }}</td>
                 <td class="px-3 py-2">
                   <Tag
                     :value="rowStatusLabel(row.status)"
@@ -933,7 +783,7 @@ function filterButtonClass(active: boolean) {
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="5" class="px-3 py-6 text-center text-sm text-surface-500">
+                <td colspan="5" class="prism-table-empty px-3 py-6">
                   Tidak ada baris untuk filter ini.
                 </td>
               </tr>

@@ -50,6 +50,12 @@ func TestJourneyReturnsConcretePathRevisionMetadataAndFundingDetails(t *testing.
 	if err != nil {
 		t.Fatalf("CreateLoanAgreement(journey) error = %v", err)
 	}
+	secondLAReq := env.loanAgreementRequest(dkProject.ID, lender, "LA-JRN-002")
+	secondLAReq.AmountOriginal = 25
+	secondLAReq.AmountUSD = 25
+	if _, err := laService.CreateLoanAgreement(env.ctx, secondLAReq); err != nil {
+		t.Fatalf("CreateLoanAgreement(second journey) error = %v", err)
+	}
 	if _, err := env.queries.CreateMonitoring(env.ctx, queries.CreateMonitoringParams{
 		LoanAgreementID:    mustParseUUID(t, la.ID),
 		BudgetYear:         2025,
@@ -109,10 +115,11 @@ func TestJourneyReturnsConcretePathRevisionMetadataAndFundingDetails(t *testing.
 	if gbNode.DKProjects[0].DaftarKegiatan == nil || gbNode.DKProjects[0].DaftarKegiatan.LetterNumber == nil || *gbNode.DKProjects[0].DaftarKegiatan.LetterNumber != "DK-JRN-001" {
 		t.Fatalf("DK header = %+v, want letter number DK-JRN-001", gbNode.DKProjects[0].DaftarKegiatan)
 	}
-	laNode := gbNode.DKProjects[0].LoanAgreement
-	if laNode == nil {
-		t.Fatal("loan agreement is nil, want populated")
+	loanAgreements := gbNode.DKProjects[0].LoanAgreements
+	if len(loanAgreements) != 2 {
+		t.Fatalf("loan agreements = %+v, want 2 items", loanAgreements)
 	}
+	laNode := loanAgreements[0]
 	if !laNode.IsExtended || laNode.ExtensionDays <= 0 || laNode.Currency != "USD" || laNode.AmountUSD != 100 {
 		t.Fatalf("loan agreement = %+v, want extended USD 100", laNode)
 	}
