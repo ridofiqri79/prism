@@ -21,9 +21,7 @@ services:
       - prism_network
 
   backend:
-    build:
-      context: ./prism-backend
-      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-ghcr.io/ridofiqri79/prism-backend:main}
     container_name: prism_backend
     restart: unless-stopped
     env_file: .env
@@ -36,12 +34,7 @@ services:
       - prism_network
 
   frontend:
-    build:
-      context: ./prism-frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
-        - VITE_APP_NAME=${VITE_APP_NAME}
+    image: ${FRONTEND_IMAGE:-ghcr.io/ridofiqri79/prism-frontend:main}
     container_name: prism_frontend
     restart: unless-stopped
     expose:
