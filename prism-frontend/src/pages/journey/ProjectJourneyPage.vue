@@ -2,7 +2,10 @@
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
-import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
+import AutoComplete, {
+  type AutoCompleteCompleteEvent,
+  type AutoCompleteOptionSelectEvent,
+} from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
@@ -28,6 +31,7 @@ type ProjectJourneyOption = Pick<
 > & {
   label: string
 }
+type ProjectJourneySelection = ProjectJourneyOption | string | null
 
 type JourneyView = 'summary' | 'flow' | 'detail'
 
@@ -54,11 +58,14 @@ const {
   error,
 } = storeToRefs(journeyStore)
 
-const selectedProject = ref<ProjectJourneyOption | null>(null)
+const selectedProject = ref<ProjectJourneySelection>(null)
 const activeView = ref<JourneyView>('summary')
 const bbProjectId = computed(() => String(route.params.bbProjectId ?? ''))
 const projectSuggestions = computed<ProjectJourneyOption[]>(() =>
   projectOptions.value.map(toOption),
+)
+const selectedProjectOption = computed(() =>
+  isProjectJourneyOption(selectedProject.value) ? selectedProject.value : null,
 )
 const viewOptions: Array<{ label: string; value: JourneyView; icon: string }> = [
   { label: 'Ringkasan', value: 'summary', icon: 'pi pi-chart-bar' },
@@ -94,6 +101,10 @@ function optionFromJourney(journey: JourneyResponse): ProjectJourneyOption {
   }
 }
 
+function isProjectJourneyOption(value: ProjectJourneySelection): value is ProjectJourneyOption {
+  return typeof value === 'object' && value !== null && typeof value.id === 'string' && value.id !== ''
+}
+
 async function searchProjects(event: AutoCompleteCompleteEvent) {
   await journeyStore.searchProjectOptions(event.query)
 }
@@ -106,8 +117,14 @@ async function loadJourney(projectId: string) {
 }
 
 async function openSelectedProject() {
-  if (!selectedProject.value) return
-  await router.push({ name: 'project-journey', params: { bbProjectId: selectedProject.value.id } })
+  if (!selectedProjectOption.value) return
+  await router.push({ name: 'project-journey', params: { bbProjectId: selectedProjectOption.value.id } })
+}
+
+async function openSelectedOption(event: AutoCompleteOptionSelectEvent) {
+  const option = event.value as ProjectJourneyOption
+  selectedProject.value = option
+  await router.push({ name: 'project-journey', params: { bbProjectId: option.id } })
 }
 
 async function retryLoad() {
@@ -137,9 +154,7 @@ onMounted(async () => {
   <section class="space-y-6">
     <PageHeader title="Perjalanan Proyek" subtitle="Alur proyek dari Blue Book sampai Monitoring" />
 
-    <section
-      class="rounded-lg border border-surface-200 bg-white p-4 shadow-sm shadow-surface-200/40"
-    >
+    <section class="rounded-lg border border-surface-200 bg-white p-4 shadow-sm shadow-surface-200/40">
       <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Cari Proyek Blue Book</span>
@@ -148,12 +163,13 @@ onMounted(async () => {
             :suggestions="projectSuggestions"
             :loading="searching"
             option-label="label"
+            data-key="id"
             placeholder="Cari kode atau nama proyek"
             dropdown
             force-selection
             class="w-full"
             @complete="searchProjects"
-            @item-select="openSelectedProject"
+            @option-select="openSelectedOption"
           >
             <template #option="{ option }">
               <div class="min-w-0 space-y-1">
@@ -175,34 +191,34 @@ onMounted(async () => {
           <Button
             label="Lihat Perjalanan"
             icon="pi pi-share-alt"
-            :disabled="!selectedProject"
+            :disabled="!selectedProjectOption"
             :loading="loading"
             @click="openSelectedProject"
           />
         </div>
         <div
-          v-if="selectedProject"
+          v-if="selectedProjectOption"
           class="rounded-lg border border-surface-100 bg-surface-50 px-3 py-2 md:col-span-2"
         >
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold text-surface-900">{{
-              selectedProject.bb_code
+              selectedProjectOption.bb_code
             }}</span>
             <Tag
-              v-if="selectedProject.blue_book_revision_label"
-              :value="selectedProject.blue_book_revision_label"
+              v-if="selectedProjectOption.blue_book_revision_label"
+              :value="selectedProjectOption.blue_book_revision_label"
               severity="secondary"
               rounded
             />
             <Tag
-              v-if="selectedProject.has_newer_revision"
+              v-if="selectedProjectOption.has_newer_revision"
               value="Ada revisi lebih baru"
               severity="warn"
               rounded
             />
           </div>
           <p class="mt-1 line-clamp-1 text-sm text-surface-500">
-            {{ selectedProject.project_name }}
+            {{ selectedProjectOption.project_name }}
           </p>
         </div>
       </div>
