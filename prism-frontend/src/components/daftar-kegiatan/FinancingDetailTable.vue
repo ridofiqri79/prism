@@ -5,7 +5,6 @@ import MultiCurrencyTable from './MultiCurrencyTable.vue'
 
 const props = defineProps<{
   rows: DKFinancingDetailPayload[]
-  allowedLenderIds: string[]
 }>()
 
 const emit = defineEmits<{
@@ -31,11 +30,14 @@ const emit = defineEmits<{
       <template #first-col="{ row, index }">
         <LenderSelect
           :model-value="(row as DKFinancingDetailPayload).lender_id"
-          :allowed-ids="allowedLenderIds"
-          :disabled="allowedLenderIds.length === 0"
           placeholder="Pilih lender"
           @update:model-value="
-            emit('update:rows', props.rows.map((r, i) => i === index ? { ...r, lender_id: String($event ?? '') } : { ...r }) as DKFinancingDetailPayload[])
+            emit(
+              'update:rows',
+              props.rows.map((r, i) =>
+                i === index ? { ...r, lender_id: String($event ?? '') } : { ...r },
+              ) as DKFinancingDetailPayload[],
+            )
           "
         />
       </template>

@@ -15,7 +15,6 @@ import LocationMultiSelect from '@/components/forms/LocationMultiSelect.vue'
 import ProgramTitleSelect from '@/components/forms/ProgramTitleSelect.vue'
 import { useDKProjectForm } from '@/composables/forms/useDKProjectForm'
 import { useToast } from '@/composables/useToast'
-import { useBlueBookStore } from '@/stores/blue-book.store'
 import { useDaftarKegiatanStore } from '@/stores/daftar-kegiatan.store'
 import { useGreenBookStore } from '@/stores/green-book.store'
 import { useMasterStore } from '@/stores/master.store'
@@ -24,7 +23,6 @@ const route = useRoute()
 const router = useRouter()
 const dkStore = useDaftarKegiatanStore()
 const greenBookStore = useGreenBookStore()
-const blueBookStore = useBlueBookStore()
 const masterStore = useMasterStore()
 const toast = useToast()
 
@@ -36,7 +34,6 @@ const pageTitle = computed(() =>
 )
 const form = useDKProjectForm(null, {
   gbProjects: () => greenBookStore.projectOptions,
-  bbProjects: () => blueBookStore.projectOptions,
 })
 
 const gbProjectOptions = computed(() =>
@@ -55,7 +52,6 @@ async function loadData() {
   await Promise.all([
     dkStore.fetchDK(dkId.value),
     greenBookStore.fetchProjectOptions(),
-    blueBookStore.fetchProjectOptions(),
     masterStore.fetchProgramTitles(true, { limit: 1000 }),
     masterStore.fetchBappenasPartners(true, { limit: 1000 }),
     masterStore.fetchInstitutions(true, { limit: 1000 }),
@@ -187,8 +183,8 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Rincian Pembiayaan</h2>
           <p class="text-sm text-surface-500">
-            Pilihan lender hanya berisi lender dari funding source Green Book dan indikasi lender
-            Blue Book proyek terpilih.
+            Lender dapat dipilih dari master lender dan tetap bisa berbeda dari funding source Green
+            Book proyek terpilih.
           </p>
           <small v-if="form.errors.financing_details" class="text-red-600">{{
             form.errors.financing_details
@@ -196,7 +192,6 @@ onMounted(() => {
         </div>
         <FinancingDetailTable
           v-model:rows="form.financingDetails.value"
-          :allowed-lender-ids="form.allowedLenderIds.value"
           @add="form.addFinancing"
           @remove="form.removeFinancing"
         />

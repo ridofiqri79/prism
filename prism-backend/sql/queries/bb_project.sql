@@ -565,7 +565,8 @@ related_la AS (
         rd.letter_number,
         rd.gb_code
     FROM related_dk rd
-    JOIN loan_agreement la ON la.dk_project_id = rd.id
+    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = rd.id
+    JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
 ),
 related_monitoring AS (
     SELECT DISTINCT

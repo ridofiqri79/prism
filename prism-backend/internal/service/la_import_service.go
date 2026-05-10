@@ -15,11 +15,20 @@ import (
 	"github.com/ridofiqri79/prism-backend/internal/model"
 )
 
-const laImportSheetInput = "Loan Agreement"
+const (
+	laImportSheetInput     = "Loan Agreement"
+	laImportSheetRelations = "Relasi - DK Project"
+)
 
 type laImportDKProjectLookup struct {
 	byID    map[string]queries.ListLoanAgreementImportDKProjectReferencesRow
 	byLabel map[string]queries.ListLoanAgreementImportDKProjectReferencesRow
+}
+
+type parsedLoanAgreementImportAllocation struct {
+	DKProjectID        pgtype.UUID
+	DKProjectName      string
+	AllocationOriginal float64
 }
 
 func (s *LAService) PreviewLoanAgreementImport(ctx context.Context, fileName string, reader io.Reader, size int64) (*model.MasterImportResponse, error) {
@@ -93,7 +102,6 @@ func (s *LAService) processLoanAgreementWorkbook(ctx context.Context, fileName s
 func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *queries.Queries, workbook *xlsxWorkbook, fileName string) (*model.MasterImportResponse, []string, error) {
 	result := model.MasterImportSheetResult{Sheet: laImportSheetInput}
 	rows, ok := workbook.importRows(laImportSheetInput, []string{
-		"dk_project_ref",
 		"lender_name",
 		"loan_code",
 		"agreement_date",
@@ -116,6 +124,7 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 		return response, nil, nil
 	}
 
+	relationResult := model.MasterImportSheetResult{Sheet: laImportSheetRelations}
 	dkRefs, err := qtx.ListLoanAgreementImportDKProjectReferences(ctx)
 	if err != nil {
 		return nil, nil, apperrors.Internal("Gagal membaca referensi DK Project")
@@ -126,6 +135,7 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 	}
 	lookup := buildLAImportDKProjectLookup(dkRefs)
 	allowedByDK := buildLAImportAllowedLenderMap(allowedLenders)
+	relationAllocations, hasRelationSheet := parseLoanAgreementImportRelations(workbook, lookup, &relationResult)
 
 	masterSvc := &MasterService{db: s.db, queries: s.queries}
 	lookups, err := masterSvc.loadMasterImportLookups(ctx, qtx)
@@ -142,7 +152,7 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 			label = row.value("dk_project_ref")
 		}
 
-		parsed, skip, messages := s.parseLoanAgreementImportRow(ctx, qtx, row, lookup, allowedByDK, lookups, seenLoanCodes)
+		parsed, skip, messages := s.parseLoanAgreementImportRow(ctx, qtx, row, lookup, allowedByDK, lookups, seenLoanCodes, relationAllocations, hasRelationSheet)
 		switch {
 		case skip:
 			result.Skipped++
@@ -150,8 +160,12 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 		case len(messages) > 0:
 			addImportError(&result, row.number, strings.Join(messages, "; "))
 		default:
+			allocationRows, err := buildLoanAgreementImportAllocationRows(ctx, qtx, parsed)
+			if err != nil {
+				return nil, nil, err
+			}
 			created, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
-				DkProjectID:            parsed.DKProjectID,
+				DkProjectID:            parsed.PrimaryDKProjectID(),
 				LenderID:               parsed.LenderID,
 				LoanCode:               parsed.LoanCode,
 				AgreementDate:          parsed.AgreementDate,
@@ -166,22 +180,35 @@ func (s *LAService) buildLoanAgreementImportPreview(ctx context.Context, qtx *qu
 			if err != nil {
 				return nil, nil, fromPg(err)
 			}
+			for _, allocation := range allocationRows {
+				if err := qtx.AddLoanAgreementDKProject(ctx, queries.AddLoanAgreementDKProjectParams{
+					LoanAgreementID:    created.ID,
+					DkProjectID:        allocation.DKProjectID,
+					AllocationOriginal: numericFromFloat(allocation.AllocationOriginal),
+					AllocationUsd:      numericFromFloat(allocation.AllocationUSD),
+				}); err != nil {
+					return nil, nil, fromPg(err)
+				}
+			}
 			createdIDs = append(createdIDs, model.UUIDToString(created.ID))
-			addImportCreated(&result, row.number, fmt.Sprintf("%s - %s", parsed.LoanCode, parsed.DKProjectName))
+			addImportCreated(&result, row.number, fmt.Sprintf("%s - %s", parsed.LoanCode, parsed.ProjectNames()))
 		}
 	}
 
+	sheets := []model.MasterImportSheetResult{result}
+	if hasRelationSheet {
+		sheets = append(sheets, relationResult)
+	}
 	response := &model.MasterImportResponse{
 		FileName: fileName,
-		Sheets:   []model.MasterImportSheetResult{result},
+		Sheets:   sheets,
 	}
 	recalculateImportTotals(response)
 	return response, createdIDs, nil
 }
 
 type parsedLoanAgreementImportRow struct {
-	DKProjectID            pgtype.UUID
-	DKProjectName          string
+	Allocations            []parsedLoanAgreementImportAllocation
 	LenderID               pgtype.UUID
 	LoanCode               string
 	AgreementDate          pgtype.Date
@@ -189,32 +216,55 @@ type parsedLoanAgreementImportRow struct {
 	OriginalClosingDate    pgtype.Date
 	ClosingDate            pgtype.Date
 	Currency               string
+	AmountOriginalValue    float64
+	AmountUSDValue         float64
 	AmountOriginal         pgtype.Numeric
 	AmountUsd              pgtype.Numeric
 	CumulativeDisbursement pgtype.Numeric
 }
 
-func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *queries.Queries, row importRow, dkLookup laImportDKProjectLookup, allowedByDK map[string]map[string]struct{}, lookups *masterImportLookups, seenLoanCodes map[string]struct{}) (parsedLoanAgreementImportRow, bool, []string) {
+func (p parsedLoanAgreementImportRow) PrimaryDKProjectID() pgtype.UUID {
+	if len(p.Allocations) == 0 {
+		return pgtype.UUID{}
+	}
+	return p.Allocations[0].DKProjectID
+}
+
+func (p parsedLoanAgreementImportRow) ProjectNames() string {
+	names := make([]string, 0, len(p.Allocations))
+	seen := map[string]struct{}{}
+	for _, allocation := range p.Allocations {
+		name := strings.TrimSpace(allocation.DKProjectName)
+		if name == "" {
+			name = model.UUIDToString(allocation.DKProjectID)
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	return strings.Join(names, ", ")
+}
+
+func (p parsedLoanAgreementImportRow) RequestAllocations() []parsedLoanAgreementAllocation {
+	allocations := make([]parsedLoanAgreementAllocation, 0, len(p.Allocations))
+	for _, allocation := range p.Allocations {
+		allocations = append(allocations, parsedLoanAgreementAllocation{
+			DKProjectID:        allocation.DKProjectID,
+			AllocationOriginal: allocation.AllocationOriginal,
+		})
+	}
+	return allocations
+}
+
+func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *queries.Queries, row importRow, dkLookup laImportDKProjectLookup, allowedByDK map[string]map[string]struct{}, lookups *masterImportLookups, seenLoanCodes map[string]struct{}, relationAllocations map[string][]parsedLoanAgreementImportAllocation, hasRelationSheet bool) (parsedLoanAgreementImportRow, bool, []string) {
 	var parsed parsedLoanAgreementImportRow
 	messages := make([]string, 0)
 	addMessage := func(message string) {
 		message = strings.TrimSpace(message)
 		if message != "" {
 			messages = append(messages, message)
-		}
-	}
-
-	dkProjectRef := row.value("dk_project_ref")
-	dkProject, exists := resolveLAImportDKProjectRef(dkProjectRef, dkLookup)
-	if dkProjectRef == "" {
-		addMessage("DK Project Ref wajib diisi")
-	} else if !exists {
-		addMessage("DK Project Ref tidak ditemukan di snapshot Master Data")
-	} else {
-		parsed.DKProjectID = dkProject.ID
-		parsed.DKProjectName = dkProject.ProjectName
-		if !dkProject.HasFinancingDetail {
-			addMessage("DK Project belum memiliki Financing Detail")
 		}
 	}
 
@@ -236,6 +286,31 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 		parsed.LoanCode = loanCode
 	}
 
+	if hasRelationSheet {
+		allocations := relationAllocations[normalizeLookupKey(loanCode)]
+		if loanCode != "" && len(allocations) == 0 {
+			addMessage("Relasi DK Project untuk Loan Code belum diisi")
+		}
+		parsed.Allocations = allocations
+	} else {
+		dkProjectRef := row.value("dk_project_ref")
+		dkProject, exists := resolveLAImportDKProjectRef(dkProjectRef, dkLookup)
+		if dkProjectRef == "" {
+			addMessage("DK Project Ref wajib diisi")
+		} else if !exists {
+			addMessage("DK Project Ref tidak ditemukan di snapshot Master Data")
+		} else {
+			parsed.Allocations = []parsedLoanAgreementImportAllocation{{
+				DKProjectID:        dkProject.ID,
+				DKProjectName:      dkProject.ProjectName,
+				AllocationOriginal: 0,
+			}}
+			if !dkProject.HasFinancingDetail {
+				addMessage("DK Project belum memiliki Financing Detail")
+			}
+		}
+	}
+
 	lenderName := row.value("lender_name")
 	if lenderName == "" {
 		addMessage("Lender Name wajib diisi")
@@ -248,10 +323,10 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 			addMessage(fmt.Sprintf("Lender %q belum ada di master data", lenderName))
 		default:
 			parsed.LenderID = lender.ID
-			if parsed.DKProjectID.Valid {
-				dkAllowed := allowedByDK[model.UUIDToString(parsed.DKProjectID)]
+			for _, allocation := range parsed.Allocations {
+				dkAllowed := allowedByDK[model.UUIDToString(allocation.DKProjectID)]
 				if _, ok := dkAllowed[model.UUIDToString(lender.ID)]; !ok {
-					addMessage("Lender harus berasal dari Financing Detail DK Project terkait")
+					addMessage(fmt.Sprintf("Lender harus berasal dari Financing Detail DK Project %s", allocation.DKProjectName))
 				}
 			}
 		}
@@ -301,15 +376,108 @@ func (s *LAService) parseLoanAgreementImportRow(ctx context.Context, qtx *querie
 	if err != nil {
 		addMessage(err.Error())
 	}
+	if !hasRelationSheet && len(parsed.Allocations) == 1 {
+		parsed.Allocations[0].AllocationOriginal = amountOriginal
+	}
+	if hasRelationSheet && len(parsed.Allocations) > 0 && !sameLoanAgreementImportAllocationTotal(parsed.Allocations, amountOriginal) {
+		addMessage("Total Allocation Original pada sheet Relasi - DK Project harus sama dengan Amount Original")
+	}
 	amountUSD, err := calculateLoanAgreementAmountUSD(ctx, qtx, currency, amountOriginal)
 	if err != nil {
 		addMessage(err.Error())
 	}
+	parsed.AmountOriginalValue = amountOriginal
+	parsed.AmountUSDValue = amountUSD
 	parsed.AmountOriginal = numericFromFloat(amountOriginal)
 	parsed.AmountUsd = numericFromFloat(amountUSD)
 	parsed.CumulativeDisbursement = numericFromFloat(cumulativeDisbursement)
 
 	return parsed, false, messages
+}
+
+func parseLoanAgreementImportRelations(workbook *xlsxWorkbook, dkLookup laImportDKProjectLookup, result *model.MasterImportSheetResult) (map[string][]parsedLoanAgreementImportAllocation, bool) {
+	rows, ok := workbook.importRows(laImportSheetRelations, []string{
+		"loan_code",
+		"dk_project_ref",
+		"allocation_original",
+	})
+	if !ok {
+		return map[string][]parsedLoanAgreementImportAllocation{}, false
+	}
+	if hasImportHeaderError(result, rows) {
+		return map[string][]parsedLoanAgreementImportAllocation{}, true
+	}
+	allocationsByLoanCode := map[string][]parsedLoanAgreementImportAllocation{}
+	seenByLoanCode := map[string]map[string]struct{}{}
+	for _, row := range rows {
+		messages := make([]string, 0)
+		addMessage := func(message string) {
+			if strings.TrimSpace(message) != "" {
+				messages = append(messages, strings.TrimSpace(message))
+			}
+		}
+		loanCode := strings.TrimSpace(row.value("loan_code"))
+		if loanCode == "" {
+			addMessage("Loan Code wajib diisi")
+		}
+		dkProjectRef := row.value("dk_project_ref")
+		dkProject, exists := resolveLAImportDKProjectRef(dkProjectRef, dkLookup)
+		if dkProjectRef == "" {
+			addMessage("DK Project Ref wajib diisi")
+		} else if !exists {
+			addMessage("DK Project Ref tidak ditemukan di snapshot Master Data")
+		} else if !dkProject.HasFinancingDetail {
+			addMessage("DK Project belum memiliki Financing Detail")
+		}
+		allocationOriginal, err := parseLAImportAmount(row.value("allocation_original"), "Allocation Original", true)
+		if err != nil {
+			addMessage(err.Error())
+		}
+		loanCodeKey := normalizeLookupKey(loanCode)
+		if loanCodeKey != "" && exists {
+			if seenByLoanCode[loanCodeKey] == nil {
+				seenByLoanCode[loanCodeKey] = map[string]struct{}{}
+			}
+			dkProjectID := model.UUIDToString(dkProject.ID)
+			if _, duplicate := seenByLoanCode[loanCodeKey][dkProjectID]; duplicate {
+				addMessage("DK Project duplikat untuk Loan Code yang sama")
+			}
+			seenByLoanCode[loanCodeKey][dkProjectID] = struct{}{}
+		}
+		label := strings.TrimSpace(loanCode)
+		if exists {
+			label = fmt.Sprintf("%s - %s", loanCode, dkProject.ProjectName)
+		}
+		if len(messages) > 0 {
+			addImportError(result, row.number, strings.Join(messages, "; "))
+			continue
+		}
+		allocationsByLoanCode[loanCodeKey] = append(allocationsByLoanCode[loanCodeKey], parsedLoanAgreementImportAllocation{
+			DKProjectID:        dkProject.ID,
+			DKProjectName:      dkProject.ProjectName,
+			AllocationOriginal: allocationOriginal,
+		})
+		addImportRow(result, row.number, masterImportStatusCreate, label, "Relasi valid")
+	}
+	return allocationsByLoanCode, true
+}
+
+func sameLoanAgreementImportAllocationTotal(allocations []parsedLoanAgreementImportAllocation, amountOriginal float64) bool {
+	total := 0.0
+	for _, allocation := range allocations {
+		total += allocation.AllocationOriginal
+	}
+	return sameCurrencyAmount(total, amountOriginal)
+}
+
+func buildLoanAgreementImportAllocationRows(ctx context.Context, qtx *queries.Queries, parsed parsedLoanAgreementImportRow) ([]loanAgreementAllocationRow, error) {
+	request := parsedLoanAgreementRequest{
+		Allocations:         parsed.RequestAllocations(),
+		Currency:            parsed.Currency,
+		AmountOriginalValue: parsed.AmountOriginalValue,
+		AmountOriginal:      parsed.AmountOriginal,
+	}
+	return buildLoanAgreementAllocationRows(ctx, qtx, request, parsed.AmountUSDValue)
 }
 
 func buildLAImportDKProjectLookup(items []queries.ListLoanAgreementImportDKProjectReferencesRow) laImportDKProjectLookup {

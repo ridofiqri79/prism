@@ -1278,8 +1278,8 @@ func validateLender(req model.CreateLenderRequest) error {
 	if req.Type != "Bilateral" && req.Type != "Multilateral" && req.Type != "KSA" {
 		return validation("type", "harus Bilateral, Multilateral, atau KSA")
 	}
-	if req.Type != "Multilateral" && (req.CountryID == nil || strings.TrimSpace(*req.CountryID) == "") {
-		return validation("country_id", "Wajib diisi untuk Bilateral dan KSA")
+	if req.Type == "Bilateral" && (req.CountryID == nil || strings.TrimSpace(*req.CountryID) == "") {
+		return validation("country_id", "Wajib diisi untuk Bilateral")
 	}
 	if req.Type == "Multilateral" && req.CountryID != nil && strings.TrimSpace(*req.CountryID) != "" {
 		return validation("country_id", "Harus kosong untuk Multilateral")

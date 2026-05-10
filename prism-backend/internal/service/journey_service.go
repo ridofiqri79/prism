@@ -246,6 +246,8 @@ func toJourneyLoanAgreement(row queries.ListJourneyLoanAgreementsByDKProjectsRow
 		Currency:            row.Currency,
 		AmountOriginal:      floatFromNumeric(row.AmountOriginal),
 		AmountUSD:           floatFromNumeric(row.AmountUsd),
+		AllocationOriginal:  floatFromNumeric(row.AllocationOriginal),
+		AllocationUSD:       floatFromNumeric(row.AllocationUsd),
 		Monitoring:          monitoring,
 	}
 }

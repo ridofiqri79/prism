@@ -384,7 +384,7 @@ Validasi: `currency_id` wajib merujuk Master Currency, `kurs` dan `kurs_tengah_b
 {
   "name": "JICA",
   "type": "Bilateral",
-  "country_id": "uuid"        // wajib jika type Bilateral atau KSA
+  "country_id": "uuid"        // wajib jika type Bilateral; opsional untuk KSA; null/kosong untuk Multilateral
 }
 ```
 
@@ -1209,7 +1209,7 @@ History selalu mengembalikan daftar snapshot revisi. Untuk user ADMIN, response 
 Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh relasinya. Workbook mendukung multi header DK. `DK Key (*)` adalah kunci sementara workbook untuk header; `Project Key (*)` wajib unik per `DK Key` dan hanya dipakai untuk menghubungkan sheet relasi. `Letter Number (*)` wajib untuk import dan menjadi idempotency key.
 
 **Template:**
-`GET /daftar-kegiatan/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Daftar Kegiatan`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data, GB Project aktif, dan referensi allowed lender per GB Project saat template dibuat.
+`GET /daftar-kegiatan/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Daftar Kegiatan`, `Input Data`, semua sheet relasi, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot master data, Master Lender, dan GB Project aktif saat template dibuat.
 
 **Kolom workbook:**
 
@@ -1232,7 +1232,7 @@ Import ini membuat header Daftar Kegiatan baru beserta DK Project dan seluruh re
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Project Name, Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Project Name` adalah nama snapshot di Daftar Kegiatan dan boleh berbeda dari nama Green Book. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus berasal dari allowed lender GB Project terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
+Jika `Letter Number` sudah ada di DB, header dan semua project/relasi di bawahnya berstatus `skip`. Duplikat `Letter Number` dalam workbook berstatus `failed`. Project baru wajib punya Project Name, Executing Agency, minimal 1 GB Project aktif, Location, Financing Detail, Loan Allocation, dan Activity Detail. `Project Name` adalah nama snapshot di Daftar Kegiatan dan boleh berbeda dari nama Green Book. `Program Title` opsional, tetapi jika diisi harus ada di master data. Kolom institution pada `Input Data.Executing Agency Name` dan `Relasi - Loan Allocation.Institution Name` dapat diisi dengan nama jika unik, UUID dari sheet `Master Data`, atau path `Nama Child; Nama Parent; Nama Root;`. Sheet `Panduan` menjelaskan fallback ini dan Preview tetap gagal untuk nama polos yang ambigu. Lender Financing Detail harus ada di Master Lender dan boleh berbeda dari funding source Green Book terkait. `Currency` kosong dianggap `USD`; jika diisi harus kode ISO 4217 yang aktif di Master Currency. Amount kosong dianggap `0` dan tidak boleh negatif. `Activity No` duplikat per project berstatus `failed`.
 Kolom `Duration` pada workbook diisi sebagai angka jumlah bulan.
 `Date` pada sheet `Daftar Kegiatan` memakai format `YYYY-MM-DD`.
 
@@ -1366,7 +1366,7 @@ Response DK Project pada `GET /daftar-kegiatan/:dk_id/projects` dan `GET /daftar
 }
 ```
 
-Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect Proyek Daftar Kegiatan. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`. Loan Agreement yang sudah ada ditampilkan sebagai daftar aksi `Buka Loan Agreement`.
+Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail Header Daftar Kegiatan dengan query `dk_id` dan `dk_project_id`. Form Loan Agreement menggunakan query tersebut untuk preselect satu Proyek Daftar Kegiatan awal, lalu user tetap dapat menambahkan project lain dan mengatur alokasi. Tombol dibuat aktif hanya jika user memiliki permission `create: loan_agreement` dan proyek DK memiliki lender pada `financing_details`. Loan Agreement yang sudah ada ditampilkan sebagai daftar aksi `Buka Loan Agreement` dengan nilai alokasi project terkait.
 
 ---
 
@@ -1391,18 +1391,19 @@ Frontend dapat membuka form `Buat Loan Agreement` dari setiap proyek pada detail
 
 | Field | Keterangan |
 |-------|------------|
-| `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` |
+| `file` | Workbook `.xlsx` berisi sheet `Loan Agreement` dan `Relasi - DK Project` |
 
-Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru. DK Project boleh muncul lebih dari satu kali selama setiap baris memakai `Loan Code` berbeda; `Loan Code` yang sudah dipakai oleh record lain masuk status `failed`.
+Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan Agreement baru. Satu `Loan Code` dapat memiliki beberapa baris relasi DK Project pada sheet `Relasi - DK Project`, termasuk relasi lintas header Daftar Kegiatan. `Loan Code` yang sudah dipakai oleh record lain masuk status `failed`.
 
 **Template:**
-`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, currency aktif, dan Kurs Tengah BI saat template dibuat.
+`GET /loan-agreements/import/template` mengunduh workbook `.xlsx` dengan sheet `Panduan`, `Master Data`, `Loan Agreement`, `Relasi - DK Project`, dan sheet `_Dropdowns` tersembunyi. Sheet `Master Data` berisi snapshot DK Project, allowed lender dari `dk_financing_detail`, lender, currency aktif, dan Kurs Tengah BI saat template dibuat.
 
 **Kolom workbook:**
 
 | Sheet | Kolom |
 |-------|-------|
-| `Loan Agreement` | `DK Project Ref (*)`, `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Cumulative Disbursement` |
+| `Loan Agreement` | `Lender Name (*)`, `Loan Code (*)`, `Agreement Date (*)`, `Effective Date (*)`, `Original Closing Date`, `Closing Date (*)`, `Currency (*)`, `Amount Original (*)`, `Cumulative Disbursement` |
+| `Relasi - DK Project` | `Loan Code (*)`, `DK Project Ref (*)`, `Allocation Original (*)` |
 
 **Preview:**
 `POST /loan-agreements/import/preview` membaca workbook dan menjalankan validasi dalam transaksi yang di-rollback. Tidak ada data tersimpan.
@@ -1413,13 +1414,16 @@ Import Loan Agreement bersifat **create-only**. Endpoint ini hanya membuat Loan 
 **Response `200`:**
 Format response sama dengan Import Data Master: `data.file_name`, `total_inserted`, `total_skipped`, `total_failed`, dan `sheets[].rows[]` dengan status `create`, `skip`, atau `failed`.
 
-`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`. Backend menghitung `amount_usd` dari Kurs Tengah BI terbaru untuk currency non-USD; jika Kurs Tengah BI untuk currency tersebut belum tersedia, preview/import berstatus `failed`. Jika `Currency` adalah `USD`, `amount_usd` disamakan dengan `Amount Original`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih.
+`DK Project Ref` dapat diisi dari dropdown template atau UUID DK Project. `Lender Name` di-resolve dari master Lender berdasarkan `name`, lalu fallback ke `short_name` unik. Lender wajib berasal dari Financing Detail semua DK Project terkait. `Currency` wajib kode ISO 4217 aktif di Master Currency. `Original Closing Date` opsional dan diisi hanya jika pinjaman diperpanjang. Jika diisi, `Closing Date` tidak boleh lebih awal dari `Original Closing Date`. `Amount Original` wajib lebih dari `0`. Total `Allocation Original` pada sheet relasi untuk satu `Loan Code` wajib sama dengan `Amount Original`. Backend menghitung `amount_usd` dari Kurs Tengah BI terbaru untuk currency non-USD; jika Kurs Tengah BI untuk currency tersebut belum tersedia, preview/import berstatus `failed`. Jika `Currency` adalah `USD`, `amount_usd` disamakan dengan `Amount Original`. `allocation_usd` per project dihitung dari alokasi original dan disesuaikan rounding-nya agar total sama dengan `amount_usd`. `Cumulative Disbursement` opsional, tidak boleh negatif, dan memakai currency Loan Agreement yang dipilih. Workbook lama yang masih mengirim `DK Project Ref` di sheet `Loan Agreement` tetap diterima sebagai fallback single-project.
 
 **`POST /loan-agreements` Request:**
 `original_closing_date` boleh dikosongkan/diomit untuk pinjaman yang belum diperpanjang. `is_extended=false` dan `extension_days=0` saat field ini kosong.
 ```json
 {
-  "dk_project_id": "uuid",
+  "dk_project_allocations": [
+    { "dk_project_id": "uuid-dk-project-1", "allocation_original": 30000000000 },
+    { "dk_project_id": "uuid-dk-project-2", "allocation_original": 15000000000 }
+  ],
   "lender_id": "uuid-jica",
   "loan_code": "IP-603",
   "agreement_date": "2025-03-15",
@@ -1432,7 +1436,7 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 }
 ```
 
-`amount_usd` pada request diabaikan untuk perhitungan baru dan dipertahankan hanya untuk kompatibilitas client lama; backend selalu menghitung nilai USD dari `amount_original` dan Kurs Tengah BI terbaru.
+`dk_project_allocations` wajib untuk kontrak baru. Field lama `dk_project_id` masih diterima sebagai fallback single-project dan backend mengisi alokasi sebesar `amount_original`. Backend menolak project kosong, project duplikat, project yang tidak ditemukan, lender yang tidak ada di Financing Detail salah satu project, dan total alokasi yang tidak sama dengan `amount_original`. `amount_usd` pada request diabaikan untuk perhitungan baru dan dipertahankan hanya untuk kompatibilitas client lama; backend selalu menghitung nilai USD dari `amount_original` dan Kurs Tengah BI terbaru.
 
 **`GET /loan-agreements/:id` Response `200`:**
 ```json
@@ -1440,7 +1444,38 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
   "data": {
     "id": "uuid",
     "loan_code": "IP-603",
-    "dk_project": { "id": "uuid", "objectives": "..." },
+    "dk_projects": [
+      {
+        "id": "uuid-dk-project-1",
+        "dk_id": "uuid-dk-header-1",
+        "project_name": "Trans Sumatra Section 1 - DK",
+        "objectives": "Meningkatkan konektivitas",
+        "gb_codes": "GB-2025-001",
+        "daftar_kegiatan": {
+          "id": "uuid-dk-header-1",
+          "subject": "DK TA 2025",
+          "date": "2025-02-01",
+          "letter_number": "B-001/2025"
+        },
+        "allocation_original": 30000000000,
+        "allocation_usd": 200000000
+      },
+      {
+        "id": "uuid-dk-project-2",
+        "dk_id": "uuid-dk-header-2",
+        "project_name": "Trans Sumatra Section 2 - DK",
+        "objectives": "Meningkatkan konektivitas",
+        "gb_codes": "GB-2025-002",
+        "daftar_kegiatan": {
+          "id": "uuid-dk-header-2",
+          "subject": "DK TA 2026",
+          "date": "2026-02-01",
+          "letter_number": "B-002/2026"
+        },
+        "allocation_original": 15000000000,
+        "allocation_usd": 100000000
+      }
+    ],
     "lender": { "id": "uuid", "name": "JICA", "type": "Bilateral" },
     "agreement_date": "2025-03-15",
     "effective_date": "2025-06-01",
@@ -1465,7 +1500,7 @@ Format response sama dengan Import Data Master: `data.file_name`, `total_inserte
 }
 ```
 
-`amount_usd` dan `cumulative_disbursement_usd` dihitung dari Kurs Tengah BI terbaru untuk currency non-USD. `cumulative_disbursement` tetap nilai input manual dalam `currency` Loan Agreement yang dipilih. `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, dan `performance_status` adalah field tampilan dan tidak disimpan sebagai kolom DB.
+`amount_usd` dan `cumulative_disbursement_usd` dihitung dari Kurs Tengah BI terbaru untuk currency non-USD. `amount_original`, `amount_usd`, `cumulative_disbursement`, dan metrik kinerja adalah nilai global Loan Agreement. `dk_projects[].allocation_original` dan `dk_projects[].allocation_usd` adalah nilai komitmen per DK Project. `cumulative_disbursement` tetap nilai input manual dalam `currency` Loan Agreement yang dipilih dan tidak dialokasikan per project. `disbursement_ratio`, `estimated_time_ratio`, `performance_value`, dan `performance_status` adalah field tampilan dan tidak disimpan sebagai kolom DB.
 
 **`GET /loan-agreements` Query Params tambahan:**
 
@@ -1981,7 +2016,7 @@ Contoh deep link dari item endpoint ini:
 - `/projects?reached_stages=LA&dk_executing_agency_ids=<uuid-root-institution>`
 - `/projects?reached_stages=LA&program_title_ids=<uuid-program-title>`
 
-Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu Loan Agreement. Karena itu total `project_count` per distribusi dapat lebih besar dari total proyek Loan Agreement.
+Catatan: satu proyek Daftar Kegiatan dapat memiliki lebih dari satu Loan Agreement, dan satu Loan Agreement dapat dialokasikan ke beberapa proyek Daftar Kegiatan. Agregasi nilai per project memakai `loan_agreement_dk_project.allocation_usd`; agregasi nilai global LA memakai `COUNT(DISTINCT loan_agreement.id)` atau nilai LA distinct agar tidak double count.
 
 ---
 
@@ -2168,6 +2203,8 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
                 "currency": "USD",
                 "amount_original": 300000000,
                 "amount_usd": 300000000,
+                "allocation_original": 300000000,
+                "allocation_usd": 300000000,
                 "cumulative_disbursement": 125000000,
                 "monitoring": [
                   {

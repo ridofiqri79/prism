@@ -115,6 +115,11 @@ function deleteItem(lender: Lender) {
   })
 }
 
+function resetFilters() {
+  selectedTypes.value = []
+  controls.resetAndLoad(loadData)
+}
+
 onMounted(() => {
   void loadData()
 })
@@ -130,9 +135,17 @@ watch(selectedTypes, () => {
 
 <template>
   <section class="space-y-6">
-    <PageHeader title="Lender" subtitle="Master lender dengan aturan country untuk Bilateral dan KSA">
+    <PageHeader
+      title="Lender"
+      subtitle="Master lender dengan negara wajib untuk Bilateral dan opsional untuk KSA"
+    >
       <template #actions>
-        <Button v-if="can('lender', 'create')" label="Tambah" icon="pi pi-plus" @click="openCreate" />
+        <Button
+          v-if="can('lender', 'create')"
+          label="Tambah"
+          icon="pi pi-plus"
+          @click="openCreate"
+        />
       </template>
     </PageHeader>
 
@@ -140,7 +153,7 @@ watch(selectedTypes, () => {
       v-model:search="controls.search.value"
       search-placeholder="Cari nama atau nama singkat lender"
       :filter-count="selectedTypes.length"
-      @reset="selectedTypes = []; controls.resetAndLoad(loadData)"
+      @reset="resetFilters"
       @apply="controls.resetAndLoad(loadData)"
     >
       <template #filters>
@@ -173,7 +186,9 @@ watch(selectedTypes, () => {
     >
       <template #body-row="{ row, column }">
         <Tag v-if="column.field === 'type'" :value="row.type" severity="info" rounded />
-        <span v-else-if="column.field === 'country'">{{ (row as Lender).country?.name ?? '-' }}</span>
+        <span v-else-if="column.field === 'country'">{{
+          (row as Lender).country?.name ?? '-'
+        }}</span>
         <div v-else-if="column.field === 'actions'" class="flex flex-wrap gap-2">
           <Button
             v-if="can('lender', 'update')"
@@ -197,7 +212,12 @@ watch(selectedTypes, () => {
       </template>
     </DataTable>
 
-    <Dialog v-model:visible="dialogVisible" modal :header="editing ? 'Edit Lender' : 'Tambah Lender'" class="w-[36rem] max-w-[95vw]">
+    <Dialog
+      v-model:visible="dialogVisible"
+      modal
+      :header="editing ? 'Edit Lender' : 'Tambah Lender'"
+      class="w-[36rem] max-w-[95vw]"
+    >
       <form class="space-y-4" @submit.prevent="save">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama</span>
@@ -207,7 +227,11 @@ watch(selectedTypes, () => {
 
         <label class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Nama Singkat</span>
-          <InputText v-model="form.short_name" class="w-full" :invalid="Boolean(errors.short_name)" />
+          <InputText
+            v-model="form.short_name"
+            class="w-full"
+            :invalid="Boolean(errors.short_name)"
+          />
           <small v-if="errors.short_name" class="text-red-600">{{ errors.short_name }}</small>
         </label>
 

@@ -1,7 +1,7 @@
 # PLAN 06 - Daftar Kegiatan Module
 
 > **Scope:** CRUD Daftar Kegiatan (header surat + DK Project + sub-tabel multi-currency).
-> **Deliverable:** Staff bisa input DK lengkap. Lender difilter dari BB/GB terkait.
+> **Deliverable:** Staff bisa input DK lengkap. Lender dipilih dari Master Lender dan boleh berbeda dari BB/GB terkait.
 > **Referensi:** docs/PRISM_API_Contract.md (Daftar Kegiatan), docs/PRISM_Business_Rules.md (bagian 5)
 > **Revision update:** Ikuti `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`. Picker GB Project harus default ke latest snapshot, tetapi detail DK harus menampilkan concrete snapshot yang tersimpan saat DK dibuat.
 
@@ -53,14 +53,6 @@ export const dkProjectSchema = z.object({
 export function useDKProjectForm(initialData?) {
   const { handleSubmit, errors, values, setFieldValue } = useForm({ ... })
 
-  // Computed allowed lenders dari GB yang dipilih
-  const allowedLenderIds = computed(async () => {
-    const gbIds = values.gb_project_ids ?? []
-    if (!gbIds.length) return []
-    // fetch funding_sources dari GB yang dipilih + lender_indications dari BB terkait
-    // return array of lender IDs yang diperbolehkan
-  })
-
   // Financing Details
   const financingDetails = ref<FinancingRow[]>([])
   const addFinancing = () => financingDetails.value.push({ lender_id: '', currency: 'USD', amount_original: 0, grant_original: 0, counterpart_original: 0, amount_usd: 0, grant_usd: 0, counterpart_usd: 0 })
@@ -74,7 +66,7 @@ export function useDKProjectForm(initialData?) {
   const addActivity = () => activityDetails.value.push({ activity_number: activityDetails.value.length + 1, activity_name: '' })
   const removeActivity = (i: number) => { activityDetails.value.splice(i, 1); activityDetails.value.forEach((a, idx) => a.activity_number = idx + 1) }
 
-  return { values, errors, allowedLenderIds, financingDetails, addFinancing, loanAllocations, addAllocation, activityDetails, addActivity, removeActivity, handleSubmit }
+  return { values, errors, financingDetails, addFinancing, loanAllocations, addAllocation, activityDetails, addActivity, removeActivity, handleSubmit }
 }
 ```
 
@@ -105,7 +97,7 @@ Gunakan `useDKProjectForm()`.
 gb_project_ids (MultiSelect GB Project) ditempatkan paling atas. Saat user memilih GB Project, form mengisi otomatis project_name dari nama proyek GB pertama, program_title_id, institution_id dari Executing Agency GB pertama, bappenas_partner_ids dari Mitra Kerja Bappenas GB terpilih, duration bulan, objectives dari objective GB, location_ids, financing detail dari funding source GB, loan allocation dari institution funding source atau institution proyek GB, dan activity detail dari activities GB. Semua field hasil autofill tetap editable sebelum disimpan. Field setelahnya: project_name (`<InputText>`), program_title_id (`<ProgramTitleSelect>`), institution_id (`<InstitutionSelect>` - Executing Agency), bappenas_partner_ids (multi-select Eselon II, opsional), duration bulan (`<InputNumber>` integer), location_ids (`<LocationMultiSelect>`), objectives.
 
 **Section 2 - Financing Detail (tabel multi-currency):**
-Kolom: lender_id (`<LenderSelect :allowedIds>`), currency (text input ISO), amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd (`<CurrencyInput>`), remarks. Tombol "Tambah Baris". Tampilkan catatan: "Konversi ke USD dilakukan manual".
+Kolom: lender_id (`<LenderSelect>` dari Master Lender), currency (text input ISO), amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd (`<CurrencyInput>`), remarks. Tombol "Tambah Baris". Tampilkan catatan: "Konversi ke USD dilakukan manual".
 
 **Section 3 - Loan Allocation (tabel multi-currency):**
 Kolom: institution_id (`<InstitutionSelect>`), currency, amount_original, grant_original, counterpart_original, amount_usd, grant_usd, counterpart_usd, remarks.
@@ -121,7 +113,7 @@ List sederhana dengan nomor urut otomatis + nama aktivitas (input bebas). Tombol
 - [x] `daftar-kegiatan.schema.ts`
 - [x] `daftar-kegiatan.service.ts`
 - [x] `daftar-kegiatan.store.ts`
-- [x] `useDKProjectForm.ts` - allowedLenderIds computed
+- [x] `useDKProjectForm.ts` - autofill financing dari GB, lender tetap bebas dari Master Lender
 - [x] `DKListPage.vue`
 - [x] `DKDetailPage.vue` - accordion per DK Project
 - [x] `DKProjectFormPage.vue` - 4 section + multi-currency

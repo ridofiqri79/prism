@@ -78,6 +78,8 @@ type JourneyLoanAgreement struct {
 	Currency            string                      `json:"currency"`
 	AmountOriginal      float64                     `json:"amount_original"`
 	AmountUSD           float64                     `json:"amount_usd"`
+	AllocationOriginal  float64                     `json:"allocation_original"`
+	AllocationUSD       float64                     `json:"allocation_usd"`
 	Monitoring          []JourneyMonitoringResponse `json:"monitoring"`
 }
 

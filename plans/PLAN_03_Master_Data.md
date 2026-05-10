@@ -33,9 +33,9 @@ export const lenderSchema = z.object({
   type: z.enum(['Bilateral', 'Multilateral', 'KSA']),
   country_id: z.string().uuid().optional(),
 }).refine(data => {
-  if (data.type !== 'Multilateral') return !!data.country_id
+  if (data.type === 'Bilateral') return !!data.country_id
   return true
-}, { message: 'Negara wajib diisi untuk Bilateral dan KSA', path: ['country_id'] })
+}, { message: 'Negara wajib diisi untuk Bilateral', path: ['country_id'] })
 
 export const institutionSchema = z.object({
   name: z.string().min(1),

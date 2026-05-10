@@ -22,6 +22,10 @@ export interface DKProjectLoanAgreementSummary {
   id: string
   loan_code: string
   currency: string
+  amount_original: number
+  amount_usd: number
+  allocation_original: number
+  allocation_usd: number
   cumulative_disbursement: number
 }
 

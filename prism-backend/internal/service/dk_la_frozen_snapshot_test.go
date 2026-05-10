@@ -28,10 +28,7 @@ func TestDKLAFrozenSnapshotResolvesLatestAtCreateAndKeepsStoredConcreteVersion(t
 	revision1Project := env.createGBProjectWithFundingLender(t, gbService, revision1GB.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 1", storedLender)
 
 	dk := env.createDaftarKegiatan(t, dkService, "DK-001")
-	_, err := dkService.CreateDKProject(env.ctx, mustParseUUID(t, dk.ID), env.dkProjectRequest(originalGBProject.ID, legacyLender))
-	assertAppErrorCode(t, err, "BUSINESS_RULE_ERROR")
-
-	dkProject := env.createDKProject(t, dkService, dk.ID, originalGBProject.ID, storedLender)
+	dkProject := env.createDKProject(t, dkService, dk.ID, originalGBProject.ID, legacyLender)
 	if len(dkProject.GBProjects) != 1 {
 		t.Fatalf("DK GB project relations = %d, want 1", len(dkProject.GBProjects))
 	}
@@ -41,8 +38,7 @@ func TestDKLAFrozenSnapshotResolvesLatestAtCreateAndKeepsStoredConcreteVersion(t
 	if !dkProject.GBProjects[0].IsLatest || dkProject.GBProjects[0].HasNewerRevision {
 		t.Fatalf("stored DK GB latest flags before later revision = %+v, want latest without newer revision", dkProject.GBProjects[0])
 	}
-
-	env.assertDKAllowedLenders(t, dkProject.ID, []queries.Lender{storedLender}, []queries.Lender{legacyLender, newerLender})
+	assertDKFinancingLenders(t, dkProject, []queries.Lender{legacyLender}, []queries.Lender{storedLender, newerLender})
 
 	revision2GB := env.createGreenBook(t, gbService, 2, &revision1GB.ID)
 	revision2Project := env.createGBProjectWithFundingLender(t, gbService, revision2GB.ID, oldBBProject.ID, "GB-001", "Flood Control GB Revision 2", newerLender)
@@ -60,21 +56,22 @@ func TestDKLAFrozenSnapshotResolvesLatestAtCreateAndKeepsStoredConcreteVersion(t
 	if reloadedDKProject.GBProjects[0].IsLatest || !reloadedDKProject.GBProjects[0].HasNewerRevision {
 		t.Fatalf("reloaded DK GB latest flags = %+v, want historical with newer revision", reloadedDKProject.GBProjects[0])
 	}
-
-	env.assertDKAllowedLenders(t, dkProject.ID, []queries.Lender{storedLender}, []queries.Lender{legacyLender, newerLender})
+	assertDKFinancingLenders(t, reloadedDKProject, []queries.Lender{legacyLender}, []queries.Lender{storedLender, newerLender})
 
 	_, err = laService.CreateLoanAgreement(env.ctx, env.loanAgreementRequest(dkProject.ID, newerLender, "LA-BAD"))
 	assertAppErrorCode(t, err, "BUSINESS_RULE_ERROR")
+	_, err = laService.CreateLoanAgreement(env.ctx, env.loanAgreementRequest(dkProject.ID, storedLender, "LA-STORED-BAD"))
+	assertAppErrorCode(t, err, "BUSINESS_RULE_ERROR")
 
-	la, err := laService.CreateLoanAgreement(env.ctx, env.loanAgreementRequest(dkProject.ID, storedLender, "LA-001"))
+	la, err := laService.CreateLoanAgreement(env.ctx, env.loanAgreementRequest(dkProject.ID, legacyLender, "LA-001"))
 	if err != nil {
-		t.Fatalf("CreateLoanAgreement(stored lender) error = %v", err)
+		t.Fatalf("CreateLoanAgreement(DK financing lender) error = %v", err)
 	}
 	if la.DKProjectID != dkProject.ID {
 		t.Fatalf("LA DKProjectID = %s, want stored DK project %s", la.DKProjectID, dkProject.ID)
 	}
-	if la.Lender.ID != model.UUIDToString(storedLender.ID) {
-		t.Fatalf("LA lender = %s, want stored lender %s", la.Lender.ID, model.UUIDToString(storedLender.ID))
+	if la.Lender.ID != model.UUIDToString(legacyLender.ID) {
+		t.Fatalf("LA lender = %s, want DK financing lender %s", la.Lender.ID, model.UUIDToString(legacyLender.ID))
 	}
 }
 
@@ -203,26 +200,24 @@ func (env *blueBookVersioningTestEnv) loanAgreementRequest(dkProjectID string, l
 	}
 }
 
-func (env *blueBookVersioningTestEnv) assertDKAllowedLenders(t *testing.T, dkProjectID string, wantPresent []queries.Lender, wantAbsent []queries.Lender) {
+func assertDKFinancingLenders(t *testing.T, project *model.DKProjectResponse, wantPresent []queries.Lender, wantAbsent []queries.Lender) {
 	t.Helper()
-	allowed, err := env.queries.GetAllowedLenderIDsForDK(env.ctx, mustParseUUID(t, dkProjectID))
-	if err != nil {
-		t.Fatalf("GetAllowedLenderIDsForDK(%s) error = %v", dkProjectID, err)
-	}
-	got := make(map[string]struct{}, len(allowed))
-	for _, id := range allowed {
-		got[model.UUIDToString(id)] = struct{}{}
+	got := make(map[string]struct{}, len(project.FinancingDetails))
+	for _, detail := range project.FinancingDetails {
+		if detail.Lender != nil {
+			got[detail.Lender.ID] = struct{}{}
+		}
 	}
 	for _, lender := range wantPresent {
 		id := model.UUIDToString(lender.ID)
 		if _, ok := got[id]; !ok {
-			t.Fatalf("allowed lenders missing %s; got %v", id, got)
+			t.Fatalf("DK financing lenders missing %s; got %v", id, got)
 		}
 	}
 	for _, lender := range wantAbsent {
 		id := model.UUIDToString(lender.ID)
 		if _, ok := got[id]; ok {
-			t.Fatalf("allowed lenders unexpectedly include %s; got %v", id, got)
+			t.Fatalf("DK financing lenders unexpectedly include %s; got %v", id, got)
 		}
 	}
 }

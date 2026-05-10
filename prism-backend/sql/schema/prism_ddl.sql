@@ -48,14 +48,15 @@ CREATE INDEX idx_kurs_tengah_currency_cutoff
 
 CREATE TABLE lender (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    country_id  UUID REFERENCES country(id),           -- NULL untuk Multilateral
+    country_id  UUID REFERENCES country(id),           -- wajib untuk Bilateral, opsional untuk KSA, NULL untuk Multilateral
     name        VARCHAR(255) NOT NULL,
     short_name  VARCHAR(100),
     type        VARCHAR(20) NOT NULL CHECK (type IN ('Bilateral', 'Multilateral', 'KSA')),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chk_lender_negara CHECK (
-        (type IN ('Bilateral', 'KSA') AND country_id IS NOT NULL) OR
+        (type = 'Bilateral' AND country_id IS NOT NULL) OR
+        (type = 'KSA') OR
         (type = 'Multilateral' AND country_id IS NULL)
     )
 );
@@ -450,7 +451,7 @@ CREATE TABLE dk_activity_detail (
 
 CREATE TABLE loan_agreement (
     id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dk_project_id         UUID NOT NULL REFERENCES dk_project(id), -- One-to-Many: satu DK Project dapat memiliki lebih dari satu Loan Agreement
+    dk_project_id         UUID NOT NULL REFERENCES dk_project(id), -- legacy primary DK Project reference; relasi resmi disimpan di loan_agreement_dk_project
     lender_id             UUID NOT NULL REFERENCES lender(id),
     loan_code             VARCHAR(100) NOT NULL UNIQUE,
     agreement_date        DATE NOT NULL,
@@ -464,6 +465,19 @@ CREATE TABLE loan_agreement (
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chk_closing_date CHECK (original_closing_date IS NULL OR closing_date >= original_closing_date)
+);
+
+-- Relasi Loan Agreement <-> DK Project dengan alokasi komitmen per project
+CREATE TABLE loan_agreement_dk_project (
+    loan_agreement_id   UUID NOT NULL REFERENCES loan_agreement(id) ON DELETE CASCADE,
+    dk_project_id       UUID NOT NULL REFERENCES dk_project(id),
+    allocation_original NUMERIC(20, 2) NOT NULL,
+    allocation_usd      NUMERIC(20, 2) NOT NULL DEFAULT 0,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (loan_agreement_id, dk_project_id),
+    CONSTRAINT chk_la_dk_project_allocation_original CHECK (allocation_original > 0),
+    CONSTRAINT chk_la_dk_project_allocation_usd CHECK (allocation_usd >= 0)
 );
 
 -- View helper: deteksi LA yang diperpanjang
@@ -596,6 +610,8 @@ CREATE INDEX idx_la_dk_project             ON loan_agreement(dk_project_id);
 CREATE INDEX idx_la_lender                 ON loan_agreement(lender_id);
 CREATE INDEX idx_la_effective_date         ON loan_agreement(effective_date);
 CREATE INDEX idx_la_closing_date           ON loan_agreement(closing_date);
+CREATE INDEX idx_la_dk_project_rel_loan    ON loan_agreement_dk_project(loan_agreement_id);
+CREATE INDEX idx_la_dk_project_rel_project ON loan_agreement_dk_project(dk_project_id);
 
 -- Monitoring
 CREATE INDEX idx_monitoring_la             ON monitoring_disbursement(loan_agreement_id);
@@ -853,6 +869,10 @@ CREATE TRIGGER trg_audit_dk_activity_detail
 CREATE TRIGGER trg_audit_loan_agreement
     AFTER INSERT OR UPDATE OR DELETE ON loan_agreement
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+
+CREATE TRIGGER trg_audit_loan_agreement_dk_project
+    AFTER INSERT OR UPDATE OR DELETE ON loan_agreement_dk_project
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_by_column_fn('loan_agreement_id');
 
 -- Monitoring
 CREATE TRIGGER trg_audit_monitoring_disbursement

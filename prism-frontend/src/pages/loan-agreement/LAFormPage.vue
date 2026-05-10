@@ -60,10 +60,13 @@ const form = useLAForm(null, {
   dkProjects: () => loanAgreementStore.dkProjectOptions,
   kursTengah: () => masterStore.kursTengah,
 })
-const dkProjectModel = computed<DKProjectLoanOption | null>({
-  get: () => loanAgreementStore.dkProjectOptionMap.get(form.values.dk_project_id) ?? null,
+const dkProjectModel = computed<DKProjectLoanOption[]>({
+  get: () =>
+    form.values.dk_project_allocations
+      .map((allocation) => loanAgreementStore.dkProjectOptionMap.get(allocation.dk_project_id))
+      .filter((project): project is DKProjectLoanOption => Boolean(project)),
   set: (value) => {
-    form.values.dk_project_id = value?.id ?? ''
+    form.setDKProjectIDs(value.map((project) => project.id))
   },
 })
 const agreementDateModel = computed({
@@ -90,8 +93,12 @@ const closingDateModel = computed({
     form.values.closing_date = toDateString(value)
   },
 })
-const selectedProject = computed(() => form.selectedDKProject.value)
-const persistedLoanAgreements = computed(() => selectedProject.value?.loan_agreements ?? [])
+const selectedProjects = computed(() => form.selectedDKProjects.value)
+const persistedLoanAgreementRows = computed(() =>
+  selectedProjects.value.flatMap((project) =>
+    (project.loan_agreements ?? []).map((loanAgreement) => ({ project, loanAgreement })),
+  ),
+)
 const canChangeProject = computed(
   () => !isEditMode.value && draftLoanAgreements.value.length === 0 && !savingDrafts.value,
 )
@@ -113,7 +120,7 @@ async function loadData() {
       sourceDKId.value,
       sourceDKProjectId.value,
     )
-    form.values.dk_project_id = selectedProject.id
+    form.setDKProjectIDs([selectedProject.id])
     return
   }
 
@@ -144,6 +151,7 @@ function createDraft(values: LoanAgreementPayload): DraftLoanAgreement {
 function toPayload(draft: DraftLoanAgreement): LoanAgreementPayload {
   return {
     dk_project_id: draft.dk_project_id,
+    dk_project_allocations: draft.dk_project_allocations.map((allocation) => ({ ...allocation })),
     lender_id: draft.lender_id,
     loan_code: draft.loan_code,
     agreement_date: draft.agreement_date,
@@ -159,14 +167,27 @@ function toPayload(draft: DraftLoanAgreement): LoanAgreementPayload {
 
 function lenderNameForDraft(draft: DraftLoanAgreement) {
   return (
-    selectedProject.value?.financing_details.find((detail) => detail.lender?.id === draft.lender_id)
-      ?.lender?.name ?? '-'
+    selectedProjects.value
+      .flatMap((project) => project.financing_details)
+      .find((detail) => detail.lender?.id === draft.lender_id)?.lender?.name ?? '-'
+  )
+}
+
+function projectLabelById(projectId: string) {
+  return formatDKProjectLabel(loanAgreementStore.dkProjectOptionMap.get(projectId) ?? null)
+}
+
+function projectNamesForDraft(draft: DraftLoanAgreement) {
+  return draft.dk_project_allocations.map((allocation) =>
+    projectLabelById(allocation.dk_project_id),
   )
 }
 
 function clearDraftEditor() {
+  const allocations = form.values.dk_project_allocations.map((allocation) => ({ ...allocation }))
   form.reset({
-    dk_project_id: form.values.dk_project_id,
+    dk_project_id: allocations[0]?.dk_project_id ?? '',
+    dk_project_allocations: allocations,
   })
   editingDraftIndex.value = null
 }
@@ -178,6 +199,7 @@ function editDraft(index: number) {
   editingDraftIndex.value = index
   Object.assign(form.values, {
     dk_project_id: draft.dk_project_id,
+    dk_project_allocations: draft.dk_project_allocations.map((allocation) => ({ ...allocation })),
     lender_id: draft.lender_id,
     loan_code: draft.loan_code,
     agreement_date: draft.agreement_date,
@@ -206,7 +228,7 @@ function clearDrafts() {
 }
 
 async function refreshCurrentProjectOption(projectId: string) {
-  const dkId = selectedProject.value?.dk_id ?? sourceDKId.value
+  const dkId = loanAgreementStore.dkProjectOptionMap.get(projectId)?.dk_id ?? sourceDKId.value
   if (dkId) {
     await loanAgreementStore.fetchDKProjectOption(dkId, projectId)
     return
@@ -222,8 +244,8 @@ const addDraftToStack = form.submit(async (values) => {
       index !== editingDraftIndex.value &&
       draft.loan_code.trim().toLowerCase() === normalizedLoanCode,
   )
-  const duplicatePersisted = persistedLoanAgreements.value.some(
-    (loanAgreement) => loanAgreement.loan_code.trim().toLowerCase() === normalizedLoanCode,
+  const duplicatePersisted = persistedLoanAgreementRows.value.some(
+    ({ loanAgreement }) => loanAgreement.loan_code.trim().toLowerCase() === normalizedLoanCode,
   )
 
   if (duplicateIndex >= 0) {
@@ -270,12 +292,16 @@ async function saveDrafts() {
 
       await loanAgreementStore.createLoanAgreement(toPayload(draft))
       draftLoanAgreements.value.shift()
-      await refreshCurrentProjectOption(draft.dk_project_id)
+      await Promise.all(
+        draft.dk_project_allocations.map((allocation) =>
+          refreshCurrentProjectOption(allocation.dk_project_id),
+        ),
+      )
     }
 
     toast.success(
       'Berhasil',
-      `${selectedProject.value?.project_name ?? 'Loan Agreement'} berhasil disimpan ke daftar.`,
+      `${draftLoanAgreements.value.length === 0 ? 'Loan Agreement' : 'Data'} berhasil disimpan ke daftar.`,
     )
   } catch (error) {
     toast.warn('Gagal Menyimpan', formatApiError(error, 'Gagal menyimpan Loan Agreement'), 12000)
@@ -312,8 +338,7 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-semibold text-surface-950">Referensi Daftar Kegiatan</h2>
           <p class="text-sm text-surface-500">
-            Pilih Proyek Daftar Kegiatan sebagai referensi untuk semua Loan Agreement yang akan
-            ditambahkan.
+            Pilih satu atau lebih Proyek Daftar Kegiatan yang tercakup dalam Loan Agreement.
           </p>
         </div>
 
@@ -324,8 +349,9 @@ onMounted(() => {
               v-model="dkProjectModel"
               :suggestions="loanAgreementStore.dkProjectOptions"
               option-label="label"
-              placeholder="Cari tujuan atau kode Green Book"
+              placeholder="Cari proyek atau kode Green Book"
               dropdown
+              multiple
               force-selection
               class="w-full"
               :disabled="!canChangeProject"
@@ -338,8 +364,8 @@ onMounted(() => {
                 </div>
               </template>
             </AutoComplete>
-            <small v-if="form.errors.dk_project_id" class="text-red-600">{{
-              form.errors.dk_project_id
+            <small v-if="form.errors.dk_project_allocations" class="text-red-600">{{
+              form.errors.dk_project_allocations
             }}</small>
           </label>
         </div>
@@ -371,7 +397,7 @@ onMounted(() => {
               <LenderSelect
                 v-model="form.values.lender_id"
                 :allowed-ids="form.allowedLenderIds.value"
-                :disabled="!form.values.dk_project_id"
+                :disabled="form.values.dk_project_allocations.length === 0"
                 placeholder="Pilih Proyek Daftar Kegiatan dulu"
               />
               <small v-if="form.errors.lender_id" class="text-red-600">{{
@@ -492,6 +518,64 @@ onMounted(() => {
               </label>
             </div>
 
+            <div
+              v-if="form.values.dk_project_allocations.length > 0"
+              class="space-y-3 rounded-md border border-surface-200 p-4"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="font-semibold text-surface-950">Alokasi per Proyek Daftar Kegiatan</h4>
+                  <p class="text-sm text-surface-500">
+                    Total alokasi harus sama dengan nilai pinjaman global.
+                  </p>
+                </div>
+                <div class="text-right text-sm">
+                  <p class="font-medium text-surface-900">
+                    <CurrencyDisplay
+                      :amount="form.allocationTotal.value"
+                      :currency="form.values.currency || 'USD'"
+                    />
+                  </p>
+                  <p
+                    :class="[
+                      'text-xs',
+                      Math.abs(form.allocationDifference.value) < 0.005
+                        ? 'text-emerald-600'
+                        : 'text-red-600',
+                    ]"
+                  >
+                    Selisih:
+                    <CurrencyDisplay
+                      :amount="form.allocationDifference.value"
+                      :currency="form.values.currency || 'USD'"
+                    />
+                  </p>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div
+                  v-for="allocation in form.values.dk_project_allocations"
+                  :key="allocation.dk_project_id"
+                  class="grid gap-3 rounded-md bg-surface-50 p-3 md:grid-cols-[1fr_16rem]"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium text-surface-900">
+                      {{ projectLabelById(allocation.dk_project_id) }}
+                    </p>
+                  </div>
+                  <CurrencyInput
+                    v-model="allocation.allocation_original"
+                    :currency="form.values.currency || 'USD'"
+                  />
+                </div>
+              </div>
+
+              <small v-if="form.errors.dk_project_allocations" class="text-red-600">
+                {{ form.errors.dk_project_allocations }}
+              </small>
+            </div>
+
             <Message
               v-if="!form.isUSD.value && !form.latestKursTengah.value"
               severity="warn"
@@ -556,7 +640,7 @@ onMounted(() => {
       </section>
 
       <section
-        v-if="!isEditMode && selectedProject"
+        v-if="!isEditMode && selectedProjects.length > 0"
         class="space-y-4 rounded-lg border border-surface-200 bg-white p-5"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -598,6 +682,9 @@ onMounted(() => {
                 <div class="min-w-0 space-y-1">
                   <p class="font-semibold text-surface-950">{{ draft.loan_code }}</p>
                   <p class="text-sm text-surface-600">{{ lenderNameForDraft(draft) }}</p>
+                  <p class="text-xs text-surface-500">
+                    {{ projectNamesForDraft(draft).join(' | ') }}
+                  </p>
                   <p class="text-xs text-surface-500">
                     {{ formatDate(draft.agreement_date) }} - {{ formatDate(draft.closing_date) }}
                   </p>
@@ -650,6 +737,22 @@ onMounted(() => {
                     <CurrencyDisplay :amount="draft.amount_usd" currency="USD" />
                   </p>
                 </div>
+                <div class="md:col-span-2">
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Alokasi</p>
+                  <div class="mt-1 space-y-1">
+                    <p
+                      v-for="allocation in draft.dk_project_allocations"
+                      :key="allocation.dk_project_id"
+                      class="text-sm text-surface-700"
+                    >
+                      {{ projectLabelById(allocation.dk_project_id) }}:
+                      <CurrencyDisplay
+                        :amount="allocation.allocation_original"
+                        :currency="draft.currency"
+                      />
+                    </p>
+                  </div>
+                </div>
                 <div>
                   <p class="text-xs uppercase tracking-wide text-surface-500">Cumulative USD</p>
                   <p class="font-medium text-surface-900">
@@ -693,25 +796,35 @@ onMounted(() => {
             <div class="flex items-center justify-between gap-2">
               <h3 class="font-semibold text-surface-950">Yang Sudah Tersimpan</h3>
               <Tag
-                :value="`${persistedLoanAgreements.length} Tersimpan`"
+                :value="`${persistedLoanAgreementRows.length} Tersimpan`"
                 severity="success"
                 rounded
               />
             </div>
             <div
-              v-if="persistedLoanAgreements.length === 0"
+              v-if="persistedLoanAgreementRows.length === 0"
               class="rounded-lg border border-dashed border-surface-200 p-4 text-sm text-surface-500"
             >
-              Belum ada Loan Agreement tersimpan untuk proyek ini.
+              Belum ada Loan Agreement tersimpan untuk proyek yang dipilih.
             </div>
             <article
-              v-for="loanAgreement in persistedLoanAgreements"
-              :key="loanAgreement.id"
+              v-for="{ project, loanAgreement } in persistedLoanAgreementRows"
+              :key="`${project.id}-${loanAgreement.id}`"
               class="rounded-lg border border-surface-200 p-4"
             >
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 space-y-1">
                   <p class="font-semibold text-surface-950">{{ loanAgreement.loan_code }}</p>
+                  <p class="text-sm text-surface-600">{{ formatDKProjectLabel(project) }}</p>
+                  <p class="text-xs uppercase tracking-wide text-surface-500">Alokasi Project</p>
+                  <p class="text-sm font-medium text-surface-700">
+                    <CurrencyDisplay
+                      :amount="loanAgreement.allocation_original"
+                      :currency="loanAgreement.currency"
+                    />
+                    <span class="text-surface-400"> / </span>
+                    <CurrencyDisplay :amount="loanAgreement.allocation_usd" currency="USD" />
+                  </p>
                   <p class="text-xs uppercase tracking-wide text-surface-500">
                     Cumulative Disbursement
                   </p>

@@ -8,12 +8,7 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useLoanAgreementStore } from '@/stores/loan-agreement.store'
-import {
-  formatDate,
-  formatDKProjectLabel,
-  formatPercent,
-  formatRatio,
-} from './loan-agreement-page-utils'
+import { formatDate, formatPercent, formatRatio } from './loan-agreement-page-utils'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,9 +18,34 @@ const { can } = usePermission()
 
 const loanAgreementId = computed(() => String(route.params.id ?? ''))
 const loanAgreement = computed(() => loanAgreementStore.currentLoanAgreement)
-const dkProject = computed(() => {
-  const id = loanAgreement.value?.dk_project?.id ?? loanAgreement.value?.dk_project_id
-  return id ? loanAgreementStore.dkProjectOptionMap.get(id) : null
+const relatedDKProjects = computed(() => loanAgreement.value?.dk_projects ?? [])
+const relatedDKHeaders = computed(() => {
+  const groups = new Map<
+    string,
+    {
+      id: string
+      subject: string
+      date: string
+      letterNumber?: string | null
+      projects: typeof relatedDKProjects.value
+    }
+  >()
+  relatedDKProjects.value.forEach((project) => {
+    const header = project.daftar_kegiatan
+    const existing = groups.get(header.id)
+    if (existing) {
+      existing.projects.push(project)
+      return
+    }
+    groups.set(header.id, {
+      id: header.id,
+      subject: header.subject,
+      date: header.date,
+      letterNumber: header.letter_number,
+      projects: [project],
+    })
+  })
+  return [...groups.values()]
 })
 
 async function deleteLoanAgreement() {
@@ -225,21 +245,47 @@ onMounted(() => {
 
       <aside class="space-y-4 rounded-lg border border-surface-200 bg-white p-5">
         <h2 class="text-lg font-semibold text-surface-950">Relasi Alur Kerja</h2>
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-            Proyek Daftar Kegiatan
-          </p>
-          <p class="mt-1 font-medium text-surface-900">{{ formatDKProjectLabel(dkProject) }}</p>
+        <div v-if="relatedDKHeaders.length === 0" class="text-sm text-surface-500">
+          Belum ada relasi Proyek Daftar Kegiatan.
         </div>
-        <Button
-          v-if="dkProject?.dk_id"
-          as="router-link"
-          :to="{ name: 'daftar-kegiatan-detail', params: { id: dkProject.dk_id } }"
-          label="Lihat Proyek Daftar Kegiatan"
-          icon="pi pi-list"
-          outlined
-          class="w-full"
-        />
+        <article
+          v-for="header in relatedDKHeaders"
+          :key="header.id"
+          class="space-y-3 rounded-md border border-surface-200 p-3"
+        >
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+              Daftar Kegiatan
+            </p>
+            <p class="mt-1 font-medium text-surface-900">
+              {{ header.letterNumber || header.subject }}
+            </p>
+            <p class="text-xs text-surface-500">{{ formatDate(header.date) }}</p>
+          </div>
+          <div class="space-y-2">
+            <div v-for="project in header.projects" :key="project.id" class="space-y-1">
+              <p class="text-sm font-medium text-surface-900">{{ project.project_name }}</p>
+              <p class="text-xs text-surface-500">{{ project.gb_codes }}</p>
+              <p class="text-sm text-surface-700">
+                Alokasi:
+                <CurrencyDisplay
+                  :amount="project.allocation_original"
+                  :currency="loanAgreement.currency"
+                />
+                <span class="text-surface-400"> / </span>
+                <CurrencyDisplay :amount="project.allocation_usd" currency="USD" />
+              </p>
+            </div>
+          </div>
+          <Button
+            as="router-link"
+            :to="{ name: 'daftar-kegiatan-detail', params: { id: header.id } }"
+            label="Lihat Daftar Kegiatan"
+            icon="pi pi-list"
+            outlined
+            class="w-full"
+          />
+        </article>
       </aside>
     </section>
   </section>

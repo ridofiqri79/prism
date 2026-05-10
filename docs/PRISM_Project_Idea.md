@@ -150,7 +150,7 @@ Surat yang diterbitkan oleh **Bappenas** atas usulan dari Executing Agency, seba
 | Program Title | Judul program |
 | Program Reference | Satu atau lebih Green Book Code (dan Blue Book Code terkait) |
 | Duration | Durasi |
-| Funding Source | Dipilih dari Lender yang sudah terdaftar — bisa dari Lender Indication (BB) maupun Funding Source (GB) |
+| Funding Source | Dipilih dari Master Lender dan boleh berbeda dari Lender Indication (BB) maupun Funding Source (GB) |
 | Objectives | Tujuan |
 | Location | Multi-select wilayah (Nasional / Provinsi / Kota-Kabupaten); jika Nasional otomatis mencakup seluruh provinsi |
 | Executing Agency | Dipilih dari entitas Institution |
@@ -180,9 +180,9 @@ Daftar komponen kegiatan — hanya memuat **nama aktivitas**, diinput secara beb
 
 ### 3.5 Loan Agreement (LA)
 
-Perjanjian pinjaman yang diterbitkan setelah Daftar Kegiatan. Setiap proyek dalam Daftar Kegiatan dapat memiliki **lebih dari satu Loan Agreement** bila pembiayaan legal binding-nya terbagi ke beberapa perjanjian.
+Perjanjian pinjaman yang diterbitkan setelah Daftar Kegiatan. Satu Loan Agreement dapat mencakup satu atau lebih proyek dalam Daftar Kegiatan, termasuk proyek dari header Daftar Kegiatan berbeda. Setiap proyek dalam Daftar Kegiatan juga tetap dapat memiliki **lebih dari satu Loan Agreement** bila pembiayaan legal binding-nya terbagi ke beberapa perjanjian.
 
-> **Contoh:** Daftar Kegiatan memuat 3 proyek → setiap proyek bisa punya satu atau lebih Loan Agreement sesuai kebutuhan legal binding.
+> **Contoh:** Daftar Kegiatan memuat 3 proyek → satu Loan Agreement dapat mencakup sebagian/seluruh proyek dengan alokasi per project, atau setiap proyek bisa punya satu atau lebih Loan Agreement sesuai kebutuhan legal binding.
 
 #### Atribut Loan Agreement
 
@@ -338,11 +338,11 @@ Aktif setelah Tanggal Efektif LA. Struktur dua level:
 ### 5.8 Lender
 - Nama lembaga
 - Type: `Bilateral` / `Multilateral` / `KSA`
-- Negara asal *(wajib untuk Bilateral dan KSA, tidak relevan untuk Multilateral — dipilih dari entitas master Negara)*
+- Negara asal *(wajib untuk Bilateral, opsional untuk KSA, tidak relevan untuk Multilateral — dipilih dari entitas master Negara)*
 
 ### 5.8b Country
 - Entitas master daftar negara
-- Digunakan oleh entitas Lender (untuk Bilateral dan KSA)
+- Digunakan oleh entitas Lender (wajib untuk Bilateral, opsional untuk KSA)
 
 ### 5.9 Letter of Intent (LoI)
 - Perihal surat *(wajib)*
@@ -352,7 +352,7 @@ Aktif setelah Tanggal Efektif LA. Struktur dua level:
 - Blue Book Project terkait
 - *(Catatan: satu BB project dapat menerima LoI dari lebih dari satu lender, masing-masing sebagai entitas LoI terpisah)*
 
-> **Catatan alur Lender:** BB Project → Lender Indication *(nama lender + keterangan, belum pasti)* → LoI *(hampir pasti)* → Funding Source GB *(sudah pasti, cofinancing dimungkinkan)* → Funding Source DK *(dipilih dari lender yang sudah ada di GB atau Lender Indication)*
+> **Catatan alur Lender:** BB Project → Lender Indication *(nama lender + keterangan, belum pasti)* → LoI *(hampir pasti)* → Funding Source GB *(sudah pasti, cofinancing dimungkinkan)* → Funding Source DK *(dipilih dari Master Lender dan dapat berbeda dari GB/BB)*
 
 ### 5.10 Bappenas Partner *(Hierarki: Parent → Child)*
 | Level | Contoh |
@@ -391,7 +391,7 @@ Bappenas Publish Blue Book (per 5 tahun)
          ▼
   Bappenas terbitkan Daftar Kegiatan
          │
-         │ Tiap proyek di DK → >1 Loan Agreement bila diperlukan
+        │ Satu LA dapat mencakup beberapa proyek DK dengan alokasi
          ▼
   Loan Agreement ditandatangani
          │
@@ -417,12 +417,12 @@ Bappenas Publish Blue Book (per 5 tahun)
 - **Mitra Kerja Bappenas** pada BB, GB, dan DK Project bersifat opsional dan boleh lebih dari satu. Simpan Eselon II; Eselon I diturunkan otomatis dari hierarki parent-child.
 - **Executing Agency & Implementing Agency** keduanya bersifat multi-select di BB maupun GB, mengacu ke entitas Institution yang sama (Kementerian/Eselon I).
 - **Lender Indication** dicatat di level BB Project — lender masih bersifat indikasi (belum pasti). Berbeda dengan Funding Source di GB yang sudah hampir pasti.
-- **Funding Source di DK** dipilih dari lender yang sudah terdaftar (dari Lender Indication BB atau Funding Source GB), bukan diinput bebas.
+- **Funding Source di DK** dipilih dari Master Lender dan boleh berbeda dari Lender Indication BB atau Funding Source GB.
 - Tingkat kepastian lender: Lender Indication (BB) → LoI → Funding Source GB → Funding Source DK.
 - **Region** di BB, GB, dan DK bersifat multi-select dengan tipe: `COUNTRY` → `PROVINCE` → `CITY`. Pemilihan Nasional otomatis mencakup seluruh provinsi.
-- **Country** adalah entitas master tersendiri, digunakan oleh Lender tipe Bilateral dan KSA.
+- **Country** adalah entitas master tersendiri, wajib untuk Lender tipe Bilateral dan opsional untuk KSA.
 - **Status proyek** BB dan GB tidak perlu field eksplisit — status diturunkan dari relasi yang ada (ada/tidaknya GB, LoI, atau DK terkait).
-- **Loan Agreement (LA)** merupakan tahapan setelah Daftar Kegiatan — relasi Many-to-One dari LA ke proyek DK. Satu proyek DK boleh memiliki lebih dari satu LA. Memuat Kode Loan, tanggal Agreement, Efektif, Original Closing Date *(opsional)*, Closing Date, Lender, Mata Uang, dan Amount (original + USD). Perpanjangan LA terdeteksi otomatis apabila Original Closing Date diisi dan Closing Date ≠ Original Closing Date.
+- **Loan Agreement (LA)** merupakan tahapan setelah Daftar Kegiatan. Relasi LA ke proyek DK bersifat many-to-many melalui alokasi per project; header Daftar Kegiatan hanya konteks dari proyek yang dipilih. Satu LA boleh mencakup beberapa proyek DK dan satu proyek DK boleh memiliki lebih dari satu LA. Memuat Kode Loan, tanggal Agreement, Efektif, Original Closing Date *(opsional)*, Closing Date, Lender, Mata Uang, Amount global (original + USD), serta allocation per project. Perpanjangan LA terdeteksi otomatis apabila Original Closing Date diisi dan Closing Date ≠ Original Closing Date.
 - **Monitoring Disbursement** aktif setelah Tanggal Efektif LA, dicatat per triwulan mengikuti tahun anggaran (TW1: Apr–Jun, TW2: Jul–Sep, TW3: Okt–Des, TW4: Jan–Mar). Mencatat rencana vs realisasi dalam tiga mata uang (Mata Uang LA, USD, IDR) dengan kurs diinput manual per triwulan. Breakdown per komponen bersifat **opsional** — dapat diisi jika ingin pencatatan lebih granular.
 - **Disbursement Plan** di GB adalah total keseluruhan proyek per tahun — bukan per lender.
 - **Funding Allocation** di GB kolom Activities mengacu ke baris Activities yang sudah diinput di tabel Activities GB — ada relasi teknis antar keduanya.

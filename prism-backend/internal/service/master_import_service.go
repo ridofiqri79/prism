@@ -712,11 +712,13 @@ func (s *MasterService) importLenders(ctx context.Context, qtx *queries.Queries,
 
 		countryID := pgtype.UUID{}
 		countryName := row.value("country_name")
-		if lenderType != "Multilateral" {
+		if lenderType == "Bilateral" {
 			if countryName == "" {
-				addImportError(&result, row.number, "Country Name wajib diisi untuk Bilateral dan KSA")
+				addImportError(&result, row.number, "Country Name wajib diisi untuk Bilateral")
 				continue
 			}
+		}
+		if lenderType != "Multilateral" && countryName != "" {
 			country, exists := lookups.countryByNameOrCode(countryName)
 			if !exists {
 				addImportError(&result, row.number, fmt.Sprintf("Country Name %q belum ada di master country", countryName))

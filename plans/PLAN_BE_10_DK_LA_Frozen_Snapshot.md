@@ -1,7 +1,7 @@
 # PLAN BE-10 - DK/LA Latest Resolver & Frozen Snapshot
 
 > Scope: DK memakai latest GB saat link dibuat, tetapi DK/LA yang sudah tersimpan tetap frozen ke concrete snapshot.
-> Deliverable: create/update eksplisit DK resolve ke latest GB Project, downstream tidak auto-pindah, dan lender validation memakai concrete stored version.
+> Deliverable: create/update eksplisit DK resolve ke latest GB Project, downstream tidak auto-pindah, dan LA lender validation memakai Financing Detail DK yang tersimpan.
 > Referensi: `plans/PLAN_BE_09_Green_Book_Revision_Versioning.md`, `docs/PRISM_BB_GB_Revision_Versioning_Plan.md`, `docs/PRISM_Business_Rules.md`, `docs/PRISM_API_Contract.md`.
 
 ---
@@ -27,7 +27,7 @@ Checklist:
 - [x] Pastikan resolver memakai `gb_project_identity_id`.
 - [x] Pastikan resolver hanya memilih snapshot aktif dan dokumen/revisi yang valid untuk dipilih.
 - [x] Pastikan query detail DK tetap membaca concrete `gb_project_id` dari `dk_project_gb_project`.
-- [x] Pastikan query allowed lender membaca concrete GB/BB path yang tersimpan.
+- [x] Pastikan DK Financing Detail tetap tersimpan pada concrete DK Project tanpa validasi allowed lender GB/BB.
 - [x] Jalankan `make generate` setelah query berubah.
 
 Acceptance:
@@ -60,7 +60,7 @@ Acceptance:
 
 ---
 
-## Step 3 - Lender Validation
+## Step 3 - Lender Behavior
 
 Files:
 
@@ -71,17 +71,15 @@ Files:
 
 Checklist:
 
-- [x] DK financing lender validation memakai concrete GB Project yang tersimpan.
-- [x] DK lender validation tetap mengambil lender dari:
-  - [x] `gb_funding_source` pada concrete GB Project.
-  - [x] `lender_indication` pada concrete BB Project yang terhubung ke concrete GB Project.
-- [x] LA lender validation tetap memakai `dk_financing_detail` dari DK Project terkait.
+- [x] DK financing lender dapat memakai Master Lender mana pun dan tidak dibatasi oleh concrete GB/BB path.
+- [x] LA lender validation tetap memakai irisan `dk_financing_detail` dari semua DK Project terkait.
+- [x] LA multi-project tetap menyimpan relasi pada concrete DK Project di `loan_agreement_dk_project`, bukan live-link ke header DK atau latest GB/BB.
 - [x] Jangan resolve latest saat membuat LA atau monitoring.
 - [x] Pastikan validation error tetap memakai format aman dari error handling repo.
 
 Acceptance:
 
-- [x] Revisi BB/GB setelah DK dibuat tidak mengubah allowed lender untuk DK/LA tersebut.
+- [x] Revisi BB/GB setelah DK dibuat tidak mengubah lender pada DK/LA yang sudah tersimpan.
 
 ---
 
@@ -93,7 +91,7 @@ Checklist:
 - [x] Verify junction tersimpan menunjuk latest GB snapshot saat create.
 - [x] Tambah/update test DK tetap menunjuk snapshot lama setelah GB revisi baru dibuat.
 - [x] Tambah/update test lender validation memakai concrete snapshot.
-- [x] Tambah/update test LA tetap mengikuti DK Project yang tersimpan.
+- [x] Tambah/update test LA tetap mengikuti DK Project yang tersimpan, termasuk saat satu LA mencakup beberapa DK Project.
 - [x] Jalankan `go test ./...`.
 - [x] Jalankan smoke API:
   - [x] create BB original + revision.

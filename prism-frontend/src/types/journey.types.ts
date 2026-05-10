@@ -97,6 +97,8 @@ export interface LAJourney {
   currency?: string
   amount_original?: number
   amount_usd?: number
+  allocation_original?: number
+  allocation_usd?: number
   monitoring: MonitoringSummaryItem[]
 }
 

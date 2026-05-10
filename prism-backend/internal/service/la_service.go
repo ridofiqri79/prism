@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -49,6 +50,10 @@ func (s *LAService) ListLoanAgreements(ctx context.Context, filter model.LoanAgr
 	data := make([]model.LoanAgreementResponse, 0, len(rows))
 	for _, row := range rows {
 		data = append(data, laListResponse(row))
+	}
+	data, err = s.attachLoanAgreementDKProjects(ctx, data)
+	if err != nil {
+		return nil, err
 	}
 	return listResponse(data, page, limit, total), nil
 }
@@ -103,6 +108,13 @@ func (s *LAService) GetLoanAgreement(ctx context.Context, id pgtype.UUID) (*mode
 		return nil, mapNotFound(err, "Loan Agreement tidak ditemukan")
 	}
 	res := laGetResponse(row)
+	attached, err := s.attachLoanAgreementDKProjects(ctx, []model.LoanAgreementResponse{res})
+	if err != nil {
+		return nil, err
+	}
+	if len(attached) == 1 {
+		res = attached[0]
+	}
 	return &res, nil
 }
 
@@ -113,7 +125,10 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 	}
 	var created queries.LoanAgreement
 	if err := s.withTx(ctx, func(qtx *queries.Queries) error {
-		if err := validateLALender(ctx, qtx, parsed.DKProjectID, parsed.LenderID); err != nil {
+		if err := validateLADKProjects(ctx, qtx, parsed.DKProjectIDs()); err != nil {
+			return err
+		}
+		if err := validateLALenderForProjects(ctx, qtx, parsed.DKProjectIDs(), parsed.LenderID); err != nil {
 			return err
 		}
 		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
@@ -123,8 +138,12 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 		if err != nil {
 			return err
 		}
+		allocationRows, err := buildLoanAgreementAllocationRows(ctx, qtx, parsed, amountUSD)
+		if err != nil {
+			return err
+		}
 		row, err := qtx.CreateLoanAgreement(ctx, queries.CreateLoanAgreementParams{
-			DkProjectID:            parsed.DKProjectID,
+			DkProjectID:            parsed.PrimaryDKProjectID(),
 			LenderID:               parsed.LenderID,
 			LoanCode:               parsed.LoanCode,
 			AgreementDate:          parsed.AgreementDate,
@@ -136,8 +155,21 @@ func (s *LAService) CreateLoanAgreement(ctx context.Context, req model.LoanAgree
 			AmountUsd:              numericFromFloat(amountUSD),
 			CumulativeDisbursement: parsed.CumulativeDisbursement,
 		})
+		if err != nil {
+			return err
+		}
+		for _, allocation := range allocationRows {
+			if err := qtx.AddLoanAgreementDKProject(ctx, queries.AddLoanAgreementDKProjectParams{
+				LoanAgreementID:    row.ID,
+				DkProjectID:        allocation.DKProjectID,
+				AllocationOriginal: numericFromFloat(allocation.AllocationOriginal),
+				AllocationUsd:      numericFromFloat(allocation.AllocationUSD),
+			}); err != nil {
+				return err
+			}
+		}
 		created = row
-		return err
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -159,7 +191,10 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 		if err != nil {
 			return mapNotFound(err, "Loan Agreement tidak ditemukan")
 		}
-		if err := validateLALender(ctx, qtx, current.DkProjectID, parsed.LenderID); err != nil {
+		if err := validateLADKProjects(ctx, qtx, parsed.DKProjectIDs()); err != nil {
+			return err
+		}
+		if err := validateLALenderForProjects(ctx, qtx, parsed.DKProjectIDs(), parsed.LenderID); err != nil {
 			return err
 		}
 		if err := validateActiveCurrency(ctx, qtx, "currency", parsed.Currency); err != nil {
@@ -169,8 +204,13 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 		if err != nil {
 			return err
 		}
+		allocationRows, err := buildLoanAgreementAllocationRows(ctx, qtx, parsed, amountUSD)
+		if err != nil {
+			return err
+		}
 		row, err := qtx.UpdateLoanAgreement(ctx, queries.UpdateLoanAgreementParams{
 			ID:                     id,
+			DkProjectID:            parsed.PrimaryDKProjectID(),
 			LenderID:               parsed.LenderID,
 			LoanCode:               parsed.LoanCode,
 			AgreementDate:          parsed.AgreementDate,
@@ -184,6 +224,19 @@ func (s *LAService) UpdateLoanAgreement(ctx context.Context, id pgtype.UUID, req
 		})
 		if err != nil {
 			return err
+		}
+		if err := qtx.DeleteLoanAgreementDKProjects(ctx, id); err != nil {
+			return err
+		}
+		for _, allocation := range allocationRows {
+			if err := qtx.AddLoanAgreementDKProject(ctx, queries.AddLoanAgreementDKProjectParams{
+				LoanAgreementID:    id,
+				DkProjectID:        allocation.DKProjectID,
+				AllocationOriginal: numericFromFloat(allocation.AllocationOriginal),
+				AllocationUsd:      numericFromFloat(allocation.AllocationUSD),
+			}); err != nil {
+				return err
+			}
 		}
 		updated = row
 		publishExtended = !sameDate(current.ClosingDate, row.ClosingDate) && isExtended(row.OriginalClosingDate, row.ClosingDate)
@@ -225,7 +278,7 @@ func (s *LAService) withTx(ctx context.Context, fn func(*queries.Queries) error)
 }
 
 type parsedLoanAgreementRequest struct {
-	DKProjectID            pgtype.UUID
+	Allocations            []parsedLoanAgreementAllocation
 	LenderID               pgtype.UUID
 	LoanCode               string
 	AgreementDate          pgtype.Date
@@ -238,14 +291,33 @@ type parsedLoanAgreementRequest struct {
 	CumulativeDisbursement pgtype.Numeric
 }
 
+type parsedLoanAgreementAllocation struct {
+	DKProjectID        pgtype.UUID
+	AllocationOriginal float64
+}
+
+type loanAgreementAllocationRow struct {
+	DKProjectID        pgtype.UUID
+	AllocationOriginal float64
+	AllocationUSD      float64
+}
+
+func (p parsedLoanAgreementRequest) DKProjectIDs() []pgtype.UUID {
+	ids := make([]pgtype.UUID, 0, len(p.Allocations))
+	for _, allocation := range p.Allocations {
+		ids = append(ids, allocation.DKProjectID)
+	}
+	return ids
+}
+
+func (p parsedLoanAgreementRequest) PrimaryDKProjectID() pgtype.UUID {
+	if len(p.Allocations) == 0 {
+		return pgtype.UUID{}
+	}
+	return p.Allocations[0].DKProjectID
+}
+
 func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreementRequest, error) {
-	if strings.TrimSpace(req.DKProjectID) == "" {
-		return parsedLoanAgreementRequest{}, validation("dk_project_id", "wajib diisi")
-	}
-	dkProjectID, err := model.ParseUUID(req.DKProjectID)
-	if err != nil {
-		return parsedLoanAgreementRequest{}, validation("dk_project_id", "UUID tidak valid")
-	}
 	lenderID, err := model.ParseUUID(req.LenderID)
 	if err != nil {
 		return parsedLoanAgreementRequest{}, validation("lender_id", "UUID tidak valid")
@@ -282,8 +354,15 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 	if req.CumulativeDisbursement < 0 {
 		return parsedLoanAgreementRequest{}, validation("cumulative_disbursement", "tidak boleh negatif")
 	}
+	allocations, err := parseLoanAgreementAllocations(req)
+	if err != nil {
+		return parsedLoanAgreementRequest{}, err
+	}
+	if !sameCurrencyAmount(totalLoanAgreementAllocation(allocations), req.AmountOriginal) {
+		return parsedLoanAgreementRequest{}, validation("dk_project_allocations", "total alokasi harus sama dengan nilai Loan Agreement")
+	}
 	return parsedLoanAgreementRequest{
-		DKProjectID:            dkProjectID,
+		Allocations:            allocations,
 		LenderID:               lenderID,
 		LoanCode:               strings.TrimSpace(req.LoanCode),
 		AgreementDate:          agreementDate,
@@ -297,6 +376,57 @@ func parseLoanAgreementRequest(req model.LoanAgreementRequest) (parsedLoanAgreem
 	}, nil
 }
 
+func parseLoanAgreementAllocations(req model.LoanAgreementRequest) ([]parsedLoanAgreementAllocation, error) {
+	items := req.DKProjectAllocations
+	if len(items) == 0 && strings.TrimSpace(req.DKProjectID) != "" {
+		items = []model.LoanAgreementDKProjectAllocation{{
+			DKProjectID:        req.DKProjectID,
+			AllocationOriginal: req.AmountOriginal,
+		}}
+	}
+	if len(items) == 0 {
+		return nil, validation("dk_project_allocations", "minimal satu Proyek Daftar Kegiatan")
+	}
+	seen := map[string]struct{}{}
+	allocations := make([]parsedLoanAgreementAllocation, 0, len(items))
+	for idx, item := range items {
+		field := fmt.Sprintf("dk_project_allocations.%d.dk_project_id", idx)
+		dkProjectID, err := model.ParseUUID(item.DKProjectID)
+		if err != nil {
+			return nil, validation(field, "UUID tidak valid")
+		}
+		key := model.UUIDToString(dkProjectID)
+		if _, exists := seen[key]; exists {
+			return nil, validation("dk_project_allocations", "Proyek Daftar Kegiatan tidak boleh duplikat")
+		}
+		if item.AllocationOriginal <= 0 {
+			return nil, validation(fmt.Sprintf("dk_project_allocations.%d.allocation_original", idx), "wajib lebih dari 0")
+		}
+		seen[key] = struct{}{}
+		allocations = append(allocations, parsedLoanAgreementAllocation{
+			DKProjectID:        dkProjectID,
+			AllocationOriginal: item.AllocationOriginal,
+		})
+	}
+	return allocations, nil
+}
+
+func totalLoanAgreementAllocation(allocations []parsedLoanAgreementAllocation) float64 {
+	total := 0.0
+	for _, allocation := range allocations {
+		total += allocation.AllocationOriginal
+	}
+	return roundCurrencyValue(total)
+}
+
+func roundCurrencyValue(value float64) float64 {
+	return math.Round(value*100) / 100
+}
+
+func sameCurrencyAmount(left, right float64) bool {
+	return math.Abs(roundCurrencyValue(left)-roundCurrencyValue(right)) < 0.005
+}
+
 func parseOptionalLoanAgreementDate(value string, field string) (pgtype.Date, error) {
 	if strings.TrimSpace(value) == "" {
 		return pgtype.Date{}, nil
@@ -304,15 +434,54 @@ func parseOptionalLoanAgreementDate(value string, field string) (pgtype.Date, er
 	return parseDate(value, field)
 }
 
-func validateLALender(ctx context.Context, qtx *queries.Queries, dkProjectID, lenderID pgtype.UUID) error {
-	allowed, err := qtx.GetAllowedLenderIDsForLA(ctx, dkProjectID)
+func validateLADKProjects(ctx context.Context, qtx *queries.Queries, dkProjectIDs []pgtype.UUID) error {
+	missing, err := qtx.CountMissingDKProjectsForLA(ctx, dkProjectIDs)
+	if err != nil {
+		return err
+	}
+	if missing > 0 {
+		return validation("dk_project_allocations", "memuat Proyek Daftar Kegiatan yang tidak ditemukan")
+	}
+	return nil
+}
+
+func validateLALenderForProjects(ctx context.Context, qtx *queries.Queries, dkProjectIDs []pgtype.UUID, lenderID pgtype.UUID) error {
+	allowed, err := qtx.GetAllowedLenderIDsForLAProjects(ctx, dkProjectIDs)
 	if err != nil {
 		return err
 	}
 	if _, ok := uuidSet(allowed)[model.UUIDToString(lenderID)]; !ok {
-		return apperrors.BusinessRule("Lender harus berasal dari Financing Detail DK Project terkait")
+		return apperrors.BusinessRule("Lender harus berasal dari Financing Detail semua Proyek Daftar Kegiatan terkait")
 	}
 	return nil
+}
+
+func buildLoanAgreementAllocationRows(ctx context.Context, qtx *queries.Queries, parsed parsedLoanAgreementRequest, totalAmountUSD float64) ([]loanAgreementAllocationRow, error) {
+	rows := make([]loanAgreementAllocationRow, 0, len(parsed.Allocations))
+	totalAmountUSD = roundCurrencyValue(totalAmountUSD)
+	usdTotalSoFar := 0.0
+	for idx, allocation := range parsed.Allocations {
+		allocationUSD := 0.0
+		if idx == len(parsed.Allocations)-1 {
+			allocationUSD = roundCurrencyValue(totalAmountUSD - usdTotalSoFar)
+		} else {
+			calculated, err := calculateLoanAgreementAmountUSD(ctx, qtx, parsed.Currency, allocation.AllocationOriginal)
+			if err != nil {
+				return nil, err
+			}
+			allocationUSD = roundCurrencyValue(calculated)
+			usdTotalSoFar += allocationUSD
+		}
+		if allocationUSD < 0 {
+			return nil, validation("dk_project_allocations", "alokasi USD tidak valid")
+		}
+		rows = append(rows, loanAgreementAllocationRow{
+			DKProjectID:        allocation.DKProjectID,
+			AllocationOriginal: allocation.AllocationOriginal,
+			AllocationUSD:      allocationUSD,
+		})
+	}
+	return rows, nil
 }
 
 func calculateLoanAgreementAmountUSD(ctx context.Context, qtx *queries.Queries, currency string, amountOriginal float64) (float64, error) {
@@ -338,6 +507,7 @@ func laGetResponse(row queries.GetLoanAgreementRow) model.LoanAgreementResponse 
 	return model.LoanAgreementResponse{
 		ID:                        model.UUIDToString(row.ID),
 		DKProjectID:               model.UUIDToString(row.DkProjectID),
+		DKProjects:                []model.LoanAgreementDKProjectResponse{},
 		Lender:                    model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
 		LoanCode:                  row.LoanCode,
 		AgreementDate:             dateString(row.AgreementDate),
@@ -367,6 +537,7 @@ func laListResponse(row queries.ListLoanAgreementsRow) model.LoanAgreementRespon
 	return model.LoanAgreementResponse{
 		ID:                        model.UUIDToString(row.ID),
 		DKProjectID:               model.UUIDToString(row.DkProjectID),
+		DKProjects:                []model.LoanAgreementDKProjectResponse{},
 		Lender:                    model.LenderInfo{ID: model.UUIDToString(row.LenderID), Name: row.LenderName, ShortName: stringPtrFromText(row.LenderShortName), Type: row.LenderType},
 		LoanCode:                  row.LoanCode,
 		AgreementDate:             dateString(row.AgreementDate),
@@ -389,6 +560,49 @@ func laListResponse(row queries.ListLoanAgreementsRow) model.LoanAgreementRespon
 		CreatedAt:                 formatMasterTime(row.CreatedAt),
 		UpdatedAt:                 formatMasterTime(row.UpdatedAt),
 	}
+}
+
+func (s *LAService) attachLoanAgreementDKProjects(ctx context.Context, items []model.LoanAgreementResponse) ([]model.LoanAgreementResponse, error) {
+	if len(items) == 0 {
+		return items, nil
+	}
+	ids := make([]pgtype.UUID, 0, len(items))
+	indexByID := map[string]int{}
+	for idx, item := range items {
+		id, err := model.ParseUUID(item.ID)
+		if err != nil {
+			return nil, validation("id", "UUID tidak valid")
+		}
+		ids = append(ids, id)
+		indexByID[item.ID] = idx
+	}
+	rows, err := s.queries.ListLoanAgreementDKProjectsByLoanAgreements(ctx, ids)
+	if err != nil {
+		return nil, apperrors.Internal("Gagal mengambil relasi Proyek Daftar Kegiatan Loan Agreement")
+	}
+	for _, row := range rows {
+		loanAgreementID := model.UUIDToString(row.LoanAgreementID)
+		idx, ok := indexByID[loanAgreementID]
+		if !ok {
+			continue
+		}
+		items[idx].DKProjects = append(items[idx].DKProjects, model.LoanAgreementDKProjectResponse{
+			ID:          model.UUIDToString(row.DkProjectID),
+			DKID:        model.UUIDToString(row.DkID),
+			ProjectName: row.ProjectName,
+			Objectives:  stringPtrFromText(row.Objectives),
+			GBCodes:     row.GbCodes,
+			DaftarKegiatan: model.LoanAgreementDKHeaderInfo{
+				ID:           model.UUIDToString(row.DkID),
+				Subject:      row.DkSubject,
+				Date:         dateString(row.DkDate),
+				LetterNumber: stringPtrFromText(row.DkLetterNumber),
+			},
+			AllocationOriginal: floatFromNumeric(row.AllocationOriginal),
+			AllocationUSD:      floatFromNumeric(row.AllocationUsd),
+		})
+	}
+	return items, nil
 }
 
 func floatPtrFromNumeric(value pgtype.Numeric) *float64 {

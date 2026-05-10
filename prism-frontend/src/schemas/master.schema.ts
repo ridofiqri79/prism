@@ -54,7 +54,7 @@ export const lenderSchema = z
   })
   .refine(
     (data) => {
-      if (data.type !== 'Multilateral') return Boolean(data.country_id)
+      if (data.type === 'Bilateral') return Boolean(data.country_id)
       return true
     },
     { message: 'Negara wajib diisi', path: ['country_id'] },

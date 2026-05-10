@@ -9,10 +9,29 @@ export interface DKProjectSummary {
   project_name?: string
 }
 
+export interface LoanAgreementDKHeader {
+  id: string
+  subject: string
+  date: string
+  letter_number?: string | null
+}
+
+export interface LoanAgreementDKProject {
+  id: string
+  dk_id: string
+  project_name: string
+  objectives?: string | null
+  gb_codes: string
+  daftar_kegiatan: LoanAgreementDKHeader
+  allocation_original: number
+  allocation_usd: number
+}
+
 export interface LoanAgreement {
   id: string
   dk_project?: DKProjectSummary | null
   dk_project_id?: string
+  dk_projects: LoanAgreementDKProject[]
   lender: Lender
   loan_code: string
   agreement_date: string
@@ -36,8 +55,14 @@ export interface LoanAgreement {
   updated_at?: string
 }
 
-export interface LoanAgreementPayload {
+export interface LoanAgreementDKProjectAllocationPayload {
   dk_project_id: string
+  allocation_original: number
+}
+
+export interface LoanAgreementPayload {
+  dk_project_id?: string
+  dk_project_allocations: LoanAgreementDKProjectAllocationPayload[]
   lender_id: string
   loan_code: string
   agreement_date: string

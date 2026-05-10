@@ -11,6 +11,37 @@ WITH project_rows AS (
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(la_alloc.allocation_usd)
+                FROM (
+                    SELECT DISTINCT ladp.loan_agreement_id, ladp.dk_project_id, ladp.allocation_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) la_alloc
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(dk_financing.amount_usd)
+                FROM (
+                    SELECT DISTINCT dfd.id, dfd.amount_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) dk_financing
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
                 WHERE gbp.bb_project_id = bp.id
             ) THEN COALESCE((
                 SELECT SUM(gfs.loan_usd)
@@ -31,7 +62,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Monitoring'
@@ -39,7 +71,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'LA'
             WHEN EXISTS (
@@ -60,7 +93,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Ongoing'
             ELSE 'Pipeline'
@@ -82,7 +116,8 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
             ) loan_types
@@ -213,6 +248,37 @@ WITH project_rows AS (
             WHEN EXISTS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(la_alloc.allocation_usd)
+                FROM (
+                    SELECT DISTINCT ladp.loan_agreement_id, ladp.dk_project_id, ladp.allocation_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) la_alloc
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
+                JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                WHERE gbp.bb_project_id = bp.id
+            ) THEN COALESCE((
+                SELECT SUM(dk_financing.amount_usd)
+                FROM (
+                    SELECT DISTINCT dfd.id, dfd.amount_usd
+                    FROM gb_project_bb_project gbp
+                    JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
+                    JOIN dk_financing_detail dfd ON dfd.dk_project_id = dpg.dk_project_id
+                    WHERE gbp.bb_project_id = bp.id
+                ) dk_financing
+            ), 0)
+            WHEN EXISTS (
+                SELECT 1
+                FROM gb_project_bb_project gbp
                 WHERE gbp.bb_project_id = bp.id
             ) THEN COALESCE((
                 SELECT SUM(gfs.loan_usd)
@@ -233,7 +299,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN monitoring_disbursement md ON md.loan_agreement_id = la.id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Monitoring'
@@ -241,7 +308,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'LA'
             WHEN EXISTS (
@@ -262,7 +330,8 @@ WITH project_rows AS (
                 SELECT 1
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 WHERE gbp.bb_project_id = bp.id
             ) THEN 'Ongoing'
             ELSE 'Pipeline'
@@ -284,7 +353,8 @@ WITH project_rows AS (
                 SELECT l.type AS type_label
                 FROM gb_project_bb_project gbp
                 JOIN dk_project_gb_project dpg ON dpg.gb_project_id = gbp.gb_project_id
-                JOIN loan_agreement la ON la.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement_dk_project ladp ON ladp.dk_project_id = dpg.dk_project_id
+                JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
                 JOIN lender l ON l.id = la.lender_id
                 WHERE gbp.bb_project_id = bp.id
             ) loan_types

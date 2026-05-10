@@ -17,7 +17,7 @@ latest_cutoff AS (
 base AS (
     SELECT
         la.id,
-        la.dk_project_id,
+        COALESCE(primary_rel.dk_project_id, la.dk_project_id) AS dk_project_id,
         la.lender_id,
         la.loan_code,
         la.agreement_date,
@@ -45,11 +45,30 @@ base AS (
     JOIN lender l ON l.id = la.lender_id
     LEFT JOIN latest_kurs lk ON lk.currency_code = UPPER(TRIM(la.currency))
     CROSS JOIN latest_cutoff lc
+    LEFT JOIN LATERAL (
+        SELECT ladp.dk_project_id
+        FROM loan_agreement_dk_project ladp
+        WHERE ladp.loan_agreement_id = la.id
+        ORDER BY ladp.dk_project_id
+        LIMIT 1
+    ) primary_rel ON true
     WHERE (
         sqlc.narg('search')::text IS NULL
         OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
         OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR EXISTS (
+            SELECT 1
+            FROM loan_agreement_dk_project ladp
+            JOIN dk_project dp ON dp.id = ladp.dk_project_id
+            JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+            WHERE ladp.loan_agreement_id = la.id
+              AND (
+                  dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+                  OR dk.subject ILIKE '%' || sqlc.narg('search')::text || '%'
+                  OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+              )
+        )
     )
     AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
     AND (
@@ -64,11 +83,12 @@ base AS (
         COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
         OR EXISTS (
             SELECT 1
-            FROM dk_project_gb_project dpg
+            FROM loan_agreement_dk_project ladp
+            JOIN dk_project_gb_project dpg ON dpg.dk_project_id = ladp.dk_project_id
             JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
             JOIN bb_project bp ON bp.id = gbp.bb_project_id
             JOIN blue_book bb ON bb.id = bp.blue_book_id
-            WHERE dpg.dk_project_id = la.dk_project_id
+            WHERE ladp.loan_agreement_id = la.id
               AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
         )
     )
@@ -192,6 +212,18 @@ WHERE (
     OR la.loan_code ILIKE '%' || sqlc.narg('search')::text || '%'
     OR l.name ILIKE '%' || sqlc.narg('search')::text || '%'
     OR COALESCE(l.short_name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+    OR EXISTS (
+        SELECT 1
+        FROM loan_agreement_dk_project ladp
+        JOIN dk_project dp ON dp.id = ladp.dk_project_id
+        JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+        WHERE ladp.loan_agreement_id = la.id
+          AND (
+              dp.project_name ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR dk.subject ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR COALESCE(dk.letter_number, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+          )
+    )
 )
 AND (sqlc.narg('lender_id')::uuid IS NULL OR la.lender_id = sqlc.narg('lender_id')::uuid)
 AND (
@@ -206,11 +238,12 @@ AND (
     COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0
     OR EXISTS (
         SELECT 1
-        FROM dk_project_gb_project dpg
+        FROM loan_agreement_dk_project ladp
+        JOIN dk_project_gb_project dpg ON dpg.dk_project_id = ladp.dk_project_id
         JOIN gb_project_bb_project gbp ON gbp.gb_project_id = dpg.gb_project_id
         JOIN bb_project bp ON bp.id = gbp.bb_project_id
         JOIN blue_book bb ON bb.id = bp.blue_book_id
-        WHERE dpg.dk_project_id = la.dk_project_id
+        WHERE ladp.loan_agreement_id = la.id
           AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
     )
 );
@@ -232,7 +265,7 @@ latest_cutoff AS (
 base AS (
     SELECT
         la.id,
-        la.dk_project_id,
+        COALESCE(primary_rel.dk_project_id, la.dk_project_id) AS dk_project_id,
         la.lender_id,
         la.loan_code,
         la.agreement_date,
@@ -260,6 +293,13 @@ base AS (
     JOIN lender l ON l.id = la.lender_id
     LEFT JOIN latest_kurs lk ON lk.currency_code = UPPER(TRIM(la.currency))
     CROSS JOIN latest_cutoff lc
+    LEFT JOIN LATERAL (
+        SELECT ladp.dk_project_id
+        FROM loan_agreement_dk_project ladp
+        WHERE ladp.loan_agreement_id = la.id
+        ORDER BY ladp.dk_project_id
+        LIMIT 1
+    ) primary_rel ON true
     WHERE la.id = $1
 ),
 converted AS (
@@ -343,10 +383,57 @@ SELECT
 FROM final;
 
 -- name: ListLoanAgreementsByDKProject :many
-SELECT *
-FROM loan_agreement
-WHERE dk_project_id = $1
-ORDER BY created_at DESC, loan_code ASC;
+SELECT
+    la.id,
+    la.loan_code,
+    la.currency,
+    la.amount_original,
+    la.amount_usd,
+    la.cumulative_disbursement,
+    ladp.allocation_original,
+    ladp.allocation_usd
+FROM loan_agreement_dk_project ladp
+JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
+WHERE ladp.dk_project_id = $1
+ORDER BY la.created_at DESC, la.loan_code ASC;
+
+-- name: ListLoanAgreementDKProjectsByLoanAgreements :many
+SELECT
+    ladp.loan_agreement_id,
+    ladp.dk_project_id,
+    ladp.allocation_original,
+    ladp.allocation_usd,
+    dp.dk_id,
+    dp.project_name,
+    dp.objectives,
+    dk.subject AS dk_subject,
+    dk.date AS dk_date,
+    dk.letter_number AS dk_letter_number,
+    COALESCE(string_agg(DISTINCT gp.gb_code, ', ' ORDER BY gp.gb_code), '')::text AS gb_codes
+FROM loan_agreement_dk_project ladp
+JOIN dk_project dp ON dp.id = ladp.dk_project_id
+JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
+LEFT JOIN dk_project_gb_project dkgb ON dkgb.dk_project_id = dp.id
+LEFT JOIN gb_project gp ON gp.id = dkgb.gb_project_id
+WHERE ladp.loan_agreement_id = ANY(sqlc.arg('loan_agreement_ids')::uuid[])
+GROUP BY
+    ladp.loan_agreement_id,
+    ladp.dk_project_id,
+    ladp.allocation_original,
+    ladp.allocation_usd,
+    dp.dk_id,
+    dp.project_name,
+    dp.objectives,
+    dk.subject,
+    dk.date,
+    dk.letter_number
+ORDER BY dk.date DESC, COALESCE(dk.letter_number, '') ASC, dp.project_name ASC;
+
+-- name: CountMissingDKProjectsForLA :one
+SELECT COUNT(*)::bigint
+FROM unnest(sqlc.arg('dk_project_ids')::uuid[]) AS requested(id)
+LEFT JOIN dk_project dp ON dp.id = requested.id
+WHERE dp.id IS NULL;
 
 -- name: GetLoanAgreementByLoanCode :one
 SELECT *
@@ -368,14 +455,16 @@ SELECT
           AND dfd.lender_id IS NOT NULL
     ) AS has_financing_detail,
     (
-        SELECT COUNT(*)::bigint
-        FROM loan_agreement la
-        WHERE la.dk_project_id = dp.id
+        SELECT COUNT(DISTINCT la.id)::bigint
+        FROM loan_agreement_dk_project ladp
+        JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
+        WHERE ladp.dk_project_id = dp.id
     ) AS loan_agreement_count,
     COALESCE((
-        SELECT string_agg(la.loan_code, ', ' ORDER BY la.loan_code)
-        FROM loan_agreement la
-        WHERE la.dk_project_id = dp.id
+        SELECT string_agg(DISTINCT la.loan_code, ', ' ORDER BY la.loan_code)
+        FROM loan_agreement_dk_project ladp
+        JOIN loan_agreement la ON la.id = ladp.loan_agreement_id
+        WHERE ladp.dk_project_id = dp.id
     ), '')::text AS existing_loan_codes
 FROM dk_project dp
 JOIN daftar_kegiatan dk ON dk.id = dp.dk_id
@@ -404,6 +493,14 @@ JOIN lender l ON l.id = dfd.lender_id
 WHERE dfd.lender_id IS NOT NULL
 ORDER BY dfd.dk_project_id, l.name ASC, dfd.currency ASC;
 
+-- name: GetAllowedLenderIDsForLAProjects :many
+SELECT dfd.lender_id
+FROM dk_financing_detail dfd
+WHERE dfd.dk_project_id = ANY(sqlc.arg('dk_project_ids')::uuid[])
+  AND dfd.lender_id IS NOT NULL
+GROUP BY dfd.lender_id
+HAVING COUNT(DISTINCT dfd.dk_project_id) = cardinality(sqlc.arg('dk_project_ids')::uuid[]);
+
 -- name: CreateLoanAgreement :one
 INSERT INTO loan_agreement (
     dk_project_id,
@@ -423,19 +520,37 @@ RETURNING *;
 
 -- name: UpdateLoanAgreement :one
 UPDATE loan_agreement
-SET lender_id = $2,
-    loan_code = $3,
-    agreement_date = $4,
-    effective_date = $5,
-    original_closing_date = $6,
-    closing_date = $7,
-    currency = $8,
-    amount_original = $9,
-    amount_usd = $10,
-    cumulative_disbursement = $11,
+SET dk_project_id = $2,
+    lender_id = $3,
+    loan_code = $4,
+    agreement_date = $5,
+    effective_date = $6,
+    original_closing_date = $7,
+    closing_date = $8,
+    currency = $9,
+    amount_original = $10,
+    amount_usd = $11,
+    cumulative_disbursement = $12,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: AddLoanAgreementDKProject :exec
+INSERT INTO loan_agreement_dk_project (
+    loan_agreement_id,
+    dk_project_id,
+    allocation_original,
+    allocation_usd
+)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (loan_agreement_id, dk_project_id) DO UPDATE
+SET allocation_original = EXCLUDED.allocation_original,
+    allocation_usd = EXCLUDED.allocation_usd,
+    updated_at = NOW();
+
+-- name: DeleteLoanAgreementDKProjects :exec
+DELETE FROM loan_agreement_dk_project
+WHERE loan_agreement_id = $1;
 
 -- name: DeleteLoanAgreement :exec
 DELETE FROM loan_agreement

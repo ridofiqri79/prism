@@ -374,20 +374,10 @@ func (s *DKService) replaceDKProjectChildren(ctx context.Context, qtx *queries.Q
 			return err
 		}
 	}
-	allowed, err := qtx.GetAllowedLenderIDsForDK(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	allowedSet := uuidSet(allowed)
 	for _, item := range req.FinancingDetails {
 		lenderID, err := parseOptionalUUID(item.LenderID, "financing_details.lender_id")
 		if err != nil {
 			return err
-		}
-		if lenderID.Valid {
-			if _, ok := allowedSet[model.UUIDToString(lenderID)]; !ok {
-				return apperrors.BusinessRule("Lender tidak terdaftar di GB atau BB terkait")
-			}
 		}
 		currency := normalizeCurrency(item.Currency)
 		if err := validateActiveCurrency(ctx, qtx, "financing_details.currency", currency); err != nil {
@@ -502,6 +492,10 @@ func (s *DKService) buildDKProjectResponse(ctx context.Context, row queries.DkPr
 			ID:                     model.UUIDToString(loanAgreement.ID),
 			LoanCode:               loanAgreement.LoanCode,
 			Currency:               loanAgreement.Currency,
+			AmountOriginal:         floatFromNumeric(loanAgreement.AmountOriginal),
+			AmountUSD:              floatFromNumeric(loanAgreement.AmountUsd),
+			AllocationOriginal:     floatFromNumeric(loanAgreement.AllocationOriginal),
+			AllocationUSD:          floatFromNumeric(loanAgreement.AllocationUsd),
 			CumulativeDisbursement: floatFromNumeric(loanAgreement.CumulativeDisbursement),
 		})
 	}

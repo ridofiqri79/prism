@@ -55,6 +55,7 @@ const isExtendedOptions = [
 const columns: ColumnDef[] = [
   { field: 'loan_code', header: 'Kode Pinjaman', sortable: true, nowrap: true },
   { field: 'lender', header: 'Lender', sortable: true },
+  { field: 'dk_projects', header: 'Proyek Daftar Kegiatan' },
   { field: 'effective_date', header: 'Tgl. Efektif', sortable: true, nowrap: true },
   { field: 'closing_date', header: 'Tgl. Penutupan', sortable: true, nowrap: true },
   { field: 'currency', header: 'Mata Uang', sortable: true, nowrap: true },
@@ -165,6 +166,16 @@ onMounted(() => {
         <span v-if="column.field === 'lender'">{{
           (row as LoanAgreement).lender?.name || '-'
         }}</span>
+        <div v-else-if="column.field === 'dk_projects'" class="space-y-1">
+          <p
+            v-for="project in (row as LoanAgreement).dk_projects"
+            :key="project.id"
+            class="text-sm text-surface-700"
+          >
+            {{ project.project_name }}
+          </p>
+          <span v-if="(row as LoanAgreement).dk_projects.length === 0">-</span>
+        </div>
         <span v-else-if="column.field === 'effective_date'">{{
           formatDate(String(row.effective_date))
         }}</span>

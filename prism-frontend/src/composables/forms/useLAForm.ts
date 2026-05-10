@@ -5,6 +5,7 @@ import { LoanAgreementService } from '@/services/loan-agreement.service'
 import type {
   DKProjectLoanOption,
   LoanAgreement,
+  LoanAgreementDKProjectAllocationPayload,
   LoanAgreementPayload,
 } from '@/types/loan-agreement.types'
 import type { KursTengah } from '@/types/master.types'
@@ -14,6 +15,7 @@ export type LAFormErrors = Partial<Record<keyof LoanAgreementPayload, string>>
 function defaultValues(): LoanAgreementPayload {
   return {
     dk_project_id: '',
+    dk_project_allocations: [],
     lender_id: '',
     loan_code: '',
     agreement_date: '',
@@ -115,11 +117,13 @@ export function useLAForm(
     kursTengah?: () => KursTengah[]
   },
 ) {
+  const initialAllocations = initialData ? loanAgreementAllocationsFromData(initialData) : []
   const values = reactive<LoanAgreementPayload>({
     ...defaultValues(),
     ...(initialData
       ? {
-          dk_project_id: initialData.dk_project?.id ?? initialData.dk_project_id ?? '',
+          dk_project_id: initialAllocations[0]?.dk_project_id ?? '',
+          dk_project_allocations: initialAllocations,
           lender_id: initialData.lender.id,
           loan_code: initialData.loan_code,
           agreement_date: initialData.agreement_date,
@@ -138,9 +142,21 @@ export function useLAForm(
   const selectedDKProject = computed(
     () => options?.dkProjects?.().find((project) => project.id === values.dk_project_id) ?? null,
   )
+  const selectedDKProjects = computed(() => {
+    const optionMap = new Map(
+      (options?.dkProjects?.() ?? []).map((project) => [project.id, project]),
+    )
+    return values.dk_project_allocations
+      .map((allocation) => optionMap.get(allocation.dk_project_id))
+      .filter((project): project is DKProjectLoanOption => Boolean(project))
+  })
   const allowedLenderIds = computed(() =>
-    LoanAgreementService.getAllowedLenderIds(selectedDKProject.value),
+    LoanAgreementService.getAllowedLenderIdsForProjects(selectedDKProjects.value),
   )
+  const allocationTotal = computed(() =>
+    values.dk_project_allocations.reduce((sum, item) => sum + item.allocation_original, 0),
+  )
+  const allocationDifference = computed(() => values.amount_original - allocationTotal.value)
   const extensionDays = computed(() =>
     Math.max(0, daysBetween(values.original_closing_date, values.closing_date)),
   )
@@ -194,6 +210,16 @@ export function useLAForm(
   )
 
   watch(
+    () => values.amount_original,
+    (amount) => {
+      const allocation = values.dk_project_allocations[0]
+      if (values.dk_project_allocations.length === 1 && allocation) {
+        allocation.allocation_original = amount
+      }
+    },
+  )
+
+  watch(
     () => values.currency,
     (currency) => {
       const normalized = normalizeCurrency(currency).slice(0, 3)
@@ -209,8 +235,10 @@ export function useLAForm(
   })
 
   function applyLoanAgreement(data: LoanAgreement) {
+    const allocations = loanAgreementAllocationsFromData(data)
     Object.assign(values, {
-      dk_project_id: data.dk_project?.id ?? data.dk_project_id ?? '',
+      dk_project_id: allocations[0]?.dk_project_id ?? '',
+      dk_project_allocations: allocations,
       lender_id: data.lender.id,
       loan_code: data.loan_code,
       agreement_date: data.agreement_date,
@@ -222,6 +250,18 @@ export function useLAForm(
       amount_usd: data.amount_usd,
       cumulative_disbursement: data.cumulative_disbursement,
     })
+  }
+
+  function setDKProjectIDs(ids: string[]) {
+    const existing = new Map(
+      values.dk_project_allocations.map((allocation) => [allocation.dk_project_id, allocation]),
+    )
+    values.dk_project_allocations = ids.map((id) => ({
+      dk_project_id: id,
+      allocation_original:
+        ids.length === 1 ? values.amount_original : (existing.get(id)?.allocation_original ?? 0),
+    }))
+    values.dk_project_id = values.dk_project_allocations[0]?.dk_project_id ?? ''
   }
 
   function submit(callback: (payload: LoanAgreementPayload) => unknown | Promise<unknown>) {
@@ -237,6 +277,11 @@ export function useLAForm(
       })
       const payload = {
         ...parsed.data,
+        dk_project_id: parsed.data.dk_project_allocations[0]?.dk_project_id ?? '',
+        dk_project_allocations: parsed.data.dk_project_allocations.map((allocation) => ({
+          dk_project_id: allocation.dk_project_id,
+          allocation_original: allocation.allocation_original,
+        })),
         original_closing_date: parsed.data.original_closing_date?.trim() ?? '',
         currency: normalizeCurrency(parsed.data.currency),
         amount_usd:
@@ -259,7 +304,10 @@ export function useLAForm(
     values,
     errors,
     selectedDKProject,
+    selectedDKProjects,
     allowedLenderIds,
+    allocationTotal,
+    allocationDifference,
     isExtended,
     isUSD,
     extensionDays,
@@ -273,6 +321,21 @@ export function useLAForm(
     performanceStatus,
     submit,
     applyLoanAgreement,
+    setDKProjectIDs,
     reset,
   }
+}
+
+function loanAgreementAllocationsFromData(
+  data: LoanAgreement,
+): LoanAgreementDKProjectAllocationPayload[] {
+  if (data.dk_projects?.length) {
+    return data.dk_projects.map((project) => ({
+      dk_project_id: project.id,
+      allocation_original: project.allocation_original,
+    }))
+  }
+  const fallbackID = data.dk_project?.id ?? data.dk_project_id ?? ''
+  if (!fallbackID) return []
+  return [{ dk_project_id: fallbackID, allocation_original: data.amount_original }]
 }
