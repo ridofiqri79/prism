@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
@@ -9,7 +9,6 @@ import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import PageHeader from '@/components/common/PageHeader.vue'
-import ProjectJourneyFlow from '@/components/journey/ProjectJourneyFlow.vue'
 import ProjectJourneySummary from '@/components/journey/ProjectJourneySummary.vue'
 import ProjectTimeline from '@/components/journey/ProjectTimeline.vue'
 import { useJourneyStore } from '@/stores/journey.store'
@@ -31,6 +30,10 @@ type ProjectJourneyOption = Pick<
 }
 
 type JourneyView = 'summary' | 'flow' | 'detail'
+
+const ProjectJourneyFlow = defineAsyncComponent(
+  () => import('@/components/journey/ProjectJourneyFlow.vue'),
+)
 
 const emptyJourneyStages = [
   { label: 'Blue Book', icon: 'pi pi-book', state: 'Aktif' },

@@ -362,18 +362,6 @@ function projectTarget(
   }
 }
 
-function spatialTarget(
-  query: DashboardInsightTarget['query'],
-  label: string,
-): DashboardInsightTarget {
-  return {
-    name: 'spatial-distribution',
-    query: withSelectedDashboardQuery(query),
-    label,
-    exact: true,
-  }
-}
-
 function usdAmountLabel(value: number) {
   if (value <= 0) return 'USD 0'
   return `USD ${compactUsdFormatter.format(value)}`
@@ -1200,7 +1188,7 @@ async function fetchDashboardMap() {
         dashboardMapRegionFilter.value = nextSelectedRegion
       }
     }
-  } catch (err) {
+  } catch {
     if (requestId !== dashboardMapRequestId) return
     dashboardMapError.value = 'Gagal memuat peta distribusi dashboard.'
   } finally {

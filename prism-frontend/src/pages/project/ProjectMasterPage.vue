@@ -19,7 +19,6 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar from '@/components/common/SearchFilterBar.vue'
 import SummaryCard from '@/components/common/SummaryCard.vue'
 import { useListControls } from '@/composables/useListControls'
-import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useMasterStore } from '@/stores/master.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -49,7 +48,6 @@ import { primeTablePt } from '@/utils/table-styles'
 const projectStore = useProjectStore()
 const masterStore = useMasterStore()
 const route = useRoute()
-const { can } = usePermission()
 const toast = useToast()
 let routeHydrating = false
 
