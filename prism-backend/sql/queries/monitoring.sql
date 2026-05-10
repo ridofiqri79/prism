@@ -340,7 +340,8 @@ SELECT
         'GB ',
         latest_gb.publish_year,
         CASE WHEN latest_gb.revision_number > 0 THEN CONCAT(' Revisi ke-', latest_gb.revision_number) ELSE '' END
-    )::text AS latest_green_book_revision_label
+    )::text AS latest_green_book_revision_label,
+    COALESCE(latest_funding.latest_loan_usd, 0)::numeric AS latest_loan_usd
 FROM gb_project_bb_project gbp
 JOIN gb_project gp ON gp.id = gbp.gb_project_id
 JOIN green_book gb ON gb.id = gp.green_book_id
@@ -354,6 +355,11 @@ JOIN LATERAL (
     LIMIT 1
 ) latest ON TRUE
 JOIN green_book latest_gb ON latest_gb.id = latest.green_book_id
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(gfs.loan_usd), 0)::numeric AS latest_loan_usd
+    FROM gb_funding_source gfs
+    WHERE gfs.gb_project_id = latest.id
+) latest_funding ON TRUE
 WHERE gbp.bb_project_id = $1
 ORDER BY gp.gb_code ASC;
 

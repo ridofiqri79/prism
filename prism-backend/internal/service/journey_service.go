@@ -85,6 +85,7 @@ func (s *JourneyService) GetProjectJourney(ctx context.Context, bbProjectID pgty
 			HasNewerRevision:             gb.HasNewerRevision,
 			LatestGBProjectID:            model.UUIDToString(gb.LatestGbProjectID),
 			LatestGreenBookRevisionLabel: gb.LatestGreenBookRevisionLabel,
+			LatestLoanUSD:                floatFromNumeric(gb.LatestLoanUsd),
 			FundingSources:               fundingSources,
 			DKProjects:                   dkProjects,
 		})

@@ -49,6 +49,7 @@ export interface GBProjectJourney {
   has_newer_revision?: boolean
   latest_gb_project_id?: string
   latest_green_book_revision_label?: string
+  latest_loan_usd?: number
   funding_sources: JourneyFundingSource[]
   dk_projects: DKProjectJourney[]
 }

@@ -75,7 +75,12 @@ func TestJourneyReturnsConcretePathRevisionMetadataAndFundingDetails(t *testing.
 	blueBookRevision := env.createBlueBook(t, 1, &blueBook.ID)
 	env.importBBProjectFromBlueBook(t, blueBookRevision.ID, blueBook.ID, bbProject.ID)
 	greenBookRevision := env.createGreenBook(t, gbService, 1, &greenBook.ID)
-	env.createGBProjectWithFundingLender(t, gbService, greenBookRevision.ID, bbProject.ID, "GB-JRN-001", "Journey GB Revision", lender)
+	latestGBProject := env.createGBProjectWithFundingLender(t, gbService, greenBookRevision.ID, bbProject.ID, "GB-JRN-001", "Journey GB Revision", lender)
+	latestGBReq := env.gbProjectRequestWithFundingLender(bbProject.ID, "GB-JRN-001", "Journey GB Revision", lender)
+	latestGBReq.FundingSources[0].LoanUSD = 250
+	if _, err := gbService.UpdateGBProject(env.ctx, mustParseUUID(t, greenBookRevision.ID), mustParseUUID(t, latestGBProject.ID), latestGBReq); err != nil {
+		t.Fatalf("UpdateGBProject(latest journey funding) error = %v", err)
+	}
 
 	journey, err := journeyService.GetProjectJourney(env.ctx, mustParseUUID(t, bbProject.ID))
 	if err != nil {
@@ -108,6 +113,9 @@ func TestJourneyReturnsConcretePathRevisionMetadataAndFundingDetails(t *testing.
 	}
 	if len(gbNode.FundingSources) != 1 || gbNode.FundingSources[0].LoanUSD != 100 {
 		t.Fatalf("funding sources = %+v, want one USD 100 loan", gbNode.FundingSources)
+	}
+	if gbNode.LatestLoanUSD != 250 {
+		t.Fatalf("latest loan USD = %v, want 250", gbNode.LatestLoanUSD)
 	}
 	if len(gbNode.DKProjects) != 1 || gbNode.DKProjects[0].ID != dkProject.ID {
 		t.Fatalf("DK projects = %+v, want concrete DK %s", gbNode.DKProjects, dkProject.ID)
