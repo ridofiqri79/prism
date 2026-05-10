@@ -36,6 +36,7 @@ import {
   queryEnumArray,
   queryNumber,
   queryString,
+  queryStringValues,
 } from '@/utils/route-query'
 import { getPipelineStatusLabel, getPipelineStatusSeverity } from '@/utils/status-labels'
 import { primeTablePt } from '@/utils/table-styles'
@@ -67,6 +68,7 @@ const provinceName = ref<string | undefined>()
 const selectedRegion = ref<SpatialDistributionRegionMetric | null>(null)
 const pendingRegionCode = ref<string | null>(null)
 const metric = ref<SpatialDistributionMetric>('count')
+const periodIds = ref<string[]>([])
 const projectPage = ref(1)
 const projectLimit = ref(10)
 const projectSortField = ref<ProjectMasterSortField>('project_name')
@@ -304,6 +306,7 @@ function buildParams(): SpatialDistributionParams {
   return {
     level: level.value,
     province_code: level.value === 'city' ? provinceCode.value : undefined,
+    period_ids: periodIds.value.length ? [...periodIds.value] : undefined,
     pipeline_statuses: selectedFilterValues(appliedFilters.pipelineStatuses, pipelineStatusValues),
     reached_stages: selectedExactFilterValues(appliedFilters.reachedStages),
     missing_stages: selectedExactFilterValues(appliedFilters.missingStages),
@@ -529,6 +532,7 @@ function hydrateSpatialRouteQuery() {
     selectedRegion.value = null
     pendingRegionCode.value = queryString(route.query, 'region_code') ?? null
     metric.value = queryEnum(route.query, metricValues, 'metric') ?? 'count'
+    periodIds.value = queryStringValues(route.query, 'period_ids', 'period_ids[]', 'period_id')
     projectPage.value = routePage ?? 1
     projectLimit.value = routeLimit ?? 10
     projectSortField.value = queryEnum(route.query, projectSortFieldValues, 'sort') ?? 'project_name'
@@ -867,6 +871,7 @@ onUnmounted(() => {
                   :options="pipelineOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua Tahap"
                   filter
                   filter-placeholder="Cari tahap"
                   :show-toggle-all="false"
@@ -886,6 +891,7 @@ onUnmounted(() => {
                   :options="pipelineOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua tahap"
                   filter
                   filter-placeholder="Cari tahap"
                   :show-toggle-all="false"
@@ -904,6 +910,7 @@ onUnmounted(() => {
                   :options="pipelineOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Tidak ada bottleneck"
                   filter
                   filter-placeholder="Cari tahap"
                   :show-toggle-all="false"
@@ -922,6 +929,7 @@ onUnmounted(() => {
                   :options="projectStatusOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua Status"
                   filter
                   filter-placeholder="Cari status"
                   :show-toggle-all="false"
@@ -941,6 +949,7 @@ onUnmounted(() => {
                   :options="presenceOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua LoI"
                   class="w-full"
                 />
               </label>
@@ -952,6 +961,7 @@ onUnmounted(() => {
                   :options="presenceOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua indikasi"
                   class="w-full"
                 />
               </label>
@@ -963,6 +973,7 @@ onUnmounted(() => {
                   :options="loanTypeOptions"
                   option-label="label"
                   option-value="value"
+                  placeholder="Semua Tipe Pinjaman"
                   filter
                   filter-placeholder="Cari tipe pinjaman"
                   :show-toggle-all="false"

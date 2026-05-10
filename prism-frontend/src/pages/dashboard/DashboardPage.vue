@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import Button from 'primevue/button'
 import MultiSelect from 'primevue/multiselect'
 import PlanningFunnelFlow from '@/components/dashboard/PlanningFunnelFlow.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import SpatialChoroplethMap from '@/components/spatial/SpatialChoroplethMap.vue'
 import { DashboardService } from '@/services/dashboard.service'
 import { LoanAgreementService } from '@/services/loan-agreement.service'
 import { ProjectService } from '@/services/project.service'
+import { SpatialDistributionService } from '@/services/spatial-distribution.service'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useMasterStore } from '@/stores/master.store'
 import type {
@@ -17,6 +20,12 @@ import type {
 } from '@/types/dashboard-flow.types'
 import type { DashboardDistributionItem } from '@/types/dashboard.types'
 import type { ProjectMasterListParams, ProjectMasterRow } from '@/types/project.types'
+import type {
+  SpatialDistributionChoroplethResponse,
+  SpatialDistributionLevel,
+  SpatialDistributionMetric,
+  SpatialDistributionRegionMetric,
+} from '@/types/spatial-distribution.types'
 
 const dashboardStore = useDashboardStore()
 const masterStore = useMasterStore()
@@ -26,7 +35,7 @@ const {
   daftarKegiatanDistribution,
   loanAgreementDistribution,
 } = storeToRefs(dashboardStore)
-const { periods } = storeToRefs(masterStore)
+const { periods, regions: masterRegions } = storeToRefs(masterStore)
 const selectedPeriodIds = ref<string[]>([])
 
 const countFormatter = new Intl.NumberFormat('id-ID', {
@@ -52,7 +61,47 @@ type DashboardStageSummary = {
 
 type DashboardStageRegionPanels = Record<DashboardStageKey, DashboardDatum[] | null>
 
+type DashboardMapStageOption = {
+  key: DashboardStageKey
+  label: string
+  color: string
+}
+
 const dashboardStageKeys: DashboardStageKey[] = ['BB', 'GB', 'DK', 'LA']
+
+const dashboardMapStageOptions: DashboardMapStageOption[] = [
+  { key: 'BB', label: 'Blue Book', color: '#2563eb' },
+  { key: 'GB', label: 'Green Book', color: '#16a34a' },
+  { key: 'DK', label: 'Daftar Kegiatan', color: '#d97706' },
+  { key: 'LA', label: 'Loan Agreement', color: '#7c3aed' },
+]
+
+function emptyDashboardChoropleth(): SpatialDistributionChoroplethResponse {
+  return {
+    level: 'province',
+    regions: [],
+    summary: {
+      total_regions: 0,
+      active_regions: 0,
+      total_project_count: 0,
+      total_loan_usd: 0,
+      max_project_count: 0,
+      max_loan_usd: 0,
+    },
+  }
+}
+
+function emptyDashboardStageMaps(): Record<
+  DashboardStageKey,
+  SpatialDistributionChoroplethResponse
+> {
+  return {
+    BB: emptyDashboardChoropleth(),
+    GB: emptyDashboardChoropleth(),
+    DK: emptyDashboardChoropleth(),
+    LA: emptyDashboardChoropleth(),
+  }
+}
 
 const defaultStageSummaries: Record<DashboardStageKey, DashboardStageSummary> = {
   BB: { count: 96, totalLoanUsd: 0 },
@@ -75,6 +124,18 @@ const blueBookPipelineCards = ref<DashboardDatum[] | null>(null)
 const blueBookLoiCards = ref<DashboardDatum[] | null>(null)
 const blueBookIndicationCards = ref<DashboardDatum[] | null>(null)
 const loanAgreementStatusCards = ref<DashboardDatum[] | null>(null)
+const dashboardMapLevel = ref<SpatialDistributionLevel>('province')
+const dashboardMapProvinceCode = ref<string | undefined>()
+const dashboardMapProvinceName = ref<string | undefined>()
+const dashboardMapMetric = ref<SpatialDistributionMetric>('count')
+const dashboardMap = ref<SpatialDistributionChoroplethResponse>(emptyDashboardChoropleth())
+const dashboardStageMaps =
+  ref<Record<DashboardStageKey, SpatialDistributionChoroplethResponse>>(emptyDashboardStageMaps())
+const dashboardMapLoading = ref(false)
+const dashboardMapError = ref<string | null>(null)
+const selectedDashboardMapRegion = ref<SpatialDistributionRegionMetric | null>(null)
+const dashboardMapRegionFilter = ref<SpatialDistributionRegionMetric | null>(null)
+const dashboardMapProvinceFilter = ref<SpatialDistributionRegionMetric | null>(null)
 
 const periodOptions = computed(() => periods.value)
 const availablePeriodIds = computed(() => periodOptions.value.map((period) => period.id))
@@ -97,8 +158,65 @@ const selectedPeriodLabel = computed(() => {
   return `${countFormatter.format(selectedIds.length)} periode`
 })
 
+const dashboardMapFocusRegion = computed(
+  () =>
+    selectedDashboardMapRegion.value?.region_name ??
+    dashboardMapProvinceName.value ??
+    'Seluruh Indonesia',
+)
+
+const dashboardMapScopeLabel = computed(() =>
+  dashboardMapLevel.value === 'city'
+    ? `Kabupaten/Kota ${dashboardMapProvinceName.value?.replace(/^Provinsi\s+/i, '') ?? ''}`.trim()
+    : 'Indonesia',
+)
+
+const dashboardMapResetLabel = computed(() =>
+  dashboardMapLevel.value === 'city' ? 'Kembali ke Indonesia' : 'Fokus Indonesia',
+)
+
+const dashboardMapResetIcon = computed(() =>
+  dashboardMapLevel.value === 'city' ? 'pi pi-arrow-left' : 'pi pi-globe',
+)
+
+const showDashboardMapReset = computed(
+  () => dashboardMapLevel.value === 'city' || Boolean(selectedDashboardMapRegion.value),
+)
+
+const canDrillDownDashboardMap = computed(
+  () =>
+    dashboardMapLevel.value === 'province' &&
+    selectedDashboardMapRegion.value?.region_type === 'PROVINCE',
+)
+
+const dashboardMapDetailRoute = computed(() => ({
+  name: 'spatial-distribution',
+  query: dashboardMapRouteQuery(selectedDashboardMapRegion.value),
+}))
+
+const dashboardMapStageBreakdown = computed(() => {
+  const selectedRegionCode = selectedDashboardMapRegion.value?.region_code
+
+  return dashboardMapStageOptions.map((stage) => {
+    const stageMap = dashboardStageMaps.value[stage.key]
+    const region = selectedRegionCode
+      ? stageMap.regions.find((item) => item.region_code === selectedRegionCode)
+      : null
+    const projectCount =
+      region?.project_count ?? (selectedRegionCode ? 0 : stageMap.summary.total_project_count)
+
+    return {
+      ...stage,
+      projectCount,
+      totalLoanUsd:
+        region?.total_loan_usd ?? (selectedRegionCode ? 0 : stageMap.summary.total_loan_usd),
+    }
+  })
+})
+
 let stageSummaryRequestId = 0
 let loanAgreementStatusRequestId = 0
+let dashboardMapRequestId = 0
 
 function selectedPeriodFilterIds() {
   const selectedIds = selectedPeriodIds.value.filter((periodId) =>
@@ -117,13 +235,118 @@ function selectedPeriodParams(): Pick<ProjectMasterListParams, 'period_ids'> {
   return periodIds.length ? { period_ids: periodIds } : {}
 }
 
-function withSelectedPeriodQuery(query: DashboardInsightTarget['query']) {
+function selectedDashboardRegionFilterIds() {
+  const region = dashboardMapRegionFilter.value
+  if (!region) return []
+
+  const expandedIds = new Set<string>([region.region_id])
+
+  if (region.region_type === 'PROVINCE') {
+    const province = masterRegions.value.find((item) => item.id === region.region_id)
+    const parentCountry = province?.parent_code
+      ? masterRegions.value.find((item) => item.code === province.parent_code)
+      : null
+
+    if (parentCountry) {
+      expandedIds.add(parentCountry.id)
+    }
+
+    masterRegions.value
+      .filter((item) => item.parent_code === region.region_code)
+      .forEach((item) => expandedIds.add(item.id))
+  }
+
+  return [...expandedIds]
+}
+
+function selectedDashboardRegionParams(): Pick<ProjectMasterListParams, 'region_ids'> {
+  const regionIds = selectedDashboardRegionFilterIds()
+  return regionIds.length ? { region_ids: regionIds } : {}
+}
+
+function selectedDashboardProjectParams(): Pick<
+  ProjectMasterListParams,
+  'period_ids' | 'region_ids'
+> {
+  return {
+    ...selectedPeriodParams(),
+    ...selectedDashboardRegionParams(),
+  }
+}
+
+function selectedDashboardStageParams() {
+  const params = selectedDashboardProjectParams()
+  return Object.keys(params).length ? params : undefined
+}
+
+function dashboardMapRouteQuery(region?: SpatialDistributionRegionMetric | null) {
   const periodIds = selectedPeriodFilterIds()
-  if (!periodIds.length) return query
+  const query: Record<string, string | string[]> = {
+    level: dashboardMapLevel.value,
+    metric: dashboardMapMetric.value,
+  }
+
+  if (dashboardMapLevel.value === 'city' && dashboardMapProvinceCode.value) {
+    query.province_code = dashboardMapProvinceCode.value
+  }
+
+  if (region) {
+    query.region_code = region.region_code
+  }
+
+  if (periodIds.length) {
+    query.period_ids = periodIds
+  }
+
+  return query
+}
+
+function selectDashboardMapRegion(region: SpatialDistributionRegionMetric) {
+  const isSameRegion = selectedDashboardMapRegion.value?.region_code === region.region_code
+  const nextRegion = isSameRegion ? null : region
+
+  selectedDashboardMapRegion.value = nextRegion
+  dashboardMapRegionFilter.value =
+    nextRegion ?? (dashboardMapLevel.value === 'city' ? dashboardMapProvinceFilter.value : null)
+
+  void fetchStageSummaries()
+}
+
+async function drillDownDashboardMapProvince() {
+  const region = selectedDashboardMapRegion.value
+  if (!region || region.region_type !== 'PROVINCE') return
+
+  dashboardMapLevel.value = 'city'
+  dashboardMapProvinceCode.value = region.region_code
+  dashboardMapProvinceName.value = region.region_name
+  dashboardMapProvinceFilter.value = region
+  dashboardMapRegionFilter.value = region
+  selectedDashboardMapRegion.value = null
+  await Promise.allSettled([fetchDashboardMap(), fetchStageSummaries()])
+}
+
+async function resetDashboardMapFocus() {
+  dashboardMapLevel.value = 'province'
+  dashboardMapProvinceCode.value = undefined
+  dashboardMapProvinceName.value = undefined
+  dashboardMapProvinceFilter.value = null
+  dashboardMapRegionFilter.value = null
+  selectedDashboardMapRegion.value = null
+  await Promise.allSettled([fetchDashboardMap(), fetchStageSummaries()])
+}
+
+function formatDashboardMapUsd(value: number) {
+  if (value <= 0) return 'USD 0'
+  return `USD ${compactUsdFormatter.format(value)}`
+}
+
+function withSelectedDashboardQuery(query: DashboardInsightTarget['query']) {
+  const filterParams = selectedDashboardProjectParams()
+  if (!Object.keys(filterParams).length) return query
 
   return {
     ...query,
-    period_ids: periodIds,
+    ...filterParams,
   }
 }
 
@@ -133,7 +356,7 @@ function projectTarget(
 ): DashboardInsightTarget {
   return {
     name: 'project-master',
-    query: withSelectedPeriodQuery(query),
+    query: withSelectedDashboardQuery(query),
     label,
     exact: true,
   }
@@ -145,7 +368,7 @@ function spatialTarget(
 ): DashboardInsightTarget {
   return {
     name: 'spatial-distribution',
-    query: withSelectedPeriodQuery(query),
+    query: withSelectedDashboardQuery(query),
     label,
     exact: true,
   }
@@ -828,14 +1051,14 @@ const loanAgreementPrograms = computed(() => {
 
 async function fetchStageSummaries() {
   const requestId = ++stageSummaryRequestId
-  const periodIds = selectedPeriodFilterIds()
+  const stageParams = selectedDashboardStageParams()
   const [overviewResponse, blueBookResponse] = await Promise.allSettled([
-    DashboardService.getStageOverview(periodIds.length ? { period_ids: periodIds } : undefined),
+    DashboardService.getStageOverview(stageParams),
     ProjectService.getProjectMaster({
       page: 1,
       limit: 1000,
       reached_stages: ['BB'],
-      ...selectedPeriodParams(),
+      ...selectedDashboardProjectParams(),
     }),
   ])
 
@@ -870,10 +1093,7 @@ async function fetchStageSummaries() {
 
   if (blueBookResponse.status === 'fulfilled') {
     const blueBookRows = blueBookResponse.value.data
-    const remainingBeforeGreenBook = Math.max(
-      nextSummaries.BB.count - nextSummaries.GB.count,
-      0,
-    )
+    const remainingBeforeGreenBook = Math.max(nextSummaries.BB.count - nextSummaries.GB.count, 0)
     const candidateRows = blueBookRows.filter((row) => row.pipeline_status === 'BB')
     const loiOnlyRows = Math.min(
       candidateRows.filter((row) => row.has_loi).length,
@@ -922,6 +1142,74 @@ async function refreshDashboardDistributions() {
   ])
 }
 
+async function fetchDashboardMap() {
+  const requestId = ++dashboardMapRequestId
+  const periodIds = selectedPeriodFilterIds()
+  const level = dashboardMapLevel.value
+  const provinceCode = dashboardMapProvinceCode.value
+
+  if (level === 'city' && !provinceCode) {
+    dashboardMapLevel.value = 'province'
+    dashboardMapProvinceName.value = undefined
+    selectedDashboardMapRegion.value = null
+    return fetchDashboardMap()
+  }
+
+  const baseParams = {
+    level,
+    province_code: level === 'city' ? provinceCode : undefined,
+    period_ids: periodIds.length ? periodIds : undefined,
+  }
+
+  dashboardMapLoading.value = true
+  dashboardMapError.value = null
+
+  try {
+    const [response, ...stageResponses] = await Promise.all([
+      SpatialDistributionService.getChoropleth(baseParams),
+      ...dashboardMapStageOptions.map((stage) =>
+        SpatialDistributionService.getChoropleth({
+          ...baseParams,
+          reached_stages: [stage.key],
+        }),
+      ),
+    ])
+
+    if (requestId !== dashboardMapRequestId) return
+
+    dashboardMap.value = response
+    if (response.level === 'province') {
+      dashboardMapProvinceCode.value = undefined
+      dashboardMapProvinceName.value = undefined
+    }
+    dashboardStageMaps.value = dashboardMapStageOptions.reduce(
+      (maps, stage, index) => ({
+        ...maps,
+        [stage.key]: stageResponses[index] ?? emptyDashboardChoropleth(),
+      }),
+      emptyDashboardStageMaps(),
+    )
+
+    const selectedRegionCode = selectedDashboardMapRegion.value?.region_code
+    if (selectedRegionCode) {
+      const nextSelectedRegion =
+        response.regions.find((region) => region.region_code === selectedRegionCode) ?? null
+
+      selectedDashboardMapRegion.value = nextSelectedRegion
+      if (dashboardMapRegionFilter.value?.region_code === selectedRegionCode) {
+        dashboardMapRegionFilter.value = nextSelectedRegion
+      }
+    }
+  } catch (err) {
+    if (requestId !== dashboardMapRequestId) return
+    dashboardMapError.value = 'Gagal memuat peta distribusi dashboard.'
+  } finally {
+    if (requestId === dashboardMapRequestId) {
+      dashboardMapLoading.value = false
+    }
+  }
+}
+
 async function fetchLoanAgreementStatuses() {
   const requestId = ++loanAgreementStatusRequestId
   const periodIds = selectedPeriodFilterIds()
@@ -967,6 +1255,7 @@ async function fetchLoanAgreementStatuses() {
 async function refreshDashboard() {
   await Promise.allSettled([
     refreshDashboardDistributions(),
+    fetchDashboardMap(),
     fetchStageSummaries(),
     fetchLoanAgreementStatuses(),
   ])
@@ -974,6 +1263,7 @@ async function refreshDashboard() {
 
 onMounted(() => {
   void masterStore.fetchPeriods(false, { limit: 1000, sort: 'year_start', order: 'desc' })
+  void masterStore.fetchAllRegionLevels(false)
   void refreshDashboard()
 })
 
@@ -1421,6 +1711,163 @@ const stages = computed<DashboardStage[]>(() => {
         </div>
       </template>
     </PageHeader>
+
+    <section class="overflow-hidden rounded-lg border border-surface-200 bg-white shadow-sm">
+      <header
+        class="flex flex-col gap-3 border-b border-surface-100 px-4 py-3 xl:flex-row xl:items-center xl:justify-between"
+      >
+        <div class="min-w-0">
+          <p class="text-xs font-semibold uppercase text-primary-700">Sebaran wilayah</p>
+          <h2 class="mt-1 text-base font-semibold text-surface-950">
+            Peta Choropleth Distribusi Wilayah
+          </h2>
+          <p class="mt-1 max-w-3xl text-sm leading-5 text-surface-500">
+            Distribusi proyek berdasarkan wilayah dan periode dashboard.
+          </p>
+        </div>
+        <Button
+          v-if="showDashboardMapReset"
+          :label="dashboardMapResetLabel"
+          :icon="dashboardMapResetIcon"
+          severity="secondary"
+          outlined
+          size="small"
+          class="shrink-0"
+          @click="resetDashboardMapFocus"
+        />
+      </header>
+
+      <div
+        class="grid gap-3 bg-surface-50/60 p-3 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-stretch"
+      >
+        <SpatialChoroplethMap
+          :level="dashboardMapLevel"
+          :metric="dashboardMapMetric"
+          :province-code="dashboardMapProvinceCode"
+          :province-name="dashboardMapProvinceName"
+          :regions="dashboardMap.regions"
+          :selected-region-code="selectedDashboardMapRegion?.region_code"
+          :loading="dashboardMapLoading"
+          compact
+          @select="selectDashboardMapRegion"
+        />
+
+        <aside
+          class="flex flex-col rounded-lg border border-surface-200 bg-white p-3 shadow-sm xl:h-full xl:min-h-[24rem]"
+        >
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-prism-teal-dark">
+              Fokus peta
+            </p>
+            <h3 class="mt-0.5 truncate text-xl font-semibold text-surface-950">
+              {{ dashboardMapFocusRegion }}
+            </h3>
+            <p class="mt-0.5 text-xs text-surface-500">
+              {{ dashboardMapScopeLabel }} - {{ selectedPeriodLabel }}
+            </p>
+          </div>
+
+          <p
+            v-if="dashboardMapError"
+            class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {{ dashboardMapError }}
+          </p>
+
+          <div class="mt-3 space-y-1.5">
+            <div
+              v-for="stage in dashboardMapStageBreakdown"
+              :key="stage.key"
+              class="rounded-lg border border-surface-100 bg-surface-50 px-3 py-2"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="inline-flex min-w-0 items-center gap-2 text-xs font-semibold text-surface-800"
+                >
+                  <span
+                    class="h-2 w-2 shrink-0 rounded-sm"
+                    :style="{ backgroundColor: stage.color }"
+                    aria-hidden="true"
+                  />
+                  <span class="truncate">{{ stage.label }}</span>
+                </span>
+                <span class="inline-flex shrink-0 items-baseline gap-1.5">
+                  <span class="text-base font-semibold text-surface-950">
+                    {{ countFormatter.format(stage.projectCount) }}
+                  </span>
+                  <span class="text-[11px] font-medium text-surface-500">
+                    {{ formatDashboardMapUsd(stage.totalLoanUsd) }}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <div class="rounded-lg border border-surface-100 bg-white px-3 py-2">
+              <p class="text-xs font-semibold uppercase text-surface-500">Wilayah aktif</p>
+              <p class="mt-0.5 text-sm font-semibold text-surface-950">
+                {{ countFormatter.format(dashboardMap.summary.active_regions) }}
+                <span class="text-xs font-medium text-surface-500">
+                  / {{ countFormatter.format(dashboardMap.summary.total_regions) }}
+                </span>
+              </p>
+            </div>
+
+            <div class="rounded-lg border border-surface-100 bg-white px-2 py-2">
+              <p class="px-1 text-xs font-semibold uppercase text-surface-500">Metrik peta</p>
+              <div
+                class="mt-1 grid grid-cols-2 rounded-lg border border-surface-200 bg-surface-50 p-1"
+              >
+                <button
+                  type="button"
+                  class="min-h-7 rounded-md text-xs font-semibold transition"
+                  :class="
+                    dashboardMapMetric === 'count'
+                      ? 'bg-white text-surface-950 shadow-sm'
+                      : 'text-surface-500 hover:text-surface-800'
+                  "
+                  @click="dashboardMapMetric = 'count'"
+                >
+                  Proyek
+                </button>
+                <button
+                  type="button"
+                  class="min-h-7 rounded-md text-xs font-semibold transition"
+                  :class="
+                    dashboardMapMetric === 'value'
+                      ? 'bg-white text-surface-950 shadow-sm'
+                      : 'text-surface-500 hover:text-surface-800'
+                  "
+                  @click="dashboardMapMetric = 'value'"
+                >
+                  Nilai
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-auto space-y-1.5 pt-2">
+            <Button
+              v-if="canDrillDownDashboardMap"
+              label="Lihat Kab/Kota"
+              icon="pi pi-map-marker"
+              size="small"
+              class="w-full"
+              @click="drillDownDashboardMapProvince"
+            />
+
+            <RouterLink
+              :to="dashboardMapDetailRoute"
+              class="inline-flex min-h-8 w-full items-center justify-center gap-2 rounded-lg border border-surface-200 px-3 text-xs font-semibold text-surface-700 no-underline transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Buka sebaran wilayah
+              <i class="pi pi-arrow-up-right text-xs" aria-hidden="true" />
+            </RouterLink>
+          </div>
+        </aside>
+      </div>
+    </section>
 
     <PlanningFunnelFlow :stages="stages" />
   </section>

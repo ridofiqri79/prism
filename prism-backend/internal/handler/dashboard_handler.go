@@ -20,12 +20,17 @@ func NewDashboardHandler(service *service.DashboardService) *DashboardHandler {
 }
 
 func (h *DashboardHandler) StageOverview(c echo.Context) error {
-	periodIDs, err := dashboardPeriodIDs(c)
+	periodIDs, err := dashboardUUIDs(c, "period_ids", "period_ids[]", "period_id")
 	if err != nil {
 		return err
 	}
 
-	res, err := h.service.GetStageOverview(c.Request().Context(), periodIDs)
+	regionIDs, err := dashboardUUIDs(c, "region_ids", "region_ids[]", "region_id")
+	if err != nil {
+		return err
+	}
+
+	res, err := h.service.GetStageOverview(c.Request().Context(), periodIDs, regionIDs)
 	if err != nil {
 		return err
 	}
@@ -90,22 +95,27 @@ func (h *DashboardHandler) LoanAgreementDistribution(c echo.Context) error {
 }
 
 func dashboardPeriodIDs(c echo.Context) ([]pgtype.UUID, error) {
-	rawValues := queryValues(c, "period_ids", "period_ids[]", "period_id")
+	return dashboardUUIDs(c, "period_ids", "period_ids[]", "period_id")
+}
+
+func dashboardUUIDs(c echo.Context, names ...string) ([]pgtype.UUID, error) {
+	rawValues := queryValues(c, names...)
 	if len(rawValues) == 0 {
 		return nil, nil
 	}
 
-	periodIDs := make([]pgtype.UUID, 0, len(rawValues))
+	field := names[0]
+	values := make([]pgtype.UUID, 0, len(rawValues))
 	for _, raw := range rawValues {
-		periodID, err := model.ParseUUID(raw)
+		value, err := model.ParseUUID(raw)
 		if err != nil {
 			return nil, apperrors.Validation(
-				apperrors.FieldError{Field: "period_ids", Message: "UUID tidak valid"},
+				apperrors.FieldError{Field: field, Message: "UUID tidak valid"},
 			)
 		}
 
-		periodIDs = append(periodIDs, periodID)
+		values = append(values, value)
 	}
 
-	return periodIDs, nil
+	return values, nil
 }

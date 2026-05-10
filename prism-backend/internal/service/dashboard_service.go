@@ -17,13 +17,20 @@ func NewDashboardService(q *queries.Queries) *DashboardService {
 	return &DashboardService{queries: q}
 }
 
-func (s *DashboardService) GetStageOverview(ctx context.Context, periodIDs []pgtype.UUID) (*model.DashboardStageOverviewResponse, error) {
-	summaryRows, err := s.queries.ListDashboardStageSummaries(ctx, periodIDs)
+func (s *DashboardService) GetStageOverview(ctx context.Context, periodIDs []pgtype.UUID, regionIDs []pgtype.UUID) (*model.DashboardStageOverviewResponse, error) {
+	params := queries.ListDashboardStageSummariesParams{
+		PeriodIds: periodIDs,
+		RegionIds: regionIDs,
+	}
+	summaryRows, err := s.queries.ListDashboardStageSummaries(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
-	regionRows, err := s.queries.ListDashboardStageRegionGroups(ctx, periodIDs)
+	regionRows, err := s.queries.ListDashboardStageRegionGroups(ctx, queries.ListDashboardStageRegionGroupsParams{
+		PeriodIds: periodIDs,
+		RegionIds: regionIDs,
+	})
 	if err != nil {
 		return nil, err
 	}

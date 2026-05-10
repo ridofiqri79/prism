@@ -10,6 +10,7 @@ import type {
 
 interface DashboardDistributionParams {
   period_ids?: string[]
+  region_ids?: string[]
 }
 
 export const DashboardService = {

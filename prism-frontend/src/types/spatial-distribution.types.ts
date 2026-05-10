@@ -54,6 +54,7 @@ export interface SpatialDistributionProjectListResponse {
 export interface SpatialDistributionParams {
   level?: SpatialDistributionLevel
   province_code?: string
+  period_ids?: string[]
   loan_types?: LenderType[]
   project_statuses?: ProjectStatus[]
   pipeline_statuses?: ProjectPipelineStatus[]

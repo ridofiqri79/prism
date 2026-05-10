@@ -1857,6 +1857,7 @@ Mengembalikan ringkasan tahap untuk funnel dashboard. Hitungan memakai entitas p
 | Param | Keterangan |
 |-------|------------|
 | `period_ids` | Multi-value UUID periode Blue Book untuk membatasi seluruh tahap berdasarkan relasi BB |
+| `region_ids` | Multi-value UUID wilayah/lokasi untuk membatasi ringkasan tahap pada wilayah terpilih |
 
 **Response `200`:**
 ```json

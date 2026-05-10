@@ -7,6 +7,15 @@ WITH latest_bb_projects AS (
     JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM bb_project_location bpl_filter
+              WHERE bpl_filter.bb_project_id = bp.id
+                AND bpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -53,6 +62,15 @@ stage_entities AS (
                 AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
           )
       )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_location gpl_filter
+              WHERE gpl_filter.gb_project_id = gp.id
+                AND gpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 
     UNION ALL
 
@@ -77,6 +95,15 @@ stage_entities AS (
               AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
         )
     )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM dk_project_location dkpl_filter
+              WHERE dkpl_filter.dk_project_id = dp.id
+                AND dkpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 
     UNION ALL
 
@@ -98,6 +125,16 @@ stage_entities AS (
               AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
         )
     )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM loan_agreement_dk_project ladp_filter
+              JOIN dk_project_location dkpl_filter ON dkpl_filter.dk_project_id = ladp_filter.dk_project_id
+              WHERE ladp_filter.loan_agreement_id = la.id
+                AND dkpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 ),
 stage_order AS (
     SELECT 'BB'::text AS stage, 1::int AS sort_order
@@ -124,6 +161,15 @@ WITH latest_bb_projects AS (
     JOIN blue_book bb ON bb.id = bp.blue_book_id
     WHERE bp.status = 'active'
       AND (COALESCE(cardinality(sqlc.arg('period_ids')::uuid[]), 0) = 0 OR bb.period_id = ANY(sqlc.arg('period_ids')::uuid[]))
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM bb_project_location bpl_filter
+              WHERE bpl_filter.bb_project_id = bp.id
+                AND bpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
       AND bp.id = (
           SELECT latest.id
           FROM bb_project latest
@@ -172,6 +218,15 @@ stage_entities AS (
                 AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
           )
       )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM gb_project_location gpl_filter
+              WHERE gpl_filter.gb_project_id = gp.id
+                AND gpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 
     UNION ALL
 
@@ -197,6 +252,15 @@ stage_entities AS (
               AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
         )
     )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM dk_project_location dkpl_filter
+              WHERE dkpl_filter.dk_project_id = dp.id
+                AND dkpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 
     UNION ALL
 
@@ -219,6 +283,15 @@ stage_entities AS (
               AND bb.period_id = ANY(sqlc.arg('period_ids')::uuid[])
         )
     )
+      AND (
+          COALESCE(cardinality(sqlc.arg('region_ids')::uuid[]), 0) = 0
+          OR EXISTS (
+              SELECT 1
+              FROM dk_project_location dkpl_filter
+              WHERE dkpl_filter.dk_project_id = ladp.dk_project_id
+                AND dkpl_filter.region_id = ANY(sqlc.arg('region_ids')::uuid[])
+          )
+      )
 ),
 stage_locations AS (
     SELECT se.stage, se.entity_id, se.location_owner_id, se.amount_usd, bpl.region_id

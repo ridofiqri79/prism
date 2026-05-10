@@ -16,7 +16,7 @@ const props = defineProps<{
   stages: DashboardStage[]
 }>()
 
-const expandedStages = ref<DashboardStageKey[]>(['BB'])
+const expandedStages = ref<DashboardStageKey[]>([])
 const activeTabs = ref<Record<DashboardStageKey, string>>({
   BB: 'Status Pipeline',
   GB: 'Lender & Funding',
