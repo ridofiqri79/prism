@@ -205,7 +205,7 @@ const filterGuides = [
     scope: 'Mencari dan menyaring daftar proyek lintas Blue Book, Green Book, Daftar Kegiatan, dan Perjanjian Pinjaman.',
     filters: [
       'Pencarian cepat: nama proyek, pemberi pinjaman, instansi pelaksana, atau program.',
-      'Klasifikasi proyek: jenis pinjaman, status proyek, status tahapan, sudah mencapai tahap, dan belum mencapai tahap.',
+      'Klasifikasi proyek: jenis pinjaman, status proyek, status tahapan, sudah mencapai tahap, dan belum mencapai tahap. Tahap utama manual ini berakhir pada Perjanjian Pinjaman; label Monitoring bila muncul dibaca sebagai penanda historis atau status teknis, bukan menu operasional aktif.',
       'Pemberi pinjaman dan instansi: indikasi pemberi pinjaman, pemberi pinjaman tetap di Green Book, pemberi pinjaman Daftar Kegiatan, pemberi pinjaman Perjanjian Pinjaman, instansi pelaksana, dan instansi pelaksana Daftar Kegiatan.',
       'Program dan wilayah: judul program serta wilayah atau lokasi.',
       'Nilai dan waktu: batas nilai pinjaman minimum/maksimum serta rentang tanggal Daftar Kegiatan.',
@@ -223,6 +223,7 @@ const filterGuides = [
     ],
     tips: [
       'Untuk mencari proyek yang berhenti di tahap tertentu, gunakan filter Status Tahapan atau Belum Mencapai Tahap.',
+      'Gunakan Sudah Mencapai Tahap untuk mencari proyek yang minimal sudah masuk tahap tertentu, misalnya semua proyek yang sudah mencapai Green Book meskipun sebagian sudah lanjut ke Daftar Kegiatan atau Perjanjian Pinjaman.',
       'Untuk analisis pemberi pinjaman, bedakan indikasi awal, pemberi pinjaman Green Book, pemberi pinjaman Daftar Kegiatan, dan pemberi pinjaman Perjanjian Pinjaman karena masing-masing berasal dari tahap berbeda.',
       'Unduh Excel akan mengikuti filter yang sedang aktif, sehingga hasil unduhan sama dengan konteks daftar yang sedang ditinjau.',
     ],
@@ -257,7 +258,7 @@ const filterGuides = [
       'Metrik peta: Jumlah Proyek atau Nilai Pinjaman.',
       'Tingkat wilayah: provinsi atau kabupaten/kota setelah memilih provinsi.',
       'Pencarian proyek: kata kunci proyek pada daftar wilayah fokus.',
-      'Tahap proses: Status Tahapan, Sudah Mencapai Tahap, dan Belum Mencapai Tahap.',
+      'Tahap proses: Status Tahapan, Sudah Mencapai Tahap, dan Belum Mencapai Tahap. Tahap Monitoring dapat muncul sebagai filter historis, tetapi menu Monitoring Disbursement tidak menjadi ruang kerja aktif pada manual ini.',
       'Status dan sumber pendanaan: status proyek, LoI, indikasi pemberi pinjaman, dan tipe pinjaman.',
       'Riwayat revisi: aktifkan bila perlu memasukkan data versi lama dalam analisis wilayah.',
     ],
@@ -345,21 +346,21 @@ const planningModules = [
     title: 'Perjanjian Pinjaman',
     subtitle: 'Kesepakatan tertulis yang mengikat Pemerintah dan pemberi pinjaman luar negeri setelah proses perundingan.',
     context:
-      'Perjanjian Pinjaman adalah tahap ketika komitmen pembiayaan sudah memiliki dasar tertulis. Aplikasi mencatat identitas pinjaman, pemberi pinjaman, tanggal perjanjian, tanggal efektif, tanggal penutupan, nilai komitmen, pembagian alokasi ke Proyek Daftar Kegiatan, realisasi kumulatif, serta indikator kinerja untuk pemantauan.',
+      'Perjanjian Pinjaman adalah tahap ketika komitmen pembiayaan sudah memiliki dasar tertulis. Aplikasi mencatat identitas pinjaman, pemberi pinjaman, tanggal perjanjian, tanggal efektif, tanggal penutupan, nilai komitmen dalam mata uang pinjaman, pembagian alokasi ke Proyek Daftar Kegiatan, realisasi kumulatif, serta indikator kinerja yang dihitung dari Kurs Tengah BI terbaru.',
     imageKey: 'loan-agreements',
     fields: ['Kode pinjaman', 'Tanggal perjanjian', 'Tanggal efektif', 'Tanggal penutupan', 'Mata uang', 'Nilai pinjaman utama', 'Realisasi kumulatif', 'Alokasi per Proyek Daftar Kegiatan'],
     process: [
       'Buka menu Perjanjian Pinjaman dan klik buat baru.',
       'Pilih satu atau lebih Proyek Daftar Kegiatan yang sudah memenuhi syarat.',
-      'Isi pemberi pinjaman, mata uang, nilai pinjaman, tanggal penting, dan alokasi komitmen per proyek.',
+      'Isi pemberi pinjaman, mata uang, nilai pinjaman dalam mata uang pinjaman, realisasi kumulatif, tanggal penting, dan alokasi komitmen per proyek.',
       'Pastikan total alokasi per proyek sama dengan nilai pinjaman utama.',
     ],
     rules: [
       'Perjanjian Pinjaman perlu menjelaskan jumlah, peruntukan, hak dan kewajiban, serta ketentuan dan persyaratan pinjaman.',
       'Kode pinjaman harus unik dan tidak boleh sama dengan Perjanjian Pinjaman lain.',
       'Pemberi pinjaman pada Perjanjian Pinjaman harus berasal dari rincian pembiayaan Proyek Daftar Kegiatan yang dipilih.',
-      'Realisasi kumulatif diisi manual mengikuti mata uang Perjanjian Pinjaman.',
-      'Status kinerja dihitung dari Kurs Tengah BI terbaru dan tanggal efektif atau closing.',
+      'Nilai pinjaman dan realisasi kumulatif diisi manual mengikuti mata uang Perjanjian Pinjaman.',
+      'Nilai USD, rasio pencairan, rasio waktu, nilai kinerja, dan status kinerja dihitung sebagai tampilan dari Kurs Tengah BI terbaru dan tanggal penting perjanjian.',
     ],
   },
 ]
@@ -558,14 +559,14 @@ const masterDataGuides = [
   {
     title: 'Mata Uang',
     purpose: 'Menentukan mata uang yang dapat dipilih pada Green Book, Daftar Kegiatan, dan Perjanjian Pinjaman.',
-    fill: ['Gunakan kode mata uang resmi seperti USD, EUR, JPY, atau IDR.', 'Aktifkan hanya mata uang yang boleh dipakai operator.', 'Nonaktifkan mata uang yang hanya menjadi referensi.'],
-    caution: 'Mata uang nonaktif tidak muncul pada pilihan pengisian baru.',
+    fill: ['Gunakan kode mata uang resmi ISO 4217 seperti USD, EUR, JPY, atau IDR.', 'Isi nama, simbol bila perlu, urutan tampil, dan status aktif.', 'Aktifkan hanya mata uang yang boleh dipakai operator pada pengisian Green Book, Daftar Kegiatan, dan Perjanjian Pinjaman.'],
+    caution: 'Mata uang nonaktif tidak muncul pada pilihan pengisian baru. Untuk pinjaman selain USD, pastikan Kurs Tengah BI juga tersedia agar tampilan nilai USD dan indikator Perjanjian Pinjaman dapat dihitung.',
   },
   {
     title: 'Kurs Tengah BI',
-    purpose: 'Dipakai untuk tampilan nilai USD dan indikator kinerja Perjanjian Pinjaman.',
-    fill: ['Pilih mata uang.', 'Isi kurs dan tanggal cut off.', 'Pastikan satu mata uang tidak memiliki dua kurs pada tanggal cut off yang sama.'],
-    caution: 'Jika kurs terbaru belum tersedia, nilai tampilan dan indikator Perjanjian Pinjaman bisa tidak terbaca.',
+    purpose: 'Dipakai untuk menghitung tampilan nilai USD, realisasi kumulatif USD, rasio pencairan, rasio waktu, nilai kinerja, dan status kinerja Perjanjian Pinjaman.',
+    fill: ['Pilih mata uang aktif.', 'Isi kurs, Kurs Tengah BI, dan tanggal cut off.', 'Gunakan tombol Tambah bila memasukkan beberapa baris, lalu Simpan Perubahan agar seluruh baris baru atau baris yang diubah tersimpan bersama.'],
+    caution: 'Satu mata uang dan satu tanggal cut off tidak boleh dicatat dua kali. Jika pinjaman non-USD belum memiliki Kurs Tengah BI terbaru, penyimpanan atau tampilan indikator Perjanjian Pinjaman dapat gagal.',
   },
   {
     title: 'Instansi',
@@ -626,7 +627,7 @@ const formFieldGuides = [
       ['Relasi Proyek Blue Book', 'Pilih minimal satu Proyek Blue Book sebagai asal proyek.', 'Jika memilih lebih dari satu Proyek Blue Book, semuanya harus berasal dari dokumen Blue Book yang sama.'],
       ['Identitas dan pihak proyek', 'Kode, nama proyek, instansi, lokasi, mitra Bappenas, durasi, dan informasi proyek.', 'Saat revisi, sistem menjaga hubungan proyek lama dan baru agar riwayat tetap terbaca.'],
       ['Kegiatan', 'Daftar kegiatan proyek Green Book dan urutannya.', 'Alokasi pendanaan mengikuti daftar kegiatan; periksa kembali setelah menambah atau menghapus kegiatan.'],
-      ['Sumber pendanaan', 'Pemberi pinjaman, mata uang, nilai sesuai dokumen, dan nilai USD.', 'Untuk USD, nilai sesuai dokumen dan nilai USD sama. Untuk mata uang lain, isi nilai sesuai dokumen dan aturan yang berlaku.'],
+      ['Sumber pendanaan', 'Pemberi pinjaman, mata uang aktif dari Master Mata Uang, nilai sesuai dokumen, dan nilai USD.', 'Untuk USD, nilai sesuai dokumen dan nilai USD sama. Untuk mata uang lain, pastikan nilai USD terisi sesuai dokumen atau hasil konversi yang sudah disepakati.'],
       ['Rencana pencairan dan alokasi', 'Rencana pencairan per tahun serta pembagian pendanaan ke kegiatan.', 'Rencana pencairan dibaca sebagai total proyek per tahun, bukan per pemberi pinjaman.'],
     ],
   },
@@ -649,9 +650,9 @@ const formFieldGuides = [
       ['Proyek terkait', 'Pilih satu atau lebih Proyek Daftar Kegiatan.', 'Satu Perjanjian Pinjaman bisa mencakup proyek dari beberapa surat Daftar Kegiatan.'],
       ['Pemberi pinjaman', 'Pilih pemberi pinjaman Perjanjian Pinjaman.', 'Pemberi pinjaman harus berasal dari rincian pembiayaan semua Proyek Daftar Kegiatan yang dipilih.'],
       ['Identitas pinjaman', 'Kode pinjaman, tanggal perjanjian, tanggal efektif, tanggal penutupan awal, dan tanggal penutupan terbaru.', 'Kode pinjaman harus unik. Tanggal penutupan terbaru tidak boleh lebih awal dari tanggal penutupan awal bila tanggal awal diisi.'],
-      ['Nilai dan mata uang', 'Mata uang, nilai pinjaman utama, dan realisasi kumulatif.', 'Realisasi kumulatif diisi manual mengikuti mata uang Perjanjian Pinjaman.'],
-      ['Alokasi per proyek', 'Nilai alokasi pinjaman untuk setiap Proyek Daftar Kegiatan.', 'Total alokasi harus sama dengan nilai pinjaman utama.'],
-      ['Indikator tampilan', 'Status perpanjangan, jumlah hari perpanjangan, nilai USD tampilan, dan status kinerja.', 'Indikator ini dibaca dari tanggal dan Kurs Tengah BI terbaru; gunakan sebagai alat bantu peninjauan.'],
+      ['Nilai dan mata uang', 'Mata uang aktif, nilai pinjaman utama, dan realisasi kumulatif dalam mata uang pinjaman.', 'Nilai pinjaman dan realisasi kumulatif diisi manual; nilai USD ditampilkan dari Kurs Tengah BI terbaru.'],
+      ['Alokasi per proyek', 'Nilai alokasi pinjaman untuk setiap Proyek Daftar Kegiatan.', 'Total alokasi harus sama dengan nilai pinjaman utama. Alokasi USD mengikuti aturan perhitungan Kurs Tengah BI yang sama.'],
+      ['Indikator tampilan', 'Status perpanjangan, jumlah hari perpanjangan, nilai USD, realisasi kumulatif USD, rasio pencairan, rasio waktu, nilai kinerja, dan status kinerja.', 'Indikator ini adalah hasil tampilan dari tanggal dan Kurs Tengah BI terbaru; gunakan sebagai alat bantu peninjauan, bukan isian manual.'],
     ],
   },
 ]
@@ -692,8 +693,8 @@ const importWorkbookGuides = [
   {
     title: 'Perjanjian Pinjaman',
     sheets: 'Loan Agreement dan Relasi - Daftar Kegiatan Project bila satu pinjaman mencakup beberapa Proyek Daftar Kegiatan.',
-    before: ['Isi Loan Code sebagai kunci utama impor.', 'Pilih referensi Proyek Daftar Kegiatan dari data master agar tidak salah proyek.', 'Pastikan pemberi pinjaman berasal dari rincian pembiayaan Proyek Daftar Kegiatan yang dipilih.'],
-    preview: ['Loan Code harus unik.', 'Total alokasi pada relasi proyek harus sama dengan nilai pinjaman utama.', 'Untuk mata uang selain USD, pastikan Kurs Tengah BI terbaru tersedia.'],
+    before: ['Isi Loan Code sebagai kunci utama impor.', 'Pilih referensi Proyek Daftar Kegiatan dari data master agar tidak salah proyek.', 'Pastikan pemberi pinjaman berasal dari rincian pembiayaan Proyek Daftar Kegiatan yang dipilih.', 'Isi nilai pinjaman dan realisasi kumulatif dalam mata uang Perjanjian Pinjaman.'],
+    preview: ['Loan Code harus unik.', 'Total alokasi pada relasi proyek harus sama dengan nilai pinjaman utama.', 'Untuk mata uang selain USD, pastikan Kurs Tengah BI terbaru tersedia karena nilai USD dan indikator kinerja dihitung dari kurs tersebut.'],
   },
 ]
 
@@ -786,9 +787,9 @@ const operationalSpecialGuides = [
       'Klik Simpan Perubahan untuk menyimpan seluruh baris baru dan baris yang diubah.',
     ],
     notes: [
-      'Kurs Tengah BI dipakai untuk indikator tampilan Perjanjian Pinjaman.',
+      'Kurs Tengah BI dipakai untuk nilai USD, realisasi kumulatif USD, dan indikator tampilan Perjanjian Pinjaman.',
       'Satu mata uang dan satu tanggal cut off tidak boleh dicatat dua kali.',
-      'Jika indikator Perjanjian Pinjaman kosong, cek apakah kurs untuk mata uang terkait sudah tersedia.',
+      'Jika indikator Perjanjian Pinjaman kosong atau penyimpanan pinjaman non-USD ditolak, cek apakah kurs untuk mata uang terkait sudah tersedia.',
     ],
   },
   {
@@ -807,6 +808,7 @@ const operationalSpecialGuides = [
       'Data belum menjadi Perjanjian Pinjaman final sebelum daftar draft disimpan.',
       'Total alokasi per proyek harus sama dengan nilai pinjaman utama.',
       'Kode pinjaman harus unik dan pemberi pinjaman harus sesuai dengan pembiayaan Proyek Daftar Kegiatan yang dipilih.',
+      'Nilai USD, realisasi kumulatif USD, rasio pencairan, rasio waktu, dan status kinerja adalah tampilan dari Kurs Tengah BI terbaru, bukan angka yang diketik manual.',
     ],
   },
   {
@@ -871,6 +873,7 @@ const systemStateGuides = [
   ['Preview impor menampilkan skip', 'Baris dikenali sudah ada atau tidak perlu dibuat ulang.', 'Pastikan skip memang sesuai harapan, terutama saat impor revisi atau data master yang sudah pernah dibuat.'],
   ['Preview impor menampilkan failed', 'Baris gagal melewati pemeriksaan template, referensi, nilai wajib, atau aturan bisnis.', 'Baca pesan pada baris tersebut, perbaiki file Excel, unggah ulang, lalu jalankan Preview lagi. Jangan eksekusi sebelum failed menjadi nol.'],
   ['Tombol aksi tidak aktif', 'Pengguna belum memilih data, belum selesai preview, data belum memenuhi syarat, atau hak akses tidak mencukupi.', 'Cek pilihan baris, status preview, kelengkapan formulir, dan hak akses pengguna.'],
+  ['Menu Monitoring Disbursement tidak terlihat', 'Fitur Monitoring Disbursement tidak menjadi menu operasional aktif pada versi aplikasi ini.', 'Gunakan Dashboard, Proyek, Perjalanan Proyek, Sebaran Wilayah, dan Perjanjian Pinjaman untuk peninjauan yang tersedia. Jika label Monitoring muncul pada filter, baca sebagai konteks historis atau teknis.'],
 ]
 
 const troubleshootingGuides = [
@@ -880,6 +883,7 @@ const troubleshootingGuides = [
   ['Preview impor gagal', 'File Excel tidak mengikuti template, referensi master belum ada, atau ada nilai wajib yang kosong.', 'Baca baris failed, perbaiki file Excel, unggah ulang, lalu jalankan Preview lagi.'],
   ['Tombol eksekusi impor tidak bisa dipakai', 'Preview belum selesai bersih atau masih ada baris failed.', 'Pastikan total failed = 0 sebelum menjalankan eksekusi impor.'],
   ['Nilai atau indikator Perjanjian Pinjaman kosong', 'Kurs Tengah BI untuk mata uang terkait belum tersedia atau tanggal penting belum lengkap.', 'Lengkapi Kurs Tengah BI dan periksa tanggal efektif serta tanggal penutupan.'],
+  ['Pinjaman non-USD tidak bisa disimpan', 'Kurs Tengah BI terbaru untuk mata uang tersebut belum tersedia atau nilai alokasi belum sama dengan nilai pinjaman utama.', 'Isi Kurs Tengah BI pada Master Data, lalu periksa ulang total alokasi per Proyek Daftar Kegiatan.'],
   ['Peta wilayah terlihat kosong', 'Filter terlalu sempit, lokasi proyek belum diisi, atau data berada di level nasional/provinsi sementara pengguna melihat kota.', 'Reset filter, cek lokasi proyek, lalu lihat tingkat wilayah yang sesuai.'],
   ['Penghapusan data ditolak', 'Data masih dipakai oleh tahap berikutnya.', 'Buka detail data untuk melihat relasi turunan, lalu selesaikan hubungan tersebut sesuai arahan pengelola data.'],
 ]
