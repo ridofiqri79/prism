@@ -16,6 +16,7 @@ import type {
   JourneyResponse,
   JourneyStageState,
   LAJourney,
+  MonitoringSummaryItem,
 } from '@/types/journey.types'
 
 use([SankeyChart, TooltipComponent, LabelLayout, CanvasRenderer])
@@ -34,6 +35,10 @@ type FlowTooltipParam = {
   data?: unknown
   marker?: string
   name?: string
+}
+
+type LinkOptions = {
+  pending?: boolean
 }
 
 const usdFormatter = new Intl.NumberFormat('en-US', {
@@ -84,7 +89,7 @@ const flowLinks = computed(() => flow.value.links)
 const chartHeight = computed(() => `${Math.min(760, Math.max(380, flowNodes.value.length * 34))}px`)
 
 const totalFlowUsd = computed(() =>
-  props.journey.gb_projects.reduce((sum, project) => sum + fundingTotalForGreenBook(project), 0),
+  props.journey.gb_projects.reduce((sum, project) => sum + latestLoanUsdForGreenBook(project), 0),
 )
 
 const chartOption = computed(() => ({
@@ -96,8 +101,8 @@ const chartOption = computed(() => ({
       if (isFlowLink(param.data)) {
         const value =
           param.data.rawValue > 0
-            ? `Nilai: ${usdFormatter.format(param.data.rawValue)}`
-            : 'Nilai USD belum tersedia'
+            ? `Loan USD: ${usdFormatter.format(param.data.rawValue)}`
+            : 'Loan USD belum tersedia'
 
         return [
           `<strong>${escapeHtml(param.data.label)}</strong>`,
@@ -166,7 +171,7 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
 
   for (const greenBookProject of journey.gb_projects) {
     const greenBookNode = `Green Book\n${greenBookProject.gb_code}`
-    const greenBookAmount = fundingTotalForGreenBook(greenBookProject)
+    const greenBookAmount = latestLoanUsdForGreenBook(greenBookProject)
     ensureNode(
       nodes,
       greenBookNode,
@@ -178,13 +183,23 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
     if (greenBookProject.dk_projects.length === 0) {
       const pendingDkNode = `Daftar Kegiatan\nBelum ada untuk ${greenBookProject.gb_code}`
       ensureNode(nodes, pendingDkNode, 'pending', 'daftar-kegiatan')
-      links.push(makeLink(greenBookNode, pendingDkNode, 0, 'Green Book ke Daftar Kegiatan'))
+      links.push(
+        makeLink(greenBookNode, pendingDkNode, greenBookAmount, 'Green Book ke Daftar Kegiatan', {
+          pending: true,
+        }),
+      )
       continue
     }
 
-    for (const dkProject of greenBookProject.dk_projects) {
+    const dkAmounts = distributeFlow(
+      greenBookAmount,
+      greenBookProject.dk_projects,
+      flowWeightForDk,
+    )
+
+    for (const [dkIndex, dkProject] of greenBookProject.dk_projects.entries()) {
       const dkNode = `Daftar Kegiatan\n${shortLabel(dkLabel(dkProject), 42)}`
-      const dkAmount = amountForDk(greenBookProject, dkProject)
+      const dkAmount = dkAmounts[dkIndex] ?? 0
       ensureNode(nodes, dkNode, 'completed', 'daftar-kegiatan')
       links.push(makeLink(greenBookNode, dkNode, dkAmount, 'Green Book ke Daftar Kegiatan'))
 
@@ -196,13 +211,26 @@ function buildFlow(journey: JourneyResponse): FlowBuildResult {
         )}`
         ensureNode(nodes, pendingLoanAgreementNode, 'pending', 'loan-agreement')
         links.push(
-          makeLink(dkNode, pendingLoanAgreementNode, 0, 'Daftar Kegiatan ke Loan Agreement'),
+          makeLink(dkNode, pendingLoanAgreementNode, dkAmount, 'Daftar Kegiatan ke Loan Agreement', {
+            pending: true,
+          }),
         )
         continue
       }
 
-      for (const loanAgreement of loanAgreements) {
-        appendLoanAgreementFlow(nodes, links, dkNode, dkAmount, loanAgreement)
+      const loanAgreementAmounts = distributeFlow(
+        dkAmount,
+        loanAgreements,
+        flowWeightForLoanAgreement,
+      )
+      for (const [loanAgreementIndex, loanAgreement] of loanAgreements.entries()) {
+        appendLoanAgreementFlow(
+          nodes,
+          links,
+          dkNode,
+          loanAgreementAmounts[loanAgreementIndex] ?? 0,
+          loanAgreement,
+        )
       }
     }
   }
@@ -214,11 +242,10 @@ function appendLoanAgreementFlow(
   nodes: Map<string, JourneyFlowNode>,
   links: JourneyFlowLink[],
   dkNode: string,
-  fallbackAmount: number,
+  flowAmount: number,
   loanAgreement: LAJourney,
 ) {
   const loanAgreementNode = `Loan Agreement\n${loanAgreement.loan_code}`
-  const loanAgreementAmount = loanAgreement.amount_usd ?? fallbackAmount
   ensureNode(
     nodes,
     loanAgreementNode,
@@ -226,22 +253,27 @@ function appendLoanAgreementFlow(
     'loan-agreement',
   )
   links.push(
-    makeLink(dkNode, loanAgreementNode, loanAgreementAmount, 'Daftar Kegiatan ke Loan Agreement'),
+    makeLink(dkNode, loanAgreementNode, flowAmount, 'Daftar Kegiatan ke Loan Agreement'),
   )
 
   if (loanAgreement.monitoring.length === 0) {
     const pendingMonitoringNode = `Monitoring Disbursement\nBelum ada untuk ${loanAgreement.loan_code}`
     ensureNode(nodes, pendingMonitoringNode, 'pending', 'monitoring')
     links.push(
-      makeLink(loanAgreementNode, pendingMonitoringNode, 0, 'Loan Agreement ke Monitoring'),
+      makeLink(loanAgreementNode, pendingMonitoringNode, flowAmount, 'Loan Agreement ke Monitoring', {
+        pending: true,
+      }),
     )
     return
   }
 
-  for (const monitoring of loanAgreement.monitoring) {
+  const monitoringAmounts = distributeFlow(
+    flowAmount,
+    loanAgreement.monitoring,
+    flowWeightForMonitoring,
+  )
+  for (const [monitoringIndex, monitoring] of loanAgreement.monitoring.entries()) {
     const monitoringNode = `Monitoring\n${monitoring.quarter} ${monitoring.budget_year}`
-    const monitoringAmount =
-      monitoring.realized_usd > 0 ? monitoring.realized_usd : monitoring.planned_usd
     ensureNode(
       nodes,
       monitoringNode,
@@ -252,7 +284,7 @@ function appendLoanAgreementFlow(
       makeLink(
         loanAgreementNode,
         monitoringNode,
-        monitoringAmount,
+        monitoringAmounts[monitoringIndex] ?? 0,
         `${monitoring.quarter} ${monitoring.budget_year} - ${monitoring.absorption_pct.toFixed(
           1,
         )}% penyerapan`,
@@ -287,6 +319,7 @@ function makeLink(
   target: string,
   rawValue: number,
   label: string,
+  options: LinkOptions = {},
 ): JourneyFlowLink {
   return {
     source,
@@ -295,7 +328,7 @@ function makeLink(
     value: normalizeFlowValue(rawValue),
     label,
     lineStyle: {
-      opacity: rawValue > 0 ? 0.34 : 0.14,
+      opacity: options.pending ? 0.16 : rawValue > 0 ? 0.34 : 0.14,
     },
   }
 }
@@ -305,26 +338,46 @@ function normalizeFlowValue(value: number) {
   return Math.max(1, value / 1_000_000)
 }
 
-function fundingTotalForGreenBook(project: GBProjectJourney) {
-  return project.funding_sources.reduce(
-    (sum, source) =>
-      sum + (source.loan_usd ?? 0) + (source.grant_usd ?? 0) + (source.local_usd ?? 0),
+function latestLoanUsdForGreenBook(project: GBProjectJourney) {
+  if (typeof project.latest_loan_usd === 'number' && Number.isFinite(project.latest_loan_usd)) {
+    return Math.max(0, project.latest_loan_usd)
+  }
+  return currentLoanUsdForGreenBook(project)
+}
+
+function currentLoanUsdForGreenBook(project: GBProjectJourney) {
+  return project.funding_sources.reduce((sum, source) => sum + safeFlowWeight(source.loan_usd), 0)
+}
+
+function flowWeightForDk(project: DKProjectJourney) {
+  return loanAgreementsForDk(project).reduce(
+    (sum, loanAgreement) => sum + flowWeightForLoanAgreement(loanAgreement),
     0,
   )
 }
 
-function amountForDk(greenBookProject: GBProjectJourney, dkProject: DKProjectJourney) {
-  const loanAgreementAmount = loanAgreementsForDk(dkProject).reduce(
-    (sum, loanAgreement) => sum + (loanAgreement.amount_usd ?? 0),
-    0,
-  )
-  if (loanAgreementAmount > 0) {
-    return loanAgreementAmount
-  }
+function flowWeightForLoanAgreement(loanAgreement: LAJourney) {
+  return safeFlowWeight(loanAgreement.allocation_usd)
+}
 
-  const greenBookAmount = fundingTotalForGreenBook(greenBookProject)
-  if (greenBookAmount <= 0) return 0
-  return greenBookAmount / Math.max(1, greenBookProject.dk_projects.length)
+function flowWeightForMonitoring(monitoring: MonitoringSummaryItem) {
+  return safeFlowWeight(monitoring.realized_usd > 0 ? monitoring.realized_usd : monitoring.planned_usd)
+}
+
+function distributeFlow<T>(total: number, items: T[], weightFor: (item: T) => number) {
+  const safeTotal = safeFlowWeight(total)
+  if (items.length === 0) return []
+  if (safeTotal <= 0) return items.map(() => 0)
+
+  const weights = items.map((item) => safeFlowWeight(weightFor(item)))
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
+  if (totalWeight <= 0) return items.map(() => safeTotal / items.length)
+
+  return weights.map((weight) => (safeTotal * weight) / totalWeight)
+}
+
+function safeFlowWeight(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
 }
 
 function loanAgreementsForDk(project: DKProjectJourney) {
@@ -392,7 +445,7 @@ function escapeHtml(value: string) {
       <div>
         <h2 class="text-base font-semibold text-surface-950">Alur Visual</h2>
         <p class="text-sm text-surface-500">
-          Warna node mengikuti tahap, sementara ketebalan garis mengikuti nilai USD bila tersedia.
+          Warna node mengikuti tahap, sementara ketebalan garis mengikuti Loan USD Green Book terbaru.
         </p>
       </div>
       <div class="flex flex-wrap gap-2 text-xs">
@@ -433,7 +486,7 @@ function escapeHtml(value: string) {
         <p class="mt-1 text-lg font-semibold text-surface-900">{{ flowLinks.length }}</p>
       </div>
       <div class="rounded-lg border border-surface-100 bg-surface-50 p-3">
-        <p class="text-xs font-medium uppercase tracking-wide text-surface-500">Nilai Green Book</p>
+        <p class="text-xs font-medium uppercase tracking-wide text-surface-500">Loan USD Green Book</p>
         <p class="mt-1 text-lg font-semibold text-surface-900">
           <CurrencyDisplay :amount="totalFlowUsd" currency="USD" compact />
         </p>

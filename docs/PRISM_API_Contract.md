@@ -2165,6 +2165,7 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
         "has_newer_revision": false,
         "latest_gb_project_id": "uuid",
         "latest_green_book_revision_label": "GB 2025",
+        "latest_loan_usd": 300000000,
         "funding_sources": [
           {
             "id": "uuid",
@@ -2226,6 +2227,8 @@ Menampilkan seluruh alur proyek dari BB → GB → DK → LA → Monitoring dala
   }
 }
 ```
+
+`latest_loan_usd` dihitung dari total `gb_funding_source.loan_usd` pada snapshot Green Book terbaru untuk `gb_project_identity_id` yang sama. Field ini dipakai untuk nilai visual terbaru tanpa mengubah path historis `funding_sources`, DK, dan LA yang tetap menunjuk concrete snapshot.
 
 ---
 

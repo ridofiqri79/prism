@@ -46,6 +46,7 @@ type JourneyGBProject struct {
 	HasNewerRevision             bool                   `json:"has_newer_revision"`
 	LatestGBProjectID            string                 `json:"latest_gb_project_id"`
 	LatestGreenBookRevisionLabel string                 `json:"latest_green_book_revision_label"`
+	LatestLoanUSD                float64                `json:"latest_loan_usd"`
 	FundingSources               []JourneyFundingSource `json:"funding_sources"`
 	DKProjects                   []JourneyDKProject     `json:"dk_projects"`
 }
