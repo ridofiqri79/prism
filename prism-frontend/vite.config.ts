@@ -27,7 +27,6 @@ export default defineConfig({
             {
               name: 'chart-vendor',
               test: /node_modules[\\/](echarts|zrender|vue-echarts)[\\/]/,
-              maxSize: 420 * 1024,
               priority: 10,
             },
           ],
