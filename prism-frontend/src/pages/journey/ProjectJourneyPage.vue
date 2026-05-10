@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
-import AutoComplete, {
-  type AutoCompleteCompleteEvent,
-  type AutoCompleteOptionSelectEvent,
-} from 'primevue/autocomplete'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
@@ -59,6 +56,8 @@ const {
 } = storeToRefs(journeyStore)
 
 const selectedProject = ref<ProjectJourneySelection>(null)
+const searchQuery = ref('')
+const searchPanelOpen = ref(false)
 const activeView = ref<JourneyView>('summary')
 const bbProjectId = computed(() => String(route.params.bbProjectId ?? ''))
 const projectSuggestions = computed<ProjectJourneyOption[]>(() =>
@@ -72,6 +71,7 @@ const viewOptions: Array<{ label: string; value: JourneyView; icon: string }> = 
   { label: 'Alur Visual', value: 'flow', icon: 'pi pi-share-alt' },
   { label: 'Detail Hierarki', value: 'detail', icon: 'pi pi-sitemap' },
 ]
+let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 
 function toOption(project: ProjectMasterRow): ProjectJourneyOption {
   return {
@@ -105,15 +105,32 @@ function isProjectJourneyOption(value: ProjectJourneySelection): value is Projec
   return typeof value === 'object' && value !== null && typeof value.id === 'string' && value.id !== ''
 }
 
-async function searchProjects(event: AutoCompleteCompleteEvent) {
-  await journeyStore.searchProjectOptions(event.query)
+function scheduleSearch() {
+  selectedProject.value = null
+  searchPanelOpen.value = true
+
+  if (searchTimer) {
+    window.clearTimeout(searchTimer)
+  }
+
+  searchTimer = window.setTimeout(() => {
+    void journeyStore.searchProjectOptions(searchQuery.value)
+  }, 250)
+}
+
+async function openSearchPanel() {
+  searchPanelOpen.value = true
+  if (projectOptions.value.length === 0) {
+    await journeyStore.searchProjectOptions(searchQuery.value)
+  }
 }
 
 async function loadJourney(projectId: string) {
   const data = await journeyStore.fetchJourney(projectId)
   if (!data) return
-  selectedProject.value =
-    projectSuggestions.value.find((project) => project.id === projectId) ?? optionFromJourney(data)
+  const option = projectSuggestions.value.find((project) => project.id === projectId) ?? optionFromJourney(data)
+  selectedProject.value = option
+  searchQuery.value = option.label
 }
 
 async function openSelectedProject() {
@@ -121,10 +138,27 @@ async function openSelectedProject() {
   await router.push({ name: 'project-journey', params: { bbProjectId: selectedProjectOption.value.id } })
 }
 
-async function openSelectedOption(event: AutoCompleteOptionSelectEvent) {
-  const option = event.value as ProjectJourneyOption
+async function selectProject(option: ProjectJourneyOption) {
   selectedProject.value = option
+  searchQuery.value = option.label
+  searchPanelOpen.value = false
   await router.push({ name: 'project-journey', params: { bbProjectId: option.id } })
+}
+
+async function selectFirstSuggestion() {
+  if (selectedProjectOption.value) {
+    await openSelectedProject()
+    return
+  }
+
+  const firstProject = projectSuggestions.value[0]
+  if (firstProject) {
+    await selectProject(firstProject)
+  }
+}
+
+function closeSearchPanel() {
+  searchPanelOpen.value = false
 }
 
 async function retryLoad() {
@@ -143,9 +177,17 @@ watch(
 onMounted(async () => {
   await journeyStore.searchProjectOptions('')
   if (bbProjectId.value && !selectedProject.value && journeyData.value) {
-    selectedProject.value =
+    const option =
       projectSuggestions.value.find((project) => project.id === bbProjectId.value) ??
       optionFromJourney(journeyData.value)
+    selectedProject.value = option
+    searchQuery.value = option.label
+  }
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) {
+    window.clearTimeout(searchTimer)
   }
 })
 </script>
@@ -156,37 +198,58 @@ onMounted(async () => {
 
     <section class="rounded-lg border border-surface-200 bg-white p-4 shadow-sm shadow-surface-200/40">
       <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-        <label class="block space-y-2">
+        <div class="block space-y-2">
           <span class="text-sm font-medium text-surface-700">Cari Proyek Blue Book</span>
-          <AutoComplete
-            v-model="selectedProject"
-            :suggestions="projectSuggestions"
-            :loading="searching"
-            option-label="label"
-            data-key="id"
-            placeholder="Cari kode atau nama proyek"
-            dropdown
-            force-selection
-            class="w-full"
-            @complete="searchProjects"
-            @option-select="openSelectedOption"
-          >
-            <template #option="{ option }">
-              <div class="min-w-0 space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <p class="font-medium text-surface-900">{{ option.bb_code }}</p>
+          <div class="relative">
+            <i
+              class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-surface-400"
+            />
+            <InputText
+              v-model="searchQuery"
+              placeholder="Cari kode atau nama proyek"
+              class="w-full pl-10"
+              autocomplete="off"
+              @focus="openSearchPanel"
+              @input="scheduleSearch"
+              @keydown.enter.prevent="selectFirstSuggestion"
+              @keydown.escape="closeSearchPanel"
+            />
+            <div
+              v-if="searchPanelOpen"
+              class="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-auto rounded-lg border border-surface-200 bg-white py-1 shadow-xl shadow-surface-900/10"
+            >
+              <div v-if="searching" class="px-3 py-3 text-sm text-surface-500">
+                Memuat hasil...
+              </div>
+              <button
+                v-for="option in projectSuggestions"
+                :key="option.id"
+                type="button"
+                class="block w-full px-3 py-2 text-left hover:bg-surface-50 focus:bg-surface-50 focus:outline-none"
+                @mousedown.prevent="selectProject(option)"
+              >
+                <span class="flex min-w-0 flex-wrap items-center gap-2">
+                  <span class="font-medium text-surface-900">{{ option.bb_code }}</span>
                   <span
                     v-if="option.blue_book_revision_label"
                     class="text-xs font-medium text-surface-500"
                   >
                     {{ option.blue_book_revision_label }}
                   </span>
-                </div>
-                <p class="text-xs text-surface-500">{{ option.project_name }}</p>
+                </span>
+                <span class="mt-1 block truncate text-xs text-surface-500">
+                  {{ option.project_name }}
+                </span>
+              </button>
+              <div
+                v-if="!searching && projectSuggestions.length === 0"
+                class="px-3 py-3 text-sm text-surface-500"
+              >
+                Tidak ada hasil.
               </div>
-            </template>
-          </AutoComplete>
-        </label>
+            </div>
+          </div>
+        </div>
         <div class="flex items-end">
           <Button
             label="Lihat Perjalanan"

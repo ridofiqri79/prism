@@ -11,6 +11,7 @@ export const useJourneyStore = defineStore('journey', () => {
   const loading = ref(false)
   const searching = ref(false)
   const error = ref<string | null>(null)
+  let searchRequestId = 0
 
   async function fetchJourney(bbProjectId: string) {
     const normalized = bbProjectId.trim()
@@ -36,6 +37,7 @@ export const useJourneyStore = defineStore('journey', () => {
   }
 
   async function searchProjectOptions(search?: string) {
+    const currentRequestId = ++searchRequestId
     searching.value = true
     try {
       const response = await ProjectService.getProjectMaster({
@@ -45,10 +47,15 @@ export const useJourneyStore = defineStore('journey', () => {
         order: 'asc',
         search: search?.trim() || undefined,
       })
-      projectOptions.value = response.data
+
+      if (currentRequestId === searchRequestId) {
+        projectOptions.value = response.data
+      }
       return projectOptions.value
     } finally {
-      searching.value = false
+      if (currentRequestId === searchRequestId) {
+        searching.value = false
+      }
     }
   }
 
@@ -58,6 +65,7 @@ export const useJourneyStore = defineStore('journey', () => {
     loading.value = false
     searching.value = false
     error.value = null
+    searchRequestId = 0
   }
 
   return {
