@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+    paths:
+      - .github/workflows/deploy.yml
+      - docker-compose.yml
+      - .env.example
+      - prism-backend/**
+      - prism-frontend/**
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -34,9 +44,65 @@ jobs:
             set -euo pipefail
             export PATH=$PATH:/usr/bin:/usr/local/bin
             cd /home/prism.admin/prism
-            git fetch origin main
-            git checkout main
-            git reset --hard origin/main
+
+            current_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+            git fetch origin main:refs/remotes/origin/main
+            target_sha="$(git rev-parse origin/main)"
+
+            if [ -n "${current_sha}" ] && [ "${current_sha}" = "${target_sha}" ]; then
+              echo "Repository already at ${target_sha}; no deploy needed."
+              exit 0
+            fi
+
+            if [ -n "${current_sha}" ] && git cat-file -e "${current_sha}^{commit}" 2>/dev/null; then
+              changed_files="$(git diff --name-only "${current_sha}" "${target_sha}" || true)"
+            else
+              changed_files="$(printf '%s\n' 'docker-compose.yml' 'prism-backend/Dockerfile' 'prism-frontend/Dockerfile')"
+            fi
+
+            echo "=== Changed files ==="
+            if [ -n "${changed_files}" ]; then
+              printf '%s\n' "${changed_files}"
+            else
+              echo "No changed files detected; forcing full deploy."
+              changed_files="$(printf '%s\n' 'docker-compose.yml' 'prism-backend/Dockerfile' 'prism-frontend/Dockerfile')"
+            fi
+
+            backend_changed=false
+            frontend_changed=false
+            migrate_changed=false
+            infra_changed=false
+
+            while IFS= read -r file; do
+              [ -z "${file}" ] && continue
+              case "${file}" in
+                docker-compose.yml|.github/workflows/deploy.yml|.env.example)
+                  infra_changed=true
+                  backend_changed=true
+                  frontend_changed=true
+                  migrate_changed=true
+                  ;;
+                prism-backend/migrations/*)
+                  migrate_changed=true
+                  ;;
+                prism-backend/*)
+                  backend_changed=true
+                  ;;
+                prism-frontend/*)
+                  frontend_changed=true
+                  ;;
+              esac
+            done <<EOF_CHANGED
+            ${changed_files}
+            EOF_CHANGED
+
+            git checkout -f main
+            git reset --hard "${target_sha}"
+
+            if [ "${backend_changed}" = false ] && [ "${frontend_changed}" = false ] && [ "${migrate_changed}" = false ] && [ "${infra_changed}" = false ]; then
+              echo "Only non-runtime files changed; repository updated without container rebuild."
+              exit 0
+            fi
 
             # Generate .env
             echo "POSTGRES_USER=${POSTGRES_USER}" > .env
@@ -56,37 +122,40 @@ jobs:
             for var in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET VITE_API_BASE_URL CLOUDFLARE_TUNNEL_TOKEN; do
               val=$(grep "^${var}=" .env | cut -d'=' -f2)
               if [ -z "$val" ]; then
-                echo "❌ ${var} kosong!"
+                echo "ERROR: ${var} kosong!"
                 exit 1
               else
-                echo "✅ ${var} terisi"
+                echo "OK: ${var} terisi"
               fi
             done
 
-            # Stop container lama
-            docker compose --profile tunnel down
+            if [ "${backend_changed}" = true ] || [ "${migrate_changed}" = true ] || [ "${infra_changed}" = true ]; then
+              docker compose up -d postgres
 
-            # Build image aplikasi
-            docker compose --profile tunnel build --pull backend
-            docker compose --profile tunnel build --pull --no-cache frontend
+              echo "Menunggu postgres ready..."
+              until docker compose exec postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" 2>/dev/null; do
+                sleep 2
+              done
+              echo "OK: Postgres ready"
 
-            # Jalankan postgres
-            docker compose up -d postgres
+              echo "Menjalankan migrasi..."
+              docker compose run --rm migrate
+              echo "OK: Migrasi selesai"
+            fi
 
-            # Tunggu postgres healthy
-            echo "Menunggu postgres ready..."
-            until docker compose exec postgres pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} 2>/dev/null; do
-              sleep 2
-            done
-            echo "✅ Postgres ready"
+            if [ "${backend_changed}" = true ]; then
+              echo "Build dan restart backend..."
+              docker compose --profile tunnel build --pull backend
+              docker compose --profile tunnel up -d --no-deps backend
+            fi
 
-            # Jalankan migrasi
-            echo "Menjalankan migrasi..."
-            docker compose run --rm migrate
-            echo "✅ Migrasi selesai"
+            if [ "${frontend_changed}" = true ]; then
+              echo "Build dan restart frontend..."
+              docker compose --profile tunnel build --pull frontend
+              docker compose --profile tunnel up -d --no-deps frontend
+            fi
 
-            # Deploy semua service
-            docker compose --profile tunnel up -d
+            docker compose --profile tunnel up -d cloudflared
 
             # Verifikasi container jalan
             echo "=== Status Container ==="
@@ -95,4 +164,4 @@ jobs:
             # Cleanup image lama
             docker image prune -f
 
-            echo "✅ Deploy selesai!"
+            echo "Deploy selesai."

@@ -1,0 +1,9 @@
+tmp
+bin
+api.exe
+*.exe
+*.log
+*.err.log
+*.out.log
+.air.toml
+Dockerfile.dev
