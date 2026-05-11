@@ -136,9 +136,18 @@ const dashboardMapError = ref<string | null>(null)
 const selectedDashboardMapRegion = ref<SpatialDistributionRegionMetric | null>(null)
 const dashboardMapRegionFilter = ref<SpatialDistributionRegionMetric | null>(null)
 const dashboardMapProvinceFilter = ref<SpatialDistributionRegionMetric | null>(null)
+const dashboardPeriodsLoading = ref(true)
+const dashboardPeriodsLoaded = ref(false)
 
 const periodOptions = computed(() => periods.value)
 const availablePeriodIds = computed(() => periodOptions.value.map((period) => period.id))
+const periodFilterReady = computed(
+  () => dashboardPeriodsLoaded.value && periodOptions.value.length > 0,
+)
+const periodFilterKey = computed(() => periodOptions.value.map((period) => period.id).join('|'))
+const periodFilterFallbackLabel = computed(() =>
+  dashboardPeriodsLoading.value ? 'Memuat periode' : 'Belum ada periode',
+)
 
 const selectedPeriodLabel = computed(() => {
   const selectedIds = selectedPeriodIds.value.filter((periodId) =>
@@ -1295,8 +1304,19 @@ async function refreshDashboard() {
   ])
 }
 
+async function loadDashboardPeriods() {
+  dashboardPeriodsLoading.value = true
+
+  try {
+    await masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' })
+  } finally {
+    dashboardPeriodsLoaded.value = true
+    dashboardPeriodsLoading.value = false
+  }
+}
+
 onMounted(() => {
-  void masterStore.fetchPeriods(false, { limit: 1000, sort: 'year_start', order: 'desc' })
+  void loadDashboardPeriods()
   void masterStore.fetchAllRegionLevels(false)
   void refreshDashboard()
 })
@@ -1678,6 +1698,8 @@ const stages = computed<DashboardStage[]>(() => {
           class="dashboard-page-actions flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto"
         >
           <MultiSelect
+            v-if="periodFilterReady"
+            :key="periodFilterKey"
             v-model="selectedPeriodIds"
             :options="periodOptions"
             option-label="name"
@@ -1685,14 +1707,34 @@ const stages = computed<DashboardStage[]>(() => {
             placeholder="Semua periode"
             filter
             filter-placeholder="Cari periode"
+            empty-message="Belum ada periode"
+            empty-filter-message="Periode tidak ditemukan"
             :max-selected-labels="1"
+            scroll-height="16rem"
             append-to="body"
             class="min-w-56 flex-1 sm:w-72 sm:flex-none"
           >
             <template #value>
               <span class="truncate">{{ selectedPeriodLabel }}</span>
             </template>
+            <template #option="{ option }">
+              <span class="block min-w-0">
+                <span class="block truncate font-medium">{{ option.name }}</span>
+                <span class="mt-0.5 block text-xs text-surface-500">
+                  {{ option.year_start }}-{{ option.year_end }}
+                </span>
+              </span>
+            </template>
           </MultiSelect>
+          <Button
+            v-else
+            :label="periodFilterFallbackLabel"
+            :icon="dashboardPeriodsLoading ? 'pi pi-spin pi-spinner' : 'pi pi-calendar'"
+            severity="secondary"
+            outlined
+            disabled
+            class="min-w-56 flex-1 justify-center sm:w-72 sm:flex-none"
+          />
         </div>
       </template>
     </PageHeader>
