@@ -21,7 +21,7 @@ export default defineConfig({
             {
               name: 'prime-vendor',
               test: /node_modules[\\/](primevue|@primeuix|primeicons)[\\/]/,
-              maxSize: 420 * 1024,
+              // Keep PrimeVue internals together; split vendor chunks can break component resolution.
               priority: 20,
             },
             {
