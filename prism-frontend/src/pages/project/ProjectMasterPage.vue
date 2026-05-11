@@ -57,6 +57,7 @@ const listControls = useListControls<ProjectMasterFilterState>({
   initialOrder: 'asc',
   searchDebounceMs: 500,
   filterLabels: {
+    period_ids: 'Periode',
     loan_types: 'Jenis Pinjaman',
     indication_lender_ids: 'Indikasi Lender',
     executing_agency_ids: 'Executing Agency',
@@ -88,14 +89,44 @@ const filters = listControls.draftFilters
 const appliedFilters = listControls.appliedFilters
 const columnConfigs: ProjectMasterColumnConfig[] = [
   { key: 'loan_types', label: 'Jenis Pinjaman', sortField: 'loan_types', defaultVisible: false },
-  { key: 'indication_lenders', label: 'Indikasi Lender', sortField: 'indication_lenders', defaultVisible: false },
-  { key: 'executing_agencies', label: 'Executing Agency', sortField: 'executing_agencies', defaultVisible: true },
-  { key: 'fixed_lenders', label: 'Fixed Lender', sortField: 'fixed_lenders', defaultVisible: false },
+  {
+    key: 'indication_lenders',
+    label: 'Indikasi Lender',
+    sortField: 'indication_lenders',
+    defaultVisible: false,
+  },
+  {
+    key: 'executing_agencies',
+    label: 'Executing Agency',
+    sortField: 'executing_agencies',
+    defaultVisible: true,
+  },
+  {
+    key: 'fixed_lenders',
+    label: 'Fixed Lender',
+    sortField: 'fixed_lenders',
+    defaultVisible: false,
+  },
   { key: 'status', label: 'Status', sortField: 'project_status', defaultVisible: true },
-  { key: 'program_title', label: 'Program Title', sortField: 'program_title', defaultVisible: false },
+  {
+    key: 'program_title',
+    label: 'Program Title',
+    sortField: 'program_title',
+    defaultVisible: false,
+  },
   { key: 'locations', label: 'Region/Location', sortField: 'locations', defaultVisible: false },
-  { key: 'foreign_loan_usd', label: 'Nilai Pinjaman', sortField: 'foreign_loan_usd', defaultVisible: true },
-  { key: 'dk_dates', label: 'Tanggal Daftar Kegiatan', sortField: 'dk_dates', defaultVisible: false },
+  {
+    key: 'foreign_loan_usd',
+    label: 'Nilai Pinjaman',
+    sortField: 'foreign_loan_usd',
+    defaultVisible: true,
+  },
+  {
+    key: 'dk_dates',
+    label: 'Tanggal Daftar Kegiatan',
+    sortField: 'dk_dates',
+    defaultVisible: false,
+  },
   { key: 'bb_book_ref', label: 'Kode Blue Book', sortField: 'bb_code', defaultVisible: false },
   { key: 'gb_book_ref', label: 'Kode Green Book', sortField: 'gb_codes', defaultVisible: false },
 ]
@@ -110,6 +141,7 @@ const columnVisibleCount = computed(() => visibleColumns.value.length + 1) // +1
 const columnPopover = ref()
 const tableSortOrder = computed(() => (sortOrder.value === 'asc' ? 1 : -1))
 const tablePt = primeTablePt
+const periodOptions = computed(() => masterStore.periods)
 const programTitleOptions = computed(() =>
   masterStore.programTitles.map((programTitle) => ({
     label: formatProgramTitle(programTitle),
@@ -169,10 +201,12 @@ const projectSortFieldValues: ProjectMasterSortField[] = [
 ]
 const sortOrderValues: ProjectMasterSortOrder[] = ['asc', 'desc']
 
-const loanTypeOptions: Array<{ label: string; value: LenderType }> = loanTypeValues.map((value) => ({
-  label: value,
-  value,
-}))
+const loanTypeOptions: Array<{ label: string; value: LenderType }> = loanTypeValues.map(
+  (value) => ({
+    label: value,
+    value,
+  }),
+)
 const projectStatusOptions: Array<{ label: string; value: ProjectStatus }> = [
   { label: 'Pipeline (Blue Book-Daftar Kegiatan)', value: 'Pipeline' },
   { label: 'Ongoing (Loan Agreement-Monitoring)', value: 'Ongoing' },
@@ -184,10 +218,15 @@ const pipelineStatusOptions: Array<{ label: string; value: ProjectPipelineStatus
   { label: 'Loan Agreement', value: 'LA' },
   { label: 'Monitoring', value: 'Monitoring' },
 ]
-const presenceOptions: Array<{ label: string; value: boolean | null }> = [
-  { label: 'Semua', value: null },
-  { label: 'Ada', value: true },
-  { label: 'Tidak ada', value: false },
+const loiPresenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua status LoI', value: null },
+  { label: 'Ada LoI', value: true },
+  { label: 'Tidak ada LoI', value: false },
+]
+const lenderIndicationPresenceOptions: Array<{ label: string; value: boolean | null }> = [
+  { label: 'Semua indikasi lender', value: null },
+  { label: 'Ada indikasi', value: true },
+  { label: 'Tidak ada indikasi', value: false },
 ]
 
 const fundingSummaryCards = computed(() => [
@@ -207,6 +246,7 @@ const fundingSummaryCards = computed(() => [
 
 function createDefaultFilters(): ProjectMasterFilterState {
   return {
+    period_ids: [],
     loan_types: [],
     indication_lender_ids: [],
     executing_agency_ids: [],
@@ -244,6 +284,9 @@ function buildParams(): ProjectMasterListParams {
     order: sortOrder.value,
   }
 
+  if (appliedFilters.period_ids.length > 0) {
+    params.period_ids = [...appliedFilters.period_ids]
+  }
   if (appliedFilters.loan_types.length > 0) params.loan_types = [...appliedFilters.loan_types]
   if (appliedFilters.indication_lender_ids.length > 0) {
     params.indication_lender_ids = [...appliedFilters.indication_lender_ids]
@@ -321,6 +364,7 @@ function hydrateProjectMasterRouteQuery() {
     sortField.value = queryEnum(query, projectSortFieldValues, 'sort') ?? 'project_name'
     sortOrder.value = queryEnum(query, sortOrderValues, 'order') ?? 'asc'
 
+    nextFilters.period_ids = queryStringValues(query, 'period_ids', 'period_ids[]')
     nextFilters.loan_types = queryEnumArray(query, loanTypeValues, 'loan_types', 'loan_types[]')
     nextFilters.indication_lender_ids = queryStringValues(
       query,
@@ -332,7 +376,11 @@ function hydrateProjectMasterRouteQuery() {
       'executing_agency_ids',
       'executing_agency_ids[]',
     )
-    nextFilters.fixed_lender_ids = queryStringValues(query, 'fixed_lender_ids', 'fixed_lender_ids[]')
+    nextFilters.fixed_lender_ids = queryStringValues(
+      query,
+      'fixed_lender_ids',
+      'fixed_lender_ids[]',
+    )
     nextFilters.dk_lender_ids = queryStringValues(query, 'dk_lender_ids', 'dk_lender_ids[]')
     nextFilters.loan_agreement_lender_ids = queryStringValues(
       query,
@@ -356,11 +404,25 @@ function hydrateProjectMasterRouteQuery() {
       'pipeline_statuses',
       'pipeline_statuses[]',
     )
-    nextFilters.reached_stages = queryEnumArray(query, pipelineStatusValues, 'reached_stages', 'reached_stages[]')
-    nextFilters.missing_stages = queryEnumArray(query, pipelineStatusValues, 'missing_stages', 'missing_stages[]')
+    nextFilters.reached_stages = queryEnumArray(
+      query,
+      pipelineStatusValues,
+      'reached_stages',
+      'reached_stages[]',
+    )
+    nextFilters.missing_stages = queryEnumArray(
+      query,
+      pipelineStatusValues,
+      'missing_stages',
+      'missing_stages[]',
+    )
     nextFilters.has_loi = queryBoolean(query, 'has_loi')
     nextFilters.has_lender_indication = queryBoolean(query, 'has_lender_indication')
-    nextFilters.program_title_ids = queryStringValues(query, 'program_title_ids', 'program_title_ids[]')
+    nextFilters.program_title_ids = queryStringValues(
+      query,
+      'program_title_ids',
+      'program_title_ids[]',
+    )
     nextFilters.region_ids = queryStringValues(query, 'region_ids', 'region_ids[]')
     nextFilters.foreign_loan_min = minLoan ?? null
     nextFilters.foreign_loan_max = maxLoan ?? null
@@ -450,7 +512,9 @@ function formatLender(lender: Lender) {
 }
 
 function formatInstitution(institution: Institution) {
-  return institution.short_name ? `${institution.name} (${institution.short_name})` : institution.name
+  return institution.short_name
+    ? `${institution.name} (${institution.short_name})`
+    : institution.name
 }
 
 function formatRegion(region: Region) {
@@ -506,12 +570,21 @@ function selectedLabelSummary(labels: string[]) {
 function formatProjectFilterValue(key: string, value: unknown) {
   if (Array.isArray(value)) {
     if (
+      key === 'period_ids' ||
       key === 'indication_lender_ids' ||
       key === 'fixed_lender_ids' ||
       key === 'dk_lender_ids' ||
       key === 'loan_agreement_lender_ids'
     ) {
       const selected = new Set(value)
+      if (key === 'period_ids') {
+        return selectedLabelSummary(
+          masterStore.periods
+            .filter((period) => selected.has(period.id))
+            .map((period) => period.name),
+        )
+      }
+
       return selectedLabelSummary(
         masterStore.lenders
           .filter((lender) => selected.has(lender.id))
@@ -540,12 +613,16 @@ function formatProjectFilterValue(key: string, value: unknown) {
     if (key === 'region_ids') {
       const selected = new Set(value)
       return selectedLabelSummary(
-        masterStore.regions.filter((region) => selected.has(region.id)).map((region) => region.name),
+        masterStore.regions
+          .filter((region) => selected.has(region.id))
+          .map((region) => region.name),
       )
     }
 
     if (key === 'pipeline_statuses' || key === 'reached_stages' || key === 'missing_stages') {
-      return selectedLabelSummary(value.map((item) => getPipelineStatusLabel(item as ProjectPipelineStatus)))
+      return selectedLabelSummary(
+        value.map((item) => getPipelineStatusLabel(item as ProjectPipelineStatus)),
+      )
     }
 
     return selectedLabelSummary(value.map(String))
@@ -575,7 +652,10 @@ function expandRegionFilterIds(regionIds: string[]) {
           ? masterStore.regions.find((item) => item.code === region.parent_code)
           : undefined
 
-        if (region.parent_code === selectedRegion.code || parent?.parent_code === selectedRegion.code) {
+        if (
+          region.parent_code === selectedRegion.code ||
+          parent?.parent_code === selectedRegion.code
+        ) {
           expanded.add(region.id)
         }
       })
@@ -620,6 +700,7 @@ onMounted(() => {
     masterStore.fetchInstitutions(true, { limit: 1000, sort: 'name', order: 'asc' }),
     masterStore.fetchAllRegionLevels(true),
     masterStore.fetchProgramTitles(true, { limit: 1000, sort: 'title', order: 'asc' }),
+    masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' }),
     loadProjectMaster(),
   ])
 })
@@ -672,7 +753,9 @@ onUnmounted(() => {
         />
         <Popover ref="columnPopover">
           <div class="w-52">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-400">Kolom Tampil</p>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-400">
+              Kolom Tampil
+            </p>
             <div class="space-y-0.5">
               <label
                 v-for="column in columnConfigs"
@@ -687,9 +770,9 @@ onUnmounted(() => {
         </Popover>
       </template>
       <template #filters>
-        <div class="xl:col-span-6 space-y-5">
+        <div class="min-w-0 space-y-5 md:col-span-2 xl:col-span-6">
           <div
-            class="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            class="grid gap-3 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
           >
             <div class="min-w-0">
               <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">
@@ -698,7 +781,7 @@ onUnmounted(() => {
               <p class="mt-0.5 text-sm font-medium text-surface-800">Snapshot historis</p>
             </div>
             <label
-              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 sm:self-center"
+              class="inline-flex items-center gap-3 self-start rounded-full border border-white/80 bg-white px-3 py-2 shadow-sm shadow-primary-100/50 md:self-center"
             >
               <span class="text-sm font-semibold text-surface-700">
                 {{ filters.include_history ? 'Aktif' : 'Nonaktif' }}
@@ -760,7 +843,7 @@ onUnmounted(() => {
                 />
               </label>
 
-              <label class="block min-w-0 space-y-2 xl:col-span-2">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
                 <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
                 <MultiSelect
                   v-model="filters.reached_stages"
@@ -775,7 +858,7 @@ onUnmounted(() => {
                 />
               </label>
 
-              <label class="block min-w-0 space-y-2 xl:col-span-2">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
                 <span class="text-sm font-medium text-surface-700">Belum Mencapai Tahap</span>
                 <MultiSelect
                   v-model="filters.missing_stages"
@@ -790,25 +873,27 @@ onUnmounted(() => {
                 />
               </label>
 
-              <label class="block min-w-0 space-y-2 xl:col-span-1">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
                 <span class="text-sm font-medium text-surface-700">LoI</span>
                 <Select
                   v-model="filters.has_loi"
-                  :options="presenceOptions"
+                  :options="loiPresenceOptions"
                   option-label="label"
                   option-value="value"
-                  class="w-full"
+                  placeholder="Semua status LoI"
+                  class="w-full min-w-0 max-w-full"
                 />
               </label>
 
-              <label class="block min-w-0 space-y-2 xl:col-span-1">
+              <label class="block min-w-0 space-y-2 xl:col-span-3">
                 <span class="text-sm font-medium text-surface-700">Indikasi</span>
                 <Select
                   v-model="filters.has_lender_indication"
-                  :options="presenceOptions"
+                  :options="lenderIndicationPresenceOptions"
                   option-label="label"
                   option-value="value"
-                  class="w-full"
+                  placeholder="Semua indikasi lender"
+                  class="w-full min-w-0 max-w-full"
                 />
               </label>
             </div>
@@ -960,12 +1045,12 @@ onUnmounted(() => {
           <div class="space-y-3">
             <div class="flex items-center gap-3">
               <span class="text-xs font-semibold uppercase tracking-wide text-surface-400">
-                Lokasi, nilai, tanggal
+                Lokasi, nilai, tanggal, periode
               </span>
               <span class="h-px flex-1 bg-surface-100" aria-hidden="true" />
             </div>
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-              <label class="block min-w-0 space-y-2 xl:col-span-2">
+            <div class="grid min-w-0 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+              <label class="block min-w-0 space-y-2">
                 <span class="text-sm font-medium text-surface-700">Region/Location</span>
                 <MultiSelect
                   v-model="filters.region_ids"
@@ -977,11 +1062,11 @@ onUnmounted(() => {
                   filter
                   filter-placeholder="Cari lokasi"
                   display="chip"
-                  class="w-full"
+                  class="w-full min-w-0 max-w-full"
                 />
               </label>
 
-              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+              <div class="grid min-w-0 gap-3 sm:grid-cols-2">
                 <label class="block min-w-0 space-y-2">
                   <span class="text-sm font-medium text-surface-700">Loan Min</span>
                   <InputNumber
@@ -992,7 +1077,8 @@ onUnmounted(() => {
                     :min-fraction-digits="0"
                     :max-fraction-digits="2"
                     placeholder="Minimum"
-                    class="w-full"
+                    class="w-full min-w-0 max-w-full"
+                    input-class="w-full min-w-0"
                   />
                 </label>
                 <label class="block min-w-0 space-y-2">
@@ -1005,21 +1091,55 @@ onUnmounted(() => {
                     :min-fraction-digits="0"
                     :max-fraction-digits="2"
                     placeholder="Maksimum"
-                    class="w-full"
+                    class="w-full min-w-0 max-w-full"
+                    input-class="w-full min-w-0"
                   />
                 </label>
               </div>
 
-              <div class="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+              <div class="grid min-w-0 gap-3 sm:grid-cols-2">
                 <label class="block min-w-0 space-y-2">
                   <span class="text-sm font-medium text-surface-700">DK Dari</span>
-                  <InputText v-model="filters.dk_date_from" type="date" class="w-full" />
+                  <InputText
+                    v-model="filters.dk_date_from"
+                    type="date"
+                    class="w-full min-w-0 max-w-full"
+                  />
                 </label>
                 <label class="block min-w-0 space-y-2">
                   <span class="text-sm font-medium text-surface-700">DK Sampai</span>
-                  <InputText v-model="filters.dk_date_to" type="date" class="w-full" />
+                  <InputText
+                    v-model="filters.dk_date_to"
+                    type="date"
+                    class="w-full min-w-0 max-w-full"
+                  />
                 </label>
               </div>
+
+              <label class="block min-w-0 space-y-2">
+                <span class="text-sm font-medium text-surface-700">Periode</span>
+                <MultiSelect
+                  v-model="filters.period_ids"
+                  :options="periodOptions"
+                  option-label="name"
+                  option-value="id"
+                  placeholder="Semua periode"
+                  filter
+                  filter-placeholder="Cari periode"
+                  display="chip"
+                  :max-selected-labels="1"
+                  class="w-full min-w-0 max-w-full"
+                >
+                  <template #option="{ option }">
+                    <span class="block min-w-0">
+                      <span class="block truncate font-medium">{{ option.name }}</span>
+                      <span class="mt-0.5 block text-xs text-surface-500">
+                        {{ option.year_start }}-{{ option.year_end }}
+                      </span>
+                    </span>
+                  </template>
+                </MultiSelect>
+              </label>
             </div>
           </div>
         </div>
@@ -1055,19 +1175,33 @@ onUnmounted(() => {
           @sort="handleSort"
         >
           <template #empty>
-            <EmptyState title="Tidak ada project" description="Ubah filter atau kata kunci pencarian." />
+            <EmptyState
+              title="Tidak ada project"
+              description="Ubah filter atau kata kunci pencarian."
+            />
           </template>
 
           <!-- Kolom Nama Proyek (fixed) -->
-          <Column field="project_name" header="Nama Proyek" sortable :style="{ minWidth: '18rem', width: '18rem' }">
+          <Column
+            field="project_name"
+            header="Nama Proyek"
+            sortable
+            :style="{ minWidth: '18rem', width: '18rem' }"
+          >
             <template #body="{ data: project }">
               <RouterLink
-                :to="{ name: 'bb-project-detail', params: { bbId: project.blue_book_id, id: project.id } }"
+                :to="{
+                  name: 'bb-project-detail',
+                  params: { bbId: project.blue_book_id, id: project.id },
+                }"
                 class="block whitespace-normal font-semibold leading-relaxed text-surface-950 hover:text-primary-600"
               >
                 {{ project.project_name }}
               </RouterLink>
-              <p v-if="project.program_title" class="mt-0.5 whitespace-normal text-xs leading-relaxed text-surface-500">
+              <p
+                v-if="project.program_title"
+                class="mt-0.5 whitespace-normal text-xs leading-relaxed text-surface-500"
+              >
                 {{ project.program_title }}
               </p>
             </template>
@@ -1080,15 +1214,19 @@ onUnmounted(() => {
             :field="column.sortField"
             :header="column.label"
             sortable
-            :style="column.key === 'foreign_loan_usd'
-              ? { minWidth: '11rem', width: '11rem', textAlign: 'right' }
-              : { minWidth: '8rem', width: '8rem' }"
+            :style="
+              column.key === 'foreign_loan_usd'
+                ? { minWidth: '11rem', width: '11rem', textAlign: 'right' }
+                : { minWidth: '8rem', width: '8rem' }
+            "
             :header-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
             :body-class="column.key === 'foreign_loan_usd' ? 'prism-table-currency' : undefined"
             :header-style="column.key === 'foreign_loan_usd' ? { textAlign: 'right' } : {}"
-            :body-style="column.key === 'foreign_loan_usd'
-              ? { textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }
-              : {}"
+            :body-style="
+              column.key === 'foreign_loan_usd'
+                ? { textAlign: 'right', fontWeight: '500', color: 'var(--p-surface-900)' }
+                : {}
+            "
           >
             <template #body="{ data: project }">
               <div v-if="column.key === 'loan_types'">
@@ -1107,31 +1245,38 @@ onUnmounted(() => {
                 v-else-if="column.key === 'indication_lenders'"
                 class="block whitespace-normal leading-relaxed"
                 :title="listLabel(project.indication_lenders)"
-              >{{ listLabel(project.indication_lenders) }}</span>
+                >{{ listLabel(project.indication_lenders) }}</span
+              >
               <span
                 v-else-if="column.key === 'executing_agencies'"
                 class="block whitespace-normal leading-relaxed"
                 :title="listLabel(project.executing_agencies)"
-              >{{ listLabel(project.executing_agencies) }}</span>
+                >{{ listLabel(project.executing_agencies) }}</span
+              >
               <span
                 v-else-if="column.key === 'fixed_lenders'"
                 class="block whitespace-normal leading-relaxed"
                 :title="listLabel(project.fixed_lenders)"
-              >{{ listLabel(project.fixed_lenders) }}</span>
+                >{{ listLabel(project.fixed_lenders) }}</span
+              >
               <Tag
                 v-else-if="column.key === 'status'"
                 :value="statusLabel(project)"
                 :severity="projectStatusSeverity(project.project_status)"
                 rounded
               />
-              <span v-else-if="column.key === 'program_title'" class="block whitespace-normal leading-relaxed">
+              <span
+                v-else-if="column.key === 'program_title'"
+                class="block whitespace-normal leading-relaxed"
+              >
                 {{ project.program_title || '-' }}
               </span>
               <span
                 v-else-if="column.key === 'locations'"
                 class="block whitespace-normal leading-relaxed"
                 :title="listLabel(project.locations)"
-              >{{ listLabel(project.locations) }}</span>
+                >{{ listLabel(project.locations) }}</span
+              >
               <CurrencyDisplay
                 v-else-if="column.key === 'foreign_loan_usd'"
                 :amount="project.foreign_loan_usd"
@@ -1141,10 +1286,13 @@ onUnmounted(() => {
                 v-else-if="column.key === 'dk_dates'"
                 class="block whitespace-normal leading-relaxed"
                 :title="listLabel(project.dk_dates)"
-              >{{ listLabel(project.dk_dates) }}</span>
+                >{{ listLabel(project.dk_dates) }}</span
+              >
               <div v-else-if="column.key === 'bb_book_ref'">
                 <div class="font-semibold">{{ project.bb_code }}</div>
-                <div class="mt-0.5 text-xs text-surface-500">{{ project.blue_book_revision_label }}</div>
+                <div class="mt-0.5 text-xs text-surface-500">
+                  {{ project.blue_book_revision_label }}
+                </div>
               </div>
               <div v-else-if="column.key === 'gb_book_ref'">
                 <template v-if="project.gb_codes.length > 0">
@@ -1154,7 +1302,9 @@ onUnmounted(() => {
                     :class="Number(i) > 0 ? 'mt-1.5 border-t border-surface-100 pt-1.5' : ''"
                   >
                     <div class="font-semibold">{{ gbCode }}</div>
-                    <div class="mt-0.5 text-xs text-surface-500">{{ project.green_book_revision_labels[i] ?? '-' }}</div>
+                    <div class="mt-0.5 text-xs text-surface-500">
+                      {{ project.green_book_revision_labels[i] ?? '-' }}
+                    </div>
                   </div>
                 </template>
                 <span v-else class="text-surface-400">-</span>

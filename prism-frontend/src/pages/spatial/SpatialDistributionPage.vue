@@ -15,6 +15,7 @@ import ListPaginationFooter from '@/components/common/ListPaginationFooter.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SearchFilterBar, { type ActiveFilterPill } from '@/components/common/SearchFilterBar.vue'
 import SpatialChoroplethMap from '@/components/spatial/SpatialChoroplethMap.vue'
+import { useMasterStore } from '@/stores/master.store'
 import { useSpatialDistributionStore } from '@/stores/spatial-distribution.store'
 import type { LenderType } from '@/types/master.types'
 import type {
@@ -58,6 +59,7 @@ interface SpatialFilterState {
 }
 
 const store = useSpatialDistributionStore()
+const masterStore = useMasterStore()
 const route = useRoute()
 const router = useRouter()
 const { choropleth, error, loadingMap, loadingProjects, projectError, projectList } = storeToRefs(store)
@@ -80,6 +82,7 @@ let searchWatcherPaused = false
 const tablePt = primeTablePt
 
 const tableSortOrder = computed(() => (projectSortOrder.value === 'asc' ? 1 : -1))
+const periodOptions = computed(() => masterStore.periods)
 
 const pipelineStatusValues: ProjectPipelineStatus[] = ['BB', 'GB', 'DK', 'LA', 'Monitoring']
 const projectStatusValues: ProjectStatus[] = ['Pipeline', 'Ongoing']
@@ -224,10 +227,6 @@ const activeComparisonBadge = computed(() => {
   return comparisonBadge(current, average)
 })
 
-const pipelineSelectionLabel = computed(() =>
-  selectionControlLabel(filters.pipelineStatuses, pipelineOptions, 'Semua Tahap', 'tahap'),
-)
-
 const reachedStageSelectionLabel = computed(() =>
   selectionControlLabel(filters.reachedStages, pipelineOptions, 'Semua tahap', 'tahap'),
 )
@@ -244,22 +243,34 @@ const loanTypeSelectionLabel = computed(() =>
   selectionControlLabel(filters.loanTypes, loanTypeOptions, 'Semua Tipe Pinjaman', 'tipe'),
 )
 
+const periodSelectionLabel = computed(() => {
+  if (periodIds.value.length === 0) return 'Semua periode'
+
+  const labels = selectedPeriodLabels()
+  if (labels.length === 1) return labels[0] ?? '1 periode dipilih'
+  if (labels.length > 1) return `${labels.length} periode dipilih`
+  return `${periodIds.value.length} periode dipilih`
+})
+
 const activeFilterPills = computed<ActiveFilterPill[]>(() => {
   const pills: ActiveFilterPill[] = []
+  if (periodIds.value.length > 0) {
+    pills.push({ key: 'periodIds', label: 'Periode', value: periodPillValue() })
+  }
   if (metric.value !== 'count') {
     pills.push({ key: 'metric', label: 'Metrik', value: 'Nilai Pinjaman' })
   }
   if (isFilteredSelection(appliedFilters.pipelineStatuses, pipelineStatusValues)) {
     pills.push({
       key: 'pipelineStatuses',
-      label: 'Tahap',
+      label: 'Status pipeline',
       value: selectionPillValue(appliedFilters.pipelineStatuses, pipelineOptions),
     })
   }
   if (appliedFilters.reachedStages.length > 0) {
     pills.push({
       key: 'reachedStages',
-      label: 'Sudah mencapai',
+      label: 'Tahap',
       value: selectionPillValue(appliedFilters.reachedStages, pipelineOptions),
     })
   }
@@ -418,6 +429,7 @@ async function resetFilters() {
     filters.hasLenderIndication = null
     filters.search = ''
     filters.includeHistory = false
+    periodIds.value = []
     syncAppliedFiltersFromDraft()
     metric.value = 'count'
     projectPage.value = 1
@@ -603,6 +615,24 @@ function presencePillValue(value: boolean) {
   return value ? 'Ada' : 'Tidak ada'
 }
 
+function selectedPeriodLabels() {
+  const selected = new Set(periodIds.value)
+  return periodOptions.value
+    .filter((period) => selected.has(period.id))
+    .map((period) => period.name)
+}
+
+function periodPillValue() {
+  const labels = selectedPeriodLabels()
+  if (labels.length === 0) return `${periodIds.value.length} dipilih`
+  if (labels.length <= 2) return labels.join(', ')
+  return `${labels.length} dipilih`
+}
+
+function periodYearRange(period: { year_start: number; year_end: number }) {
+  return `${period.year_start}-${period.year_end}`
+}
+
 function averagePerRegion(total: number) {
   if (comparisonRegionCount.value <= 0) return 0
   return total / comparisonRegionCount.value
@@ -679,10 +709,6 @@ function syncAppliedFiltersFromDraft() {
   appliedFilters.includeHistory = filters.includeHistory
 }
 
-function ensurePipelineSelection() {
-  if (filters.pipelineStatuses.length === 0) filters.pipelineStatuses = [...pipelineStatusValues]
-}
-
 function ensureProjectStatusSelection() {
   if (filters.projectStatuses.length === 0) filters.projectStatuses = [...projectStatusValues]
 }
@@ -711,6 +737,7 @@ async function removeFilter(key: string) {
   clearSearchTimer()
 
   if (key === 'metric') metric.value = 'count'
+  if (key === 'periodIds') periodIds.value = []
   if (key === 'pipelineStatuses') {
     filters.pipelineStatuses = [...pipelineStatusValues]
     appliedFilters.pipelineStatuses = [...pipelineStatusValues]
@@ -771,7 +798,10 @@ watch(
 
 onMounted(() => {
   hydrateSpatialRouteQuery()
-  void loadMap()
+  void Promise.all([
+    masterStore.fetchPeriods(true, { limit: 1000, sort: 'year_start', order: 'desc' }),
+    loadMap(),
+  ])
 })
 
 onUnmounted(() => {
@@ -867,26 +897,6 @@ onUnmounted(() => {
               <label class="block min-w-0 space-y-2 xl:col-span-2">
                 <span class="text-sm font-medium text-surface-700">Tahap</span>
                 <MultiSelect
-                  v-model="filters.pipelineStatuses"
-                  :options="pipelineOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Semua Tahap"
-                  filter
-                  filter-placeholder="Cari tahap"
-                  :show-toggle-all="false"
-                  class="w-full"
-                  @change="ensurePipelineSelection"
-                >
-                  <template #value>
-                    <span class="block truncate">{{ pipelineSelectionLabel }}</span>
-                  </template>
-                </MultiSelect>
-              </label>
-
-              <label class="block min-w-0 space-y-2 xl:col-span-2">
-                <span class="text-sm font-medium text-surface-700">Sudah Mencapai Tahap</span>
-                <MultiSelect
                   v-model="filters.reachedStages"
                   :options="pipelineOptions"
                   option-label="label"
@@ -899,6 +909,35 @@ onUnmounted(() => {
                 >
                   <template #value>
                     <span class="block truncate">{{ reachedStageSelectionLabel }}</span>
+                  </template>
+                </MultiSelect>
+              </label>
+
+              <label class="block min-w-0 space-y-2 xl:col-span-2">
+                <span class="text-sm font-medium text-surface-700">Periode</span>
+                <MultiSelect
+                  v-model="periodIds"
+                  :options="periodOptions"
+                  option-label="name"
+                  option-value="id"
+                  placeholder="Semua periode"
+                  filter
+                  filter-placeholder="Cari periode"
+                  class="w-full min-w-0 max-w-full"
+                >
+                  <template #value>
+                    <span class="block truncate">{{ periodSelectionLabel }}</span>
+                  </template>
+                  <template #option="{ option }">
+                    <span class="block min-w-0">
+                      <span class="block truncate font-medium">{{ option.name }}</span>
+                      <span
+                        v-if="option.name !== periodYearRange(option)"
+                        class="mt-0.5 block text-xs text-surface-500"
+                      >
+                        {{ periodYearRange(option) }}
+                      </span>
+                    </span>
                   </template>
                 </MultiSelect>
               </label>

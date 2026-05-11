@@ -1712,6 +1712,7 @@ const stages = computed<DashboardStage[]>(() => {
             :max-selected-labels="1"
             scroll-height="16rem"
             append-to="body"
+            :overlay-style="{ width: '18rem', minWidth: '18rem' }"
             class="min-w-56 flex-1 sm:w-72 sm:flex-none"
           >
             <template #value>

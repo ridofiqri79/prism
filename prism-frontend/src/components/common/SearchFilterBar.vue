@@ -140,7 +140,7 @@ function applyFilters() {
               {{ visibleFilterCount }} filter diterapkan
             </span>
           </div>
-          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-6">
             <slot name="filters" />
           </div>
         </div>
