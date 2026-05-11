@@ -52,11 +52,7 @@ function formatRegionLabel(region: Region) {
     return `${region.name} (Nasional)`
   }
 
-  if (region.type === 'CITY') {
-    return `-- ${region.name}`
-  }
-
-  return `- ${region.name}`
+  return region.name
 }
 
 function formatRegionType(region: Region) {

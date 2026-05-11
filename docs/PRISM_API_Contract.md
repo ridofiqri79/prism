@@ -2035,6 +2035,7 @@ Ringkasan pendanaan (`summary`) dihitung dari seluruh hasil filter, bukan hanya 
 |-------|-----------|
 | `page`, `limit` | Pagination standar |
 | `sort`, `order` | Sorting standar. `sort`: `project_name`, `bb_code`, `loan_types`, `indication_lenders`, `executing_agencies`, `fixed_lenders`, `project_status`, `pipeline_status`, `program_title`, `locations`, `foreign_loan_usd`, `dk_dates`. `order`: `asc` atau `desc` |
+| `period_ids` | Multi value UUID periode Blue Book |
 | `loan_types` | Multi value: `Bilateral`, `Multilateral`, `KSA` |
 | `indication_lender_ids` | Multi value UUID lender dari `lender_indication` BB |
 | `executing_agency_ids` | Multi value UUID institution role `Executing Agency`. Jika UUID adalah institution level tertinggi, filter juga mencakup EA turunan di bawah root tersebut |

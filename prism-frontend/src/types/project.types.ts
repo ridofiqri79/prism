@@ -103,6 +103,7 @@ export interface ProjectMasterListParams {
 }
 
 export interface ProjectMasterFilterState {
+  period_ids: string[]
   loan_types: LenderType[]
   indication_lender_ids: string[]
   executing_agency_ids: string[]
