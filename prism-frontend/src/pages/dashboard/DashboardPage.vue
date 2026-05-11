@@ -279,6 +279,8 @@ function selectedDashboardStageParams() {
   return Object.keys(params).length ? params : undefined
 }
 
+const hasActivePeriodFilter = computed(() => selectedPeriodFilterIds().length > 0)
+
 function dashboardMapRouteQuery(region?: SpatialDistributionRegionMetric | null) {
   const periodIds = selectedPeriodFilterIds()
   const query: Record<string, string | string[]> = {
@@ -953,88 +955,124 @@ function totalDistributionItems(items: DashboardDatum[]) {
   return items.reduce((sum, item) => sum + item.value, 0)
 }
 
+function withDashboardFallback(items: DashboardDatum[], fallback: DashboardDatum[]) {
+  if (items.length > 0 || hasActivePeriodFilter.value) {
+    return items
+  }
+
+  return fallback
+}
+
 const blueBookAgencyGroups = computed(() => {
   const items = blueBookDistribution.value.agency_groups
-  if (!items.length) return fallbackBlueBookAgencyGroups
-  return items.map((item, index) => distributionDatum(item, index))
+  return withDashboardFallback(
+    items.map((item, index) => distributionDatum(item, index)),
+    fallbackBlueBookAgencyGroups,
+  )
 })
 
 const blueBookTopLevelAgencies = computed(() => {
   const items = blueBookDistribution.value.top_agencies
-  if (!items.length) return fallbackBlueBookTopLevelAgencies
-  return items.map((item, index) => distributionDatum(item, index, true))
+  return withDashboardFallback(
+    items.map((item, index) => distributionDatum(item, index, true)),
+    fallbackBlueBookTopLevelAgencies,
+  )
 })
 
 const blueBookPrograms = computed(() => {
   const items = blueBookDistribution.value.programs
-  if (!items.length) return fallbackBlueBookPrograms
-  return items.map((item, index) => programDatum(item, index))
+  return withDashboardFallback(
+    items.map((item, index) => programDatum(item, index)),
+    fallbackBlueBookPrograms,
+  )
 })
 
 const greenBookLenderTypes = computed(() => {
   const items = greenBookDistribution.value.lender_types
-  if (!items.length) return fallbackGreenBookLenderTypes
-  return items.map((item, index) => greenBookLenderTypeDatum(item, index))
+  return withDashboardFallback(
+    items.map((item, index) => greenBookLenderTypeDatum(item, index)),
+    fallbackGreenBookLenderTypes,
+  )
 })
 
 const greenBookTopLenders = computed(() => {
   const items = greenBookDistribution.value.top_lenders
-  if (!items.length) return fallbackGreenBookTopLenders
-  return items.map((item, index) => greenBookLenderDatum(item, index))
+  return withDashboardFallback(
+    items.map((item, index) => greenBookLenderDatum(item, index)),
+    fallbackGreenBookTopLenders,
+  )
 })
 
 const greenBookTopLevelAgencies = computed(() => {
   const items = greenBookDistribution.value.top_agencies
-  if (!items.length) return fallbackGreenBookTopLevelAgencies
-  return items.map((item, index) => greenBookAgencyDatum(item, index))
+  return withDashboardFallback(
+    items.map((item, index) => greenBookAgencyDatum(item, index)),
+    fallbackGreenBookTopLevelAgencies,
+  )
 })
 
 const daftarKegiatanLenderTypes = computed(() => {
   const items = daftarKegiatanDistribution.value.lender_types
-  if (!items.length) return fallbackDaftarKegiatanLenderTypes
-  return items.map((item, index) => stageLenderTypeDatum('DK', 'Daftar Kegiatan', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageLenderTypeDatum('DK', 'Daftar Kegiatan', item, index)),
+    fallbackDaftarKegiatanLenderTypes,
+  )
 })
 
 const daftarKegiatanTopLenders = computed(() => {
   const items = daftarKegiatanDistribution.value.top_lenders
-  if (!items.length) return fallbackDaftarKegiatanTopLenders
-  return items.map((item, index) => stageLenderDatum('DK', 'Daftar Kegiatan', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageLenderDatum('DK', 'Daftar Kegiatan', item, index)),
+    fallbackDaftarKegiatanTopLenders,
+  )
 })
 
 const daftarKegiatanTopLevelAgencies = computed(() => {
   const items = daftarKegiatanDistribution.value.top_agencies
-  if (!items.length) return fallbackDaftarKegiatanTopLevelAgencies
-  return items.map((item, index) => stageAgencyDatum('DK', 'Daftar Kegiatan', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageAgencyDatum('DK', 'Daftar Kegiatan', item, index)),
+    fallbackDaftarKegiatanTopLevelAgencies,
+  )
 })
 
 const daftarKegiatanPrograms = computed(() => {
   const items = daftarKegiatanDistribution.value.programs ?? []
-  if (!items.length) return fallbackDaftarKegiatanPrograms
-  return items.map((item, index) => stageProgramDatum('DK', 'Daftar Kegiatan', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageProgramDatum('DK', 'Daftar Kegiatan', item, index)),
+    fallbackDaftarKegiatanPrograms,
+  )
 })
 
 const loanAgreementLenderTypes = computed(() => {
   const items = loanAgreementDistribution.value.lender_types
-  if (!items.length) return fallbackLoanAgreementLenderTypes
-  return items.map((item, index) => stageLenderTypeDatum('LA', 'Loan Agreement', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageLenderTypeDatum('LA', 'Loan Agreement', item, index)),
+    fallbackLoanAgreementLenderTypes,
+  )
 })
 
 const loanAgreementTopLenders = computed(() => {
   const items = loanAgreementDistribution.value.top_lenders
-  if (!items.length) return fallbackLoanAgreementTopLenders
-  return items.map((item, index) => stageLenderDatum('LA', 'Loan Agreement', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageLenderDatum('LA', 'Loan Agreement', item, index)),
+    fallbackLoanAgreementTopLenders,
+  )
 })
 
 const loanAgreementTopLevelAgencies = computed(() => {
   const items = loanAgreementDistribution.value.top_agencies
-  if (!items.length) return fallbackLoanAgreementTopLevelAgencies
-  return items.map((item, index) => stageAgencyDatum('LA', 'Loan Agreement', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageAgencyDatum('LA', 'Loan Agreement', item, index)),
+    fallbackLoanAgreementTopLevelAgencies,
+  )
 })
 
 const loanAgreementPrograms = computed(() => {
   const items = loanAgreementDistribution.value.programs ?? []
-  if (!items.length) return fallbackLoanAgreementPrograms
-  return items.map((item, index) => stageProgramDatum('LA', 'Loan Agreement', item, index))
+  return withDashboardFallback(
+    items.map((item, index) => stageProgramDatum('LA', 'Loan Agreement', item, index)),
+    fallbackLoanAgreementPrograms,
+  )
 })
 
 async function fetchStageSummaries() {
@@ -1052,9 +1090,17 @@ async function fetchStageSummaries() {
 
   if (requestId !== stageSummaryRequestId) return
 
-  const nextSummaries: Record<DashboardStageKey, DashboardStageSummary> = {
-    ...defaultStageSummaries,
-  }
+  const nextSummaries: Record<DashboardStageKey, DashboardStageSummary> =
+    hasActivePeriodFilter.value
+      ? {
+          BB: { count: 0, totalLoanUsd: 0 },
+          GB: { count: 0, totalLoanUsd: 0 },
+          DK: { count: 0, totalLoanUsd: 0 },
+          LA: { count: 0, totalLoanUsd: 0 },
+        }
+      : {
+          ...defaultStageSummaries,
+        }
   const nextStageRegions: DashboardStageRegionPanels = {
     BB: null,
     GB: null,
@@ -1264,13 +1310,6 @@ watch(
     const allowedIds = new Set(ids)
     const nextSelectedIds = selectedPeriodIds.value.filter((periodId) => allowedIds.has(periodId))
 
-    if (nextSelectedIds.length === 0 || nextSelectedIds.length === ids.length) {
-      if (selectedPeriodIds.value.length !== ids.length || nextSelectedIds.length !== ids.length) {
-        selectedPeriodIds.value = [...ids]
-      }
-      return
-    }
-
     if (nextSelectedIds.length !== selectedPeriodIds.value.length) {
       selectedPeriodIds.value = nextSelectedIds
     }
@@ -1292,31 +1331,41 @@ const stages = computed<DashboardStage[]>(() => {
   const daftarKegiatanToLoanAgreement = stageGap('DK', 'LA')
   const blueBookPipelineData =
     blueBookPipelineCards.value ??
-    buildBlueBookPipelineStatusData({
-      advancedToGreenBook: greenBook.count,
-      loiOnly: 18,
-      indicationOnly: 24,
-      withoutIndication: 18,
-    })
+    (hasActivePeriodFilter.value
+      ? []
+      : buildBlueBookPipelineStatusData({
+          advancedToGreenBook: greenBook.count,
+          loiOnly: 18,
+          indicationOnly: 24,
+          withoutIndication: 18,
+        }))
   const blueBookLoiData =
     blueBookLoiCards.value ??
-    buildBlueBookLenderMixData('loi', {
-      bilateral: 16,
-      multilateral: 13,
-      ksa: 5,
-      other: 2,
-    })
+    (hasActivePeriodFilter.value
+      ? []
+      : buildBlueBookLenderMixData('loi', {
+          bilateral: 16,
+          multilateral: 13,
+          ksa: 5,
+          other: 2,
+        }))
   const blueBookIndicationData =
     blueBookIndicationCards.value ??
-    buildBlueBookLenderMixData('indication', {
-      bilateral: 22,
-      multilateral: 14,
-      ksa: 6,
-    })
-  const blueBookRegionItems = stageRegionData.value.BB ?? fallbackStageLocationData('BB')
-  const greenBookRegionItems = stageRegionData.value.GB ?? fallbackStageLocationData('GB')
-  const daftarKegiatanRegionItems = stageRegionData.value.DK ?? fallbackStageLocationData('DK')
-  const loanAgreementRegionItems = stageRegionData.value.LA ?? fallbackStageLocationData('LA')
+    (hasActivePeriodFilter.value
+      ? []
+      : buildBlueBookLenderMixData('indication', {
+          bilateral: 22,
+          multilateral: 14,
+          ksa: 6,
+        }))
+  const blueBookRegionItems =
+    stageRegionData.value.BB ?? (hasActivePeriodFilter.value ? [] : fallbackStageLocationData('BB'))
+  const greenBookRegionItems =
+    stageRegionData.value.GB ?? (hasActivePeriodFilter.value ? [] : fallbackStageLocationData('GB'))
+  const daftarKegiatanRegionItems =
+    stageRegionData.value.DK ?? (hasActivePeriodFilter.value ? [] : fallbackStageLocationData('DK'))
+  const loanAgreementRegionItems =
+    stageRegionData.value.LA ?? (hasActivePeriodFilter.value ? [] : fallbackStageLocationData('LA'))
   const loanAgreementStatusData =
     loanAgreementStatusCards.value ??
     buildLoanAgreementStatusData({
@@ -1442,56 +1491,17 @@ const stages = computed<DashboardStage[]>(() => {
             hint: `${countFormatter.format(greenBook.count)} proyek`,
             kind: 'donutbar',
             span: 'medium',
-            data: greenBookLenderTypes.value.length
-              ? greenBookLenderTypes.value
-              : [
-                  {
-                    label: 'Bilateral',
-                    value: 16,
-                    valueLabel: '16 · Rp 8,7 T',
-                    color: '#0b6f73',
-                    target: projectTarget(
-                      { reached_stages: 'GB', loan_types: 'Bilateral' },
-                      'Buka Project Master untuk proyek Green Book Bilateral',
-                    ),
-                  },
-                  {
-                    label: 'Multilateral',
-                    value: 14,
-                    valueLabel: '14 · Rp 7,6 T',
-                    color: '#1fb5b2',
-                    target: projectTarget(
-                      { reached_stages: 'GB', loan_types: 'Multilateral' },
-                      'Buka Project Master untuk proyek Green Book Multilateral',
-                    ),
-                  },
-                  {
-                    label: 'KSA',
-                    value: 6,
-                    valueLabel: '6 · Rp 1,1 T',
-                    color: '#fdb813',
-                    target: projectTarget(
-                      { reached_stages: 'GB', loan_types: 'KSA' },
-                      'Buka Project Master untuk proyek Green Book KSA',
-                    ),
-                  },
-                ],
+            data: greenBookLenderTypes.value,
           },
           {
             tab: 'Lender & Funding',
             title: 'Top lender',
-            hint: `${greenBookTopLenders.value.length || 5} lender`,
+            hint: greenBookTopLenders.value.length
+              ? `${greenBookTopLenders.value.length} lender`
+              : 'Belum ada lender',
             kind: 'bars',
             span: 'medium',
-            data: greenBookTopLenders.value.length
-              ? greenBookTopLenders.value
-              : [
-                  { label: 'JICA', value: 10, valueLabel: '10 · Rp 4,1 T', color: '#0b6f73' },
-                  { label: 'World Bank', value: 7, valueLabel: '7 · Rp 3,0 T', color: '#1fb5b2' },
-                  { label: 'ADB', value: 6, valueLabel: '6 · Rp 2,4 T', color: '#1fa06f' },
-                  { label: 'KfW', value: 4, valueLabel: '4 · Rp 1,5 T', color: '#fdb813' },
-                  { label: 'AIIB', value: 3, valueLabel: '3 · Rp 1,1 T', color: '#64748b' },
-                ],
+            data: greenBookTopLenders.value,
           },
 
           {
@@ -1500,20 +1510,7 @@ const stages = computed<DashboardStage[]>(() => {
             hint: `${countFormatter.format(totalDistributionItems(greenBookTopLevelAgencies.value))} relasi EA`,
             kind: 'bars',
             span: 'wide',
-            data: greenBookTopLevelAgencies.value.length
-              ? greenBookTopLevelAgencies.value
-              : [
-                  { label: 'PUPR', value: 11, valueLabel: '11 · Rp 5,1 T', color: '#0b6f73' },
-                  { label: 'Kemenhub', value: 8, valueLabel: '8 · Rp 3,4 T', color: '#1fb5b2' },
-                  { label: 'ESDM', value: 5, valueLabel: '5 · Rp 2,0 T', color: '#1fa06f' },
-                  {
-                    label: 'SDA dan pangan',
-                    value: 6,
-                    valueLabel: '6 · Rp 2,8 T',
-                    color: '#fdb813',
-                  },
-                  { label: 'Digital', value: 4, valueLabel: '4 · Rp 1,2 T', color: '#64748b' },
-                ],
+            data: greenBookTopLevelAgencies.value,
           },
           {
             tab: 'Wilayah',

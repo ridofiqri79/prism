@@ -62,17 +62,39 @@ const programTitleExtraOptions = computed<ProgramTitle[]>(() => {
 
   return options
 })
-const executingAgencyExtraOptions = computed(() => greenBookStore.currentProject?.executing_agencies ?? [])
-const implementingAgencyExtraOptions = computed(() => greenBookStore.currentProject?.implementing_agencies ?? [])
-
-const bbProjectOptions = computed(() =>
-  blueBookStore.projectOptions
-    .filter((project) => project.is_latest !== false)
-    .map((project) => ({
-      ...project,
-      label: `${project.bb_code} - ${project.project_name}`,
-    })),
+const executingAgencyExtraOptions = computed(
+  () => greenBookStore.currentProject?.executing_agencies ?? [],
 )
+const implementingAgencyExtraOptions = computed(
+  () => greenBookStore.currentProject?.implementing_agencies ?? [],
+)
+const currentBBProjectOptions = computed(() => greenBookStore.currentProject?.bb_projects ?? [])
+
+const bbProjectOptions = computed(() => {
+  const selectedIds = new Set(form.values.bb_project_ids)
+  const byId = new Map<
+    string,
+    { id: string; bb_code: string; project_name: string; is_latest?: boolean }
+  >()
+
+  for (const project of [...blueBookStore.projectOptions, ...currentBBProjectOptions.value]) {
+    if (project.is_latest === false && !selectedIds.has(project.id)) {
+      continue
+    }
+
+    byId.set(project.id, {
+      id: project.id,
+      bb_code: project.bb_code,
+      project_name: project.project_name,
+      is_latest: project.is_latest,
+    })
+  }
+
+  return [...byId.values()].map((project) => ({
+    ...project,
+    label: `${project.bb_code} - ${project.project_name}`,
+  }))
+})
 const bappenasPartnerOptions = computed(() =>
   masterStore.bappenasPartners.filter((partner) => partner.level === 'Eselon II'),
 )
@@ -179,6 +201,7 @@ onMounted(() => {
                     placeholder="Pilih Proyek Blue Book"
                     filter
                     display="chip"
+                    append-to="body"
                     class="w-full"
                   />
                   <small v-if="form.errors.bb_project_ids" class="text-red-600">
@@ -198,6 +221,7 @@ onMounted(() => {
                     placeholder="Pilih mitra kerja Bappenas"
                     filter
                     display="chip"
+                    append-to="body"
                     class="w-full"
                   />
                   <small v-if="form.errors.bappenas_partner_ids" class="text-red-600">
@@ -206,7 +230,12 @@ onMounted(() => {
                 </label>
                 <label class="block space-y-2">
                   <span class="text-sm font-medium text-surface-700">Kode Green Book</span>
-                  <InputText v-model="form.values.gb_code" class="w-full" :class="isEditMode ? 'bg-surface-50 opacity-100' : ''" :disabled="isEditMode" />
+                  <InputText
+                    v-model="form.values.gb_code"
+                    class="w-full"
+                    :class="isEditMode ? 'bg-surface-50 opacity-100' : ''"
+                    :disabled="isEditMode"
+                  />
                   <small v-if="form.errors.gb_code" class="text-red-600">{{
                     form.errors.gb_code
                   }}</small>
